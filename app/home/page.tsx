@@ -5,6 +5,7 @@ import {
   IconCircleCheck,
   IconCircleDashed,
   IconClock,
+  IconPencil,
   IconPlus,
 } from "@tabler/icons-react"
 
@@ -20,7 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
 
-type TaskStatus = "todo" | "in-progress" | "done"
+type TaskStatus = "draft" | "todo" | "in-progress" | "done"
 
 type Task = {
   id: string
@@ -36,18 +37,21 @@ type Task = {
 }
 
 const statusLabels: Record<TaskStatus, string> = {
+  draft: "Draft",
   todo: "Todo",
   "in-progress": "In progress",
   done: "Done",
 }
 
 const statusStyles: Record<TaskStatus, string> = {
+  draft: "bg-muted/60 text-muted-foreground",
   todo: "bg-muted text-muted-foreground",
   "in-progress": "bg-primary/15 text-primary-foreground",
   done: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 }
 
 const statusIcons = {
+  draft: IconPencil,
   todo: IconCircleDashed,
   "in-progress": IconClock,
   done: IconCircleCheck,

@@ -6,7 +6,7 @@ import { z } from "zod"
 
 import { createClient } from "@/lib/supabase/server"
 
-const taskStatusSchema = z.enum(["todo", "in-progress", "done"])
+const taskStatusSchema = z.enum(["draft", "todo", "in-progress", "done"])
 
 const taskSchema = z.object({
   project_id: z.string().uuid(),

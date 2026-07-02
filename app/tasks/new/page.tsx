@@ -122,6 +122,7 @@ export default async function NewTaskPage() {
                     defaultValue="todo"
                     className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                   >
+                    <option value="draft">Draft</option>
                     <option value="todo">Todo</option>
                     <option value="in-progress">In progress</option>
                     <option value="done">Done</option>
