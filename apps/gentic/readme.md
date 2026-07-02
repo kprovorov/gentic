@@ -1,0 +1,125 @@
+# Gentic Agent
+
+The Gentic agent is the background worker for the Gentic app. It watches
+Supabase for issues with `run_status = 'queued'`, clones the configured GitHub
+repository into a local work directory, and runs Claude Code through the Agent
+Client Protocol.
+
+## Prerequisites
+
+- Node.js 20 or newer.
+- pnpm 11.9.0 or newer.
+- A Supabase project with the migrations in `supabase/migrations` applied.
+- A Supabase service-role key. This key bypasses RLS, so only use it on a
+  trusted machine or server.
+- Git access to every repository configured in the Gentic web app.
+- Claude Code / ACP credentials available in the environment where the agent
+  runs.
+
+## Upload or deploy the agent
+
+Run the agent on a server or VM that can keep secrets private and can reach both
+Supabase and GitHub.
+
+1. Upload or clone this repository to the server.
+2. Install Node.js and pnpm.
+3. Configure Git authentication for the repositories the agent will clone. For
+   the default SSH remote base, add an SSH deploy key or machine user key.
+4. Create `apps/gentic/.env` from `apps/gentic/.env.example`.
+5. Install dependencies from the repository root.
+6. Start the agent process with a process manager such as `systemd`, `pm2`, or
+   your host's worker process command.
+
+Do not expose this process as a public web service. It is a private worker that
+polls Supabase.
+
+## Environment
+
+Create the agent environment file:
+
+```bash
+cp apps/gentic/.env.example apps/gentic/.env
+```
+
+Fill in these values:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+GIT_REMOTE_BASE=git@github.com:
+WORKDIR=/tmp/gentic-workspaces
+POLL_INTERVAL_MS=3000
+```
+
+For local Supabase development, `SUPABASE_URL` can stay as
+`http://127.0.0.1:54321`.
+
+`GIT_REMOTE_BASE` is prepended to each project repo stored in Supabase. For a
+project repo of `owner/repo` and the default base of `git@github.com:`, the
+agent clones `git@github.com:owner/repo`.
+
+## Setup
+
+Install dependencies from the repository root:
+
+```bash
+pnpm install
+```
+
+Run type checks for the agent:
+
+```bash
+pnpm --filter @gentic/gentic typecheck
+```
+
+Run lint for the agent:
+
+```bash
+pnpm --filter @gentic/gentic lint
+```
+
+## Run locally
+
+Start the agent in watch mode:
+
+```bash
+pnpm --filter @gentic/gentic dev
+```
+
+Start the agent without watch mode:
+
+```bash
+pnpm --filter @gentic/gentic start
+```
+
+To queue work from the web app:
+
+1. Add a project in the Gentic web app settings using the `owner/repo` format.
+2. Create an issue as `Draft`.
+3. Move the issue to `Todo`.
+
+Moving an issue from `Draft` to `Todo` sets `run_status = 'queued'` and inserts
+the initial user message. The agent picks it up on the next poll interval.
+
+## Production process example
+
+Example `pm2` command from the repository root:
+
+```bash
+pm2 start "pnpm --filter @gentic/gentic start" --name gentic-agent
+```
+
+Example `systemd` service command:
+
+```ini
+ExecStart=/usr/bin/pnpm --filter @gentic/gentic start
+WorkingDirectory=/path/to/gentic
+EnvironmentFile=/path/to/gentic/apps/gentic/.env
+```
+
+## Current checkout note
+
+`apps/gentic/package.json` starts `src/index.ts`, but this checkout does not
+currently include that file. Add the worker entrypoint before expecting
+`pnpm --filter @gentic/gentic dev` or `pnpm --filter @gentic/gentic start` to
+run successfully.
