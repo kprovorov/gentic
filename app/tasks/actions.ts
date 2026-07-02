@@ -6,11 +6,13 @@ import { z } from "zod"
 
 import { createClient } from "@/lib/supabase/server"
 
+const taskStatusSchema = z.enum(["todo", "in-progress", "done"])
+
 const taskSchema = z.object({
   project_id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().optional(),
-  status: z.enum(["todo", "in-progress", "done"]),
+  status: taskStatusSchema,
 })
 
 function getString(formData: FormData, key: string) {
@@ -53,4 +55,22 @@ export async function createTask(formData: FormData) {
 
   revalidatePath("/home")
   redirect(`/tasks/${data.id}`)
+}
+
+export async function updateTaskStatus(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const id = z.string().uuid().parse(getString(formData, "id"))
+  const status = taskStatusSchema.parse(getString(formData, "status"))
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ status })
+    .eq("id", id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/home")
+  revalidatePath(`/tasks/${id}`)
 }

@@ -19,6 +19,8 @@ import {
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
 
+import { TaskStatusSelect } from "./task-status-select"
+
 type TaskStatus = "todo" | "in-progress" | "done"
 
 type Task = {
@@ -120,6 +122,18 @@ export default async function TaskDetailPage({
         </header>
 
         <section className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+              <CardDescription>
+                Update where this task stands.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TaskStatusSelect taskId={task.id} status={task.status} />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Description</CardTitle>
