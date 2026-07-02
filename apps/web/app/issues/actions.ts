@@ -62,15 +62,71 @@ export async function updateIssueStatus(formData: FormData) {
   const id = z.string().uuid().parse(getString(formData, "id"))
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("status,title,description")
+    .eq("id", id)
+    .single<{ status: string; title: string; description: string | null }>()
+
+  if (fetchError) {
+    throw new Error(fetchError.message)
+  }
+
+  // Moving an issue from Draft to Todo queues an agent run: the remote
+  // `@gentic/gentic` agent picks up `run_status = 'queued'` issues over
+  // Supabase and drives Claude Code against a fresh clone of the repo.
+  const startsRun = current.status === "draft" && status === "todo"
+
   const { error } = await supabase
     .from("issues")
-    .update({ status })
+    .update(startsRun ? { status, run_status: "queued" } : { status })
     .eq("id", id)
 
   if (error) {
     throw new Error(error.message)
   }
 
+  if (startsRun) {
+    const prompt = current.description
+      ? `${current.title}\n\n${current.description}`
+      : current.title
+
+    const { error: messageError } = await supabase.from("messages").insert({
+      issue_id: id,
+      role: "user",
+      content: prompt,
+    })
+
+    if (messageError) {
+      throw new Error(messageError.message)
+    }
+  }
+
   revalidatePath("/home")
   revalidatePath(`/issues/${id}`)
+}
+
+const sendMessageSchema = z.object({
+  issue_id: z.string().uuid(),
+  content: z.string().trim().min(1).max(10_000),
+})
+
+export async function sendIssueMessage(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const { issue_id, content } = sendMessageSchema.parse({
+    issue_id: getString(formData, "issue_id"),
+    content: getString(formData, "content"),
+  })
+
+  const { error } = await supabase.from("messages").insert({
+    issue_id,
+    role: "user",
+    content,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath(`/issues/${issue_id}`)
 }
