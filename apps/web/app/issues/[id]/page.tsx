@@ -21,6 +21,11 @@ import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 
 import { IssueStatusSelect } from "./issue-status-select"
+import {
+  IssueChat,
+  type ChatMessage,
+  type RunStatus,
+} from "./issue-chat"
 
 type IssueStatus = "draft" | "todo" | "in-progress" | "done"
 
@@ -29,6 +34,7 @@ type Issue = {
   title: string
   description: string | null
   status: IssueStatus
+  run_status: RunStatus
   created_at: string
   updated_at: string
   projects: {
@@ -85,7 +91,7 @@ export default async function IssueDetailPage({
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,description,status,created_at,updated_at,projects(id,name,repo)"
+      "id,title,description,status,run_status,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -97,6 +103,17 @@ export default async function IssueDetailPage({
 
   if (!issue) {
     notFound()
+  }
+
+  const { data: messages, error: messagesError } = await supabase
+    .from("messages")
+    .select("id,role,kind,content,status,created_at")
+    .eq("issue_id", id)
+    .order("created_at", { ascending: true })
+    .returns<ChatMessage[]>()
+
+  if (messagesError) {
+    throw new Error(messagesError.message)
   }
 
   const StatusIcon = statusIcons[issue.status]
@@ -135,6 +152,22 @@ export default async function IssueDetailPage({
             </CardHeader>
             <CardContent>
               <IssueStatusSelect issueId={issue.id} status={issue.status} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent</CardTitle>
+              <CardDescription>
+                Move this issue to Todo to run the agent, then chat with it here.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IssueChat
+                issueId={issue.id}
+                initialMessages={messages ?? []}
+                initialRunStatus={issue.run_status}
+              />
             </CardContent>
           </Card>
 
