@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { IconBrandGithub, IconPlus, IconTrash } from "@tabler/icons-react"
 
@@ -22,6 +23,11 @@ type Project = {
   id: string
   name: string
   repo: string
+}
+
+export const metadata: Metadata = {
+  title: "Projects",
+  description: "Configure the repositories Gentic can assign coding agents to.",
 }
 
 export default async function SettingsPage() {
