@@ -1,0 +1,30 @@
+{
+  "name": "@gentic/supabase",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client": "./src/client.ts",
+    "./middleware": "./src/middleware.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0"
+  },
+  "devDependencies": {
+    "@gentic/eslint-config": "workspace:*",
+    "@gentic/typescript-config": "workspace:*",
+    "@types/node": "^20",
+    "eslint": "^9",
+    "next": "16.2.6",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "next": "16.2.6"
+  }
+}
