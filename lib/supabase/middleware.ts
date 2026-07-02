@@ -41,20 +41,22 @@ export async function updateSession(request: NextRequest) {
 
   const user = data?.claims
 
-  // Example: gate everything except the auth pages behind login.
-  // Uncomment and adjust the matcher once you add auth routes.
-  //
-  // if (
-  //   !user &&
-  //   !request.nextUrl.pathname.startsWith("/login") &&
-  //   !request.nextUrl.pathname.startsWith("/auth")
-  // ) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = "/login"
-  //   return NextResponse.redirect(url)
-  // }
+  // Gate protected routes behind login. Copy the refreshed cookies onto the
+  // redirect response so the session isn't dropped.
+  const protectedRoutes = ["/home"]
+  const isProtected = protectedRoutes.some((route) =>
+    request.nextUrl.pathname.startsWith(route),
+  )
 
-  void user
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie)
+    })
+    return redirectResponse
+  }
 
   // IMPORTANT: return supabaseResponse unchanged to preserve refreshed cookies.
   return supabaseResponse
