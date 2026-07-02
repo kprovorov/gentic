@@ -13,12 +13,12 @@ export const metadata: Metadata = {
     template: "%s | Gentic",
   },
   description:
-    "Gentic helps teams create coding tasks, assign them to agents, and track pull requests through review.",
+    "Gentic helps teams create coding issues, assign them to agents, and track pull requests through review.",
   applicationName: "Gentic",
   openGraph: {
     title: "Gentic",
     description:
-      "Create coding tasks, assign them to agents, and track pull requests through review.",
+      "Create coding issues, assign them to agents, and track pull requests through review.",
     type: "website",
   },
 }

@@ -20,15 +20,15 @@ import {
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
 
-import { TaskStatusSelect } from "./task-status-select"
+import { IssueStatusSelect } from "./issue-status-select"
 
-type TaskStatus = "draft" | "todo" | "in-progress" | "done"
+type IssueStatus = "draft" | "todo" | "in-progress" | "done"
 
-type Task = {
+type Issue = {
   id: string
   title: string
   description: string | null
-  status: TaskStatus
+  status: IssueStatus
   created_at: string
   updated_at: string
   projects: {
@@ -38,14 +38,14 @@ type Task = {
   } | null
 }
 
-const statusLabels: Record<TaskStatus, string> = {
+const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
   todo: "Todo",
   "in-progress": "In progress",
   done: "Done",
 }
 
-const statusStyles: Record<TaskStatus, string> = {
+const statusStyles: Record<IssueStatus, string> = {
   draft: "bg-muted/60 text-muted-foreground",
   todo: "bg-muted text-muted-foreground",
   "in-progress": "bg-primary/15 text-primary-foreground",
@@ -69,7 +69,7 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
-export default async function TaskDetailPage({
+export default async function IssueDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -82,24 +82,24 @@ export default async function TaskDetailPage({
     redirect("/login")
   }
 
-  const { data: task, error } = await supabase
-    .from("tasks")
+  const { data: issue, error } = await supabase
+    .from("issues")
     .select(
       "id,title,description,status,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
-    .returns<Task | null>()
+    .returns<Issue | null>()
 
   if (error) {
     throw new Error(error.message)
   }
 
-  if (!task) {
+  if (!issue) {
     notFound()
   }
 
-  const StatusIcon = statusIcons[task.status]
+  const StatusIcon = statusIcons[issue.status]
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
@@ -115,13 +115,13 @@ export default async function TaskDetailPage({
             <div
               className={cn(
                 "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-                statusStyles[task.status]
+                statusStyles[issue.status]
               )}
             >
               <StatusIcon className="size-3.5" />
-              {statusLabels[task.status]}
+              {statusLabels[issue.status]}
             </div>
-            <h1 className="text-3xl">{task.title}</h1>
+            <h1 className="text-3xl">{issue.title}</h1>
           </div>
         </header>
 
@@ -130,11 +130,11 @@ export default async function TaskDetailPage({
             <CardHeader>
               <CardTitle>Status</CardTitle>
               <CardDescription>
-                Update where this task stands.
+                Update where this issue stands.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TaskStatusSelect taskId={task.id} status={task.status} />
+              <IssueStatusSelect issueId={issue.id} status={issue.status} />
             </CardContent>
           </Card>
 
@@ -142,13 +142,13 @@ export default async function TaskDetailPage({
             <CardHeader>
               <CardTitle>Description</CardTitle>
               <CardDescription>
-                Created {formatDateTime(task.created_at)}
+                Created {formatDateTime(issue.created_at)}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {task.description ? (
+              {issue.description ? (
                 <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                  {task.description}
+                  {issue.description}
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -162,21 +162,21 @@ export default async function TaskDetailPage({
             <CardHeader>
               <CardTitle>Project</CardTitle>
               <CardDescription>
-                Last updated {formatDateTime(task.updated_at)}
+                Last updated {formatDateTime(issue.updated_at)}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {task.projects ? (
+              {issue.projects ? (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium">{task.projects.name}</p>
+                    <p className="font-medium">{issue.projects.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {task.projects.repo}
+                      {issue.projects.repo}
                     </p>
                   </div>
                   <Button asChild variant="outline">
                     <Link
-                      href={`https://github.com/${task.projects.repo}`}
+                      href={`https://github.com/${issue.projects.repo}`}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -187,7 +187,7 @@ export default async function TaskDetailPage({
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  This task is not linked to an available project.
+                  This issue is not linked to an available project.
                 </p>
               )}
             </CardContent>

@@ -6,13 +6,13 @@ import { z } from "zod"
 
 import { createClient } from "@/lib/supabase/server"
 
-const taskStatusSchema = z.enum(["draft", "todo", "in-progress", "done"])
+const issueStatusSchema = z.enum(["draft", "todo", "in-progress", "done"])
 
-const taskSchema = z.object({
+const issueSchema = z.object({
   project_id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().optional(),
-  status: taskStatusSchema,
+  status: issueStatusSchema,
 })
 
 function getString(formData: FormData, key: string) {
@@ -31,9 +31,9 @@ async function getAuthenticatedSupabase() {
   return supabase
 }
 
-export async function createTask(formData: FormData) {
+export async function createIssue(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
-  const task = taskSchema.parse({
+  const issue = issueSchema.parse({
     project_id: getString(formData, "project_id"),
     title: getString(formData, "title"),
     description: getString(formData, "description") || undefined,
@@ -41,10 +41,10 @@ export async function createTask(formData: FormData) {
   })
 
   const { data, error } = await supabase
-    .from("tasks")
+    .from("issues")
     .insert({
-      ...task,
-      description: task.description ?? null,
+      ...issue,
+      description: issue.description ?? null,
     })
     .select("id")
     .single()
@@ -54,16 +54,16 @@ export async function createTask(formData: FormData) {
   }
 
   revalidatePath("/home")
-  redirect(`/tasks/${data.id}`)
+  redirect(`/issues/${data.id}`)
 }
 
-export async function updateTaskStatus(formData: FormData) {
+export async function updateIssueStatus(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
   const id = z.string().uuid().parse(getString(formData, "id"))
-  const status = taskStatusSchema.parse(getString(formData, "status"))
+  const status = issueStatusSchema.parse(getString(formData, "status"))
 
   const { error } = await supabase
-    .from("tasks")
+    .from("issues")
     .update({ status })
     .eq("id", id)
 
@@ -72,5 +72,5 @@ export async function updateTaskStatus(formData: FormData) {
   }
 
   revalidatePath("/home")
-  revalidatePath(`/tasks/${id}`)
+  revalidatePath(`/issues/${id}`)
 }
