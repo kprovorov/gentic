@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
@@ -58,6 +59,10 @@ function formatDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value))
+}
+
+export const metadata: Metadata = {
+  title: "Home",
 }
 
 export default async function HomePage() {

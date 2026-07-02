@@ -1,21 +1,26 @@
-# Next.js template
+# Gentic
 
-This is a Next.js template with shadcn/ui.
+Gentic is a tool for managing coding agents. Teams can create coding tasks,
+assign them to an agent, and track the pull request created from the work.
 
-## Adding components
+## Tech stack
 
-To add components to your app, run the following command:
+- Next.js
+- Supabase
+- shadcn/ui
+
+## Development
+
+Install dependencies and start the local app:
 
 ```bash
-npx shadcn@latest add button
+pnpm install
+pnpm dev
 ```
 
-This will place the ui components in the `components` directory.
+Run checks before shipping changes:
 
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+pnpm lint
+pnpm typecheck
 ```
