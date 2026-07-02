@@ -4,9 +4,10 @@ import { useTransition } from "react"
 
 import { updateTaskStatus } from "@/app/tasks/actions"
 
-type TaskStatus = "todo" | "in-progress" | "done"
+type TaskStatus = "draft" | "todo" | "in-progress" | "done"
 
 const statusOptions: { value: TaskStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
   { value: "todo", label: "Todo" },
   { value: "in-progress", label: "In progress" },
   { value: "done", label: "Done" },
