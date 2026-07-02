@@ -34,6 +34,7 @@ type Project = {
   id: string
   name: string
   repo: string
+  environment_id: string | null
 }
 
 type Environment = {
@@ -53,6 +54,9 @@ export const metadata: Metadata = {
   description: "Configure the repositories Gentic can assign coding agents to.",
 }
 
+const selectClassName =
+  "h-9 w-full min-w-0 rounded-3xl border border-transparent bg-input/50 px-3 py-1 text-base transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+
 export default async function SettingsPage() {
   const supabase = await createClient()
   const { data } = await supabase.auth.getClaims()
@@ -63,7 +67,7 @@ export default async function SettingsPage() {
 
   const { data: projects, error } = await supabase
     .from("projects")
-    .select("id,name,repo")
+    .select("id,name,repo,environment_id")
     .order("created_at", { ascending: false })
     .returns<Project[]>()
 
@@ -117,6 +121,22 @@ export default async function SettingsPage() {
                     pattern="[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*"
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="project-environment">Environment</Label>
+                  <select
+                    id="project-environment"
+                    name="environment_id"
+                    defaultValue=""
+                    className={selectClassName}
+                  >
+                    <option value="">No environment</option>
+                    {environments.map((environment) => (
+                      <option key={environment.id} value={environment.id}>
+                        {environment.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <Button type="submit" className="mt-2">
                   <IconPlus />
                   Add project
@@ -135,46 +155,72 @@ export default async function SettingsPage() {
                 <Card key={project.id}>
                   <CardContent className="p-4">
                     <form
+                      key={`${project.name}-${project.repo}-${project.environment_id ?? "none"}`}
                       action={updateProject}
-                      className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
+                      className="grid gap-3"
                     >
                       <input type="hidden" name="id" value={project.id} />
-                      <div className="grid gap-2">
-                        <Label htmlFor={`name-${project.id}`}>Name</Label>
-                        <Input
-                          id={`name-${project.id}`}
-                          name="name"
-                          defaultValue={project.name}
-                          required
-                          maxLength={120}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor={`repo-${project.id}`}>Repo</Label>
-                        <div className="relative">
-                          <IconBrandGithub className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor={`name-${project.id}`}>Name</Label>
                           <Input
-                            id={`repo-${project.id}`}
-                            name="repo"
-                            defaultValue={project.repo}
+                            id={`name-${project.id}`}
+                            name="name"
+                            defaultValue={project.name}
                             required
-                            pattern="[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*"
-                            className="pl-9"
+                            maxLength={120}
                           />
                         </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor={`repo-${project.id}`}>Repo</Label>
+                          <div className="relative">
+                            <IconBrandGithub className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id={`repo-${project.id}`}
+                              name="repo"
+                              defaultValue={project.repo}
+                              required
+                              pattern="[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*"
+                              className="pl-9"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" variant="outline">
-                          Save
-                        </Button>
-                        <Button
-                          formAction={deleteProject}
-                          variant="destructive"
-                          size="icon"
-                          aria-label={`Delete ${project.name}`}
-                        >
-                          <IconTrash />
-                        </Button>
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                        <div className="grid gap-2">
+                          <Label htmlFor={`environment-${project.id}`}>
+                            Environment
+                          </Label>
+                          <select
+                            id={`environment-${project.id}`}
+                            name="environment_id"
+                            defaultValue={project.environment_id ?? ""}
+                            className={selectClassName}
+                          >
+                            <option value="">No environment</option>
+                            {environments.map((environment) => (
+                              <option
+                                key={environment.id}
+                                value={environment.id}
+                              >
+                                {environment.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="submit" variant="outline">
+                            Save
+                          </Button>
+                          <Button
+                            formAction={deleteProject}
+                            variant="destructive"
+                            size="icon"
+                            aria-label={`Delete ${project.name}`}
+                          >
+                            <IconTrash />
+                          </Button>
+                        </div>
                       </div>
                     </form>
                   </CardContent>
@@ -221,7 +267,11 @@ export default async function SettingsPage() {
               environments.map((environment) => (
                 <Card key={environment.id}>
                   <CardContent className="grid gap-5 p-4">
-                    <form action={updateEnvironment} className="grid gap-4">
+                    <form
+                      key={`${environment.name}-${environment.ssh_host ?? ""}-${environment.ssh_port}-${environment.ssh_user ?? ""}`}
+                      action={updateEnvironment}
+                      className="grid gap-4"
+                    >
                       <input type="hidden" name="id" value={environment.id} />
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_112px] md:items-end">
                         <div className="grid gap-2">
