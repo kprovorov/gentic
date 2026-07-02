@@ -10,3 +10,7 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   cpu-features: false
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@agentclientprotocol/claude-agent-acp@0.55.0'
