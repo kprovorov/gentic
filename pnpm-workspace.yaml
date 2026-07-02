@@ -10,4 +10,3 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   cpu-features: false
-  ssh2: false
