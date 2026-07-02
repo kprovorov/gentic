@@ -2,23 +2,23 @@
 
 import { useTransition } from "react"
 
-import { updateTaskStatus } from "@/app/tasks/actions"
+import { updateIssueStatus } from "@/app/issues/actions"
 
-type TaskStatus = "draft" | "todo" | "in-progress" | "done"
+type IssueStatus = "draft" | "todo" | "in-progress" | "done"
 
-const statusOptions: { value: TaskStatus; label: string }[] = [
+const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "todo", label: "Todo" },
   { value: "in-progress", label: "In progress" },
   { value: "done", label: "Done" },
 ]
 
-export function TaskStatusSelect({
-  taskId,
+export function IssueStatusSelect({
+  issueId,
   status,
 }: {
-  taskId: string
-  status: TaskStatus
+  issueId: string
+  status: IssueStatus
 }) {
   const [isPending, startTransition] = useTransition()
 
@@ -29,23 +29,23 @@ export function TaskStatusSelect({
     }
 
     const formData = new FormData()
-    formData.set("id", taskId)
+    formData.set("id", issueId)
     formData.set("status", nextStatus)
     startTransition(() => {
-      void updateTaskStatus(formData)
+      void updateIssueStatus(formData)
     })
   }
 
   return (
     <div className="grid gap-2">
       <label
-        htmlFor="task-status"
+        htmlFor="issue-status"
         className="text-sm font-medium text-muted-foreground"
       >
         Status
       </label>
       <select
-        id="task-status"
+        id="issue-status"
         name="status"
         value={status}
         onChange={handleChange}

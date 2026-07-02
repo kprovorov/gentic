@@ -2,7 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { IconArrowLeft, IconPlus } from "@tabler/icons-react"
 
-import { createTask } from "@/app/tasks/actions"
+import { createIssue } from "@/app/issues/actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -21,7 +21,7 @@ type Project = {
   repo: string
 }
 
-export default async function NewTaskPage() {
+export default async function NewIssuePage() {
   const supabase = await createClient()
   const { data } = await supabase.auth.getClaims()
 
@@ -50,34 +50,34 @@ export default async function NewTaskPage() {
             </Link>
           </Button>
           <div className="grid gap-2">
-            <p className="text-sm font-medium text-muted-foreground">Tasks</p>
-            <h1 className="text-3xl">New task</h1>
+            <p className="text-sm font-medium text-muted-foreground">Issues</p>
+            <h1 className="text-3xl">New issue</h1>
           </div>
         </header>
 
         <Card>
           <CardHeader>
-            <CardTitle>Create task</CardTitle>
+            <CardTitle>Create issue</CardTitle>
             <CardDescription>
-              Add a task to one of your tracked projects.
+              Add an issue to one of your tracked projects.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {projects.length === 0 ? (
               <div className="grid gap-4 rounded-lg border border-dashed p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Create a project before adding tasks.
+                  Create a project before adding issues.
                 </p>
                 <Button asChild variant="outline" className="mx-auto">
                   <Link href="/settings">Go to projects</Link>
                 </Button>
               </div>
             ) : (
-              <form action={createTask} className="grid gap-5">
+              <form action={createIssue} className="grid gap-5">
                 <div className="grid gap-2">
-                  <Label htmlFor="task-project">Project</Label>
+                  <Label htmlFor="issue-project">Project</Label>
                   <select
-                    id="task-project"
+                    id="issue-project"
                     name="project_id"
                     required
                     className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
@@ -92,9 +92,9 @@ export default async function NewTaskPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="task-title">Title</Label>
+                  <Label htmlFor="issue-title">Title</Label>
                   <Input
-                    id="task-title"
+                    id="issue-title"
                     name="title"
                     placeholder="Review onboarding flow"
                     required
@@ -103,9 +103,9 @@ export default async function NewTaskPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="task-description">Description</Label>
+                  <Label htmlFor="issue-description">Description</Label>
                   <textarea
-                    id="task-description"
+                    id="issue-description"
                     name="description"
                     rows={6}
                     placeholder="Add context, acceptance notes, or links."
@@ -114,9 +114,9 @@ export default async function NewTaskPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="task-status">Status</Label>
+                  <Label htmlFor="issue-status">Status</Label>
                   <select
-                    id="task-status"
+                    id="issue-status"
                     name="status"
                     required
                     defaultValue="todo"
@@ -135,7 +135,7 @@ export default async function NewTaskPage() {
                   </Button>
                   <Button type="submit">
                     <IconPlus />
-                    Create task
+                    Create issue
                   </Button>
                 </div>
               </form>

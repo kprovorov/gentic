@@ -1,6 +1,6 @@
 # Gentic
 
-Gentic is a tool for managing coding agents. Teams can create coding tasks,
+Gentic is a tool for managing coding agents. Teams can create coding issues,
 assign them to an agent, and track the pull request created from the work.
 
 ## Tech stack
