@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import {
   IconBrandGithub,
@@ -45,6 +46,11 @@ type Environment = {
   last_connection_status: "success" | "failed" | null
   last_connection_message: string | null
   last_tested_at: string | null
+}
+
+export const metadata: Metadata = {
+  title: "Projects",
+  description: "Configure the repositories Gentic can assign coding agents to.",
 }
 
 export default async function SettingsPage() {
