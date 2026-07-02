@@ -17,6 +17,11 @@ const projectSchema = z.object({
       /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/,
       "Use the format user/repo"
     ),
+  environment_id: z
+    .string()
+    .trim()
+    .transform((value) => (value.length > 0 ? value : null))
+    .pipe(z.string().uuid().nullable()),
 })
 
 const idSchema = z.string().uuid()
@@ -62,6 +67,7 @@ export async function createProject(formData: FormData) {
   const project = projectSchema.parse({
     name: getString(formData, "name"),
     repo: getString(formData, "repo"),
+    environment_id: getString(formData, "environment_id"),
   })
 
   const { error } = await supabase.from("projects").insert({
@@ -313,6 +319,7 @@ export async function updateProject(formData: FormData) {
   const project = projectSchema.parse({
     name: getString(formData, "name"),
     repo: getString(formData, "repo"),
+    environment_id: getString(formData, "environment_id"),
   })
 
   const { error } = await supabase
