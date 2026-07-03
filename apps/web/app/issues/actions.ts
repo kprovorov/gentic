@@ -89,6 +89,20 @@ export async function updateIssue(formData: FormData) {
   redirect(`/issues/${id}`)
 }
 
+export async function deleteIssue(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const id = z.string().uuid().parse(getString(formData, "id"))
+
+  const { error } = await supabase.from("issues").delete().eq("id", id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/home")
+  redirect("/home")
+}
+
 export async function updateIssueStatus(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
   const id = z.string().uuid().parse(getString(formData, "id"))
