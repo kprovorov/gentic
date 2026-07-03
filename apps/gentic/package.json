@@ -14,8 +14,6 @@
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.55.0",
     "@agentclientprotocol/sdk": "^1.1.0",
-    "@gentic/supabase": "workspace:*",
-    "@supabase/supabase-js": "^2.110.0",
     "dotenv": "^16.4.7",
     "zod": "^4.4.3"
   },

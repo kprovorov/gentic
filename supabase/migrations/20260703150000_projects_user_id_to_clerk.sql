@@ -35,26 +35,26 @@ create policy "Users can read their own projects"
   on public.projects
   for select
   to authenticated
-  using ((select auth.jwt() ->> 'sub') = user_id);
+  using (((select auth.jwt()) ->> 'sub') = user_id);
 
 create policy "Users can create their own projects"
   on public.projects
   for insert
   to authenticated
-  with check ((select auth.jwt() ->> 'sub') = user_id);
+  with check (((select auth.jwt()) ->> 'sub') = user_id);
 
 create policy "Users can update their own projects"
   on public.projects
   for update
   to authenticated
-  using ((select auth.jwt() ->> 'sub') = user_id)
-  with check ((select auth.jwt() ->> 'sub') = user_id);
+  using (((select auth.jwt()) ->> 'sub') = user_id)
+  with check (((select auth.jwt()) ->> 'sub') = user_id);
 
 create policy "Users can delete their own projects"
   on public.projects
   for delete
   to authenticated
-  using ((select auth.jwt() ->> 'sub') = user_id);
+  using (((select auth.jwt()) ->> 'sub') = user_id);
 
 -- Issues policies join through projects.user_id.
 create policy "Users can read issues for their own projects"
@@ -66,7 +66,7 @@ create policy "Users can read issues for their own projects"
       select 1
       from public.projects
       where projects.id = issues.project_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -79,7 +79,7 @@ create policy "Users can create issues for their own projects"
       select 1
       from public.projects
       where projects.id = issues.project_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -92,7 +92,7 @@ create policy "Users can update issues for their own projects"
       select 1
       from public.projects
       where projects.id = issues.project_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   )
   with check (
@@ -100,7 +100,7 @@ create policy "Users can update issues for their own projects"
       select 1
       from public.projects
       where projects.id = issues.project_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -113,7 +113,7 @@ create policy "Users can delete issues for their own projects"
       select 1
       from public.projects
       where projects.id = issues.project_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -128,7 +128,7 @@ create policy "Users can read messages for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = messages.issue_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -143,7 +143,7 @@ create policy "Users can create messages for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = messages.issue_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -157,7 +157,7 @@ create policy "Users can update messages for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = messages.issue_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   )
   with check (
@@ -166,7 +166,7 @@ create policy "Users can update messages for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = messages.issue_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -180,6 +180,6 @@ create policy "Users can delete messages for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = messages.issue_id
-        and projects.user_id = (select auth.jwt() ->> 'sub')
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );

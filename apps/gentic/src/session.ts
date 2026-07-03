@@ -15,8 +15,8 @@ import {
 import {
   StreamingAssistantMessage,
   insertMessage,
-  type Supabase,
 } from "./messages"
+import type { AgentApi } from "./api"
 
 const require = createRequire(import.meta.url)
 
@@ -27,7 +27,7 @@ const AGENT_ENTRY = require.resolve(
 )
 
 export interface RunSessionInput {
-  supabase: Supabase
+  api: AgentApi
   issueId: string
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
@@ -91,7 +91,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         if (prompt === null) {
           break
         }
-        await runTurn(session, input.supabase, input.issueId, prompt)
+        await runTurn(session, input.api, input.issueId, prompt)
       }
     })
   } finally {
@@ -102,7 +102,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
 /** Sends one prompt and streams updates into the transcript until it stops. */
 async function runTurn(
   session: ActiveSession,
-  supabase: Supabase,
+  api: AgentApi,
   issueId: string,
   prompt: string
 ): Promise<void> {
@@ -119,7 +119,7 @@ async function runTurn(
       current = null
     }
     if (!current) {
-      current = new StreamingAssistantMessage(supabase, issueId, kind)
+      current = new StreamingAssistantMessage(api, issueId, kind)
       currentKind = kind
     }
     return current
@@ -153,7 +153,7 @@ async function runTurn(
     } else if (update.sessionUpdate === "tool_call") {
       // Flush any streaming text first so the transcript keeps its ordering.
       await finalizeCurrent()
-      await insertMessage(supabase, issueId, {
+      await insertMessage(api, issueId, {
         role: "assistant",
         kind: "tool",
         content: update.title,

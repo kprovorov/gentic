@@ -1,12 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
-
-export type Supabase = SupabaseClient
+import type { AgentApi, MessageFields, RunStateFields } from "./api"
 
 /**
- * An assistant message that is written to `messages` incrementally as the agent
- * streams text. The first chunk inserts a `streaming` row; later chunks
- * throttle-update its content so Supabase Realtime pushes the growth to the
- * browser without a write per token. `finalize` marks the row `complete`.
+ * An assistant message that is written to the issue transcript incrementally as
+ * the agent streams text. The first chunk inserts a `streaming` row; later
+ * chunks throttle-update its content so the browser sees growth without a write
+ * per token. `finalize` marks the row `complete`.
  */
 export class StreamingAssistantMessage {
   private id: string | null = null
@@ -15,7 +13,7 @@ export class StreamingAssistantMessage {
   private timer: ReturnType<typeof setTimeout> | null = null
 
   constructor(
-    private readonly supabase: Supabase,
+    private readonly api: AgentApi,
     private readonly issueId: string,
     private readonly kind: "text" | "thinking" = "text",
     private readonly flushIntervalMs = 250
@@ -28,22 +26,12 @@ export class StreamingAssistantMessage {
     this.content += text
 
     if (!this.id) {
-      const { data, error } = await this.supabase
-        .from("messages")
-        .insert({
-          issue_id: this.issueId,
-          role: "assistant",
-          kind: this.kind,
-          content: this.content,
-          status: "streaming",
-        })
-        .select("id")
-        .single()
-
-      if (error) {
-        throw new Error(error.message)
-      }
-      this.id = (data as { id: string }).id
+      this.id = await this.api.insertMessage(this.issueId, {
+        role: "assistant",
+        kind: this.kind,
+        content: this.content,
+        status: "streaming",
+      })
       return
     }
 
@@ -66,10 +54,7 @@ export class StreamingAssistantMessage {
       return
     }
     this.dirty = false
-    await this.supabase
-      .from("messages")
-      .update({ content: this.content, updated_at: new Date().toISOString() })
-      .eq("id", this.id)
+    await this.api.updateMessage(this.id, { content: this.content })
   }
 
   async finalize(): Promise<void> {
@@ -80,14 +65,10 @@ export class StreamingAssistantMessage {
     if (!this.id) {
       return
     }
-    await this.supabase
-      .from("messages")
-      .update({
-        content: this.content,
-        status: "complete",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", this.id)
+    await this.api.updateMessage(this.id, {
+      content: this.content,
+      status: "complete",
+    })
   }
 
   get started(): boolean {
@@ -96,37 +77,21 @@ export class StreamingAssistantMessage {
 }
 
 export async function insertMessage(
-  supabase: Supabase,
+  api: AgentApi,
   issueId: string,
-  fields: {
-    role: "assistant" | "system"
-    kind?: "text" | "tool" | "thinking"
-    content: string
-    status?: "streaming" | "complete" | "error"
-  }
+  fields: MessageFields
 ): Promise<void> {
-  const { error } = await supabase.from("messages").insert({
-    issue_id: issueId,
-    role: fields.role,
-    kind: fields.kind ?? "text",
-    content: fields.content,
-    status: fields.status ?? "complete",
+  await api.insertMessage(issueId, {
+    kind: "text",
+    status: "complete",
+    ...fields,
   })
-  if (error) {
-    throw new Error(error.message)
-  }
 }
 
 export async function setRunState(
-  supabase: Supabase,
+  api: AgentApi,
   issueId: string,
-  fields: Record<string, unknown>
+  fields: RunStateFields
 ): Promise<void> {
-  const { error } = await supabase
-    .from("issues")
-    .update({ ...fields, updated_at: new Date().toISOString() })
-    .eq("id", issueId)
-  if (error) {
-    throw new Error(error.message)
-  }
+  await api.setRunState(issueId, fields)
 }
