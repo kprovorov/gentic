@@ -11,7 +11,7 @@ const issueStatusSchema = z.enum(["draft", "todo", "in-progress", "done"])
 const issueSchema = z.object({
   project_id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
-  description: z.string().trim().optional(),
+  prompt: z.string().trim().optional(),
   status: issueStatusSchema,
 })
 
@@ -36,7 +36,7 @@ export async function createIssue(formData: FormData) {
   const issue = issueSchema.parse({
     project_id: getString(formData, "project_id"),
     title: getString(formData, "title"),
-    description: getString(formData, "description") || undefined,
+    prompt: getString(formData, "prompt") || undefined,
     status: getString(formData, "status") || "todo",
   })
 
@@ -44,7 +44,7 @@ export async function createIssue(formData: FormData) {
     .from("issues")
     .insert({
       ...issue,
-      description: issue.description ?? null,
+      prompt: issue.prompt ?? null,
     })
     .select("id")
     .single()
@@ -60,22 +60,22 @@ export async function createIssue(formData: FormData) {
 const updateIssueSchema = z.object({
   id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
-  description: z.string().trim().optional(),
+  prompt: z.string().trim().optional(),
 })
 
 export async function updateIssue(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
-  const { id, title, description } = updateIssueSchema.parse({
+  const { id, title, prompt } = updateIssueSchema.parse({
     id: getString(formData, "id"),
     title: getString(formData, "title"),
-    description: getString(formData, "description") || undefined,
+    prompt: getString(formData, "prompt") || undefined,
   })
 
   const { error } = await supabase
     .from("issues")
     .update({
       title,
-      description: description ?? null,
+      prompt: prompt ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -96,9 +96,9 @@ export async function updateIssueStatus(formData: FormData) {
 
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("status,title,description")
+    .select("status,title,prompt")
     .eq("id", id)
-    .single<{ status: string; title: string; description: string | null }>()
+    .single<{ status: string; title: string; prompt: string | null }>()
 
   if (fetchError) {
     throw new Error(fetchError.message)
@@ -119,14 +119,14 @@ export async function updateIssueStatus(formData: FormData) {
   }
 
   if (startsRun) {
-    const prompt = current.description
-      ? `${current.title}\n\n${current.description}`
+    const messageContent = current.prompt
+      ? `${current.title}\n\n${current.prompt}`
       : current.title
 
     const { error: messageError } = await supabase.from("messages").insert({
       issue_id: id,
       role: "user",
-      content: prompt,
+      content: messageContent,
     })
 
     if (messageError) {

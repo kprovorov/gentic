@@ -103,10 +103,10 @@ export default async function NewIssuePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="issue-description">Description</Label>
+                  <Label htmlFor="issue-prompt">Prompt</Label>
                   <textarea
-                    id="issue-description"
-                    name="description"
+                    id="issue-prompt"
+                    name="prompt"
                     rows={6}
                     placeholder="Add context, acceptance notes, or links."
                     className="w-full resize-y rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base transition-[color,box-shadow,background-color] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"

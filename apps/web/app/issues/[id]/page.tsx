@@ -32,7 +32,7 @@ type IssueStatus = "draft" | "todo" | "in-progress" | "done"
 type Issue = {
   id: string
   title: string
-  description: string | null
+  prompt: string | null
   status: IssueStatus
   run_status: RunStatus
   created_at: string
@@ -91,7 +91,7 @@ export default async function IssueDetailPage({
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,description,status,run_status,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,status,run_status,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -181,19 +181,19 @@ export default async function IssueDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Description</CardTitle>
+              <CardTitle>Prompt</CardTitle>
               <CardDescription>
                 Created {formatDateTime(issue.created_at)}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {issue.description ? (
+              {issue.prompt ? (
                 <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                  {issue.description}
+                  {issue.prompt}
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No description provided.
+                  No prompt provided.
                 </p>
               )}
             </CardContent>
