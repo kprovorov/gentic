@@ -37,7 +37,7 @@ export async function createIssue(formData: FormData) {
     project_id: getString(formData, "project_id"),
     title: getString(formData, "title"),
     prompt: getString(formData, "prompt") || undefined,
-    status: getString(formData, "status") || "todo",
+    status: getString(formData, "status") || "draft",
   })
 
   const { data, error } = await supabase
