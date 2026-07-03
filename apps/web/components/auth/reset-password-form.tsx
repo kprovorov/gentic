@@ -4,10 +4,11 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useSignIn } from "@clerk/nextjs/legacy"
 import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { createClient } from "@gentic/supabase/client"
+import { clerkErrorMessage } from "@/lib/clerk-error"
 import {
   resetPasswordSchema,
   type ResetPasswordValues,
@@ -32,30 +33,42 @@ import { Input } from "@gentic/ui/input"
 
 export function ResetPasswordForm() {
   const router = useRouter()
+  const { isLoaded, signIn, setActive } = useSignIn()
   const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
+      code: "",
       password: "",
       confirmPassword: "",
     },
   })
 
   async function onSubmit(values: ResetPasswordValues) {
-    const supabase = createClient()
-    const { error } = await supabase.auth.updateUser({
-      password: values.password,
-    })
-
-    if (error) {
-      toast.error(error.message)
+    if (!isLoaded) {
       return
     }
 
-    toast.success("Your password has been updated")
-    router.push("/")
-    router.refresh()
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: values.code,
+        password: values.password,
+      })
+
+      if (result.status !== "complete") {
+        toast.error("That code didn't work. Please try again.")
+        return
+      }
+
+      await setActive({ session: result.createdSessionId })
+      toast.success("Your password has been updated")
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      toast.error(clerkErrorMessage(error, "Unable to update your password"))
+    }
   }
 
   const isSubmitting = form.formState.isSubmitting
@@ -65,12 +78,30 @@ export function ResetPasswordForm() {
       <CardHeader className="text-center">
         <CardTitle className="text-lg">Set a new password</CardTitle>
         <CardDescription>
-          Choose a new password for your account
+          Enter the code we emailed you and choose a new password
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Verification code</FormLabel>
+                  <FormControl>
+                    <Input
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="password"

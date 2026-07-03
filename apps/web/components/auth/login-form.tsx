@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useSignIn } from "@clerk/nextjs/legacy"
 import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { createClient } from "@gentic/supabase/client"
+import { clerkErrorMessage } from "@/lib/clerk-error"
 import { loginSchema, type LoginValues } from "@gentic/validators/auth"
 import { Button } from "@gentic/ui/button"
 import {
@@ -31,6 +32,7 @@ import { Input } from "@gentic/ui/input"
 
 export function LoginForm() {
   const router = useRouter()
+  const { isLoaded, signIn, setActive } = useSignIn()
   const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<LoginValues>({
@@ -42,20 +44,28 @@ export function LoginForm() {
   })
 
   async function onSubmit(values: LoginValues) {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    })
-
-    if (error) {
-      toast.error(error.message)
+    if (!isLoaded) {
       return
     }
 
-    toast.success("Welcome back!")
-    router.push("/")
-    router.refresh()
+    try {
+      const result = await signIn.create({
+        identifier: values.email,
+        password: values.password,
+      })
+
+      if (result.status !== "complete") {
+        toast.error("Additional verification is required to sign in")
+        return
+      }
+
+      await setActive({ session: result.createdSessionId })
+      toast.success("Welcome back!")
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      toast.error(clerkErrorMessage(error, "Unable to sign in"))
+    }
   }
 
   const isSubmitting = form.formState.isSubmitting

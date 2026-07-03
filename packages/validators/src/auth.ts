@@ -31,6 +31,7 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>
 
 export const resetPasswordSchema = z
   .object({
+    code: z.string().trim().min(1, "Enter the code from your email"),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")

@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTransition } from "react"
 import { IconSend } from "@tabler/icons-react"
 
-import { createClient } from "@gentic/supabase/client"
+import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 
@@ -73,7 +73,7 @@ export function IssueChat({
   const [isPending, startTransition] = useTransition()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useSupabaseClient()
 
   useEffect(() => {
     const channel = supabase

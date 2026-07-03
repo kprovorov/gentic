@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
 
@@ -25,13 +26,13 @@ function getString(formData: FormData, key: string) {
 }
 
 async function getAuthenticatedSupabase() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
-  const userId = data?.claims?.sub
+  const { userId } = await auth()
 
   if (!userId) {
     redirect("/login")
   }
+
+  const supabase = await createClient()
 
   return { supabase, userId }
 }

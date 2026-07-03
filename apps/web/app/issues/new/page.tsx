@@ -13,6 +13,7 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 
 type Project = {
@@ -22,13 +23,13 @@ type Project = {
 }
 
 export default async function NewIssuePage() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  const { userId } = await auth()
 
-  if (!data?.claims) {
+  if (!userId) {
     redirect("/login")
   }
 
+  const supabase = await createClient()
   const { data: projects, error } = await supabase
     .from("projects")
     .select("id,name,repo")

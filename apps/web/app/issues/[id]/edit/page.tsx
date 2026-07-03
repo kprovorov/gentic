@@ -12,6 +12,7 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 
 import { updateIssue } from "@/app/issues/actions"
@@ -28,13 +29,13 @@ export default async function EditIssuePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  const { userId } = await auth()
 
-  if (!data?.claims) {
+  if (!userId) {
     redirect("/login")
   }
 
+  const supabase = await createClient()
   const { data: issue, error } = await supabase
     .from("issues")
     .select("id,title,prompt")

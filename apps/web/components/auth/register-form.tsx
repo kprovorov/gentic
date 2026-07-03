@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useSignUp } from "@clerk/nextjs/legacy"
 import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { createClient } from "@gentic/supabase/client"
+import { clerkErrorMessage } from "@/lib/clerk-error"
 import { registerSchema, type RegisterValues } from "@gentic/validators/auth"
 import { Button } from "@gentic/ui/button"
 import {
@@ -28,10 +29,15 @@ import {
   FormMessage,
 } from "@gentic/ui/form"
 import { Input } from "@gentic/ui/input"
+import { Label } from "@gentic/ui/label"
 
 export function RegisterForm() {
   const router = useRouter()
+  const { isLoaded, signUp, setActive } = useSignUp()
   const [showPassword, setShowPassword] = useState(false)
+  const [pendingVerification, setPendingVerification] = useState(false)
+  const [code, setCode] = useState("")
+  const [isVerifying, setIsVerifying] = useState(false)
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -43,33 +49,85 @@ export function RegisterForm() {
   })
 
   async function onSubmit(values: RegisterValues) {
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm`,
-      },
-    })
-
-    if (error) {
-      toast.error(error.message)
+    if (!isLoaded) {
       return
     }
 
-    // When email confirmation is enabled, no session is returned yet.
-    if (data.session) {
+    try {
+      await signUp.create({
+        emailAddress: values.email,
+        password: values.password,
+      })
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
+      setPendingVerification(true)
+    } catch (error) {
+      toast.error(clerkErrorMessage(error, "Unable to create account"))
+    }
+  }
+
+  async function onVerify(event: React.FormEvent) {
+    event.preventDefault()
+    if (!isLoaded || !code) {
+      return
+    }
+
+    setIsVerifying(true)
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code })
+
+      if (result.status !== "complete") {
+        toast.error("That code didn't work. Please try again.")
+        return
+      }
+
+      await setActive({ session: result.createdSessionId })
       toast.success("Account created!")
       router.push("/")
       router.refresh()
-      return
+    } catch (error) {
+      toast.error(clerkErrorMessage(error, "Unable to verify that code"))
+    } finally {
+      setIsVerifying(false)
     }
-
-    toast.success("Check your email to confirm your account")
-    router.push("/login")
   }
 
   const isSubmitting = form.formState.isSubmitting
+
+  if (pendingVerification) {
+    return (
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-lg">Check your email</CardTitle>
+          <CardDescription>
+            Enter the verification code we just sent you
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onVerify} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="verification-code">Verification code</Label>
+              <Input
+                id="verification-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+              />
+            </div>
+            <Button
+              type="submit"
+              className="mt-2 w-full"
+              disabled={isVerifying || !code}
+            >
+              {isVerifying && <IconLoader2 className="animate-spin" />}
+              Verify email
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="w-full max-w-sm">
