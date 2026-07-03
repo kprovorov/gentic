@@ -26,7 +26,7 @@ type IssueStatus = "draft" | "todo" | "in-progress" | "done"
 type Issue = {
   id: string
   title: string
-  description: string | null
+  prompt: string | null
   status: IssueStatus
   created_at: string
   projects: {
@@ -79,7 +79,7 @@ export default async function HomePage() {
 
   const { data: issues, error } = await supabase
     .from("issues")
-    .select("id,title,description,status,created_at,projects(id,name,repo)")
+    .select("id,title,prompt,status,created_at,projects(id,name,repo)")
     .order("created_at", { ascending: false })
     .returns<Issue[]>()
 
@@ -150,10 +150,10 @@ export default async function HomePage() {
                       </span>
                     </CardAction>
                   </CardHeader>
-                  {issue.description ? (
+                  {issue.prompt ? (
                     <CardContent>
                       <p className="line-clamp-2 text-sm text-muted-foreground">
-                        {issue.description}
+                        {issue.prompt}
                       </p>
                     </CardContent>
                   ) : null}
