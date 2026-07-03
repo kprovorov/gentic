@@ -117,9 +117,17 @@ WorkingDirectory=/path/to/gentic
 EnvironmentFile=/path/to/gentic/apps/gentic/.env
 ```
 
-## Current checkout note
+## Source layout
 
-`apps/gentic/package.json` starts `src/index.ts`, but this checkout does not
-currently include that file. Add the worker entrypoint before expecting
-`pnpm --filter @gentic/gentic dev` or `pnpm --filter @gentic/gentic start` to
-run successfully.
+- `src/index.ts` — worker entrypoint. Polls Supabase, claims one queued issue at
+  a time, clones its repo, and drives an agent session per issue.
+- `src/session.ts` — spawns Claude Code over the Agent Client Protocol and
+  streams assistant output into the issue transcript, one prompt turn per user
+  message.
+- `src/git.ts` — clones a project repo into a fresh per-issue work directory.
+- `src/config.ts`, `src/messages.ts`, `src/async-queue.ts` — configuration and
+  Supabase transcript helpers.
+
+A run stays open for one poll interval after the agent goes quiet so follow-up
+messages sent while it works are handled in the same session; once the
+transcript is idle the run is marked `completed`.
