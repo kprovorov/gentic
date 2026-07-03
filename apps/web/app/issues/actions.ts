@@ -160,5 +160,17 @@ export async function sendIssueMessage(formData: FormData) {
     throw new Error(error.message)
   }
 
+  // A finished run has no worker polling for it anymore. Re-queue so the
+  // `@gentic/gentic` agent picks this follow-up up and resumes the session.
+  const { error: requeueError } = await supabase
+    .from("issues")
+    .update({ run_status: "queued", updated_at: new Date().toISOString() })
+    .eq("id", issue_id)
+    .in("run_status", ["completed", "failed", "cancelled"])
+
+  if (requeueError) {
+    throw new Error(requeueError.message)
+  }
+
   revalidatePath(`/issues/${issue_id}`)
 }

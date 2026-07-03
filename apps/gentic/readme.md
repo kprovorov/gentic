@@ -130,4 +130,7 @@ EnvironmentFile=/path/to/gentic/apps/gentic/.env
 
 A run stays open for one poll interval after the agent goes quiet so follow-up
 messages sent while it works are handled in the same session; once the
-transcript is idle the run is marked `completed`.
+transcript is idle the run is marked `completed`. Sending a message to an
+issue whose run has already ended (`completed`, `failed`, or `cancelled`)
+re-queues it; the agent resumes the same ACP session (via its stored
+`session_id`) so the conversation continues with prior context.
