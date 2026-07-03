@@ -3,25 +3,18 @@ import "dotenv/config"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
-import { createServiceClient } from "@gentic/supabase/service"
-
+import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
 import { loadConfig, type Config } from "./config"
 import { cloneRepo } from "./git"
-import { setRunState, type Supabase } from "./messages"
+import { setRunState } from "./messages"
 import { runAgentSession } from "./session"
-
-interface ClaimedIssue {
-  id: string
-  repo: string
-  /** ACP session id from a previous run, if this issue has run before. */
-  sessionId: string | null
-  /** When the previous run ended, used as the starting cursor for messages. */
-  runFinishedAt: string | null
-}
 
 async function main(): Promise<void> {
   const config = loadConfig()
-  const supabase = createServiceClient()
+  const api = createAgentApi({
+    apiUrl: config.GENTIC_API_URL,
+    apiKey: config.GENTIC_API_KEY,
+  })
 
   let running = true
   const stop = (): void => {
@@ -35,7 +28,7 @@ async function main(): Promise<void> {
   while (running) {
     let issue: ClaimedIssue | null = null
     try {
-      issue = await claimNextQueuedIssue(supabase)
+      issue = await claimNextQueuedIssue(api)
     } catch (error) {
       console.error("[gentic] failed to poll for queued issues:", describe(error))
     }
@@ -45,7 +38,7 @@ async function main(): Promise<void> {
       continue
     }
 
-    await processIssue(supabase, config, issue)
+    await processIssue(api, config, issue)
   }
 
   console.log("[gentic] worker stopped")
@@ -56,58 +49,12 @@ async function main(): Promise<void> {
  * conditional update (`run_status = 'queued'`) makes the claim safe if more
  * than one worker is polling.
  */
-async function claimNextQueuedIssue(
-  supabase: Supabase
-): Promise<ClaimedIssue | null> {
-  const { data: candidate, error: candidateError } = await supabase
-    .from("issues")
-    .select("id, session_id, run_finished_at, projects(repo)")
-    .eq("run_status", "queued")
-    .order("updated_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (candidateError) {
-    throw new Error(candidateError.message)
-  }
-  if (!candidate) {
-    return null
-  }
-
-  const now = new Date().toISOString()
-  const { data: claimed, error: claimError } = await supabase
-    .from("issues")
-    .update({
-      run_status: "cloning",
-      run_started_at: now,
-      run_error: null,
-      run_finished_at: null,
-      updated_at: now,
-    })
-    .eq("id", (candidate as { id: string }).id)
-    .eq("run_status", "queued")
-    .select("id")
-    .maybeSingle()
-
-  if (claimError) {
-    throw new Error(claimError.message)
-  }
-  if (!claimed) {
-    // Another worker claimed it between the select and the update.
-    return null
-  }
-
-  return {
-    id: (claimed as { id: string }).id,
-    repo: extractRepo(candidate),
-    sessionId: (candidate as { session_id: string | null }).session_id,
-    runFinishedAt: (candidate as { run_finished_at: string | null })
-      .run_finished_at,
-  }
+async function claimNextQueuedIssue(api: AgentApi): Promise<ClaimedIssue | null> {
+  return await api.claimNextQueuedIssue()
 }
 
 async function processIssue(
-  supabase: Supabase,
+  api: AgentApi,
   config: Config,
   issue: ClaimedIssue
 ): Promise<void> {
@@ -119,7 +66,7 @@ async function processIssue(
       repo: issue.repo,
       dir,
     })
-    await setRunState(supabase, issue.id, { run_status: "running" })
+    await setRunState(api, issue.id, { run_status: "running" })
 
     // Feed user messages to the session oldest-first. Follow-ups sent while the
     // agent is working are picked up after the current turn; once the transcript
@@ -134,7 +81,7 @@ async function processIssue(
     let idleChecked = false
     const nextPrompt = async (): Promise<string | null> => {
       for (;;) {
-        const messages = await fetchUserMessagesAfter(supabase, issue.id, cursor)
+        const messages = await fetchUserMessagesAfter(api, issue.id, cursor)
         const next = messages[0]
         if (next) {
           idleChecked = false
@@ -150,16 +97,16 @@ async function processIssue(
     }
 
     await runAgentSession({
-      supabase,
+      api,
       issueId: issue.id,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       onSessionId: (sessionId) =>
-        setRunState(supabase, issue.id, { session_id: sessionId }),
+        setRunState(api, issue.id, { session_id: sessionId }),
       nextPrompt,
     })
 
-    await setRunState(supabase, issue.id, {
+    await setRunState(api, issue.id, {
       run_status: "completed",
       run_finished_at: new Date().toISOString(),
     })
@@ -167,7 +114,7 @@ async function processIssue(
   } catch (error) {
     const message = describe(error)
     console.error(`[gentic] issue ${issue.id} failed:`, message)
-    await setRunState(supabase, issue.id, {
+    await setRunState(api, issue.id, {
       run_status: "failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
@@ -178,32 +125,11 @@ async function processIssue(
 }
 
 async function fetchUserMessagesAfter(
-  supabase: Supabase,
+  api: AgentApi,
   issueId: string,
   cursor: string
 ): Promise<Array<{ content: string | null; created_at: string }>> {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("content, created_at")
-    .eq("issue_id", issueId)
-    .eq("role", "user")
-    .gt("created_at", cursor)
-    .order("created_at", { ascending: true })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-  return (data ?? []) as Array<{ content: string | null; created_at: string }>
-}
-
-function extractRepo(row: unknown): string {
-  const projects = (row as { projects?: unknown }).projects
-  const project = Array.isArray(projects) ? projects[0] : projects
-  const repo = (project as { repo?: string } | undefined)?.repo
-  if (!repo) {
-    throw new Error("Issue has no associated project repo")
-  }
-  return repo
+  return await api.fetchUserMessagesAfter(issueId, cursor)
 }
 
 function describe(error: unknown): string {
