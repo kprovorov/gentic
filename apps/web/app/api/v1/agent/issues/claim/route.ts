@@ -38,6 +38,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const { data: claimed, error: claimError } = await supabase
     .from("issues")
     .update({
+      status: "in-progress",
       run_status: "cloning",
       run_started_at: now,
       run_error: null,
