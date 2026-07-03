@@ -7,6 +7,8 @@ settings:
 overrides:
   zod: 4.4.3
 
+packageExtensionsChecksum: sha256-7EyWhva5Lcamo6pe18OzfUc27A7xbWt39+G/ofluF9k=
+
 importers:
 
   .:
@@ -68,7 +70,7 @@ importers:
         version: link:../../packages/validators
       '@hookform/resolvers':
         specifier: ^5.4.0
-        version: 5.4.0(react-hook-form@7.80.0(react@19.2.4))
+        version: 5.4.0(react-hook-form@7.80.0(react@19.2.4))(zod@4.4.3)
       '@supabase/supabase-js':
         specifier: ^2.110.0
         version: 2.110.0
@@ -115,6 +117,9 @@ importers:
       '@gentic/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@tailwindcss/postcss':
+        specifier: ^4
+        version: 4.3.2
       '@types/node':
         specifier: ^20
         version: 20.19.43
@@ -710,6 +715,7 @@ packages:
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
     peerDependencies:
       react-hook-form: ^7.55.0
+      zod: 4.4.3
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4715,10 +4721,11 @@ snapshots:
     dependencies:
       hono: 4.12.27
 
-  '@hookform/resolvers@5.4.0(react-hook-form@7.80.0(react@19.2.4))':
+  '@hookform/resolvers@5.4.0(react-hook-form@7.80.0(react@19.2.4))(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.80.0(react@19.2.4)
+      zod: 4.4.3
 
   '@humanfs/core@0.19.2':
     dependencies:

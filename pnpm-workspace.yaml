@@ -5,6 +5,11 @@ packages:
 overrides:
   zod: 4.4.3
 
+packageExtensions:
+  "@hookform/resolvers":
+    peerDependencies:
+      zod: "*"
+
 allowBuilds:
   sharp: true
   unrs-resolver: true
