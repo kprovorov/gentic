@@ -31,6 +31,11 @@ export interface RunSessionInput {
   issueId: string
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
+  /**
+   * ACP session id from a previous run on this issue. When set, the session
+   * resumes with its prior conversation context instead of starting fresh.
+   */
+  resumeSessionId?: string | null
   /** Called once with the ACP session id after the session starts. */
   onSessionId: (sessionId: string) => Promise<void>
   /**
@@ -69,7 +74,16 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         clientInfo: { name: "gentic", version: "0.0.1" },
       })
 
-      const session = await ctx.buildSession(input.cwd).start()
+      const sessionBuilder = input.resumeSessionId
+        ? ctx.buildSession({
+            cwd: input.cwd,
+            mcpServers: [],
+            _meta: {
+              claudeCode: { options: { resume: input.resumeSessionId } },
+            },
+          })
+        : ctx.buildSession(input.cwd)
+      const session = await sessionBuilder.start()
       await input.onSessionId(session.sessionId)
 
       for (;;) {

@@ -13,6 +13,10 @@ import { runAgentSession } from "./session"
 interface ClaimedIssue {
   id: string
   repo: string
+  /** ACP session id from a previous run, if this issue has run before. */
+  sessionId: string | null
+  /** When the previous run ended, used as the starting cursor for messages. */
+  runFinishedAt: string | null
 }
 
 async function main(): Promise<void> {
@@ -57,7 +61,7 @@ async function claimNextQueuedIssue(
 ): Promise<ClaimedIssue | null> {
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
-    .select("id")
+    .select("id, session_id, run_finished_at, projects(repo)")
     .eq("run_status", "queued")
     .order("updated_at", { ascending: true })
     .limit(1)
@@ -82,7 +86,7 @@ async function claimNextQueuedIssue(
     })
     .eq("id", (candidate as { id: string }).id)
     .eq("run_status", "queued")
-    .select("id, projects(repo)")
+    .select("id")
     .maybeSingle()
 
   if (claimError) {
@@ -93,7 +97,13 @@ async function claimNextQueuedIssue(
     return null
   }
 
-  return { id: (claimed as { id: string }).id, repo: extractRepo(claimed) }
+  return {
+    id: (claimed as { id: string }).id,
+    repo: extractRepo(candidate),
+    sessionId: (candidate as { session_id: string | null }).session_id,
+    runFinishedAt: (candidate as { run_finished_at: string | null })
+      .run_finished_at,
+  }
 }
 
 async function processIssue(
@@ -113,8 +123,14 @@ async function processIssue(
 
     // Feed user messages to the session oldest-first. Follow-ups sent while the
     // agent is working are picked up after the current turn; once the transcript
-    // is quiet for one poll interval the session ends.
-    let cursor = new Date(0).toISOString()
+    // is quiet for one poll interval the session ends. When resuming a session
+    // that already consumed messages, start the cursor at that run's end so
+    // they aren't replayed. A session-less retry (e.g. clone failed before the
+    // agent started) has consumed nothing, so it replays from the beginning.
+    let cursor =
+      issue.sessionId && issue.runFinishedAt
+        ? issue.runFinishedAt
+        : new Date(0).toISOString()
     let idleChecked = false
     const nextPrompt = async (): Promise<string | null> => {
       for (;;) {
@@ -137,6 +153,7 @@ async function processIssue(
       supabase,
       issueId: issue.id,
       cwd: dir,
+      resumeSessionId: issue.sessionId,
       onSessionId: (sessionId) =>
         setRunState(supabase, issue.id, { session_id: sessionId }),
       nextPrompt,
