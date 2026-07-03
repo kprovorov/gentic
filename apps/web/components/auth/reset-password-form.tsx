@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -9,13 +8,15 @@ import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { createClient } from "@gentic/supabase/client"
-import { loginSchema, type LoginValues } from "@gentic/validators/auth"
+import {
+  resetPasswordSchema,
+  type ResetPasswordValues,
+} from "@gentic/validators/auth"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@gentic/ui/card"
@@ -29,22 +30,21 @@ import {
 } from "@gentic/ui/form"
 import { Input } from "@gentic/ui/input"
 
-export function LoginForm() {
+export function ResetPasswordForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
 
-  const form = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: "",
       password: "",
+      confirmPassword: "",
     },
   })
 
-  async function onSubmit(values: LoginValues) {
+  async function onSubmit(values: ResetPasswordValues) {
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
+    const { error } = await supabase.auth.updateUser({
       password: values.password,
     })
 
@@ -53,7 +53,7 @@ export function LoginForm() {
       return
     }
 
-    toast.success("Welcome back!")
+    toast.success("Your password has been updated")
     router.push("/")
     router.refresh()
   }
@@ -63,9 +63,9 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <CardTitle className="text-lg">Sign in to your account</CardTitle>
+        <CardTitle className="text-lg">Set a new password</CardTitle>
         <CardDescription>
-          Enter your email and password to continue
+          Choose a new password for your account
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -73,42 +73,16 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
             <FormField
               control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@example.com"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Password</FormLabel>
-                    <Link
-                      href="/forgot-password"
-                      className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
+                  <FormLabel>New password</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
                         type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        placeholder="At least 8 characters"
                         className="pr-10"
                         {...field}
                       />
@@ -130,24 +104,31 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm new password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="Re-enter your password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
               {isSubmitting && <IconLoader2 className="animate-spin" />}
-              Sign in
+              Update password
             </Button>
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="justify-center border-t">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Create one
-          </Link>
-        </p>
-      </CardFooter>
     </Card>
   )
 }
