@@ -119,7 +119,7 @@ export default async function NewIssuePage() {
                     id="issue-status"
                     name="status"
                     required
-                    defaultValue="todo"
+                    defaultValue="draft"
                     className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                   >
                     <option value="draft">Draft</option>
