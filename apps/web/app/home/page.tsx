@@ -57,6 +57,13 @@ const statusIcons = {
   done: IconCircleCheck,
 }
 
+const statusOrder: Record<IssueStatus, number> = {
+  "in-progress": 0,
+  todo: 1,
+  draft: 2,
+  done: 3,
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -86,6 +93,8 @@ export default async function HomePage() {
   if (error) {
     throw new Error(error.message)
   }
+
+  issues.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
