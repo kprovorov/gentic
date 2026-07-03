@@ -22,6 +22,7 @@ import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 
 import { IssueStatusSelect } from "./issue-status-select"
+import { IssueDeleteButton } from "./issue-delete-button"
 import {
   IssueChat,
   type ChatMessage,
@@ -130,12 +131,15 @@ export default async function IssueDetailPage({
                 Back
               </Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href={`/issues/${issue.id}/edit`}>
-                <IconPencil />
-                Edit
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline">
+                <Link href={`/issues/${issue.id}/edit`}>
+                  <IconPencil />
+                  Edit
+                </Link>
+              </Button>
+              <IssueDeleteButton issueId={issue.id} />
+            </div>
           </div>
           <div className="grid gap-3">
             <div
