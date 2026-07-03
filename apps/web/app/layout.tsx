@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
 import { Providers } from "./providers"
+import { SiteHeader } from "@/components/site-header"
 import { ThemeProvider } from "@gentic/ui/theme-provider"
 import { Toaster } from "@gentic/ui/sonner"
 import { cn } from "@gentic/ui/utils"
@@ -53,7 +54,10 @@ export default function RootLayout({
       >
         <body>
           <ThemeProvider>
-            <Providers>{children}</Providers>
+            <Providers>
+              <SiteHeader />
+              {children}
+            </Providers>
             <Toaster />
           </ThemeProvider>
         </body>
