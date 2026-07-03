@@ -4,6 +4,11 @@
 -- uuid (FK to auth.users, which no longer holds these users) to plain text.
 -- Every RLS policy that compared against auth.uid() now reads the Clerk user
 -- id out of the verified JWT via auth.jwt()->>'sub' instead.
+--
+-- All policies that depend on projects.user_id — including the issues and
+-- messages policies, which reference it through a subquery — must be dropped
+-- before the column type can change, not just the ones defined on projects
+-- itself. Recreate them all afterwards.
 
 alter table public.projects
   drop constraint projects_user_id_fkey;
@@ -12,6 +17,16 @@ drop policy "Users can read their own projects" on public.projects;
 drop policy "Users can create their own projects" on public.projects;
 drop policy "Users can update their own projects" on public.projects;
 drop policy "Users can delete their own projects" on public.projects;
+
+drop policy "Users can read issues for their own projects" on public.issues;
+drop policy "Users can create issues for their own projects" on public.issues;
+drop policy "Users can update issues for their own projects" on public.issues;
+drop policy "Users can delete issues for their own projects" on public.issues;
+
+drop policy "Users can read messages for their own issues" on public.messages;
+drop policy "Users can create messages for their own issues" on public.messages;
+drop policy "Users can update messages for their own issues" on public.messages;
+drop policy "Users can delete messages for their own issues" on public.messages;
 
 alter table public.projects
   alter column user_id type text using user_id::text;
@@ -42,11 +57,6 @@ create policy "Users can delete their own projects"
   using ((select auth.jwt() ->> 'sub') = user_id);
 
 -- Issues policies join through projects.user_id.
-drop policy "Users can read issues for their own projects" on public.issues;
-drop policy "Users can create issues for their own projects" on public.issues;
-drop policy "Users can update issues for their own projects" on public.issues;
-drop policy "Users can delete issues for their own projects" on public.issues;
-
 create policy "Users can read issues for their own projects"
   on public.issues
   for select
@@ -108,11 +118,6 @@ create policy "Users can delete issues for their own projects"
   );
 
 -- Messages policies join through issues -> projects.user_id.
-drop policy "Users can read messages for their own issues" on public.messages;
-drop policy "Users can create messages for their own issues" on public.messages;
-drop policy "Users can update messages for their own issues" on public.messages;
-drop policy "Users can delete messages for their own issues" on public.messages;
-
 create policy "Users can read messages for their own issues"
   on public.messages
   for select
