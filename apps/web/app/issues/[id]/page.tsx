@@ -122,12 +122,20 @@ export default async function IssueDetailPage({
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
-          <Button asChild variant="ghost" className="w-fit">
-            <Link href="/home">
-              <IconArrowLeft />
-              Back
-            </Link>
-          </Button>
+          <div className="flex items-center justify-between">
+            <Button asChild variant="ghost" className="w-fit">
+              <Link href="/home">
+                <IconArrowLeft />
+                Back
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/issues/${issue.id}/edit`}>
+                <IconPencil />
+                Edit
+              </Link>
+            </Button>
+          </div>
           <div className="grid gap-3">
             <div
               className={cn(

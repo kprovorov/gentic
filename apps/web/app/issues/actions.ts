@@ -57,6 +57,38 @@ export async function createIssue(formData: FormData) {
   redirect(`/issues/${data.id}`)
 }
 
+const updateIssueSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().optional(),
+})
+
+export async function updateIssue(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const { id, title, description } = updateIssueSchema.parse({
+    id: getString(formData, "id"),
+    title: getString(formData, "title"),
+    description: getString(formData, "description") || undefined,
+  })
+
+  const { error } = await supabase
+    .from("issues")
+    .update({
+      title,
+      description: description ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/home")
+  revalidatePath(`/issues/${id}`)
+  redirect(`/issues/${id}`)
+}
+
 export async function updateIssueStatus(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
   const id = z.string().uuid().parse(getString(formData, "id"))
