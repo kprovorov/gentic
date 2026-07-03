@@ -13,11 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.5.12",
     "@gentic/supabase": "workspace:*",
     "@gentic/ui": "workspace:*",
     "@gentic/validators": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
-    "@supabase/supabase-js": "^2.110.0",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-devtools": "^5.101.2",

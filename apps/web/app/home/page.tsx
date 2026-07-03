@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@gentic/ui/card"
+import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 
@@ -77,13 +78,13 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  const { userId } = await auth()
 
-  if (!data?.claims) {
+  if (!userId) {
     redirect("/login")
   }
 
+  const supabase = await createClient()
   const { data: issues, error } = await supabase
     .from("issues")
     .select("id,title,prompt,status,created_at,projects(id,name,repo)")

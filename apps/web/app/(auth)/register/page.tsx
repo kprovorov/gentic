@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
+import { auth } from "@clerk/nextjs/server"
 
-import { createClient } from "@gentic/supabase/server"
 import { RegisterForm } from "@/components/auth/register-form"
 
 export const metadata: Metadata = {
@@ -9,10 +9,9 @@ export const metadata: Metadata = {
 }
 
 export default async function RegisterPage() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  const { userId } = await auth()
 
-  if (data?.claims) {
+  if (userId) {
     redirect("/")
   }
 

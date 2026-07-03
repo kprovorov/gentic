@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useSignIn } from "@clerk/nextjs/legacy"
 import { IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { createClient } from "@gentic/supabase/client"
+import { clerkErrorMessage } from "@/lib/clerk-error"
 import {
   forgotPasswordSchema,
   type ForgotPasswordValues,
@@ -32,7 +33,8 @@ import {
 import { Input } from "@gentic/ui/input"
 
 export function ForgotPasswordForm() {
-  const [sent, setSent] = useState(false)
+  const router = useRouter()
+  const { isLoaded, signIn } = useSignIn()
 
   const form = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -42,20 +44,20 @@ export function ForgotPasswordForm() {
   })
 
   async function onSubmit(values: ForgotPasswordValues) {
-    const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      values.email,
-      {
-        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
-      },
-    )
-
-    if (error) {
-      toast.error(error.message)
+    if (!isLoaded) {
       return
     }
 
-    setSent(true)
+    try {
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: values.email,
+      })
+      toast.success("Check your email for a reset code")
+      router.push("/reset-password")
+    } catch (error) {
+      toast.error(clerkErrorMessage(error, "Unable to send a reset code"))
+    }
   }
 
   const isSubmitting = form.formState.isSubmitting
@@ -65,50 +67,40 @@ export function ForgotPasswordForm() {
       <CardHeader className="text-center">
         <CardTitle className="text-lg">Reset your password</CardTitle>
         <CardDescription>
-          Enter your email and we&apos;ll send you a link to reset it
+          Enter your email and we&apos;ll send you a code to reset it
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {sent ? (
-          <p className="text-center text-sm text-muted-foreground">
-            If an account exists for that email, we&apos;ve sent a link to
-            reset your password. Check your inbox.
-          </p>
-        ) : (
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="grid gap-4"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button
+              type="submit"
+              className="mt-2 w-full"
+              disabled={isSubmitting}
             >
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="mt-2 w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting && <IconLoader2 className="animate-spin" />}
-                Send reset link
-              </Button>
-            </form>
-          </Form>
-        )}
+              {isSubmitting && <IconLoader2 className="animate-spin" />}
+              Send reset code
+            </Button>
+          </form>
+        </Form>
       </CardContent>
       <CardFooter className="justify-center border-t">
         <p className="text-sm text-muted-foreground">
