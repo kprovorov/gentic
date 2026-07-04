@@ -6,6 +6,7 @@ import {
   IconAlertTriangle,
   IconCircleCheck,
   IconCircleDashed,
+  IconCircleX,
   IconClock,
   IconEye,
   IconFlask,
@@ -47,6 +48,7 @@ type IssueStatus =
   | "deploy-failed"
   | "validating"
   | "completed"
+  | "cancelled"
 
 type Issue = {
   id: string
@@ -76,6 +78,7 @@ const statusLabels: Record<IssueStatus, string> = {
   "deploy-failed": "Deploy failed",
   validating: "Validating",
   completed: "Completed",
+  cancelled: "Cancelled",
 }
 
 const statusStyles: Record<IssueStatus, string> = {
@@ -93,6 +96,7 @@ const statusStyles: Record<IssueStatus, string> = {
   "deploy-failed": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   validating: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
   completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  cancelled: "bg-muted text-muted-foreground",
 }
 
 const statusIcons = {
@@ -110,6 +114,7 @@ const statusIcons = {
   "deploy-failed": IconAlertOctagon,
   validating: IconShieldCheck,
   completed: IconCircleCheck,
+  cancelled: IconCircleX,
 }
 
 const statusOrder: Record<IssueStatus, number> = {
@@ -127,6 +132,7 @@ const statusOrder: Record<IssueStatus, number> = {
   todo: 11,
   merged: 12,
   completed: 13,
+  cancelled: 14,
 }
 
 function formatDate(value: string) {

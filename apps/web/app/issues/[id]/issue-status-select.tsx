@@ -19,6 +19,7 @@ type IssueStatus =
   | "deploy-failed"
   | "validating"
   | "completed"
+  | "cancelled"
 
 const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -35,6 +36,7 @@ const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "deploy-failed", label: "Deploy failed" },
   { value: "validating", label: "Validating" },
   { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
 ]
 
 export function IssueStatusSelect({

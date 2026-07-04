@@ -15,6 +15,7 @@ export const issueStatusSchema = z.enum([
   "deploy-failed",
   "validating",
   "completed",
+  "cancelled",
 ])
 
 export type IssueStatus = z.infer<typeof issueStatusSchema>

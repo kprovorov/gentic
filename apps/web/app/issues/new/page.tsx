@@ -137,6 +137,7 @@ export default async function NewIssuePage() {
                     <option value="deploy-failed">Deploy failed</option>
                     <option value="validating">Validating</option>
                     <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
 
