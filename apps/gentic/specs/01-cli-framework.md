@@ -37,6 +37,13 @@ Add `commander` to `apps/gentic/package.json` dependencies (check the repo
 for a pinned major version convention elsewhere; otherwise use the latest
 `^12` or newer).
 
+Also add `@clack/prompts` — every later command that talks to the user
+(spec 03's login prompts, spec 04's start/stop spinners, spec 05's status
+output) should render through it instead of raw `console.log`, so the CLI
+looks and feels like one product instead of a pile of ad-hoc commands.
+Wire that up now, in this task, even though `run` itself barely needs it,
+so nobody reaches for `console.log` out of habit later.
+
 ### File layout
 
 ```
@@ -44,9 +51,32 @@ apps/gentic/src/
   cli.ts                 # new — the bin entry; builds the Command tree and parses argv
   index.ts                # trimmed — see below
   worker.ts               # new — the poll loop, extracted verbatim from index.ts's main()
+  ui.ts                   # new — thin wrapper around @clack/prompts, see below
   commands/
     run.ts                 # new — registers `gentic run`, calls worker.ts's runWorker()
 ```
+
+- `ui.ts`: a small shared surface so every command formats output the same
+  way, instead of each command importing `@clack/prompts` directly and
+  making its own styling choices. Re-export (or thinly wrap) at least:
+
+  ```ts
+  export { intro, outro, spinner, log, note, cancel, isCancel } from "@clack/prompts"
+  export { text, password, confirm, select } from "@clack/prompts"
+  ```
+
+  Add one convention worth codifying here: any command that lets a prompt
+  be cancelled (Ctrl+C at a `text`/`password`/`confirm` prompt) must check
+  `isCancel(result)` and exit cleanly via `cancel("Cancelled.")` — `@clack/prompts`
+  returns a symbol on cancel rather than throwing, and forgetting the check
+  is the most common bug with this library. Document this in `ui.ts`'s
+  module comment so later specs' implementers see it.
+
+  `run` itself (a long-lived poll loop, not a short interactive command)
+  should keep using plain `console.log`/`console.error` for its ongoing
+  worker output (today's `[gentic] ...` log lines) — `@clack/prompts` is
+  for short-lived interactive/status commands, not a log stream. Don't
+  route the worker loop's logging through `intro`/`outro`/spinners.
 
 - `worker.ts`: move `main()`, `claimNextQueuedIssue`, `processIssue`,
   `fetchUserMessagesAfter`, and `describe` out of `index.ts` verbatim (no
@@ -100,6 +130,9 @@ apps/gentic/src/
 - `pnpm --filter @gentic/gentic typecheck` and `lint` both pass.
 - No existing exported behavior of `worker.ts`'s functions changed — this
   is a pure extraction/routing change.
+- `src/ui.ts` exists and is what specs 03/04/05 are expected to import from
+  rather than `@clack/prompts` directly (verify this by grepping their
+  final diffs for a stray direct `@clack/prompts` import once they land).
 
 ## Notes for the next agent (spec 02)
 

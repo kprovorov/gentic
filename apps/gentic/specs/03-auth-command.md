@@ -17,8 +17,10 @@ without hand-editing files:
   spec 02.
 - `gentic auth login --api-url <url> --api-key <key>` — same, non-interactive
   (for scripting/CI), no prompts.
-- `gentic auth logout` — calls `clearConfigFile()` (or removes just the auth
-  keys — your call, document which) and confirms.
+- `gentic auth logout` — asks for confirmation via `ui.ts`'s `confirm()`
+  (skip the prompt with a `--yes`/`-y` flag for scripting), then calls
+  `clearConfigFile()` (or removes just the auth keys — your call, document
+  which) and prints confirmation via `log.success(...)`.
 - `gentic auth status` (or fold into spec 05's `gentic status` instead —
   see "Overlap with spec 05" below) — prints whether credentials are
   configured and, if so, the masked key (`sk-...abcd`, last 4 chars only)
@@ -43,12 +45,46 @@ assuming.
 
 ### Interactive prompts
 
-Use Node's built-in `node:readline/promises` for the two prompts (URL, then
-key with input masked if feasible — masking raw stdin input in a portable
-way is fiddly; if `commander` or a small, already-broadly-used prompt
-helper is cheaper and doesn't fight spec 06's bundling, that's an
-acceptable substitution, but avoid pulling in a heavy interactive-CLI
-framework for two prompts).
+Use `@clack/prompts` (already a dependency as of spec 01, wrapped by
+`src/ui.ts` — import from there, not `@clack/prompts` directly):
+
+```ts
+import { intro, outro, text, password, confirm, isCancel, cancel, spinner } from "../ui"
+
+intro("gentic auth login")
+
+const apiUrl = await text({
+  message: "Gentic API URL",
+  defaultValue: "https://gentic.chat/api/v1",
+  placeholder: "https://gentic.chat/api/v1",
+})
+if (isCancel(apiUrl)) return cancel("Cancelled.")
+
+const apiKey = await password({
+  message: "Gentic API key",
+  validate: (v) => (v.length === 0 ? "API key is required" : undefined),
+})
+if (isCancel(apiKey)) return cancel("Cancelled.")
+
+const s = spinner()
+s.start("Validating key")
+// ... call the API health-check from "Validating the key" above ...
+s.stop("Key looks valid")
+
+outro(`Saved to ${configFilePath()}`)
+```
+
+`password()` handles input masking for you (renders `•` characters) — this
+is the actual reason to use `@clack/prompts` here instead of hand-rolling
+with `node:readline/promises`, which has no built-in masked input. Use
+`spinner()` around the API validation call so a slow/hanging network
+request doesn't look like the CLI froze.
+
+`--api-url`/`--api-key` flags must fully bypass all of the above — no
+`intro`/`outro`/spinner output, no prompts, just validate-and-save then
+print a single-line confirmation, so `gentic auth login --api-url ...
+--api-key ...` stays script-friendly (parseable/quiet output, non-zero
+exit on failure).
 
 ### Command file
 

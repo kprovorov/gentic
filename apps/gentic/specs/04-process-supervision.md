@@ -19,8 +19,10 @@ should call into whatever this spec exports rather than duplicate it) that:
 
 - Install and manage a **real OS service** so crashes auto-restart and the
   worker starts on boot, using the platform's native service manager. This
-  is a deliberate choice over hand-rolled daemonization — see spec 00's
-  cross-cutting decisions.
+  is a deliberate choice over hand-rolled daemonization (a hand-rolled
+  detached-process+pidfile daemon can't give you crash-restart or
+  boot-start on its own — the OS's service manager already solves both, so
+  we lean on it instead of reinventing it).
 - Fall back to a best-effort detached-process mode where no native service
   manager is available, clearly telling the user it won't survive reboot
   or auto-restart on crash.
@@ -148,6 +150,25 @@ registering all three plus a shared `--system` flag — implementer's call,
 keep it simple). `start` accepts `--no-boot` to skip the boot-enable step
 (default is boot-enabled, matching "so I don't have to use pm2" — the
 whole point is it Just Works without extra flags for the common case).
+
+Render each command's progress through `src/ui.ts`'s `spinner()` (from
+spec 01, wrapping `@clack/prompts`) rather than plain `console.log` —
+these are short-lived one-shot commands, exactly what `@clack/prompts` is
+for:
+
+```ts
+const s = spinner()
+s.start("Starting gentic service")
+await backend.install({ enableOnBoot })
+await backend.start()
+s.stop("gentic is running")
+```
+
+Use `log.error(...)`/`log.warn(...)` (also from `ui.ts`) for failures —
+e.g. the `loginctl enable-linger` failure case below, or "no native
+service manager found, falling back to detached-process mode" — instead of
+`console.error`, so these commands' output matches `auth`'s (spec 03) and
+`status`'s (spec 05) styling.
 
 Update `apps/gentic/readme.md`'s "Production process example" section to
 replace the pm2/systemd hand-rolled examples with `gentic start` /

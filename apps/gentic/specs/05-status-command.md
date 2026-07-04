@@ -21,6 +21,33 @@ Last run: issue 4f2a... completed 2026-07-04T10:02:11Z
 
 ## Design
 
+### Rendering
+
+Render through `src/ui.ts`'s `note()` (wrapping `@clack/prompts`) rather
+than plain `console.log`, so the output reads as one styled block instead
+of loose log lines — this is the same library specs 03 and 04 use, kept
+consistent across the whole CLI:
+
+```ts
+import { note, log } from "../ui"
+
+note(
+  [
+    `Auth:     ${authLine}`,
+    `Service:  ${serviceLine}`,
+    `Boot:     ${bootLine}`,
+    `Last run: ${lastRunLine}`,
+  ].join("\n"),
+  "gentic status"
+)
+```
+
+Use `log.warn(...)` for the "not configured" case instead of folding it
+into the `note()` box, so it's visually distinct from a healthy status
+block. Keep `--json` (see below) completely unstyled — plain
+`console.log(JSON.stringify(...))`, no `@clack/prompts` involved, since
+scripts consuming `--json` shouldn't have to strip decoration.
+
 - Reuse spec 03's exported auth-state helper for the "Auth" line — do not
   re-implement reading the config store here.
 - Reuse spec 04's `getServiceBackend().status()` for the "Service" line.
