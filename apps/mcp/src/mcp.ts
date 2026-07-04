@@ -62,11 +62,12 @@ const handler = createMcpHandler(
       {
         description:
           "Returns the Gentic account id for the account that authorized this MCP connection.",
+        inputSchema: {},
         outputSchema: {
           userId: z.string().describe("The Gentic account id for this MCP connection."),
         },
       },
-      async ({ authInfo }) => {
+      async (_input, { authInfo }) => {
         const userId = resolveMcpUserId(authInfo)
 
         return {
@@ -82,9 +83,10 @@ const handler = createMcpHandler(
         title: "List Projects",
         description:
           "List Gentic projects owned by the authenticated account. Use a returned project id as project_id when creating or filtering issues.",
+        inputSchema: {},
         outputSchema: projectsOutputSchema,
       },
-      async ({ authInfo }) => {
+      async (_input, { authInfo }) => {
         try {
           const { supabase, userId } = getMcpToolContext(authInfo)
           const projects = await projectsService.listProjects(supabase, userId)
