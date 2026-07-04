@@ -214,7 +214,7 @@ export async function sendIssueMessage(formData: FormData) {
   revalidatePath(`/issues/${issue_id}`)
 }
 
-export async function uploadIssueAttachments(formData: FormData) {
+export async function uploadAttachments(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
   const files = formData
@@ -259,7 +259,7 @@ const deleteAttachmentSchema = z.object({
   issue_id: z.string().uuid(),
 })
 
-export async function deleteIssueAttachment(formData: FormData) {
+export async function deleteAttachment(formData: FormData) {
   const supabase = await getAuthenticatedSupabase()
   const { id, issue_id } = deleteAttachmentSchema.parse({
     id: getString(formData, "id"),

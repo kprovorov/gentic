@@ -33,7 +33,7 @@ import { cn } from "@gentic/ui/utils"
 
 import { IssueStatusSelect } from "./issue-status-select"
 import { IssueDeleteButton } from "./issue-delete-button"
-import { IssueAttachments, type IssueAttachment } from "./issue-attachments"
+import { Attachments, type Attachment } from "./attachments"
 import {
   IssueChat,
   type ChatMessage,
@@ -194,7 +194,7 @@ export default async function IssueDetailPage({
     throw new Error(attachmentsError.message)
   }
 
-  const attachments: IssueAttachment[] = await Promise.all(
+  const attachments: Attachment[] = await Promise.all(
     (attachmentRows ?? []).map(async (attachment) => {
       const { data: signed } = await supabase.storage
         .from(ATTACHMENTS_BUCKET)
@@ -287,7 +287,7 @@ export default async function IssueDetailPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <IssueAttachments issueId={issue.id} attachments={attachments} />
+              <Attachments issueId={issue.id} attachments={attachments} />
             </CardContent>
           </Card>
 

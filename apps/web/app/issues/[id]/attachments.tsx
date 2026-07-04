@@ -10,12 +10,9 @@ import {
 
 import { Button } from "@gentic/ui/button"
 
-import {
-  deleteIssueAttachment,
-  uploadIssueAttachments,
-} from "@/app/issues/actions"
+import { deleteAttachment, uploadAttachments } from "@/app/issues/actions"
 
-export type IssueAttachment = {
+export type Attachment = {
   id: string
   fileName: string
   sizeBytes: number | null
@@ -35,12 +32,12 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function IssueAttachments({
+export function Attachments({
   issueId,
   attachments,
 }: {
   issueId: string
-  attachments: IssueAttachment[]
+  attachments: Attachment[]
 }) {
   return (
     <div className="grid gap-4">
@@ -59,7 +56,7 @@ export function IssueAttachments({
       )}
 
       <form
-        action={uploadIssueAttachments}
+        action={uploadAttachments}
         encType="multipart/form-data"
         className="flex flex-wrap items-center gap-2"
       >
@@ -84,7 +81,7 @@ function AttachmentRow({
   attachment,
 }: {
   issueId: string
-  attachment: IssueAttachment
+  attachment: Attachment
 }) {
   const [isPending, startTransition] = useTransition()
 
@@ -100,7 +97,7 @@ function AttachmentRow({
     formData.set("id", attachment.id)
     formData.set("issue_id", issueId)
     startTransition(() => {
-      void deleteIssueAttachment(formData)
+      void deleteAttachment(formData)
     })
   }
 
