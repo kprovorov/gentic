@@ -2,29 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { z } from "zod"
 import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
+import { idSchema, projectSchema } from "@gentic/validators/projects"
 
-const projectSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  repo: z
-    .string()
-    .trim()
-    .regex(
-      /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/,
-      "Use the format user/repo"
-    ),
-  setup_script: z
-    .string()
-    .trim()
-    .max(10000)
-    .transform((value) => (value.length > 0 ? value : null))
-    .nullable(),
-})
-
-const idSchema = z.string().uuid()
+import * as projectsService from "@/lib/services/projects"
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key)
@@ -51,20 +34,13 @@ export async function createProject(formData: FormData) {
     setup_script: getString(formData, "setup_script"),
   })
 
-  const { error } = await supabase.from("projects").insert({
-    ...project,
-    user_id: userId,
-  })
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await projectsService.createProject(supabase, userId, project)
 
   revalidatePath("/settings")
 }
 
 export async function updateProject(formData: FormData) {
-  const { supabase } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedSupabase()
   const id = idSchema.parse(getString(formData, "id"))
   const project = projectSchema.parse({
     name: getString(formData, "name"),
@@ -72,30 +48,16 @@ export async function updateProject(formData: FormData) {
     setup_script: getString(formData, "setup_script"),
   })
 
-  const { error } = await supabase
-    .from("projects")
-    .update({
-      ...project,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await projectsService.updateProject(supabase, userId, id, project)
 
   revalidatePath("/settings")
 }
 
 export async function deleteProject(formData: FormData) {
-  const { supabase } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedSupabase()
   const id = idSchema.parse(getString(formData, "id"))
 
-  const { error } = await supabase.from("projects").delete().eq("id", id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await projectsService.deleteProject(supabase, userId, id)
 
   revalidatePath("/settings")
 }

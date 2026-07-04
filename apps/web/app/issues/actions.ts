@@ -8,6 +8,14 @@ import { z } from "zod"
 import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
+import {
+  createIssueSchema,
+  issueStatusSchema,
+  sendIssueMessageSchema,
+  updateIssueSchema,
+} from "@gentic/validators/issues"
+
+import * as issuesService from "@/lib/services/issues"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -17,97 +25,45 @@ function sanitizeFileName(name: string): string {
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file"
 }
 
-const issueStatusSchema = z.enum([
-  "draft",
-  "todo",
-  "in-progress",
-  "waiting-for-input",
-  "testing",
-  "tests-failed",
-  "ready-for-review",
-  "changes-requested",
-  "approved",
-  "merged",
-  "deploying",
-  "deploy-failed",
-  "validating",
-  "completed",
-])
-
-const issueSchema = z.object({
-  project_id: z.string().uuid(),
-  title: z.string().trim().min(1).max(160),
-  prompt: z.string().trim().optional(),
-  status: issueStatusSchema,
-})
-
 function getString(formData: FormData, key: string) {
   const value = formData.get(key)
   return typeof value === "string" ? value : ""
 }
 
-async function getAuthenticatedSupabase() {
+async function getAuthenticatedContext() {
   const { userId } = await auth()
 
   if (!userId) {
     redirect("/login")
   }
 
-  return await createClient()
+  return { supabase: await createClient(), userId }
 }
 
 export async function createIssue(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
-  const issue = issueSchema.parse({
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issue = createIssueSchema.parse({
     project_id: getString(formData, "project_id"),
     title: getString(formData, "title"),
     prompt: getString(formData, "prompt") || undefined,
     status: getString(formData, "status") || "draft",
   })
 
-  const { data, error } = await supabase
-    .from("issues")
-    .insert({
-      ...issue,
-      prompt: issue.prompt ?? null,
-    })
-    .select("id")
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  const created = await issuesService.createIssue(supabase, userId, issue)
 
   revalidatePath("/home")
-  redirect(`/issues/${data.id}`)
+  redirect(`/issues/${created.id}`)
 }
 
-const updateIssueSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().trim().min(1).max(160),
-  prompt: z.string().trim().optional(),
-})
-
 export async function updateIssue(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const { id, title, prompt } = updateIssueSchema.parse({
     id: getString(formData, "id"),
     title: getString(formData, "title"),
     prompt: getString(formData, "prompt") || undefined,
   })
 
-  const { error } = await supabase
-    .from("issues")
-    .update({
-      title,
-      prompt: prompt ?? null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await issuesService.updateIssue(supabase, userId, id, { id, title, prompt })
 
   revalidatePath("/home")
   revalidatePath(`/issues/${id}`)
@@ -115,107 +71,40 @@ export async function updateIssue(formData: FormData) {
 }
 
 export async function deleteIssue(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const id = z.string().uuid().parse(getString(formData, "id"))
 
-  const { error } = await supabase.from("issues").delete().eq("id", id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await issuesService.deleteIssue(supabase, userId, id)
 
   revalidatePath("/home")
   redirect("/home")
 }
 
 export async function updateIssueStatus(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const id = z.string().uuid().parse(getString(formData, "id"))
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
-  const { data: current, error: fetchError } = await supabase
-    .from("issues")
-    .select("status,title,prompt")
-    .eq("id", id)
-    .single<{ status: string; title: string; prompt: string | null }>()
-
-  if (fetchError) {
-    throw new Error(fetchError.message)
-  }
-
-  // Moving an issue from Draft to Todo queues an agent run: the remote
-  // `@gentic/gentic` agent picks up `run_status = 'queued'` issues over
-  // Supabase and drives Claude Code against a fresh clone of the repo.
-  const startsRun = current.status === "draft" && status === "todo"
-
-  const { error } = await supabase
-    .from("issues")
-    .update(startsRun ? { status, run_status: "queued" } : { status })
-    .eq("id", id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  if (startsRun) {
-    const messageContent = current.prompt
-      ? `${current.title}\n\n${current.prompt}`
-      : current.title
-
-    const { error: messageError } = await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: messageContent,
-    })
-
-    if (messageError) {
-      throw new Error(messageError.message)
-    }
-  }
+  await issuesService.updateIssueStatus(supabase, userId, id, status)
 
   revalidatePath("/home")
   revalidatePath(`/issues/${id}`)
 }
 
-const sendMessageSchema = z.object({
-  issue_id: z.string().uuid(),
-  content: z.string().trim().min(1).max(10_000),
-})
-
 export async function sendIssueMessage(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
-  const { issue_id, content } = sendMessageSchema.parse({
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_id, content } = sendIssueMessageSchema.parse({
     issue_id: getString(formData, "issue_id"),
     content: getString(formData, "content"),
   })
 
-  const { error } = await supabase.from("messages").insert({
-    issue_id,
-    role: "user",
-    content,
-  })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  // A finished run has no worker polling for it anymore. Re-queue so the
-  // `@gentic/gentic` agent picks this follow-up up and resumes the session.
-  const { error: requeueError } = await supabase
-    .from("issues")
-    .update({ run_status: "queued", updated_at: new Date().toISOString() })
-    .eq("id", issue_id)
-    .in("run_status", ["completed", "failed", "cancelled"])
-
-  if (requeueError) {
-    throw new Error(requeueError.message)
-  }
+  await issuesService.sendIssueMessage(supabase, userId, issue_id, content)
 
   revalidatePath(`/issues/${issue_id}`)
 }
 
 export async function uploadAttachments(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
+  const { supabase } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
   const files = formData
     .getAll("files")
@@ -260,7 +149,7 @@ const deleteAttachmentSchema = z.object({
 })
 
 export async function deleteAttachment(formData: FormData) {
-  const supabase = await getAuthenticatedSupabase()
+  const { supabase } = await getAuthenticatedContext()
   const { id, issue_id } = deleteAttachmentSchema.parse({
     id: getString(formData, "id"),
     issue_id: getString(formData, "issue_id"),
