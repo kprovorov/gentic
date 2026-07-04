@@ -2,7 +2,7 @@
 -- `${issue_id}/${attachment_id}-${file_name}`, so the first path segment ties
 -- an object back to its owning issue for the RLS policies below.
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('issue-attachments', 'issue-attachments', false, 52428800)
+values ('attachments', 'attachments', false, 52428800)
 on conflict (id) do nothing;
 
 create table public.attachments (
@@ -70,7 +70,7 @@ create policy "Users can read attachment files for their own issues"
   for select
   to authenticated
   using (
-    bucket_id = 'issue-attachments'
+    bucket_id = 'attachments'
     and exists (
       select 1
       from public.issues
@@ -85,7 +85,7 @@ create policy "Users can upload attachment files for their own issues"
   for insert
   to authenticated
   with check (
-    bucket_id = 'issue-attachments'
+    bucket_id = 'attachments'
     and exists (
       select 1
       from public.issues
@@ -100,7 +100,7 @@ create policy "Users can delete attachment files for their own issues"
   for delete
   to authenticated
   using (
-    bucket_id = 'issue-attachments'
+    bucket_id = 'attachments'
     and exists (
       select 1
       from public.issues

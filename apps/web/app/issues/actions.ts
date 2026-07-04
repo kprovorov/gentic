@@ -9,7 +9,7 @@ import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
 
-const ATTACHMENTS_BUCKET = "issue-attachments"
+const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 function sanitizeFileName(name: string): string {

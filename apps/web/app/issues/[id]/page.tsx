@@ -40,7 +40,7 @@ import {
   type RunStatus,
 } from "./issue-chat"
 
-const ATTACHMENTS_BUCKET = "issue-attachments"
+const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
 
 type IssueStatus =

@@ -7,7 +7,7 @@ import {
 
 export const runtime = "nodejs"
 
-const ATTACHMENTS_BUCKET = "issue-attachments"
+const ATTACHMENTS_BUCKET = "attachments"
 const SIGNED_URL_TTL_SECONDS = 300
 
 export async function GET(
