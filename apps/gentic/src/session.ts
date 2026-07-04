@@ -128,10 +128,7 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       provider,
       entry: CODEX_AGENT_ENTRY,
       env: {
-        DEFAULT_AUTH_REQUEST:
-          process.env.DEFAULT_AUTH_REQUEST ?? JSON.stringify({ methodId: "api-key" }),
         INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
-        NO_BROWSER: process.env.NO_BROWSER ?? "1",
       },
       newSession: (input) => ({
         cwd: input.cwd,
