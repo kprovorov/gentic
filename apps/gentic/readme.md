@@ -14,7 +14,8 @@ coding agent through the Agent Client Protocol.
   should run.
 - Git access to every repository configured in the Gentic web app.
 - Claude Code credentials for issues assigned to Claude Code.
-- `CODEX_API_KEY` or `OPENAI_API_KEY` for issues assigned to Codex.
+- Codex installed and authenticated in the worker environment for issues
+  assigned to Codex.
 
 ## Upload or deploy the agent
 
@@ -49,7 +50,6 @@ GENTIC_API_KEY=your-user-clerk-api-key
 GIT_REMOTE_BASE=git@github.com:
 WORKDIR=/tmp/gentic-workspaces
 POLL_INTERVAL_MS=3000
-CODEX_API_KEY=your-codex-or-openai-api-key
 ```
 
 For local web app development, `GENTIC_API_URL` can stay as
@@ -65,10 +65,11 @@ project belongs to that user.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
-`@agentclientprotocol/codex-acp`. Codex runs default to `NO_BROWSER=1`,
-`INITIAL_AGENT_MODE=agent-full-access`, and environment-key authentication via
-`CODEX_API_KEY` or `OPENAI_API_KEY` unless those values are overridden in the
-worker environment.
+`@agentclientprotocol/codex-acp`. Codex runs assume the Codex CLI is already
+installed and authenticated in the worker environment, the same way Claude Code
+credentials are managed outside Gentic. Codex runs default to
+`INITIAL_AGENT_MODE=agent-full-access` unless overridden in the worker
+environment.
 
 ## Setup
 
