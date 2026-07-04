@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
+// /api/mcp and /.well-known/oauth-* are authenticated via an OAuth bearer
+// token (see @clerk/mcp-tools), not a Clerk session cookie, so they must
+// never match isProtectedRoute below or MCP clients would get redirected
+// to /login instead of a 401 challenge.
 const isProtectedRoute = createRouteMatcher(["/home(.*)"])
 
 export const proxy = clerkMiddleware(async (auth, request) => {
