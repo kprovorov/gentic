@@ -125,6 +125,7 @@ async function processIssue(
     await runAgentSession({
       api,
       issueId: issue.id,
+      agentProvider: issue.agentProvider,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       onSessionId: (sessionId) =>

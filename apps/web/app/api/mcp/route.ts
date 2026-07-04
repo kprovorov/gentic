@@ -1,6 +1,7 @@
 import { verifyClerkToken } from "@clerk/mcp-tools/next"
 import { auth } from "@clerk/nextjs/server"
 import {
+  agentProviderSchema,
   createIssueSchema,
   issueStatusSchema,
   updateIssueSchema,
@@ -303,6 +304,10 @@ const handler = createMcpHandler(
             .optional()
             .default("draft")
             .describe("Initial issue status. Defaults to draft."),
+          agent_provider: agentProviderSchema
+            .optional()
+            .default("claude_code")
+            .describe("Coding agent to run for this issue. Defaults to Claude Code."),
         },
         outputSchema: issueOutputSchema,
       },
@@ -315,6 +320,7 @@ const handler = createMcpHandler(
             createIssueSchema.parse({
               ...input,
               status: input.status ?? "draft",
+              agent_provider: input.agent_provider ?? "claude_code",
             })
           )
           const issue = await issuesService.getIssue(supabase, userId, created.id)
@@ -344,6 +350,9 @@ const handler = createMcpHandler(
             .trim()
             .optional()
             .describe("Updated optional detailed instructions for the background coding agent."),
+          agent_provider: agentProviderSchema.describe(
+            "Coding agent to run for this issue."
+          ),
         },
         outputSchema: issueOutputSchema,
       },

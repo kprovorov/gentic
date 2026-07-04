@@ -47,6 +47,7 @@ export async function createIssue(formData: FormData) {
     title: getString(formData, "title"),
     prompt: getString(formData, "prompt") || undefined,
     status: getString(formData, "status") || "draft",
+    agent_provider: getString(formData, "agent_provider") || "claude_code",
   })
 
   const created = await issuesService.createIssue(supabase, userId, issue)
@@ -57,13 +58,19 @@ export async function createIssue(formData: FormData) {
 
 export async function updateIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title, prompt } = updateIssueSchema.parse({
+  const { id, title, prompt, agent_provider } = updateIssueSchema.parse({
     id: getString(formData, "id"),
     title: getString(formData, "title"),
     prompt: getString(formData, "prompt") || undefined,
+    agent_provider: getString(formData, "agent_provider") || "claude_code",
   })
 
-  await issuesService.updateIssue(supabase, userId, id, { id, title, prompt })
+  await issuesService.updateIssue(supabase, userId, id, {
+    id,
+    title,
+    prompt,
+    agent_provider,
+  })
 
   revalidatePath("/home")
   revalidatePath(`/issues/${id}`)

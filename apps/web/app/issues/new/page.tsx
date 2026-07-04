@@ -104,6 +104,20 @@ export default async function NewIssuePage() {
                 </div>
 
                 <div className="grid gap-2">
+                  <Label htmlFor="issue-agent-provider">Agent</Label>
+                  <select
+                    id="issue-agent-provider"
+                    name="agent_provider"
+                    required
+                    defaultValue="claude_code"
+                    className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                  >
+                    <option value="claude_code">Claude Code</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
                   <Label htmlFor="issue-prompt">Prompt</Label>
                   <textarea
                     id="issue-prompt"

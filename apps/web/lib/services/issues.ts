@@ -107,6 +107,7 @@ export async function createIssue(
       title: input.title,
       prompt: input.prompt ?? null,
       status: input.status,
+      agent_provider: input.agent_provider,
     })
     .select("id")
     .single()
@@ -126,11 +127,25 @@ export async function updateIssue(
 ) {
   await ensureIssueOwned(supabase, userId, id)
 
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("agent_provider")
+    .eq("id", id)
+    .single<{ agent_provider: string }>()
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+
   const { error } = await supabase
     .from("issues")
     .update({
       title: input.title,
       prompt: input.prompt ?? null,
+      agent_provider: input.agent_provider,
+      ...(current.agent_provider !== input.agent_provider
+        ? { session_id: null }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -170,7 +185,7 @@ export async function updateIssueStatus(
 
   // Moving an issue from Draft to Todo queues an agent run: the remote
   // `@gentic/gentic` agent picks up `run_status = 'queued'` issues over
-  // Supabase and drives Claude Code against a fresh clone of the repo.
+  // Supabase and drives the issue's selected coding agent against a fresh clone.
   const startsRun = current.status === "draft" && status === "todo"
 
   const { error } = await supabase
