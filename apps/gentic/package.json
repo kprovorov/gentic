@@ -1,7 +1,7 @@
 {
   "name": "@gentic/gentic",
   "version": "0.0.1",
-  "description": "Gentic agent: runs Claude Code over the Agent Client Protocol for queued issues.",
+  "description": "Gentic agent: runs coding agents over the Agent Client Protocol for queued issues.",
   "type": "module",
   "private": true,
   "scripts": {
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.55.0",
+    "@agentclientprotocol/codex-acp": "^1.1.0",
     "@agentclientprotocol/sdk": "^1.1.0",
     "dotenv": "^16.4.7",
     "zod": "^4.4.3"

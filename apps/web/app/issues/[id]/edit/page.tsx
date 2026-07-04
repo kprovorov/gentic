@@ -21,6 +21,7 @@ type Issue = {
   id: string
   title: string
   prompt: string | null
+  agent_provider: "claude_code" | "codex"
 }
 
 export default async function EditIssuePage({
@@ -38,7 +39,7 @@ export default async function EditIssuePage({
   const supabase = await createClient()
   const { data: issue, error } = await supabase
     .from("issues")
-    .select("id,title,prompt")
+    .select("id,title,prompt,agent_provider")
     .eq("id", id)
     .maybeSingle()
     .returns<Issue | null>()
@@ -98,6 +99,20 @@ export default async function EditIssuePage({
                   placeholder="Add context, acceptance notes, or links."
                   className="w-full resize-y rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base transition-[color,box-shadow,background-color] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="issue-agent-provider">Agent</Label>
+                <select
+                  id="issue-agent-provider"
+                  name="agent_provider"
+                  required
+                  defaultValue={issue.agent_provider}
+                  className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  <option value="claude_code">Claude Code</option>
+                  <option value="codex">Codex</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-2">

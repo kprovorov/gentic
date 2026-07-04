@@ -7,9 +7,13 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   type ActiveSession,
+  type ClientContext,
   type ContentBlock,
+  type NewSessionResponse,
+  type NewSessionRequest,
   type PermissionOption,
   type RequestPermissionOutcome,
+  type ResumeSessionResponse,
 } from "@agentclientprotocol/sdk"
 
 import {
@@ -20,13 +24,16 @@ import type { AgentApi } from "./api.js"
 
 const require = createRequire(import.meta.url)
 
-// The claude-agent-acp binary is an ACP *agent* that we spawn and drive over
-// stdio as the ACP *client*. Resolve its entry so it can run from any cwd.
-const AGENT_ENTRY = require.resolve(
+const CLAUDE_AGENT_ENTRY = require.resolve(
   "@agentclientprotocol/claude-agent-acp/dist/index.js"
 )
+const CODEX_AGENT_ENTRY = require.resolve(
+  "@agentclientprotocol/codex-acp/dist/index.js"
+)
 
-// Appended to Claude Code's default system prompt so every issue run ends
+export type AgentProvider = "claude_code" | "codex"
+
+// Appended to the selected agent's instructions so every issue run ends
 // with its work committed and proposed for review, without relying on each
 // issue's own instructions to say so.
 const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
@@ -37,6 +44,7 @@ export type PromptTurn = string | ContentBlock[]
 export interface RunSessionInput {
   api: AgentApi
   issueId: string
+  agentProvider: AgentProvider
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
   /**
@@ -54,15 +62,16 @@ export interface RunSessionInput {
 }
 
 /**
- * Spawns Claude Code over ACP against the cloned repo and drives one prompt
- * turn per message from `nextPrompt`, streaming assistant output into the
- * issue transcript. Resolves once `nextPrompt` returns `null`.
+ * Spawns the selected coding agent over ACP against the cloned repo and drives
+ * one prompt turn per message from `nextPrompt`, streaming assistant output
+ * into the issue transcript. Resolves once `nextPrompt` returns `null`.
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
-  const child = spawn(process.execPath, [AGENT_ENTRY], {
+  const agent = getAgentProviderConfig(input.agentProvider)
+  const child = spawn(process.execPath, [agent.entry], {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "inherit"],
-    env: process.env,
+    env: { ...process.env, ...agent.env },
   })
 
   try {
@@ -82,31 +91,21 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         clientInfo: { name: "gentic", version: "0.0.1" },
       })
 
-      const sessionBuilder = ctx.buildSession({
-        cwd: input.cwd,
-        mcpServers: [],
-        _meta: {
-          claudeCode: {
-            options: {
-              systemPrompt: {
-                type: "preset",
-                preset: "claude_code",
-                append: COMMIT_AND_PR_INSTRUCTIONS,
-              },
-              ...(input.resumeSessionId
-                ? { resume: input.resumeSessionId }
-                : {}),
-            },
-          },
-        },
-      })
-      const session = await sessionBuilder.start()
+      const session =
+        agent.provider === "codex" && input.resumeSessionId
+          ? await resumeSession(ctx, input.resumeSessionId, input.cwd)
+          : await ctx.buildSession(agent.newSession(input)).start()
       await input.onSessionId(session.sessionId)
 
+      let shouldPrependInstructions = agent.provider === "codex"
       for (;;) {
-        const prompt = await input.nextPrompt()
+        let prompt = await input.nextPrompt()
         if (prompt === null) {
           break
+        }
+        if (shouldPrependInstructions) {
+          prompt = prependInstructions(prompt)
+          shouldPrependInstructions = false
         }
         await runTurn(session, input.api, input.issueId, prompt)
       }
@@ -114,6 +113,85 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
   } finally {
     child.kill()
   }
+}
+
+interface AgentProviderConfig {
+  provider: AgentProvider
+  entry: string
+  env: NodeJS.ProcessEnv
+  newSession: (input: RunSessionInput) => NewSessionRequest
+}
+
+function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
+  if (provider === "codex") {
+    return {
+      provider,
+      entry: CODEX_AGENT_ENTRY,
+      env: {
+        DEFAULT_AUTH_REQUEST:
+          process.env.DEFAULT_AUTH_REQUEST ?? JSON.stringify({ methodId: "api-key" }),
+        INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        NO_BROWSER: process.env.NO_BROWSER ?? "1",
+      },
+      newSession: (input) => ({
+        cwd: input.cwd,
+        mcpServers: [],
+      }),
+    }
+  }
+
+  return {
+    provider,
+    entry: CLAUDE_AGENT_ENTRY,
+    env: {},
+    newSession: (input) => ({
+      cwd: input.cwd,
+      mcpServers: [],
+      _meta: {
+        claudeCode: {
+          options: {
+            systemPrompt: {
+              type: "preset",
+              preset: "claude_code",
+              append: COMMIT_AND_PR_INSTRUCTIONS,
+            },
+            ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
+          },
+        },
+      },
+    }),
+  }
+}
+
+function prependInstructions(prompt: PromptTurn): PromptTurn {
+  const instructions = `System instructions for this issue run:\n${COMMIT_AND_PR_INSTRUCTIONS}\n\nUser request:\n`
+
+  if (typeof prompt === "string") {
+    return `${instructions}${prompt}`
+  }
+
+  return [{ type: "text", text: instructions }, ...prompt]
+}
+
+async function resumeSession(
+  ctx: ClientContext,
+  sessionId: string,
+  cwd: string
+): Promise<ActiveSession> {
+  const response = (await ctx.request("session/resume", {
+    sessionId,
+    cwd,
+    mcpServers: [],
+  })) as ResumeSessionResponse
+
+  const attachable = ctx as unknown as {
+    attachSession(response: NewSessionResponse): ActiveSession
+  }
+
+  return attachable.attachSession({
+    sessionId,
+    ...response,
+  } satisfies NewSessionResponse)
 }
 
 /** Sends one prompt and streams updates into the transcript until it stops. */

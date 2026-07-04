@@ -65,6 +65,7 @@ type Issue = {
   id: string
   title: string
   prompt: string | null
+  agent_provider: "claude_code" | "codex"
   status: IssueStatus
   run_status: RunStatus
   pr_url: string | null
@@ -131,6 +132,11 @@ const statusIcons = {
   cancelled: IconCircleX,
 }
 
+const agentProviderLabels: Record<Issue["agent_provider"], string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -157,7 +163,7 @@ export default async function IssueDetailPage({
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,status,run_status,pr_url,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,agent_provider,status,run_status,pr_url,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -272,7 +278,8 @@ export default async function IssueDetailPage({
             <CardHeader>
               <CardTitle>Agent</CardTitle>
               <CardDescription>
-                Move this issue to Todo to run the agent, then chat with it here.
+                {agentProviderLabels[issue.agent_provider]} will run this issue
+                when it moves to Todo.
               </CardDescription>
             </CardHeader>
             <CardContent>

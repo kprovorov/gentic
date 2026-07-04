@@ -20,7 +20,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(
-      "id, session_id, run_finished_at, projects!inner(repo,setup_script,user_id)"
+      "id, agent_provider, session_id, run_finished_at, projects!inner(repo,setup_script,user_id)"
     )
     .eq("run_status", "queued")
     .eq("projects.user_id", userId)
@@ -63,6 +63,8 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
 
   return {
     id,
+    agentProvider:
+      (candidate as { agent_provider: "claude_code" | "codex" }).agent_provider,
     repo: project.repo,
     setupScript: project.setup_script,
     sessionId: (candidate as { session_id: string | null }).session_id,

@@ -1,5 +1,6 @@
 export interface ClaimedIssue {
   id: string
+  agentProvider: "claude_code" | "codex"
   repo: string
   setupScript: string | null
   sessionId: string | null
