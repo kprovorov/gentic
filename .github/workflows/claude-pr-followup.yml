@@ -1,0 +1,53 @@
+name: Claude PR Follow-up
+
+# Reacts to human feedback left on a pull request (a review, an inline review
+# comment, or a general PR comment) by starting a follow-up Claude Code
+# session that reads the discussion and implements any requested changes.
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+jobs:
+  respond:
+    # Skip bot-authored events (including Claude's own replies) to avoid
+    # triggering the workflow on itself, and skip plain approvals since
+    # those don't require follow-up work.
+    if: |
+      (github.event_name == 'pull_request_review' &&
+        github.event.review.user.type != 'Bot' &&
+        github.event.review.state != 'approved') ||
+      (github.event_name == 'pull_request_review_comment' &&
+        github.event.comment.user.type != 'Bot') ||
+      (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        github.event.comment.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+
+            A reviewer just left feedback on this pull request (a submitted
+            review, an inline review comment, or a general PR comment). Read
+            the full PR discussion and diff, including the latest feedback,
+            using `gh pr view`, `gh pr diff`, and `gh api`.
+
+            1. If the feedback requests changes or points out something to
+               fix, implement the change on the PR branch and push a commit.
+            2. If it's a question or otherwise doesn't require a code
+               change, reply with a PR comment explaining why, and make no
+               code changes.
+          claude_args: |
+            --allowedTools "Edit,Read,Write,Bash(gh pr comment:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git commit:*),Bash(git push:*)"
