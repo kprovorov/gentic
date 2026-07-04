@@ -1,5 +1,3 @@
-import { verifyClerkToken } from "@clerk/mcp-tools/next"
-import { auth } from "@clerk/nextjs/server"
 import {
   agentProviderSchema,
   createIssueSchema,
@@ -8,13 +6,13 @@ import {
   updateIssueStatusSchema,
 } from "@gentic/validators/issues"
 import { projectSchema } from "@gentic/validators/projects"
-import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
 
-import * as issuesService from "@/lib/services/issues"
-import * as projectsService from "@/lib/services/projects"
+import * as issuesService from "@gentic/services/issues"
+import * as projectsService from "@gentic/services/projects"
 
-import { getMcpToolContext, mcpErrorResult, mcpJsonResult, resolveMcpUserId } from "./_lib"
+import { getMcpToolContext, mcpErrorResult, mcpJsonResult, resolveMcpUserId } from "./lib"
 
 const jsonObjectSchema = z.record(z.string(), z.unknown())
 
@@ -423,16 +421,7 @@ const handler = createMcpHandler(
     )
   },
   {},
-  { basePath: "/api" }
+  { basePath: "", disableSse: true }
 )
 
-const authHandler = withMcpAuth(
-  handler,
-  async (_, token) => {
-    const clerkAuth = await auth({ acceptsToken: "oauth_token" })
-    return verifyClerkToken(clerkAuth, token)
-  },
-  { required: true }
-)
-
-export { authHandler as GET, authHandler as POST }
+export { handler as mcpHandler }
