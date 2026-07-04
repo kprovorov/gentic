@@ -1,9 +1,25 @@
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import type { AgentApi } from "./api"
+import type { ContentBlock } from "@agentclientprotocol/sdk"
 
-const ATTACHMENTS_DIR = ".gentic/attachments"
+import type { AgentApi, Attachment } from "./api"
+
+const TEXT_MIME_TYPES = new Set([
+  "application/json",
+  "application/xml",
+  "application/x-yaml",
+  "application/yaml",
+])
+
+function isImage(attachment: Attachment): boolean {
+  return (attachment.contentType ?? "").startsWith("image/")
+}
+
+function isText(attachment: Attachment): boolean {
+  const type = attachment.contentType ?? ""
+  return type.startsWith("text/") || TEXT_MIME_TYPES.has(type)
+}
 
 function sanitizeFileName(name: string, index: number): string {
   const base = name.split(/[/\\]/).pop() || `file-${index}`
@@ -11,41 +27,79 @@ function sanitizeFileName(name: string, index: number): string {
   return cleaned || `file-${index}`
 }
 
+async function downloadBytes(url: string, fileName: string): Promise<Uint8Array> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to download attachment "${fileName}": ${response.status}`)
+  }
+  return new Uint8Array(await response.arrayBuffer())
+}
+
 /**
- * Downloads an issue's attachments into the cloned repo so Claude Code can
- * read them like any other file, and returns a note pointing at their local
- * paths to append to the next prompt. Empty string when there are none.
+ * Turns an issue's uploaded attachments into ACP content blocks for the next
+ * prompt turn. Images and text files are embedded directly (base64 `image`
+ * blocks and inline `resource` text — no disk access needed by Claude Code).
+ * The ACP agent we spawn ignores embedded binary resources and treats
+ * `resource_link` as a bare pointer, so anything else is downloaded into
+ * `attachmentsDir` and referenced by its local path instead. That directory
+ * is a sibling of the repo clone, not inside it, so it can never end up
+ * swept into the commit the agent is instructed to make.
  */
-export async function downloadAttachments(
+export async function buildAttachmentBlocks(
   api: AgentApi,
   issueId: string,
-  cwd: string
-): Promise<string> {
+  attachmentsDir: string
+): Promise<ContentBlock[]> {
   const attachments = await api.fetchAttachments(issueId)
   if (attachments.length === 0) {
-    return ""
+    return []
   }
 
-  await mkdir(join(cwd, ATTACHMENTS_DIR), { recursive: true })
+  // Re-downloaded fresh each run, so start from a clean directory.
+  await rm(attachmentsDir, { recursive: true, force: true })
 
-  const paths: string[] = []
+  const blocks: ContentBlock[] = []
+  let dirCreated = false
+
   for (const [index, attachment] of attachments.entries()) {
-    const response = await fetch(attachment.url)
-    if (!response.ok) {
-      throw new Error(
-        `Failed to download attachment "${attachment.fileName}": ${response.status}`
-      )
+    if (isImage(attachment)) {
+      const bytes = await downloadBytes(attachment.url, attachment.fileName)
+      blocks.push({
+        type: "image",
+        data: Buffer.from(bytes).toString("base64"),
+        mimeType: attachment.contentType ?? "application/octet-stream",
+      })
+      continue
     }
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    const relativePath = join(
-      ATTACHMENTS_DIR,
-      sanitizeFileName(attachment.fileName, index)
-    )
-    await writeFile(join(cwd, relativePath), bytes)
-    paths.push(relativePath)
+
+    if (isText(attachment)) {
+      const bytes = await downloadBytes(attachment.url, attachment.fileName)
+      blocks.push({
+        type: "resource",
+        resource: {
+          uri: `attachment:///${sanitizeFileName(attachment.fileName, index)}`,
+          text: Buffer.from(bytes).toString("utf-8"),
+          mimeType: attachment.contentType ?? undefined,
+        },
+      })
+      continue
+    }
+
+    if (!dirCreated) {
+      await mkdir(attachmentsDir, { recursive: true })
+      dirCreated = true
+    }
+    const path = join(attachmentsDir, sanitizeFileName(attachment.fileName, index))
+    const bytes = await downloadBytes(attachment.url, attachment.fileName)
+    await writeFile(path, bytes)
+    blocks.push({
+      type: "resource_link",
+      uri: `file://${path}`,
+      name: attachment.fileName,
+      mimeType: attachment.contentType ?? undefined,
+      size: attachment.sizeBytes ?? undefined,
+    })
   }
 
-  return `\n\nAttached files (available at these paths in the repo):\n${paths
-    .map((path) => `- ${path}`)
-    .join("\n")}`
+  return blocks
 }

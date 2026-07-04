@@ -31,6 +31,9 @@ const AGENT_ENTRY = require.resolve(
 // issue's own instructions to say so.
 const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
 
+/** One prompt turn: plain text, or text plus attachment content blocks. */
+export type PromptTurn = string | ContentBlock[]
+
 export interface RunSessionInput {
   api: AgentApi
   issueId: string
@@ -47,7 +50,7 @@ export interface RunSessionInput {
    * Supplies the next user prompt for the session. Resolve with `null` when
    * there is no more work, which ends the session.
    */
-  nextPrompt: () => Promise<string | null>
+  nextPrompt: () => Promise<PromptTurn | null>
 }
 
 /**
@@ -118,7 +121,7 @@ async function runTurn(
   session: ActiveSession,
   api: AgentApi,
   issueId: string,
-  prompt: string
+  prompt: PromptTurn
 ): Promise<void> {
   const promptDone = session.prompt(prompt)
 
