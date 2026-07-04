@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./issues": "./src/issues.ts",
+    "./projects": "./src/projects.ts"
   },
   "scripts": {
     "lint": "eslint .",
