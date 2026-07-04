@@ -1,5 +1,6 @@
 import type {
   CreateIssueValues,
+  IssueRelationDirection,
   IssueStatus,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
@@ -8,6 +9,22 @@ import { ServiceError } from "./errors"
 import type { Supabase } from "./types"
 
 const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
+
+export type IssueRelationIssue = {
+  id: string
+  title: string
+  status: string
+}
+
+export type IssueRelation = {
+  id: string
+  source_issue_id: string
+  target_issue_id: string
+  type: "blocks"
+  created_at: string
+  source_issue: IssueRelationIssue
+  target_issue: IssueRelationIssue
+}
 
 async function ensureProjectOwned(
   supabase: Supabase,
@@ -43,6 +60,26 @@ async function ensureIssueOwned(supabase: Supabase, userId: string, issueId: str
     throw new ServiceError("internal", error.message)
   }
   if (!data) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+}
+
+async function ensureIssuesOwned(
+  supabase: Supabase,
+  userId: string,
+  issueIds: string[]
+) {
+  const uniqueIds = Array.from(new Set(issueIds))
+  const { data, error } = await supabase
+    .from("issues")
+    .select("id, projects!inner(user_id)")
+    .in("id", uniqueIds)
+    .eq("projects.user_id", userId)
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if ((data?.length ?? 0) !== uniqueIds.length) {
     throw new ServiceError("not_found", "Issue not found")
   }
 }
@@ -88,6 +125,51 @@ export async function getIssue(supabase: Supabase, userId: string, id: string) {
   }
   if (!data) {
     throw new ServiceError("not_found", "Issue not found")
+  }
+
+  return data
+}
+
+export async function listIssueRelationCandidates(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data, error } = await supabase
+    .from("issues")
+    .select("id,title,status,projects!inner(user_id)")
+    .eq("projects.user_id", userId)
+    .neq("id", issueId)
+    .order("created_at", { ascending: false })
+    .returns<IssueRelationIssue[]>()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data
+}
+
+export async function listIssueRelations(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data, error } = await supabase
+    .from("issue_relations")
+    .select(
+      "id,source_issue_id,target_issue_id,type,created_at,source_issue:issues!issue_relations_source_issue_id_fkey(id,title,status),target_issue:issues!issue_relations_target_issue_id_fkey(id,title,status)"
+    )
+    .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
+    .order("created_at", { ascending: false })
+    .returns<IssueRelation[]>()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
   }
 
   return data
@@ -159,6 +241,77 @@ export async function deleteIssue(supabase: Supabase, userId: string, id: string
   await ensureIssueOwned(supabase, userId, id)
 
   const { error } = await supabase.from("issues").delete().eq("id", id)
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+}
+
+export async function addIssueRelation(
+  supabase: Supabase,
+  userId: string,
+  issueId: string,
+  relatedIssueId: string,
+  direction: IssueRelationDirection
+) {
+  if (issueId === relatedIssueId) {
+    throw new ServiceError("validation", "An issue cannot relate to itself")
+  }
+
+  await ensureIssuesOwned(supabase, userId, [issueId, relatedIssueId])
+
+  const sourceIssueId = direction === "blocking" ? issueId : relatedIssueId
+  const targetIssueId = direction === "blocking" ? relatedIssueId : issueId
+
+  const { error } = await supabase.from("issue_relations").insert({
+    source_issue_id: sourceIssueId,
+    target_issue_id: targetIssueId,
+    type: "blocks",
+  })
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new ServiceError("validation", "This relation already exists")
+    }
+    throw new ServiceError("internal", error.message)
+  }
+}
+
+export async function deleteIssueRelation(
+  supabase: Supabase,
+  userId: string,
+  relationId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data: relation, error: fetchError } = await supabase
+    .from("issue_relations")
+    .select("id,source_issue_id,target_issue_id")
+    .eq("id", relationId)
+    .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
+    .maybeSingle<{
+      id: string
+      source_issue_id: string
+      target_issue_id: string
+    }>()
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!relation) {
+    throw new ServiceError("not_found", "Relation not found")
+  }
+
+  await ensureIssuesOwned(supabase, userId, [
+    relation.source_issue_id,
+    relation.target_issue_id,
+  ])
+
+  const { error } = await supabase
+    .from("issue_relations")
+    .delete()
+    .eq("id", relationId)
 
   if (error) {
     throw new ServiceError("internal", error.message)

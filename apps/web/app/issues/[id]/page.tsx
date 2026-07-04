@@ -40,6 +40,8 @@ import {
   type ChatMessage,
   type RunStatus,
 } from "./issue-chat"
+import { IssueRelations } from "./issue-relations"
+import * as issuesService from "@/lib/services/issues"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
@@ -206,6 +208,11 @@ export default async function IssueDetailPage({
     throw new Error(attachmentsError.message)
   }
 
+  const [relations, relationCandidates] = await Promise.all([
+    issuesService.listIssueRelations(supabase, userId, id),
+    issuesService.listIssueRelationCandidates(supabase, userId, id),
+  ])
+
   const attachments: Attachment[] = await Promise.all(
     (attachmentRows ?? []).map(async (attachment) => {
       const { data: signed } = await supabase.storage
@@ -288,6 +295,22 @@ export default async function IssueDetailPage({
                 initialMessages={messages ?? []}
                 initialRunStatus={issue.run_status}
                 initialPrUrl={issue.pr_url}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Relations</CardTitle>
+              <CardDescription>
+                Connect issues that block or depend on this work.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IssueRelations
+                issueId={issue.id}
+                relations={relations}
+                candidates={relationCandidates}
               />
             </CardContent>
           </Card>
