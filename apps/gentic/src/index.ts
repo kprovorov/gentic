@@ -3,12 +3,12 @@ import "dotenv/config"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
-import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
-import { buildAttachmentBlocks } from "./attachments"
-import { loadConfig, type Config } from "./config"
-import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git"
-import { setRunState } from "./messages"
-import { runAgentSession, type PromptTurn } from "./session"
+import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
+import { buildAttachmentBlocks } from "./attachments.js"
+import { loadConfig, type Config } from "./config.js"
+import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git.js"
+import { setRunState } from "./messages.js"
+import { runAgentSession, type PromptTurn } from "./session.js"
 
 async function main(): Promise<void> {
   const config = loadConfig()

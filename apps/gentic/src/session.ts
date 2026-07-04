@@ -15,8 +15,8 @@ import {
 import {
   StreamingAssistantMessage,
   insertMessage,
-} from "./messages"
-import type { AgentApi } from "./api"
+} from "./messages.js"
+import type { AgentApi } from "./api.js"
 
 const require = createRequire(import.meta.url)
 
