@@ -52,6 +52,10 @@ export async function listIssues(
   userId: string,
   filters?: { projectId?: string }
 ) {
+  if (filters?.projectId) {
+    await ensureProjectOwned(supabase, userId, filters.projectId)
+  }
+
   let query = supabase
     .from("issues")
     .select(ISSUE_WITH_PROJECT_SELECT)
