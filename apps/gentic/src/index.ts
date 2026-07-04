@@ -5,7 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
 import { loadConfig, type Config } from "./config"
-import { cloneRepo } from "./git"
+import { cloneRepo, runSetupScript } from "./git"
 import { setRunState } from "./messages"
 import { runAgentSession } from "./session"
 
@@ -66,6 +66,11 @@ async function processIssue(
       repo: issue.repo,
       dir,
     })
+
+    if (issue.setupScript) {
+      await runSetupScript({ script: issue.setupScript, dir })
+    }
+
     await setRunState(api, issue.id, { run_status: "running" })
 
     // Feed user messages to the session oldest-first. Follow-ups sent while the

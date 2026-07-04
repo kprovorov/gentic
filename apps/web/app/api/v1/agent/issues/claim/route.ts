@@ -19,7 +19,9 @@ export async function POST(request: Request) {
 async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
-    .select("id, session_id, run_finished_at, projects!inner(repo,user_id)")
+    .select(
+      "id, session_id, run_finished_at, projects!inner(repo,setup_script,user_id)"
+    )
     .eq("run_status", "queued")
     .eq("projects.user_id", userId)
     .order("updated_at", { ascending: true })
@@ -57,21 +59,30 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     return null
   }
 
+  const project = extractProject(candidate)
+
   return {
     id,
-    repo: extractRepo(candidate),
+    repo: project.repo,
+    setupScript: project.setup_script,
     sessionId: (candidate as { session_id: string | null }).session_id,
     runFinishedAt: (candidate as { run_finished_at: string | null })
       .run_finished_at,
   }
 }
 
-function extractRepo(row: unknown): string {
+function extractProject(row: unknown): {
+  repo: string
+  setup_script: string | null
+} {
   const projects = (row as { projects?: unknown }).projects
   const project = Array.isArray(projects) ? projects[0] : projects
   const repo = (project as { repo?: string } | undefined)?.repo
   if (!repo) {
     throw new Error("Issue has no associated project repo")
   }
-  return repo
+  const setup_script =
+    (project as { setup_script?: string | null } | undefined)?.setup_script ??
+    null
+  return { repo, setup_script }
 }

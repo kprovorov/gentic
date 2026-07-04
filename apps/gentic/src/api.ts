@@ -1,6 +1,7 @@
 export interface ClaimedIssue {
   id: string
   repo: string
+  setupScript: string | null
   sessionId: string | null
   runFinishedAt: string | null
 }
