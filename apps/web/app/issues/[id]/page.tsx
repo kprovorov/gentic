@@ -15,6 +15,7 @@ import {
   IconMessage2,
   IconMessageQuestion,
   IconPencil,
+  IconRobot,
   IconRocket,
   IconShieldCheck,
   IconThumbUp,
@@ -248,14 +249,20 @@ export default async function IssueDetailPage({
             </div>
           </div>
           <div className="grid gap-3">
-            <div
-              className={cn(
-                "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-                statusStyles[issue.status]
-              )}
-            >
-              <StatusIcon className="size-3.5" />
-              {statusLabels[issue.status]}
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className={cn(
+                  "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
+                  statusStyles[issue.status]
+                )}
+              >
+                <StatusIcon className="size-3.5" />
+                {statusLabels[issue.status]}
+              </div>
+              <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+                <IconRobot className="size-3.5" />
+                Agent: {agentProviderLabels[issue.agent_provider]}
+              </div>
             </div>
             <h1 className="text-3xl">{issue.title}</h1>
           </div>
