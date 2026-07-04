@@ -31,6 +31,25 @@ export async function runSetupScript(options: {
   await run("sh", ["-c", options.script], { cwd: options.dir })
 }
 
+/**
+ * Looks up the URL of the pull request open for the current branch of the
+ * cloned repo, if the agent created one during its run. Returns `null` when
+ * there is no such PR (e.g. the agent made no changes).
+ */
+export async function getPullRequestUrl(dir: string): Promise<string | null> {
+  try {
+    const output = await runCapture(
+      "gh",
+      ["pr", "view", "--json", "url", "-q", ".url"],
+      { cwd: dir }
+    )
+    const url = output.trim()
+    return url.length > 0 ? url : null
+  } catch {
+    return null
+  }
+}
+
 function run(
   command: string,
   args: string[],
@@ -45,6 +64,31 @@ function run(
     child.on("close", (code) => {
       if (code === 0) {
         resolve()
+      } else {
+        reject(new Error(`${command} ${args.join(" ")} exited with code ${code}`))
+      }
+    })
+  })
+}
+
+function runCapture(
+  command: string,
+  args: string[],
+  options: { cwd?: string } = {}
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "inherit"],
+      cwd: options.cwd,
+    })
+    let stdout = ""
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
+    child.on("error", reject)
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(stdout)
       } else {
         reject(new Error(`${command} ${args.join(" ")} exited with code ${code}`))
       }

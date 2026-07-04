@@ -20,6 +20,7 @@ export const runStateSchema = z
     run_error: z.string().nullable().optional(),
     run_started_at: z.string().datetime().nullable().optional(),
     run_finished_at: z.string().datetime().nullable().optional(),
+    pr_url: z.string().url().nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0)

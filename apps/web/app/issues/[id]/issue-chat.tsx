@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTransition } from "react"
-import { IconSend } from "@tabler/icons-react"
+import { IconExternalLink, IconGitPullRequest, IconSend } from "@tabler/icons-react"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
@@ -62,13 +62,16 @@ export function IssueChat({
   issueId,
   initialMessages,
   initialRunStatus,
+  initialPrUrl,
 }: {
   issueId: string
   initialMessages: ChatMessage[]
   initialRunStatus: RunStatus
+  initialPrUrl: string | null
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [runStatus, setRunStatus] = useState<RunStatus>(initialRunStatus)
+  const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
   const [draft, setDraft] = useState("")
   const [isPending, startTransition] = useTransition()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -108,7 +111,9 @@ export function IssueChat({
           filter: `id=eq.${issueId}`,
         },
         (payload) => {
-          setRunStatus((payload.new as { run_status: RunStatus }).run_status)
+          const next = payload.new as { run_status: RunStatus; pr_url: string | null }
+          setRunStatus(next.run_status)
+          setPrUrl(next.pr_url)
         }
       )
       .subscribe()
@@ -140,14 +145,30 @@ export function IssueChat({
 
   return (
     <div className="flex flex-col gap-4">
-      {runStatus ? (
-        <div
-          className={cn(
-            "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-            runStatusStyles[runStatus]
-          )}
-        >
-          {runStatusLabels[runStatus]}
+      {runStatus || prUrl ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {runStatus ? (
+            <div
+              className={cn(
+                "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
+                runStatusStyles[runStatus]
+              )}
+            >
+              {runStatusLabels[runStatus]}
+            </div>
+          ) : null}
+          {prUrl ? (
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+            >
+              <IconGitPullRequest className="size-3.5" />
+              Pull request
+              <IconExternalLink className="size-3.5" />
+            </a>
+          ) : null}
         </div>
       ) : null}
 
