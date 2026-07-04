@@ -2,7 +2,7 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
 import { createServiceClient } from "@gentic/supabase/service"
 import { z } from "zod"
 
-import { ServiceError } from "@/lib/services/errors"
+import { ServiceError } from "@gentic/services/errors"
 
 export function resolveMcpUserId(authInfo: AuthInfo | undefined): string {
   const userId = authInfo?.extra?.userId

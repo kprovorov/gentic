@@ -7,7 +7,7 @@ import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
-import * as projectsService from "@/lib/services/projects"
+import * as projectsService from "@gentic/services/projects"
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key)

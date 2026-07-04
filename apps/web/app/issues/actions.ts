@@ -15,7 +15,7 @@ import {
   updateIssueSchema,
 } from "@gentic/validators/issues"
 
-import * as issuesService from "@/lib/services/issues"
+import * as issuesService from "@gentic/services/issues"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
