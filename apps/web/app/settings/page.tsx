@@ -17,6 +17,7 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import { Textarea } from "@gentic/ui/textarea"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 
@@ -24,6 +25,7 @@ type Project = {
   id: string
   name: string
   repo: string
+  setup_script: string | null
 }
 
 export const metadata: Metadata = {
@@ -41,7 +43,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: projects, error } = await supabase
     .from("projects")
-    .select("id,name,repo")
+    .select("id,name,repo,setup_script")
     .order("created_at", { ascending: false })
     .returns<Project[]>()
 
@@ -85,6 +87,18 @@ export default async function SettingsPage() {
                     placeholder="kprovorov/gentic"
                     required
                     pattern="[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="project-setup-script">
+                    Setup script (optional)
+                  </Label>
+                  <Textarea
+                    id="project-setup-script"
+                    name="setup_script"
+                    placeholder="npm install"
+                    rows={4}
+                    className="font-mono"
                   />
                 </div>
                 <Button type="submit" className="mt-2">
@@ -135,6 +149,19 @@ export default async function SettingsPage() {
                             />
                           </div>
                         </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`setup-script-${project.id}`}>
+                          Setup script (optional)
+                        </Label>
+                        <Textarea
+                          id={`setup-script-${project.id}`}
+                          name="setup_script"
+                          defaultValue={project.setup_script ?? ""}
+                          placeholder="npm install"
+                          rows={4}
+                          className="font-mono"
+                        />
                       </div>
                       <div className="flex gap-2">
                         <Button type="submit" variant="outline">

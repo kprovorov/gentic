@@ -20,9 +20,27 @@ export async function cloneRepo(options: {
   await run("git", ["clone", "--depth", "1", remote, options.dir])
 }
 
-function run(command: string, args: string[]): Promise<void> {
+/**
+ * Runs a project's configured setup script (e.g. `npm install`) in the
+ * cloned repo before the agent session starts.
+ */
+export async function runSetupScript(options: {
+  script: string
+  dir: string
+}): Promise<void> {
+  await run("sh", ["-c", options.script], { cwd: options.dir })
+}
+
+function run(
+  command: string,
+  args: string[],
+  options: { cwd?: string } = {}
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "inherit", "inherit"] })
+    const child = spawn(command, args, {
+      stdio: ["ignore", "inherit", "inherit"],
+      cwd: options.cwd,
+    })
     child.on("error", reject)
     child.on("close", (code) => {
       if (code === 0) {
