@@ -1,4 +1,4 @@
-import type { AgentApi, MessageFields, RunStateFields } from "./api"
+import type { AgentApi, MessageFields, RunStateFields } from "./api.js"
 
 /**
  * An assistant message that is written to the issue transcript incrementally as

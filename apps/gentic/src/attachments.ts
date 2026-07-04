@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import type { ContentBlock } from "@agentclientprotocol/sdk"
 
-import type { AgentApi, Attachment } from "./api"
+import type { AgentApi, Attachment } from "./api.js"
 
 const TEXT_MIME_TYPES = new Set([
   "application/json",

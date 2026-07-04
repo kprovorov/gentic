@@ -82,6 +82,12 @@ Run lint for the agent:
 pnpm --filter @gentic/gentic lint
 ```
 
+Build the agent:
+
+```bash
+pnpm --filter @gentic/gentic build
+```
+
 ## Run locally
 
 Start the agent in watch mode:
@@ -93,6 +99,7 @@ pnpm --filter @gentic/gentic dev
 Start the agent without watch mode:
 
 ```bash
+pnpm --filter @gentic/gentic build
 pnpm --filter @gentic/gentic start
 ```
 
@@ -111,6 +118,7 @@ agent on the next poll interval.
 Example `pm2` command from the repository root:
 
 ```bash
+pnpm --filter @gentic/gentic build
 pm2 start "pnpm --filter @gentic/gentic start" --name gentic-agent
 ```
 
