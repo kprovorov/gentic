@@ -10,7 +10,7 @@ import express from "express"
 import { mcpHandler } from "./mcp"
 
 const app = express()
-const port = Number(process.env.PORT ?? 3001)
+const port = Number(process.env.PORT ?? 3000)
 
 app.set("trust proxy", true)
 app.use(express.json({ limit: "1mb", type: ["application/json", "application/*+json"] }))
@@ -48,13 +48,9 @@ function toWebRequest(req: express.Request, handlerPath: string): Request {
   return request
 }
 
-async function handleMcpRequest(
-  req: express.Request,
-  res: express.Response,
-  handlerPath = "/mcp"
-) {
+async function handleMcpRequest(req: express.Request, res: express.Response) {
   try {
-    const webResponse = await mcpHandler(toWebRequest(req, handlerPath))
+    const webResponse = await mcpHandler(toWebRequest(req, "/mcp"))
 
     res.status(webResponse.status)
     webResponse.headers.forEach((value, key) => {
@@ -69,10 +65,12 @@ async function handleMcpRequest(
   }
 }
 
-app.all("/mcp", mcpAuthClerk, (req, res) => handleMcpRequest(req, res))
 app.all("/", mcpAuthClerk, (req, res) => handleMcpRequest(req, res))
-app.all("/api/mcp", mcpAuthClerk, (req, res) => handleMcpRequest(req, res))
 
-app.listen(port, () => {
-  console.log(`[mcp] listening on http://localhost:${port}`)
-})
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`[mcp] listening on http://localhost:${port}`)
+  })
+}
+
+export default app

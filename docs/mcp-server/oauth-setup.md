@@ -37,10 +37,7 @@ fill in the same values.
 ## Endpoints
 
 - `GET /health` returns a basic health check.
-- `POST /mcp` is the canonical Streamable HTTP MCP endpoint.
-- `POST /` is also accepted so `https://mcp.gentic.chat` can be used directly
-  by clients that allow root MCP URLs.
-- `POST /api/mcp` is accepted as a migration path from the old web-app route.
+- `POST /` is the Streamable HTTP MCP endpoint.
 - `GET /.well-known/oauth-protected-resource[/...]` serves RFC 9728 protected
   resource metadata for OAuth-capable MCP clients.
 - `GET /.well-known/oauth-authorization-server` serves Clerk authorization
@@ -52,17 +49,17 @@ fill in the same values.
 pnpm --filter @gentic/mcp dev
 
 # Discovery metadata, unauthenticated
-curl -i http://localhost:3001/.well-known/oauth-protected-resource/mcp
+curl -i http://localhost:3000/.well-known/oauth-protected-resource
 
 # No token -> 401 with a WWW-Authenticate challenge
-curl -i http://localhost:3001/mcp
+curl -i http://localhost:3000/
 
 # Garbage token -> 401
-curl -i http://localhost:3001/mcp -H "Authorization: Bearer garbage"
+curl -i http://localhost:3000/ -H "Authorization: Bearer garbage"
 ```
 
 To test the full OAuth handshake against a local dev server, tunnel it
-(for example, `ngrok http 3001`) and point an OAuth-capable MCP client at
-`https://<tunnel-host>/mcp`. The client should discover the protected resource
+(for example, `ngrok http 3000`) and point an OAuth-capable MCP client at
+`https://<tunnel-host>`. The client should discover the protected resource
 metadata, complete Clerk's hosted OAuth consent flow, and then be able to call
 the `whoami` tool.
