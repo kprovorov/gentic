@@ -1,12 +1,20 @@
-# 06 — Standalone binary compilation
+# Standalone binary compilation
 
 ## Context
 
-Depends on spec 01 only (needs `src/cli.ts` as the single entrypoint).
-Can be developed in parallel with specs 02-05, but the final artifact is
-most useful once those have landed too (a compiled binary missing `auth`/
-`start`/`status` isn't very useful) — sequence your own testing
-accordingly, but the build mechanism itself doesn't need them.
+### Prerequisites
+
+This task assumes `apps/gentic` already has a single CLI entrypoint,
+`src/cli.ts` (a `commander`-based command tree, `bin`-pointed at from
+`package.json`). If it doesn't exist yet, treat `src/index.ts` as the
+entrypoint instead and adjust the build script's target path accordingly
+— the compilation mechanism below doesn't depend on which commands exist,
+only on there being one file that boots the whole CLI.
+
+The compiled binary is most useful once login/service/status commands
+exist too (a binary that can only run the worker loop in the foreground
+isn't a great distribution target), but this task's own work — the build
+mechanism — doesn't require them to exist first.
 
 Read `src/session.ts` closely before starting — it contains the one thing
 in this codebase that makes naive bundling break silently (see below).
@@ -28,8 +36,9 @@ edges with ESM and `import.meta.url`-based resolution (`createRequire`,
 command, and produces a working executable with much less ceremony. The
 tradeoff: Bun becomes a **build-time** dependency (not a runtime one — the
 output binary doesn't need Bun installed on the target machine). Confirm
-Bun is available in CI before wiring the release workflow (spec 07) —
-don't assume it's preinstalled everywhere.
+Bun is available wherever this build script runs (local dev machine, CI) —
+don't assume it's preinstalled everywhere; document the install step if
+it's missing.
 
 ## The one hard problem: the ACP agent child process
 
@@ -130,12 +139,13 @@ authoritative list/naming — it has changed between versions).
   typecheck passing is not sufficient evidence this works, because the
   failure mode is a runtime `spawn`/`resolve` error, not a type error.
 - `gentic --help` and `gentic --version` work from the compiled binary.
-- Binary size and build time are noted in the PR description (sets a
-  baseline for spec 07's release workflow timeout budgeting).
+- Binary size and build time are noted in the PR description (useful
+  baseline for anyone later wiring this into a CI release workflow with a
+  timeout budget).
 
 ## Explicitly out of scope
 
 - Code signing / notarization for macOS binaries (Gatekeeper will warn on
-  first run) — flag as a follow-up for spec 07 if distribution friction
-  turns out to matter.
+  first run) — flag as a follow-up if distribution friction turns out to
+  matter.
 - Windows target — not requested; skip unless asked.

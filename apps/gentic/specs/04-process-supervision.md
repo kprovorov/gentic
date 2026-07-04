@@ -1,21 +1,36 @@
-# 04 — Process supervision: `start` / `stop` / `restart` (auto-restart, start-on-boot)
+# Process supervision: `start` / `stop` / `restart` (auto-restart, start-on-boot)
 
 ## Context
 
-Depends on spec 01 only (needs `gentic run` to exist as the foreground
-worker command). Can be built in parallel with specs 02/03/06.
+### Prerequisites
+
+This task assumes `apps/gentic` already has:
+
+- `src/cli.ts` — a `commander`-based CLI entry with a command-registration
+  pattern of roughly `export function register<Name>Command(program:
+  Command): void`.
+- `src/commands/run.ts` / a `gentic run` command that runs the worker loop
+  in the foreground (blocking, no daemonization of its own). This is the
+  command any service unit built by this task must invoke.
+- `src/ui.ts` — a thin wrapper around `@clack/prompts` re-exporting
+  `spinner`, `log`, and friends.
+
+If any of these don't exist yet, create a minimal version first (a `run`
+command that just calls the existing worker entrypoint in the foreground
+is enough) rather than working around its absence — the rest of this task
+depends on `gentic run` existing as the thing to supervise.
 
 Today the README tells operators to wrap `pnpm --filter @gentic/gentic
 start` in `pm2` or a hand-written `systemd` unit (see
 `apps/gentic/readme.md`, "Production process example"). The ask is for
 `gentic` itself to do this, so nobody needs pm2 installed separately, and
-so the packaged CLI (Homebrew/apt, spec 07) is self-sufficient.
+so a packaged install (Homebrew/apt) is self-sufficient.
 
 ## Goal
 
-`gentic start` / `gentic stop` / `gentic restart` / `gentic status`
-(service-state portion only — spec 05 owns the full `status` command and
-should call into whatever this spec exports rather than duplicate it) that:
+`gentic start` / `gentic stop` / `gentic restart` and a service-state
+query that a separate status command can call into later (see "Exposed
+state" below) that:
 
 - Install and manage a **real OS service** so crashes auto-restart and the
   worker starts on boot, using the platform's native service manager. This
@@ -28,9 +43,9 @@ should call into whatever this spec exports rather than duplicate it) that:
   or auto-restart on crash.
 
 **Important naming**: the service's `ExecStart`/`ProgramArguments` must
-invoke `gentic run` (the foreground command from spec 01), never `gentic
-start` — `start` is the management command in this spec, `run` is the
-thing being managed. Don't create a recursive relaunch.
+invoke `gentic run` (the existing foreground worker command), never
+`gentic start` — `start` is the management command in this task, `run` is
+the thing being managed. Don't create a recursive relaunch.
 
 ## Design
 
@@ -46,10 +61,16 @@ export interface ServiceBackend {
   start(): Promise<void>
   stop(): Promise<void>
   restart(): Promise<void>
-  status(): Promise<"running" | "stopped" | "not-installed">
+  status(): Promise<{ state: "running" | "stopped" | "not-installed"; pid?: number; since?: Date }>
+  isEnabledOnBoot(): Promise<boolean>
   logs(opts: { follow: boolean }): Promise<void> // streams to stdout
 }
 ```
+
+(The richer `status()` return type and `isEnabledOnBoot()` are there so a
+future status-summary command can query real state instead of re-deriving
+it — export them even though this task's own commands may only use part of
+what they return.)
 
 - **`src/service/systemd.ts`** (Linux): user-level unit at
   `~/.config/systemd/user/gentic.service` by default (no root needed):
@@ -83,10 +104,10 @@ export interface ServiceBackend {
   the command layer, not this backend's problem beyond accepting a
   `scope: "user" | "system"` option) that targets
   `/etc/systemd/system/gentic.service` via plain `systemctl` (no `--user`)
-  — this is what an apt postinst script (spec 07) will want, since package
-  installs typically run as root and should offer a system-wide service.
-  Extend the `ServiceBackend` interface/constructor to take this scope
-  rather than hardcoding user-mode.
+  — this is what a package-manager postinstall script would want, since
+  those installs typically run as root and should offer a system-wide
+  service. Extend the `ServiceBackend` interface/constructor to take this
+  scope rather than hardcoding user-mode.
 
   `isAvailable()`: check `which systemctl` (or `fs.existsSync` on a known
   systemd marker) succeeds.
@@ -125,9 +146,11 @@ export interface ServiceBackend {
 
   - `install()`/`start()`: `spawn(process.execPath, [genticEntry, "run"], {
     detached: true, stdio: ["ignore", logFd, logFd] }).unref()`, write PID
-    to `<envPaths.data>/gentic.pid` (reuse `env-paths` from spec 02 if
-    merged; otherwise inline the same lookup — don't add a second
-    convention).
+    to `<dataDir>/gentic.pid`, where `<dataDir>` comes from the
+    `env-paths` package (`envPaths("gentic").data`) — add `env-paths` as a
+    dependency if it isn't already one; check `package.json` first so you
+    don't add a second, inconsistent way of computing per-OS data
+    directories if one already exists in the repo.
   - `status()`: read the pidfile, check liveness with `process.kill(pid,
     0)` (catch ESRCH → stopped, clean up stale pidfile).
   - `stop()`: `process.kill(pid, "SIGTERM")`, wait briefly, remove pidfile.
@@ -148,13 +171,15 @@ error clearly if passed elsewhere.
 `src/commands/start.ts`, `stop.ts`, `restart.ts` (or one `service.ts` file
 registering all three plus a shared `--system` flag — implementer's call,
 keep it simple). `start` accepts `--no-boot` to skip the boot-enable step
-(default is boot-enabled, matching "so I don't have to use pm2" — the
-whole point is it Just Works without extra flags for the common case).
+(default is boot-enabled — the whole point of this feature is that it
+works without extra flags for the common case, so someone doesn't need
+pm2 or a hand-written systemd unit just to keep the worker alive).
 
-Render each command's progress through `src/ui.ts`'s `spinner()` (from
-spec 01, wrapping `@clack/prompts`) rather than plain `console.log` —
-these are short-lived one-shot commands, exactly what `@clack/prompts` is
-for:
+Render each command's progress through a spinner instead of plain
+`console.log` — these are short-lived one-shot commands, exactly what
+`@clack/prompts` is for. If the repo already has a `src/ui.ts` wrapper
+around `@clack/prompts` (exporting `spinner`, `log`, etc.), import from
+there; otherwise add `@clack/prompts` as a dependency and use it directly:
 
 ```ts
 const s = spinner()
@@ -164,17 +189,23 @@ await backend.start()
 s.stop("gentic is running")
 ```
 
-Use `log.error(...)`/`log.warn(...)` (also from `ui.ts`) for failures —
-e.g. the `loginctl enable-linger` failure case below, or "no native
-service manager found, falling back to detached-process mode" — instead of
-`console.error`, so these commands' output matches `auth`'s (spec 03) and
-`status`'s (spec 05) styling.
+Use a styled `log.error(...)`/`log.warn(...)` for failures — e.g. the
+`loginctl enable-linger` failure case above, or "no native service manager
+found, falling back to detached-process mode" — instead of
+`console.error`, so this command's output matches the rest of the CLI.
 
 Update `apps/gentic/readme.md`'s "Production process example" section to
 replace the pm2/systemd hand-rolled examples with `gentic start` /
 `gentic stop` / `gentic restart`, keeping a short note that `gentic run`
 still exists for foreground/dev use (what `pnpm --filter @gentic/gentic
-start` continues to run, per spec 01).
+start` continues to run).
+
+### Exposed state (for a future status command)
+
+Don't build a full status dashboard here — just make sure
+`getServiceBackend().status()` and `.isEnabledOnBoot()` return enough to
+answer "is it running, since when, is it set to survive a reboot" for
+whatever aggregates that later.
 
 ## Acceptance criteria
 
@@ -182,7 +213,7 @@ start` continues to run, per spec 01).
   CI/sandbox — if no systemd is available for testing, note that clearly
   in the PR and provide a way to verify by inspecting the generated unit
   file's contents rather than actually starting it): `gentic start`
-  installs and starts a user unit, `gentic status` reports "running",
+  installs and starts a user unit, its status query reports "running",
   killing the process externally causes systemd to restart it within
   `RestartSec`, `gentic stop` stops it and it stays stopped, `gentic
   restart` bounces it.
@@ -191,8 +222,7 @@ start` continues to run, per spec 01).
 - Fallback backend works when `systemctl`/`launchctl` are unavailable
   (e.g. force it in a test by stubbing `isAvailable()`).
 - Uninstalling/stopping cleans up unit files / pidfiles — no orphaned
-  service definitions after `gentic stop && gentic auth logout` (or
-  wherever an uninstall path should live — consider whether `stop` should
-  also `uninstall()`, or whether a separate verb is needed; document your
+  service definitions left behind (consider whether `stop` should also
+  `uninstall()`, or whether a separate verb is needed; document your
   choice).
 - `typecheck` and `lint` pass.

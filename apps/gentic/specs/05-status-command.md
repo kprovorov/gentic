@@ -1,11 +1,28 @@
-# 05 — `gentic status` command
+# `gentic status` command
 
 ## Context
 
-Depends on specs 01, 02, 03, 04 all being merged — this command is a thin
-aggregator over things they already built. Read `src/config-store.ts`
-(02), `src/commands/auth.ts`'s exported auth-state helper (03), and
-`src/service/index.ts`'s `ServiceBackend` (04) before starting.
+### Prerequisites
+
+This task assumes `apps/gentic` already has:
+
+- `src/config-store.ts` and an auth module (e.g. `src/commands/auth.ts`)
+  exporting some form of `getAuthState()` that reports whether credentials
+  are configured (and, ideally, a masked key + API URL) by reading the
+  persisted config store. If no such helper exists yet, read
+  `src/config-store.ts` directly (`readConfigFile()`) and derive the same
+  information inline rather than blocking on it.
+- `src/service/index.ts` exporting `getServiceBackend(): ServiceBackend`
+  with a `status(): Promise<{ state: "running" | "stopped" |
+  "not-installed"; pid?: number; since?: Date }>` and an
+  `isEnabledOnBoot(): Promise<boolean>`. If the real shape differs (e.g. a
+  narrower `status()` return type), widen it as needed rather than
+  duplicating a second status-checking code path.
+- `src/ui.ts` — a thin wrapper around `@clack/prompts` re-exporting `note`,
+  `log`, etc. If missing, add `@clack/prompts` as a dependency and use it
+  directly.
+- `src/api.ts` exporting `createAgentApi` and an `AgentApi` interface for
+  talking to the hosted Gentic API.
 
 ## Goal
 
@@ -23,10 +40,9 @@ Last run: issue 4f2a... completed 2026-07-04T10:02:11Z
 
 ### Rendering
 
-Render through `src/ui.ts`'s `note()` (wrapping `@clack/prompts`) rather
-than plain `console.log`, so the output reads as one styled block instead
-of loose log lines — this is the same library specs 03 and 04 use, kept
-consistent across the whole CLI:
+Render through `note()` (wrapping `@clack/prompts`, via `src/ui.ts` if it
+exists) rather than plain `console.log`, so the output reads as one styled
+block instead of loose log lines:
 
 ```ts
 import { note, log } from "../ui"
@@ -45,29 +61,25 @@ note(
 Use `log.warn(...)` for the "not configured" case instead of folding it
 into the `note()` box, so it's visually distinct from a healthy status
 block. Keep `--json` (see below) completely unstyled — plain
-`console.log(JSON.stringify(...))`, no `@clack/prompts` involved, since
-scripts consuming `--json` shouldn't have to strip decoration.
+`console.log(JSON.stringify(...))`, no prompt-library output involved,
+since scripts consuming `--json` shouldn't have to strip decoration.
 
-- Reuse spec 03's exported auth-state helper for the "Auth" line — do not
-  re-implement reading the config store here.
-- Reuse spec 04's `getServiceBackend().status()` for the "Service" line.
-  Add whatever small extension to `ServiceBackend` is needed to also report
-  uptime/pid if it doesn't already (e.g. `status(): Promise<{ state:
-  "running" | "stopped" | "not-installed", pid?: number, since?: Date }>` —
-  if spec 04 shipped a narrower `status()` return type, widen it here
-  rather than duplicating a second status-checking code path).
-- "Boot" line: whether the service is enabled at boot — add an
-  `isEnabledOnBoot(): Promise<boolean>` to `ServiceBackend` if spec 04
-  didn't already expose this.
+### Data sources
+
+- "Auth" line: reuse whatever auth-state helper already exists (see
+  Prerequisites) for reading configured credentials — do not re-implement
+  reading the config store here.
+- "Service" line: reuse `getServiceBackend().status()` for running state,
+  pid, and uptime.
+- "Boot" line: reuse `getServiceBackend().isEnabledOnBoot()`.
 - "Last run" line: call the existing `AgentApi` (see `src/api.ts`) for
   whatever endpoint already reports run state for issues owned by this
-  key — check what's already fetched in `worker.ts` (spec 01's extraction
-  of the old `index.ts`) and reuse the same API client construction
-  (`createAgentApi`) rather than inventing a new one. If there's no
-  "give me my most recent run" endpoint, this line degrading to "unknown
-  (no API support yet)" is acceptable — don't add new server-side
-  endpoints as part of this task; flag it as a follow-up in the PR
-  description instead.
+  key — check what's already fetched by the worker loop and reuse the same
+  API client construction (`createAgentApi`) rather than inventing a new
+  one. If there's no "give me my most recent run" endpoint, this line
+  degrading to "unknown (no API support yet)" is acceptable — don't add
+  new server-side endpoints as part of this task; flag it as a follow-up
+  in the PR description instead.
 - If auth isn't configured at all, skip the service/last-run lines and
   just print `Auth: not configured — run "gentic auth login"` — no point
   showing a confusing partial status.
@@ -77,12 +89,12 @@ scripts consuming `--json` shouldn't have to strip decoration.
 
 ## Acceptance criteria
 
-- `gentic status` before `gentic auth login` clearly says auth isn't
-  configured and suggests the fix, without crashing on missing service
-  state.
-- `gentic status` after `gentic auth login` + `gentic start` shows all
-  four lines populated correctly, matching what `gentic auth status` (if
-  it exists) and the service backend's own `status()` report independently
-  — i.e. no drift between this command's numbers and the underlying
-  sources of truth.
+- `gentic status` before any credentials are configured clearly says auth
+  isn't configured and suggests the fix, without crashing on missing
+  service state.
+- `gentic status` after credentials are configured and the service is
+  started shows all four lines populated correctly, matching what the
+  underlying auth-state helper and service backend report independently —
+  i.e. no drift between this command's numbers and the underlying sources
+  of truth.
 - `typecheck` and `lint` pass.

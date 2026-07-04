@@ -1,4 +1,4 @@
-# 02 — Persisted config store
+# Persisted config store
 
 ## Context
 
@@ -7,16 +7,28 @@ Today, `apps/gentic/src/config.ts` reads everything from `process.env`
 `GENTIC_API_KEY`, `GENTIC_API_URL`, `GIT_REMOTE_BASE`, `WORKDIR`,
 `POLL_INTERVAL_MS`. That's fine for a dev checkout but not for an installed
 CLI — there's no `.env` file to hand-edit once `gentic` is a Homebrew/apt
-package, and `gentic auth` (spec 03) needs somewhere durable to write the
+package, and a future login command needs somewhere durable to write the
 API key to.
 
-Depends on spec 01 (needs `cli.ts` structure to exist, though this task
-mostly touches `config.ts` and adds a new module — conflicts should be
-minimal).
+### Prerequisite: CLI command scaffolding
+
+This task assumes `apps/gentic` already has a `commander`-based CLI entry
+(`src/cli.ts`) with a command-registration pattern like:
+
+```ts
+// src/commands/<name>.ts
+export function register<Name>Command(program: Command): void { ... }
+```
+
+...and a `run` command (`src/commands/run.ts`) wrapping the worker loop. If
+none of that exists yet in the repo, this task doesn't strictly need it —
+it mostly adds a new, independent module (`config-store.ts`) and edits
+`config.ts` — but check `src/cli.ts` / `src/commands/` first so you're not
+duplicating a routing convention that's already there.
 
 ## Goal
 
-Add a persisted, per-user config file that `gentic auth` (spec 03) writes
+Add a persisted, per-user config file that a future login command writes
 to and that `loadConfig()` reads from, with environment variables still
 taking precedence for power users / CI / the existing dev workflow.
 
@@ -69,11 +81,16 @@ export interface ConfigFile {
 export function configFilePath(): string
 export function readConfigFile(): ConfigFile // returns {} if file doesn't exist
 export function writeConfigFile(patch: Partial<ConfigFile>): void // shallow-merges with existing file and writes atomically (write to temp file + rename)
-export function clearConfigFile(): void // used by `gentic auth logout` in spec 03
+export function clearConfigFile(): void // intended for use by a future logout command
 ```
 
 Use atomic writes (write to `config.json.tmp` in the same directory, then
 `fs.renameSync`) so a crash mid-write can't corrupt the file.
+
+This module is meant to be a stable, reusable dependency for any future
+command that needs to read or write persisted settings (a login command,
+a logout command, a status command) — keep its exports narrow and
+well-typed so those can build on it without touching this file again.
 
 ### `config.ts` changes
 
@@ -89,12 +106,13 @@ Concretely: build a plain object by merging `{ ...configFile,
 ...pickPresentEnvKeys(process.env) }`, then `zod.parse` it, same as today
 just with a richer input object instead of raw `process.env`. Keep
 `loadConfig(): Config`'s signature and the exported `Config` type
-unchanged so `worker.ts` (spec 01) doesn't need to change.
+unchanged so nothing that already calls `loadConfig()` (e.g. the worker
+loop) needs to change.
 
 `GENTIC_API_KEY` and `GENTIC_API_URL` currently have no `.default(...)` —
 that stays: if neither env nor config file provides them, `zod.parse`
 throws today, and should keep throwing (with a message telling the user to
-run `gentic auth`, if you want to improve the error — nice-to-have, not
+authenticate first, if you want to improve the error — nice-to-have, not
 required).
 
 ### WORKDIR default
@@ -110,12 +128,12 @@ either choice is acceptable, but if you change it, update
 
 ## Non-goals
 
-- No `gentic auth` command yet (spec 03) — this task only builds the
-  storage layer it will use.
+- No login/logout command yet — this task only builds the storage layer a
+  future command will use.
 - No secret-manager / OS-keychain integration. Plain file with `0o600` is
-  the accepted tradeoff for now (see the conversation this spec came out
-  of: keychain integration adds native deps per platform which complicates
-  spec 06's binary compilation — revisit later if needed).
+  the accepted tradeoff for now — native keychain bindings differ per
+  platform and would complicate any future cross-platform binary build of
+  this CLI. Revisit later if needed.
 
 ## Acceptance criteria
 
