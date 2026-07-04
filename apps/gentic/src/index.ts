@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
+import { downloadAttachments } from "./attachments"
 import { loadConfig, type Config } from "./config"
 import { cloneRepo } from "./git"
 import { setRunState } from "./messages"
@@ -68,6 +69,11 @@ async function processIssue(
     })
     await setRunState(api, issue.id, { run_status: "running" })
 
+    // Downloaded fresh each run since `cloneRepo` starts from a clean
+    // checkout; noted on the first prompt so Claude Code knows where to
+    // find them.
+    const attachmentsNote = await downloadAttachments(api, issue.id, dir)
+
     // Feed user messages to the session oldest-first. Follow-ups sent while the
     // agent is working are picked up after the current turn; once the transcript
     // is quiet for one poll interval the session ends. When resuming a session
@@ -79,6 +85,7 @@ async function processIssue(
         ? issue.runFinishedAt
         : new Date(0).toISOString()
     let idleChecked = false
+    let firstPrompt = true
     const nextPrompt = async (): Promise<string | null> => {
       for (;;) {
         const messages = await fetchUserMessagesAfter(api, issue.id, cursor)
@@ -86,7 +93,12 @@ async function processIssue(
         if (next) {
           idleChecked = false
           cursor = next.created_at
-          return next.content ?? ""
+          const content = next.content ?? ""
+          if (firstPrompt) {
+            firstPrompt = false
+            return attachmentsNote ? `${content}${attachmentsNote}` : content
+          }
+          return content
         }
         if (idleChecked) {
           return null

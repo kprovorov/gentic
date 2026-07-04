@@ -33,11 +33,15 @@ import { cn } from "@gentic/ui/utils"
 
 import { IssueStatusSelect } from "./issue-status-select"
 import { IssueDeleteButton } from "./issue-delete-button"
+import { IssueAttachments, type IssueAttachment } from "./issue-attachments"
 import {
   IssueChat,
   type ChatMessage,
   type RunStatus,
 } from "./issue-chat"
+
+const ATTACHMENTS_BUCKET = "issue-attachments"
+const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
 
 type IssueStatus =
   | "draft"
@@ -172,6 +176,42 @@ export default async function IssueDetailPage({
     throw new Error(messagesError.message)
   }
 
+  const { data: attachmentRows, error: attachmentsError } = await supabase
+    .from("attachments")
+    .select("id,file_name,size_bytes,storage_path")
+    .eq("issue_id", id)
+    .order("created_at", { ascending: true })
+    .returns<
+      Array<{
+        id: string
+        file_name: string
+        size_bytes: number | null
+        storage_path: string
+      }>
+    >()
+
+  if (attachmentsError) {
+    throw new Error(attachmentsError.message)
+  }
+
+  const attachments: IssueAttachment[] = await Promise.all(
+    (attachmentRows ?? []).map(async (attachment) => {
+      const { data: signed } = await supabase.storage
+        .from(ATTACHMENTS_BUCKET)
+        .createSignedUrl(
+          attachment.storage_path,
+          ATTACHMENT_SIGNED_URL_TTL_SECONDS
+        )
+
+      return {
+        id: attachment.id,
+        fileName: attachment.file_name,
+        sizeBytes: attachment.size_bytes,
+        url: signed?.signedUrl ?? null,
+      }
+    })
+  )
+
   const StatusIcon = statusIcons[issue.status]
 
   return (
@@ -235,6 +275,19 @@ export default async function IssueDetailPage({
                 initialMessages={messages ?? []}
                 initialRunStatus={issue.run_status}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Attachments</CardTitle>
+              <CardDescription>
+                Files attached here are passed to the agent along with your
+                prompt.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IssueAttachments issueId={issue.id} attachments={attachments} />
             </CardContent>
           </Card>
 
