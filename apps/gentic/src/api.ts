@@ -37,10 +37,20 @@ export interface UserMessage {
   created_at: string
 }
 
+export interface Attachment {
+  id: string
+  fileName: string
+  contentType: string | null
+  sizeBytes: number | null
+  /** Short-lived signed URL the file can be downloaded from. */
+  url: string
+}
+
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
   fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
+  fetchAttachments(issueId: string): Promise<Attachment[]>
   insertMessage(issueId: string, fields: MessageFields): Promise<string>
   updateMessage(messageId: string, fields: MessageUpdateFields): Promise<void>
 }
@@ -107,6 +117,12 @@ export function createAgentApi(input: {
         `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`
       )
       return data.messages
+    },
+    async fetchAttachments(issueId) {
+      const data = await request<{ attachments: Attachment[] }>(
+        `/agent/issues/${encodeURIComponent(issueId)}/attachments`
+      )
+      return data.attachments
     },
     async insertMessage(issueId, fields) {
       const data = await request<{ id: string }>(

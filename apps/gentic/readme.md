@@ -131,6 +131,10 @@ EnvironmentFile=/path/to/gentic/apps/gentic/.env
   message. Appends an instruction to Claude Code's system prompt so every
   session commits its changes and opens a pull request before finishing.
 - `src/git.ts` — clones a project repo into a fresh per-issue work directory.
+- `src/attachments.ts` — turns an issue's uploaded attachments into ACP
+  content blocks for the first prompt: images and text files are embedded
+  directly, everything else is downloaded next to (not inside) the repo
+  clone and referenced by path.
 - `src/api.ts`, `src/config.ts`, `src/messages.ts`, `src/async-queue.ts` —
   API, configuration, and transcript helpers.
 

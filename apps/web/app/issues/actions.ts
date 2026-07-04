@@ -1,11 +1,21 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
+
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
+
+const ATTACHMENTS_BUCKET = "attachments"
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+function sanitizeFileName(name: string): string {
+  const base = name.split(/[/\\]/).pop() || "file"
+  return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file"
+}
 
 const issueStatusSchema = z.enum([
   "draft",
@@ -199,6 +209,89 @@ export async function sendIssueMessage(formData: FormData) {
 
   if (requeueError) {
     throw new Error(requeueError.message)
+  }
+
+  revalidatePath(`/issues/${issue_id}`)
+}
+
+export async function uploadAttachments(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const files = formData
+    .getAll("files")
+    .filter((value): value is File => value instanceof File && value.size > 0)
+
+  for (const file of files) {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error(`"${file.name}" is larger than 25MB`)
+    }
+
+    const storagePath = `${issueId}/${randomUUID()}-${sanitizeFileName(file.name)}`
+
+    const { error: uploadError } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(storagePath, file, {
+        contentType: file.type || "application/octet-stream",
+      })
+
+    if (uploadError) {
+      throw new Error(uploadError.message)
+    }
+
+    const { error: insertError } = await supabase.from("attachments").insert({
+      issue_id: issueId,
+      file_name: file.name,
+      content_type: file.type || null,
+      size_bytes: file.size,
+      storage_path: storagePath,
+    })
+
+    if (insertError) {
+      throw new Error(insertError.message)
+    }
+  }
+
+  revalidatePath(`/issues/${issueId}`)
+}
+
+const deleteAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+})
+
+export async function deleteAttachment(formData: FormData) {
+  const supabase = await getAuthenticatedSupabase()
+  const { id, issue_id } = deleteAttachmentSchema.parse({
+    id: getString(formData, "id"),
+    issue_id: getString(formData, "issue_id"),
+  })
+
+  const { data: attachment, error: fetchError } = await supabase
+    .from("attachments")
+    .select("storage_path")
+    .eq("id", id)
+    .single<{ storage_path: string }>()
+
+  if (fetchError) {
+    throw new Error(fetchError.message)
+  }
+
+  const { error: removeError } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .remove([attachment.storage_path])
+
+  if (removeError) {
+    throw new Error(removeError.message)
+  }
+
+  const { error } = await supabase
+    .from("attachments")
+    .delete()
+    .eq("id", id)
+    .eq("issue_id", issue_id)
+
+  if (error) {
+    throw new Error(error.message)
   }
 
   revalidatePath(`/issues/${issue_id}`)

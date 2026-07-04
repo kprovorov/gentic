@@ -4,10 +4,11 @@ import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
+import { buildAttachmentBlocks } from "./attachments"
 import { loadConfig, type Config } from "./config"
 import { cloneRepo, runSetupScript } from "./git"
 import { setRunState } from "./messages"
-import { runAgentSession } from "./session"
+import { runAgentSession, type PromptTurn } from "./session"
 
 async function main(): Promise<void> {
   const config = loadConfig()
@@ -59,6 +60,9 @@ async function processIssue(
   issue: ClaimedIssue
 ): Promise<void> {
   const dir = join(config.WORKDIR, issue.id)
+  // Sibling of the repo clone, not inside it, so downloaded attachments can
+  // never end up swept into the commit the agent is instructed to make.
+  const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   try {
     await cloneRepo({
@@ -73,6 +77,15 @@ async function processIssue(
 
     await setRunState(api, issue.id, { run_status: "running" })
 
+    // Built fresh each run: images and text files are embedded directly,
+    // everything else downloaded into `attachmentsDir` and referenced by
+    // path. Attached to the first prompt only.
+    const attachmentBlocks = await buildAttachmentBlocks(
+      api,
+      issue.id,
+      attachmentsDir
+    )
+
     // Feed user messages to the session oldest-first. Follow-ups sent while the
     // agent is working are picked up after the current turn; once the transcript
     // is quiet for one poll interval the session ends. When resuming a session
@@ -84,14 +97,22 @@ async function processIssue(
         ? issue.runFinishedAt
         : new Date(0).toISOString()
     let idleChecked = false
-    const nextPrompt = async (): Promise<string | null> => {
+    let firstPrompt = true
+    const nextPrompt = async (): Promise<PromptTurn | null> => {
       for (;;) {
         const messages = await fetchUserMessagesAfter(api, issue.id, cursor)
         const next = messages[0]
         if (next) {
           idleChecked = false
           cursor = next.created_at
-          return next.content ?? ""
+          const content = next.content ?? ""
+          if (firstPrompt) {
+            firstPrompt = false
+            if (attachmentBlocks.length > 0) {
+              return [{ type: "text", text: content }, ...attachmentBlocks]
+            }
+          }
+          return content
         }
         if (idleChecked) {
           return null
