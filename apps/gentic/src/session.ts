@@ -26,6 +26,11 @@ const AGENT_ENTRY = require.resolve(
   "@agentclientprotocol/claude-agent-acp/dist/index.js"
 )
 
+// Appended to Claude Code's default system prompt so every issue run ends
+// with its work committed and proposed for review, without relying on each
+// issue's own instructions to say so.
+const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
+
 export interface RunSessionInput {
   api: AgentApi
   issueId: string
@@ -74,15 +79,24 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         clientInfo: { name: "gentic", version: "0.0.1" },
       })
 
-      const sessionBuilder = input.resumeSessionId
-        ? ctx.buildSession({
-            cwd: input.cwd,
-            mcpServers: [],
-            _meta: {
-              claudeCode: { options: { resume: input.resumeSessionId } },
+      const sessionBuilder = ctx.buildSession({
+        cwd: input.cwd,
+        mcpServers: [],
+        _meta: {
+          claudeCode: {
+            options: {
+              systemPrompt: {
+                type: "preset",
+                preset: "claude_code",
+                append: COMMIT_AND_PR_INSTRUCTIONS,
+              },
+              ...(input.resumeSessionId
+                ? { resume: input.resumeSessionId }
+                : {}),
             },
-          })
-        : ctx.buildSession(input.cwd)
+          },
+        },
+      })
       const session = await sessionBuilder.start()
       await input.onSessionId(session.sessionId)
 
