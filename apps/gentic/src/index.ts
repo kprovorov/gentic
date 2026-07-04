@@ -6,7 +6,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api"
 import { buildAttachmentBlocks } from "./attachments"
 import { loadConfig, type Config } from "./config"
-import { cloneRepo, runSetupScript } from "./git"
+import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git"
 import { setRunState } from "./messages"
 import { runAgentSession, type PromptTurn } from "./session"
 
@@ -132,9 +132,11 @@ async function processIssue(
       nextPrompt,
     })
 
+    const prUrl = await getPullRequestUrl(dir)
     await setRunState(api, issue.id, {
       run_status: "completed",
       run_finished_at: new Date().toISOString(),
+      ...(prUrl ? { pr_url: prUrl } : {}),
     })
     console.log(`[gentic] issue ${issue.id} completed`)
   } catch (error) {

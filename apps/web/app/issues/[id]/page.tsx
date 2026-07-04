@@ -65,6 +65,7 @@ type Issue = {
   prompt: string | null
   status: IssueStatus
   run_status: RunStatus
+  pr_url: string | null
   created_at: string
   updated_at: string
   projects: {
@@ -151,7 +152,7 @@ export default async function IssueDetailPage({
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,status,run_status,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,status,run_status,pr_url,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -274,6 +275,7 @@ export default async function IssueDetailPage({
                 issueId={issue.id}
                 initialMessages={messages ?? []}
                 initialRunStatus={issue.run_status}
+                initialPrUrl={issue.pr_url}
               />
             </CardContent>
           </Card>

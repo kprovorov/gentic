@@ -30,6 +30,7 @@ export interface RunStateFields {
   run_error?: string | null
   run_started_at?: string | null
   run_finished_at?: string | null
+  pr_url?: string | null
 }
 
 export interface UserMessage {
