@@ -126,7 +126,17 @@ export default async function NewIssuePage() {
                     <option value="draft">Draft</option>
                     <option value="todo">Todo</option>
                     <option value="in-progress">In progress</option>
-                    <option value="done">Done</option>
+                    <option value="waiting-for-input">Waiting for input</option>
+                    <option value="testing">Testing</option>
+                    <option value="tests-failed">Tests failed</option>
+                    <option value="ready-for-review">Ready for review</option>
+                    <option value="changes-requested">Changes requested</option>
+                    <option value="approved">Approved</option>
+                    <option value="merged">Merged</option>
+                    <option value="deploying">Deploying</option>
+                    <option value="deploy-failed">Deploy failed</option>
+                    <option value="validating">Validating</option>
+                    <option value="completed">Completed</option>
                   </select>
                 </div>
 

@@ -4,13 +4,37 @@ import { useTransition } from "react"
 
 import { updateIssueStatus } from "@/app/issues/actions"
 
-type IssueStatus = "draft" | "todo" | "in-progress" | "done"
+type IssueStatus =
+  | "draft"
+  | "todo"
+  | "in-progress"
+  | "waiting-for-input"
+  | "testing"
+  | "tests-failed"
+  | "ready-for-review"
+  | "changes-requested"
+  | "approved"
+  | "merged"
+  | "deploying"
+  | "deploy-failed"
+  | "validating"
+  | "completed"
 
 const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "todo", label: "Todo" },
   { value: "in-progress", label: "In progress" },
-  { value: "done", label: "Done" },
+  { value: "waiting-for-input", label: "Waiting for input" },
+  { value: "testing", label: "Testing" },
+  { value: "tests-failed", label: "Tests failed" },
+  { value: "ready-for-review", label: "Ready for review" },
+  { value: "changes-requested", label: "Changes requested" },
+  { value: "approved", label: "Approved" },
+  { value: "merged", label: "Merged" },
+  { value: "deploying", label: "Deploying" },
+  { value: "deploy-failed", label: "Deploy failed" },
+  { value: "validating", label: "Validating" },
+  { value: "completed", label: "Completed" },
 ]
 
 export function IssueStatusSelect({
