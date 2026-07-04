@@ -128,7 +128,8 @@ EnvironmentFile=/path/to/gentic/apps/gentic/.env
   a time, clones its repo, and drives an agent session per issue.
 - `src/session.ts` — spawns Claude Code over the Agent Client Protocol and
   streams assistant output into the issue transcript, one prompt turn per user
-  message.
+  message. Appends an instruction to Claude Code's system prompt so every
+  session commits its changes and opens a pull request before finishing.
 - `src/git.ts` — clones a project repo into a fresh per-issue work directory.
 - `src/api.ts`, `src/config.ts`, `src/messages.ts`, `src/async-queue.ts` —
   API, configuration, and transcript helpers.
