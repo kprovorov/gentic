@@ -7,7 +7,22 @@ import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
 
-const issueStatusSchema = z.enum(["draft", "todo", "in-progress", "done"])
+const issueStatusSchema = z.enum([
+  "draft",
+  "todo",
+  "in-progress",
+  "waiting-for-input",
+  "testing",
+  "tests-failed",
+  "ready-for-review",
+  "changes-requested",
+  "approved",
+  "merged",
+  "deploying",
+  "deploy-failed",
+  "validating",
+  "completed",
+])
 
 const issueSchema = z.object({
   project_id: z.string().uuid(),

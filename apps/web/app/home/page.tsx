@@ -2,11 +2,21 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
+  IconAlertOctagon,
+  IconAlertTriangle,
   IconCircleCheck,
   IconCircleDashed,
   IconClock,
+  IconEye,
+  IconFlask,
+  IconGitMerge,
+  IconMessage2,
+  IconMessageQuestion,
   IconPencil,
   IconPlus,
+  IconRocket,
+  IconShieldCheck,
+  IconThumbUp,
 } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
@@ -22,7 +32,21 @@ import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 
-type IssueStatus = "draft" | "todo" | "in-progress" | "done"
+type IssueStatus =
+  | "draft"
+  | "todo"
+  | "in-progress"
+  | "waiting-for-input"
+  | "testing"
+  | "tests-failed"
+  | "ready-for-review"
+  | "changes-requested"
+  | "approved"
+  | "merged"
+  | "deploying"
+  | "deploy-failed"
+  | "validating"
+  | "completed"
 
 type Issue = {
   id: string
@@ -41,28 +65,68 @@ const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
   todo: "Todo",
   "in-progress": "In progress",
-  done: "Done",
+  "waiting-for-input": "Waiting for input",
+  testing: "Testing",
+  "tests-failed": "Tests failed",
+  "ready-for-review": "Ready for review",
+  "changes-requested": "Changes requested",
+  approved: "Approved",
+  merged: "Merged",
+  deploying: "Deploying",
+  "deploy-failed": "Deploy failed",
+  validating: "Validating",
+  completed: "Completed",
 }
 
 const statusStyles: Record<IssueStatus, string> = {
   draft: "bg-muted/60 text-muted-foreground",
   todo: "bg-muted text-muted-foreground",
   "in-progress": "bg-primary/15 text-primary-foreground",
-  done: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  "tests-failed": "bg-red-500/15 text-red-700 dark:text-red-300",
+  "ready-for-review": "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  "changes-requested": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  approved: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
+  merged: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  deploying: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  "deploy-failed": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  validating: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+  completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 }
 
 const statusIcons = {
   draft: IconPencil,
   todo: IconCircleDashed,
   "in-progress": IconClock,
-  done: IconCircleCheck,
+  "waiting-for-input": IconMessageQuestion,
+  testing: IconFlask,
+  "tests-failed": IconAlertTriangle,
+  "ready-for-review": IconEye,
+  "changes-requested": IconMessage2,
+  approved: IconThumbUp,
+  merged: IconGitMerge,
+  deploying: IconRocket,
+  "deploy-failed": IconAlertOctagon,
+  validating: IconShieldCheck,
+  completed: IconCircleCheck,
 }
 
 const statusOrder: Record<IssueStatus, number> = {
-  "in-progress": 0,
-  todo: 1,
-  draft: 2,
-  done: 3,
+  "waiting-for-input": 0,
+  "tests-failed": 1,
+  "changes-requested": 2,
+  "deploy-failed": 3,
+  "in-progress": 4,
+  testing: 5,
+  validating: 6,
+  deploying: 7,
+  "ready-for-review": 8,
+  approved: 9,
+  draft: 10,
+  todo: 11,
+  merged: 12,
+  completed: 13,
 }
 
 function formatDate(value: string) {
