@@ -4,6 +4,8 @@ import { IconPlus } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 
+import { MobileNav } from "./mobile-nav"
+
 const navItems = [
   { href: "/home", label: "Issues" },
   { href: "/settings", label: "Projects" },
@@ -30,6 +32,9 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 md:px-8">
         <div className="flex items-center gap-6">
+          <Show when="signed-in">
+            <MobileNav navItems={navItems} />
+          </Show>
           <Link href="/" className="flex items-center gap-2">
             <Logo />
             <span className="font-heading text-base font-semibold tracking-tight">
