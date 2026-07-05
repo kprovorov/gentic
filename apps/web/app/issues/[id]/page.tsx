@@ -12,6 +12,7 @@ import {
   IconEye,
   IconFlask,
   IconGitMerge,
+  IconLock,
   IconMessage2,
   IconMessageQuestion,
   IconPencil,
@@ -233,6 +234,12 @@ export default async function IssueDetailPage({
   )
 
   const StatusIcon = statusIcons[issue.status]
+  const isBlocked = relations.some(
+    (relation) =>
+      relation.target_issue_id === issue.id &&
+      relation.source_issue.status !== "completed" &&
+      relation.source_issue.status !== "cancelled"
+  )
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
@@ -266,6 +273,12 @@ export default async function IssueDetailPage({
                 <StatusIcon className="size-3.5" />
                 {statusLabels[issue.status]}
               </div>
+              {isBlocked ? (
+                <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-red-500/15 px-2.5 text-xs font-medium text-red-700 dark:text-red-300">
+                  <IconLock className="size-3.5" />
+                  Blocked
+                </div>
+              ) : null}
               <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
                 <IconRobot className="size-3.5" />
                 Agent: {agentProviderLabels[issue.agent_provider]}
