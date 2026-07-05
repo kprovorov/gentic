@@ -3,6 +3,13 @@ import type React from "react"
 import { IconArrowRight, IconLink, IconTrash } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@gentic/ui/select"
 
 import {
   addIssueRelation,
@@ -94,30 +101,35 @@ export function IssueRelations({
       <form action={addIssueRelation} className="grid gap-3">
         <input type="hidden" name="issue_id" value={issueId} />
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_auto]">
-          <select
+          <Select
             name="related_issue_id"
             disabled={candidates.length === 0}
-            className="h-9 min-w-0 rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-70"
-            aria-label="Related issue"
             required
           >
-            <option value="">Select issue</option>
-            {candidates.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.title}
-              </option>
-            ))}
-          </select>
-          <select
+            <SelectTrigger className="min-w-0" aria-label="Related issue">
+              <SelectValue placeholder="Select issue" />
+            </SelectTrigger>
+            <SelectContent>
+              {candidates.map((candidate) => (
+                <SelectItem key={candidate.id} value={candidate.id}>
+                  {candidate.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
             name="direction"
             disabled={candidates.length === 0}
-            className="h-9 rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-70"
-            aria-label="Relation direction"
             defaultValue="blocking"
           >
-            <option value="blocking">is blocking</option>
-            <option value="blocked_by">is blocked by</option>
-          </select>
+            <SelectTrigger aria-label="Relation direction">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="blocking">is blocking</SelectItem>
+              <SelectItem value="blocked_by">is blocked by</SelectItem>
+            </SelectContent>
+          </Select>
           <Button type="submit" disabled={candidates.length === 0}>
             <IconLink />
             Add

@@ -12,6 +12,13 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@gentic/ui/select"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 
@@ -103,16 +110,19 @@ export default async function EditIssuePage({
 
               <div className="grid gap-2">
                 <Label htmlFor="issue-agent-provider">Agent</Label>
-                <select
-                  id="issue-agent-provider"
+                <Select
                   name="agent_provider"
                   required
                   defaultValue={issue.agent_provider}
-                  className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
-                  <option value="claude_code">Claude Code</option>
-                  <option value="codex">Codex</option>
-                </select>
+                  <SelectTrigger id="issue-agent-provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude_code">Claude Code</SelectItem>
+                    <SelectItem value="codex">Codex</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex justify-end gap-2">

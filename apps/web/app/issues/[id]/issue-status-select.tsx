@@ -3,6 +3,13 @@
 import { useTransition } from "react"
 
 import { updateIssueStatus } from "@/app/issues/actions"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@gentic/ui/select"
 
 type IssueStatus =
   | "draft"
@@ -48,8 +55,7 @@ export function IssueStatusSelect({
 }) {
   const [isPending, startTransition] = useTransition()
 
-  function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
-    const nextStatus = event.target.value
+  function handleValueChange(nextStatus: string) {
     if (nextStatus === status) {
       return
     }
@@ -70,20 +76,22 @@ export function IssueStatusSelect({
       >
         Status
       </label>
-      <select
-        id="issue-status"
-        name="status"
+      <Select
         value={status}
-        onChange={handleChange}
+        onValueChange={handleValueChange}
         disabled={isPending}
-        className="h-9 w-full max-w-xs rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-70"
       >
-        {statusOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id="issue-status" className="max-w-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {statusOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }

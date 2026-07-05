@@ -9,6 +9,7 @@
     "./form": "./src/ui/form.tsx",
     "./input": "./src/ui/input.tsx",
     "./label": "./src/ui/label.tsx",
+    "./select": "./src/ui/select.tsx",
     "./sonner": "./src/ui/sonner.tsx",
     "./textarea": "./src/ui/textarea.tsx",
     "./theme-provider": "./src/theme-provider.tsx",

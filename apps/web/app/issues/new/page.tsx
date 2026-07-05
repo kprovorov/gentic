@@ -13,6 +13,13 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@gentic/ui/select"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 
@@ -77,19 +84,22 @@ export default async function NewIssuePage() {
               <form action={createIssue} className="grid gap-5">
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
-                  <select
-                    id="issue-project"
+                  <Select
                     name="project_id"
                     required
-                    className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                     defaultValue={projects[0]?.id}
                   >
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name} ({project.repo})
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="issue-project">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name} ({project.repo})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid gap-2">
@@ -105,16 +115,19 @@ export default async function NewIssuePage() {
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-agent-provider">Agent</Label>
-                  <select
-                    id="issue-agent-provider"
+                  <Select
                     name="agent_provider"
                     required
                     defaultValue="claude_code"
-                    className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                   >
-                    <option value="claude_code">Claude Code</option>
-                    <option value="codex">Codex</option>
-                  </select>
+                    <SelectTrigger id="issue-agent-provider">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="claude_code">Claude Code</SelectItem>
+                      <SelectItem value="codex">Codex</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid gap-2">
@@ -130,29 +143,40 @@ export default async function NewIssuePage() {
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-status">Status</Label>
-                  <select
-                    id="issue-status"
+                  <Select
                     name="status"
                     required
                     defaultValue="draft"
-                    className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                   >
-                    <option value="draft">Draft</option>
-                    <option value="todo">Todo</option>
-                    <option value="in-progress">In progress</option>
-                    <option value="waiting-for-input">Waiting for input</option>
-                    <option value="testing">Testing</option>
-                    <option value="tests-failed">Tests failed</option>
-                    <option value="ready-for-review">Ready for review</option>
-                    <option value="changes-requested">Changes requested</option>
-                    <option value="approved">Approved</option>
-                    <option value="merged">Merged</option>
-                    <option value="deploying">Deploying</option>
-                    <option value="deploy-failed">Deploy failed</option>
-                    <option value="validating">Validating</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                    <SelectTrigger id="issue-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="in-progress">In progress</SelectItem>
+                      <SelectItem value="waiting-for-input">
+                        Waiting for input
+                      </SelectItem>
+                      <SelectItem value="testing">Testing</SelectItem>
+                      <SelectItem value="tests-failed">Tests failed</SelectItem>
+                      <SelectItem value="ready-for-review">
+                        Ready for review
+                      </SelectItem>
+                      <SelectItem value="changes-requested">
+                        Changes requested
+                      </SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="merged">Merged</SelectItem>
+                      <SelectItem value="deploying">Deploying</SelectItem>
+                      <SelectItem value="deploy-failed">
+                        Deploy failed
+                      </SelectItem>
+                      <SelectItem value="validating">Validating</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex justify-end gap-2">
