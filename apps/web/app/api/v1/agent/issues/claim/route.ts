@@ -7,6 +7,9 @@ import {
 
 export const runtime = "nodejs"
 
+const CLAIM_ISSUE_SELECT =
+  "id, agent_provider, session_id, run_finished_at, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
@@ -19,11 +22,12 @@ export async function POST(request: Request) {
 async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
-    .select(
-      "id, agent_provider, session_id, run_finished_at, projects!inner(repo,setup_script,user_id)"
-    )
+    .select(CLAIM_ISSUE_SELECT)
     .eq("run_status", "queued")
     .eq("projects.user_id", userId)
+    .eq("unfinished_blockers.type", "blocks")
+    .not("unfinished_blockers.source_issue.status", "in", "(completed,cancelled)")
+    .is("unfinished_blockers", null)
     .order("updated_at", { ascending: true })
     .limit(1)
     .maybeSingle()
