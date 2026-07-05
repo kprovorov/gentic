@@ -1,8 +1,10 @@
 {
   "extends": "@gentic/typescript-config/base",
   "compilerOptions": {
-    "types": ["node"]
+    "lib": ["ES2015"],
+    "outDir": "./dist",
+    "strictNullChecks": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
+  "include": ["."]
 }
