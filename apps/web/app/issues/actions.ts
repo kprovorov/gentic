@@ -187,6 +187,7 @@ export async function uploadAttachments(formData: FormData) {
     })
 
     if (insertError) {
+      await supabase.storage.from(ATTACHMENTS_BUCKET).remove([storagePath])
       throw new Error(insertError.message)
     }
   }
