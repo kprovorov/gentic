@@ -9,8 +9,6 @@ import express from "express"
 
 import { mcpHandler } from "./mcp"
 
-type AuthenticatedRequest = Request & { auth?: AuthInfo }
-
 const app = express()
 const port = Number(process.env.PORT ?? 3000)
 
@@ -31,22 +29,6 @@ app.get(
 )
 app.get("/.well-known/oauth-authorization-server", authServerMetadataHandlerClerk)
 
-function toWebHeaders(headers: express.Request["headers"]): Headers {
-  const webHeaders = new Headers()
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (typeof value === "string") {
-      webHeaders.set(key, value)
-    } else if (Array.isArray(value)) {
-      for (const headerValue of value) {
-        webHeaders.append(key, headerValue)
-      }
-    }
-  }
-
-  return webHeaders
-}
-
 function toWebRequest(req: express.Request, handlerPath: string): Request {
   const protocol = req.protocol
   const host = req.get("host")
@@ -55,16 +37,14 @@ function toWebRequest(req: express.Request, handlerPath: string): Request {
 
   const request = new Request(url, {
     method: req.method,
-    headers: toWebHeaders(req.headers),
+    headers: req.headers as HeadersInit,
     body:
       req.method !== "GET" && req.method !== "HEAD"
         ? JSON.stringify(req.body ?? {})
         : undefined,
   })
 
-  const authenticatedRequest = request as AuthenticatedRequest
-  authenticatedRequest.auth = (req as express.Request & { auth?: AuthInfo }).auth
-
+  request.auth = (req as express.Request & { auth?: AuthInfo }).auth
   return request
 }
 

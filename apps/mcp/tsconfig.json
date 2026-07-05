@@ -1,7 +1,7 @@
 {
   "extends": "@gentic/typescript-config/base",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2015"],
     "outDir": "./dist",
     "strictNullChecks": true
   },
