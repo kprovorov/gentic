@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
@@ -63,6 +64,8 @@ async function processIssue(
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   try {
+    await rm(attachmentsDir, { recursive: true, force: true })
+
     await cloneRepo({
       remoteBase: config.GIT_REMOTE_BASE,
       repo: issue.repo,
