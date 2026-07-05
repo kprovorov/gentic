@@ -11,6 +11,7 @@ import {
   IconEye,
   IconFlask,
   IconGitMerge,
+  IconLock,
   IconMessage2,
   IconMessageQuestion,
   IconPencil,
@@ -32,6 +33,7 @@ import {
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
+import * as issuesService from "@gentic/services/issues"
 
 type IssueStatus =
   | "draft"
@@ -167,6 +169,11 @@ export default async function HomePage() {
 
   issues.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
 
+  const blockedIssueIds = await issuesService.listBlockedIssueIds(
+    supabase,
+    issues.map((issue) => issue.id)
+  )
+
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
@@ -219,15 +226,23 @@ export default async function HomePage() {
                       {formatDate(issue.created_at)}
                     </CardDescription>
                     <CardAction>
-                      <span
-                        className={cn(
-                          "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-                          statusStyles[issue.status]
-                        )}
-                      >
-                        <StatusIcon className="size-3.5" />
-                        {statusLabels[issue.status]}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium",
+                            statusStyles[issue.status]
+                          )}
+                        >
+                          <StatusIcon className="size-3.5" />
+                          {statusLabels[issue.status]}
+                        </span>
+                        {blockedIssueIds.has(issue.id) ? (
+                          <span className="inline-flex h-7 items-center gap-1 rounded-full bg-red-500/15 px-2.5 text-xs font-medium text-red-700 dark:text-red-300">
+                            <IconLock className="size-3.5" />
+                            Blocked
+                          </span>
+                        ) : null}
+                      </div>
                     </CardAction>
                   </CardHeader>
                   {issue.prompt ? (

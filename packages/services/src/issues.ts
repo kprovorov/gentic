@@ -175,6 +175,39 @@ export async function listIssueRelations(
   return data
 }
 
+export async function listBlockedIssueIds(
+  supabase: Supabase,
+  issueIds: string[]
+) {
+  if (issueIds.length === 0) {
+    return new Set<string>()
+  }
+
+  const { data, error } = await supabase
+    .from("issue_relations")
+    .select(
+      "target_issue_id, source_issue:issues!issue_relations_source_issue_id_fkey(status)"
+    )
+    .in("target_issue_id", issueIds)
+    .returns<{ target_issue_id: string; source_issue: { status: string } }[]>()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  const blockedIssueIds = new Set<string>()
+  for (const relation of data) {
+    if (
+      relation.source_issue.status !== "completed" &&
+      relation.source_issue.status !== "cancelled"
+    ) {
+      blockedIssueIds.add(relation.target_issue_id)
+    }
+  }
+
+  return blockedIssueIds
+}
+
 export async function createIssue(
   supabase: Supabase,
   userId: string,
