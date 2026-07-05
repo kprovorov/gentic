@@ -9,7 +9,9 @@ import { auth } from "@clerk/nextjs/server"
 
 import { createClient } from "@gentic/supabase/server"
 import {
+  addIssueRelationSchema,
   createIssueSchema,
+  deleteIssueRelationSchema,
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueSchema,
@@ -96,6 +98,38 @@ export async function updateIssueStatus(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath(`/issues/${id}`)
+}
+
+export async function addIssueRelation(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_id, related_issue_id, direction } =
+    addIssueRelationSchema.parse({
+      issue_id: getString(formData, "issue_id"),
+      related_issue_id: getString(formData, "related_issue_id"),
+      direction: getString(formData, "direction"),
+    })
+
+  await issuesService.addIssueRelation(
+    supabase,
+    userId,
+    issue_id,
+    related_issue_id,
+    direction
+  )
+
+  revalidatePath(`/issues/${issue_id}`)
+}
+
+export async function deleteIssueRelation(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, issue_id } = deleteIssueRelationSchema.parse({
+    id: getString(formData, "id"),
+    issue_id: getString(formData, "issue_id"),
+  })
+
+  await issuesService.deleteIssueRelation(supabase, userId, id, issue_id)
+
+  revalidatePath(`/issues/${issue_id}`)
 }
 
 export async function sendIssueMessage(formData: FormData) {

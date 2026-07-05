@@ -56,3 +56,26 @@ export const sendIssueMessageSchema = z.object({
 })
 
 export type SendIssueMessageValues = z.infer<typeof sendIssueMessageSchema>
+
+export const issueRelationDirectionSchema = z.enum(["blocking", "blocked_by"])
+
+export type IssueRelationDirection = z.infer<
+  typeof issueRelationDirectionSchema
+>
+
+export const addIssueRelationSchema = z.object({
+  issue_id: z.string().uuid(),
+  related_issue_id: z.string().uuid(),
+  direction: issueRelationDirectionSchema,
+})
+
+export type AddIssueRelationValues = z.infer<typeof addIssueRelationSchema>
+
+export const deleteIssueRelationSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+})
+
+export type DeleteIssueRelationValues = z.infer<
+  typeof deleteIssueRelationSchema
+>
