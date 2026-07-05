@@ -11,7 +11,7 @@ import {
 import type {
   IssueRelation,
   IssueRelationIssue,
-} from "@/lib/services/issues"
+} from "@gentic/services/issues"
 
 type IssueRelationsProps = {
   issueId: string

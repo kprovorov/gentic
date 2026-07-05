@@ -4,9 +4,12 @@
   "description": "Gentic agent: runs coding agents over the Agent Client Protocol for queued issues.",
   "type": "module",
   "private": true,
+  "bin": {
+    "gentic": "./dist/cli.js"
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "dev": "tsx watch src/cli.ts",
+    "start": "node dist/cli.js run",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
@@ -15,6 +18,8 @@
     "@agentclientprotocol/claude-agent-acp": "^0.55.0",
     "@agentclientprotocol/codex-acp": "^1.1.0",
     "@agentclientprotocol/sdk": "^1.1.0",
+    "@clack/prompts": "^1.6.0",
+    "commander": "^12.1.0",
     "dotenv": "^16.4.7",
     "zod": "^4.4.3"
   },

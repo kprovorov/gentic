@@ -1,5 +1,3 @@
-import { verifyClerkToken } from "@clerk/mcp-tools/next"
-import { auth } from "@clerk/nextjs/server"
 import {
   agentProviderSchema,
   createIssueSchema,
@@ -8,13 +6,13 @@ import {
   updateIssueStatusSchema,
 } from "@gentic/validators/issues"
 import { projectSchema } from "@gentic/validators/projects"
-import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
 
-import * as issuesService from "@/lib/services/issues"
-import * as projectsService from "@/lib/services/projects"
+import * as issuesService from "@gentic/services/issues"
+import * as projectsService from "@gentic/services/projects"
 
-import { getMcpToolContext, mcpErrorResult, mcpJsonResult, resolveMcpUserId } from "./_lib"
+import { getMcpToolContext, mcpErrorResult, mcpJsonResult, resolveMcpUserId } from "./lib"
 
 const jsonObjectSchema = z.record(z.string(), z.unknown())
 
@@ -64,11 +62,12 @@ const handler = createMcpHandler(
       {
         description:
           "Returns the Gentic account id for the account that authorized this MCP connection.",
+        inputSchema: {},
         outputSchema: {
           userId: z.string().describe("The Gentic account id for this MCP connection."),
         },
       },
-      async ({ authInfo }) => {
+      async (_input, { authInfo }) => {
         const userId = resolveMcpUserId(authInfo)
 
         return {
@@ -84,9 +83,10 @@ const handler = createMcpHandler(
         title: "List Projects",
         description:
           "List Gentic projects owned by the authenticated account. Use a returned project id as project_id when creating or filtering issues.",
+        inputSchema: {},
         outputSchema: projectsOutputSchema,
       },
-      async ({ authInfo }) => {
+      async (_input, { authInfo }) => {
         try {
           const { supabase, userId } = getMcpToolContext(authInfo)
           const projects = await projectsService.listProjects(supabase, userId)
@@ -423,16 +423,7 @@ const handler = createMcpHandler(
     )
   },
   {},
-  { basePath: "/api" }
+  { basePath: "", disableSse: true }
 )
 
-const authHandler = withMcpAuth(
-  handler,
-  async (_, token) => {
-    const clerkAuth = await auth({ acceptsToken: "oauth_token" })
-    return verifyClerkToken(clerkAuth, token)
-  },
-  { required: true }
-)
-
-export { authHandler as GET, authHandler as POST }
+export { handler as mcpHandler }
