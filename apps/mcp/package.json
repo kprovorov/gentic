@@ -4,10 +4,11 @@
   "description": "Gentic remote MCP server.",
   "type": "module",
   "private": true,
+  "main": "dist/index.mjs",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit",
-    "start": "tsx src/index.ts",
+    "build": "tsdown",
+    "start": "node dist/index.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
@@ -31,6 +32,7 @@
     "@types/node": "^20",
     "eslint": "^9",
     "prettier": "^3.8.3",
+    "tsdown": "^0.22.3",
     "typescript": "^5"
   }
 }
