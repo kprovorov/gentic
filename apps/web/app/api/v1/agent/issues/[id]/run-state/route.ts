@@ -19,9 +19,16 @@ export async function PATCH(
 
     await ensureIssueOwned(supabase, userId, id)
 
+    const marksReadyForReview =
+      fields.run_status === "completed" && Boolean(fields.pr_url)
+
     const { error } = await supabase
       .from("issues")
-      .update({ ...fields, updated_at: new Date().toISOString() })
+      .update({
+        ...fields,
+        ...(marksReadyForReview ? { status: "ready-for-review" } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id)
 
     if (error) {
