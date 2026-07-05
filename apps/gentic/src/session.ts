@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
 import { Readable, Writable } from "node:stream"
 
 import {
@@ -22,16 +24,49 @@ import {
 } from "./messages.js"
 import type { AgentApi } from "./api.js"
 
-const require = createRequire(import.meta.url)
-
-const CLAUDE_AGENT_ENTRY = require.resolve(
-  "@agentclientprotocol/claude-agent-acp/dist/index.js"
-)
-const CODEX_AGENT_ENTRY = require.resolve(
-  "@agentclientprotocol/codex-acp/dist/index.js"
-)
-
 export type AgentProvider = "claude_code" | "codex"
+
+/** How to launch one ACP agent's child process. */
+interface AgentEntry {
+  command: string
+  args: string[]
+  /** True when `command` is the compiled sidecar binary, not a dev/node path. */
+  usingSidecar: boolean
+  /** Absolute path to the sidecar's own directory, for locating its siblings. */
+  sidecarDir: string | null
+}
+
+/**
+ * In dev/pnpm mode the ACP agent is a plain ESM file under node_modules, run
+ * with `node <file>` (`process.execPath` is the node binary). When gentic is
+ * compiled with `bun build --compile`, `require.resolve` against
+ * node_modules no longer applies (there is no node_modules on the target
+ * machine) and `process.execPath` refers to the gentic binary itself, so
+ * `node <file>` would just re-invoke gentic with a stray argument. The build
+ * script (scripts/build-binary.sh) works around both problems by compiling
+ * each ACP agent into its own standalone sidecar binary under
+ * `vendor/<name>/<name>`, next to the gentic binary — so this prefers that
+ * binary (run directly, no runtime needed) and falls back to the dev-mode
+ * `require.resolve` + node-invocation path when no sidecar is present.
+ */
+function resolveAgentEntry(
+  sidecarName: "claude-agent-acp" | "codex-acp",
+  packageEntry: string
+): AgentEntry {
+  const sidecarDir = join(dirname(process.execPath), "vendor", sidecarName)
+  const sidecar = join(sidecarDir, sidecarName)
+  if (existsSync(sidecar)) {
+    return { command: sidecar, args: [], usingSidecar: true, sidecarDir }
+  }
+
+  const require = createRequire(import.meta.url)
+  return {
+    command: process.execPath,
+    args: [require.resolve(packageEntry)],
+    usingSidecar: false,
+    sidecarDir: null,
+  }
+}
 
 // Appended to the selected agent's instructions so every issue run ends
 // with its work committed and proposed for review, without relying on each
@@ -68,7 +103,7 @@ export interface RunSessionInput {
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
   const agent = getAgentProviderConfig(input.agentProvider)
-  const child = spawn(process.execPath, [agent.entry], {
+  const child = spawn(agent.entry.command, agent.entry.args, {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "inherit"],
     env: { ...process.env, ...agent.env },
@@ -117,18 +152,32 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
 
 interface AgentProviderConfig {
   provider: AgentProvider
-  entry: string
+  entry: AgentEntry
   env: NodeJS.ProcessEnv
   newSession: (input: RunSessionInput) => NewSessionRequest
 }
 
 function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
   if (provider === "codex") {
+    const entry = resolveAgentEntry(
+      "codex-acp",
+      "@agentclientprotocol/codex-acp/dist/index.js"
+    )
     return {
       provider,
-      entry: CODEX_AGENT_ENTRY,
+      entry,
       env: {
         INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        // codex-acp resolves its bundled @openai/codex fallback via
+        // require.resolve when CODEX_PATH is unset, which — like our own
+        // CLAUDE_AGENT_ENTRY resolution — breaks under bun-compile (no
+        // node_modules on the target machine). The readme already documents
+        // the Codex CLI as an external prerequisite installed on PATH, so
+        // when running the compiled sidecar, point at that instead of
+        // letting codex-acp fall through to its broken bundled resolution.
+        ...(entry.usingSidecar
+          ? { CODEX_PATH: process.env.CODEX_PATH ?? "codex" }
+          : {}),
       },
       newSession: (input) => ({
         cwd: input.cwd,
@@ -137,10 +186,28 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
     }
   }
 
+  const entry = resolveAgentEntry(
+    "claude-agent-acp",
+    "@agentclientprotocol/claude-agent-acp/dist/index.js"
+  )
   return {
     provider,
-    entry: CLAUDE_AGENT_ENTRY,
-    env: {},
+    entry,
+    env: {
+      // claude-agent-acp locates the native `claude` CLI (a per-platform
+      // optionalDependency of @anthropic-ai/claude-agent-sdk) via
+      // import.meta.resolve, which only works against a real node_modules —
+      // absent from the compiled binary. build-binary.sh vendors that native
+      // binary next to the sidecar; point straight at it so the SDK's own
+      // (broken, in this mode) resolution never runs.
+      ...(entry.usingSidecar && entry.sidecarDir
+        ? {
+            CLAUDE_CODE_EXECUTABLE:
+              process.env.CLAUDE_CODE_EXECUTABLE ??
+              join(entry.sidecarDir, "claude"),
+          }
+        : {}),
+    },
     newSession: (input) => ({
       cwd: input.cwd,
       mcpServers: [],

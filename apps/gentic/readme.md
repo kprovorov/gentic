@@ -97,6 +97,44 @@ Build the agent:
 pnpm --filter @gentic/gentic build
 ```
 
+## Standalone binary
+
+For deploying without Node, pnpm, or `node_modules` on the target machine,
+compile a single-file executable with [Bun](https://bun.sh) instead (Bun is
+a build-time dependency only — the output binary needs nothing at runtime):
+
+```bash
+pnpm install
+cd apps/gentic
+./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+```
+
+`bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, and `bun-darwin-arm64`
+are supported; check Bun's docs for the current list of `--compile` targets.
+The output directory contains:
+
+- `gentic` — the compiled CLI.
+- `vendor/claude-agent-acp/` — a compiled sidecar binary plus the native
+  `claude` CLI (both spawned as child processes per the Agent Client
+  Protocol; see `src/session.ts`), used for `claude_code` issues.
+- `vendor/codex-acp/` — a compiled sidecar binary, used for `codex` issues.
+  It still shells out to a system-installed `codex` (`CODEX_PATH` or PATH),
+  per the Codex prerequisite above.
+
+Copy the whole output directory to the target machine and run
+`./gentic run` with `GENTIC_API_KEY`/`GENTIC_API_URL` in the environment —
+no install step needed.
+
+Cross-compiling the `claude` CLI sidecar for a platform other than the build
+host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
+optionalDependency already present in `node_modules` (pnpm only installs the
+one matching the host by default); the build script fails with an actionable
+error rather than silently skipping it. Building each target on/for a
+matching host is the simplest way to satisfy this today.
+
+macOS binaries are not code-signed or notarized; Gatekeeper will warn on
+first run.
+
 ## Run locally
 
 Start the agent in watch mode:
