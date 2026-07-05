@@ -48,12 +48,17 @@ Fill in these values:
 GENTIC_API_URL=https://gentic.chat/api/v1
 GENTIC_API_KEY=your-user-clerk-api-key
 GIT_REMOTE_BASE=git@github.com:
-WORKDIR=/tmp/gentic-workspaces
 POLL_INTERVAL_MS=3000
 ```
 
 For local web app development, `GENTIC_API_URL` can stay as
 `http://localhost:3000/api/v1`.
+
+`WORKDIR` is optional. If unset, it defaults to an OS-appropriate data
+directory (e.g. `~/.local/share/gentic/workspaces` on Linux, via
+[`env-paths`](https://github.com/sindresorhus/env-paths)). Set it explicitly
+to use a different location, such as `/tmp/gentic-workspaces` for a dev
+checkout.
 
 `GIT_REMOTE_BASE` is prepended to each project repo stored in Supabase. For a
 project repo of `owner/repo` and the default base of `git@github.com:`, the
@@ -62,6 +67,13 @@ agent clones `git@github.com:owner/repo`.
 `GENTIC_API_KEY` must be a user-scoped Clerk API key. The hosted Gentic API
 verifies it, identifies the Clerk user, and only returns or mutates issues whose
 project belongs to that user.
+
+Besides `.env`, settings can also live in a persisted config file at an
+OS-appropriate config directory (e.g. `~/.config/gentic/config.json` on
+Linux), written by a future `gentic login` command. `loadConfig()` merges
+both sources, with environment variables taking precedence over the config
+file for each key. This keeps `.env` usable for local development while
+giving an installed CLI a durable place to store settings and the API key.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
@@ -152,8 +164,9 @@ EnvironmentFile=/path/to/gentic/apps/gentic/.env
   content blocks for the first prompt: images and text files are embedded
   directly, everything else is downloaded next to (not inside) the repo
   clone and referenced by path.
-- `src/api.ts`, `src/config.ts`, `src/messages.ts`, `src/async-queue.ts` —
-  API, configuration, and transcript helpers.
+- `src/api.ts`, `src/config.ts`, `src/config-store.ts`, `src/messages.ts`,
+  `src/async-queue.ts` — API, configuration, persisted config file, and
+  transcript helpers.
 
 A run stays open for one poll interval after the agent goes quiet so follow-up
 messages sent while it works are handled in the same session; once the
