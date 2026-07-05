@@ -280,6 +280,66 @@ export async function deleteIssue(supabase: Supabase, userId: string, id: string
   }
 }
 
+export async function resetIssueAgent(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
+  await ensureIssueOwned(supabase, userId, id)
+
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("title,prompt")
+    .eq("id", id)
+    .single<{ title: string; prompt: string | null }>()
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+
+  const { error: deleteMessagesError } = await supabase
+    .from("messages")
+    .delete()
+    .eq("issue_id", id)
+
+  if (deleteMessagesError) {
+    throw new ServiceError("internal", deleteMessagesError.message)
+  }
+
+  const now = new Date().toISOString()
+  const { error: updateError } = await supabase
+    .from("issues")
+    .update({
+      status: "todo",
+      run_status: "queued",
+      session_id: null,
+      run_error: null,
+      run_started_at: null,
+      run_finished_at: null,
+      pr_url: null,
+      updated_at: now,
+    })
+    .eq("id", id)
+
+  if (updateError) {
+    throw new ServiceError("internal", updateError.message)
+  }
+
+  const messageContent = current.prompt
+    ? `${current.title}\n\n${current.prompt}`
+    : current.title
+
+  const { error: messageError } = await supabase.from("messages").insert({
+    issue_id: id,
+    role: "user",
+    content: messageContent,
+  })
+
+  if (messageError) {
+    throw new ServiceError("internal", messageError.message)
+  }
+}
+
 export async function addIssueRelation(
   supabase: Supabase,
   userId: string,

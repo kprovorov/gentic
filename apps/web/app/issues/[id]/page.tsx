@@ -37,6 +37,7 @@ import * as issuesService from "@gentic/services/issues"
 
 import { IssueStatusSelect } from "./issue-status-select"
 import { IssueDeleteButton } from "./issue-delete-button"
+import { IssueResetAgentButton } from "./issue-reset-agent-button"
 import { Attachments, type Attachment } from "./attachments"
 import {
   IssueChat,
@@ -302,12 +303,15 @@ export default async function IssueDetailPage({
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Agent</CardTitle>
-              <CardDescription>
-                {agentProviderLabels[issue.agent_provider]} will run this issue
-                when it moves to Todo.
-              </CardDescription>
+            <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid gap-1.5">
+                <CardTitle>Agent</CardTitle>
+                <CardDescription>
+                  {agentProviderLabels[issue.agent_provider]} will run this issue
+                  when it moves to Todo.
+                </CardDescription>
+              </div>
+              <IssueResetAgentButton issueId={issue.id} />
             </CardHeader>
             <CardContent>
               <IssueChat

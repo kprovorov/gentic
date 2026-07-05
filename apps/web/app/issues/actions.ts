@@ -89,6 +89,16 @@ export async function deleteIssue(formData: FormData) {
   redirect("/home")
 }
 
+export async function resetIssueAgent(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const id = z.string().uuid().parse(getString(formData, "id"))
+
+  await issuesService.resetIssueAgent(supabase, userId, id)
+
+  revalidatePath("/home")
+  revalidatePath(`/issues/${id}`)
+}
+
 export async function updateIssueStatus(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const id = z.string().uuid().parse(getString(formData, "id"))
