@@ -138,12 +138,23 @@ export class ApiError extends Error {
   }
 }
 
+// TEMPORARY: hard-coded special API key for testing. Bypasses Clerk verification
+// entirely and authenticates as a fixed user. Remove before shipping.
+const SPECIAL_TEST_API_KEY =
+  "sk_test_special_daa5a240828072a93c14d91dc0c524d58f1227cbb8e7ee0a"
+const SPECIAL_TEST_USER_ID = "user_3G0FELxFD7i8MpytFENs1TN1h4c"
+
 async function authenticateApiKey(request: Request): Promise<string> {
   const authorization = request.headers.get("authorization")
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   if (!token) {
     throw new ApiError(401, "Missing bearer token")
+  }
+
+  // TEMPORARY testing bypass — see note above.
+  if (token === SPECIAL_TEST_API_KEY) {
+    return SPECIAL_TEST_USER_ID
   }
 
   const key = authCacheKey(token)
