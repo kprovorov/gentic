@@ -100,7 +100,7 @@ export function IssueRelations({
     <div className="grid gap-5">
       <form action={addIssueRelation} className="grid gap-3">
         <input type="hidden" name="issue_id" value={issueId} />
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_auto]">
+        <div className="grid gap-3">
           <Select
             name="related_issue_id"
             disabled={candidates.length === 0}
@@ -142,7 +142,7 @@ export function IssueRelations({
         ) : null}
       </form>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4">
         <RelationList
           title="Blocking"
           empty="This issue is not blocking anything."
