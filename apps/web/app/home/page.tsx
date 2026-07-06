@@ -5,10 +5,12 @@ import { redirect } from "next/navigation"
 import {
   IconAlertOctagon,
   IconAlertTriangle,
+  IconCalendar,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
   IconClock,
+  IconFolder,
   IconEye,
   IconFlask,
   IconGitMerge,
@@ -23,6 +25,12 @@ import {
 } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@gentic/ui/card"
 import { Table, TableBody, TableCell, TableRow } from "@gentic/ui/table"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
@@ -169,6 +177,12 @@ export default async function HomePage() {
     supabase,
     issues.map((issue) => issue.id)
   )
+  const activeIssueCount = issues.filter(
+    (issue) =>
+      issue.status !== "completed" &&
+      issue.status !== "cancelled" &&
+      issue.status !== "merged"
+  ).length
 
   const groups = (Object.keys(statusOrder) as IssueStatus[])
     .sort((a, b) => statusOrder[a] - statusOrder[b])
@@ -180,11 +194,14 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-2">
             <p className="text-sm font-medium text-muted-foreground">Home</p>
             <h1 className="text-3xl">Issues</h1>
+            <p className="text-sm text-muted-foreground">
+              Track agent work, blockers, and recent project activity.
+            </p>
           </div>
           <Button asChild>
             <Link href="/issues/new">
@@ -210,69 +227,122 @@ export default async function HomePage() {
             </Button>
           </section>
         ) : (
-          <section className="overflow-hidden rounded-lg border">
-            <Table>
-              <TableBody>
-                {groups.map((group) => {
-                  const GroupIcon = statusIcons[group.status]
+          <section className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Total
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-medium tabular-nums">
+                    {issues.length}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Active
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-medium tabular-nums">
+                    {activeIssueCount}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Blocked
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-medium tabular-nums">
+                    {blockedIssueIds.size}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
-                  return (
-                    <Fragment key={group.status}>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell colSpan={3} className="py-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "inline-flex size-5 items-center justify-center rounded-md",
-                                statusStyles[group.status]
-                              )}
-                            >
-                              <GroupIcon className="size-3.5" />
-                            </span>
-                            <span className="text-sm font-medium">
-                              {statusLabels[group.status]}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {group.issues.length}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {group.issues.map((issue) => {
-                        const isBlocked = blockedIssueIds.has(issue.id)
+            <div className="overflow-hidden rounded-4xl border bg-card shadow-sm">
+              <Table>
+                <TableBody>
+                  {groups.map((group) => {
+                    const GroupIcon = statusIcons[group.status]
 
-                        return (
-                          <TableRow key={issue.id}>
-                            <TableCell className="w-full py-2.5">
-                              <Link
-                                href={`/issues/${issue.id}`}
-                                className="group/link flex items-center gap-2 font-medium"
+                    return (
+                      <Fragment key={group.status}>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableCell colSpan={2} className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "inline-flex size-6 items-center justify-center rounded-full",
+                                  statusStyles[group.status]
+                                )}
                               >
-                                <span className="truncate group-hover/link:text-primary">
-                                  {issue.title}
-                                </span>
-                                {isBlocked ? (
-                                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
-                                    <IconLock className="size-3" />
-                                    Blocked
-                                  </span>
-                                ) : null}
-                              </Link>
-                            </TableCell>
-                            <TableCell className="hidden py-2.5 text-sm text-muted-foreground sm:table-cell">
-                              {issue.projects?.name ?? "Unknown project"}
-                            </TableCell>
-                            <TableCell className="py-2.5 text-right text-sm text-muted-foreground tabular-nums">
-                              {formatDate(issue.created_at)}
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </Fragment>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                                <GroupIcon className="size-3.5" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {statusLabels[group.status]}
+                              </span>
+                              <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                                {group.issues.length}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {group.issues.map((issue) => {
+                          const isBlocked = blockedIssueIds.has(issue.id)
+
+                          return (
+                            <TableRow key={issue.id} className="group/row">
+                              <TableCell className="w-full px-4 py-4">
+                                <Link
+                                  href={`/issues/${issue.id}`}
+                                  className="grid gap-2"
+                                >
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <span className="truncate font-medium group-hover/row:text-primary">
+                                      {issue.title}
+                                    </span>
+                                    {isBlocked ? (
+                                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+                                        <IconLock className="size-3" />
+                                        Blocked
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                                      <IconFolder className="size-3.5 shrink-0" />
+                                      <span className="truncate">
+                                        {issue.projects?.name ??
+                                          "Unknown project"}
+                                      </span>
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <IconCalendar className="size-3.5" />
+                                      {formatDate(issue.created_at)}
+                                    </span>
+                                  </div>
+                                </Link>
+                              </TableCell>
+                              <TableCell className="hidden px-4 py-4 text-right text-sm text-muted-foreground md:table-cell">
+                                {issue.projects?.repo ?? ""}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </Fragment>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </section>
         )}
       </div>

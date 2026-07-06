@@ -4,6 +4,7 @@ import {
   IconAlertOctagon,
   IconAlertTriangle,
   IconArrowLeft,
+  IconCalendar,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
@@ -11,6 +12,7 @@ import {
   IconExternalLink,
   IconEye,
   IconFlask,
+  IconFolder,
   IconGitMerge,
   IconLock,
   IconMessage2,
@@ -152,6 +154,28 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof IconCalendar
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="truncate text-sm">{value}</p>
+      </div>
+    </div>
+  )
+}
+
 export default async function IssueDetailPage({
   params,
 }: {
@@ -244,16 +268,24 @@ export default async function IssueDetailPage({
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-        <header className="flex flex-col gap-4 border-b pb-6">
-          <div className="flex items-center justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
+        <header className="flex flex-col gap-5 border-b pb-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button asChild variant="ghost" className="w-fit">
               <Link href="/home">
                 <IconArrowLeft />
-                Back
+                My issues
               </Link>
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {issue.pr_url ? (
+                <Button asChild variant="outline">
+                  <Link href={issue.pr_url} target="_blank" rel="noreferrer">
+                    <IconExternalLink />
+                    Pull request
+                  </Link>
+                </Button>
+              ) : null}
               <Button asChild variant="outline">
                 <Link href={`/issues/${issue.id}/edit`}>
                   <IconPencil />
@@ -263,7 +295,7 @@ export default async function IssueDetailPage({
               <IssueDeleteButton issueId={issue.id} />
             </div>
           </div>
-          <div className="grid gap-3">
+          <div className="grid max-w-4xl gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <div
                 className={cn(
@@ -285,127 +317,153 @@ export default async function IssueDetailPage({
                 Agent: {agentProviderLabels[issue.agent_provider]}
               </div>
             </div>
-            <h1 className="text-3xl">{issue.title}</h1>
+            <h1 className="text-3xl leading-tight md:text-4xl">
+              {issue.title}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Created {formatDateTime(issue.created_at)}
+            </p>
           </div>
         </header>
 
-        <section className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>
-                Update where this issue stands.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <IssueStatusSelect issueId={issue.id} status={issue.status} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="grid gap-1.5">
-                <CardTitle>Agent</CardTitle>
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start">
+          <div className="grid min-w-0 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Prompt</CardTitle>
                 <CardDescription>
-                  {agentProviderLabels[issue.agent_provider]} will run this issue
-                  when it moves to Todo.
+                  The request and acceptance details for this issue.
                 </CardDescription>
-              </div>
-              <IssueResetAgentButton issueId={issue.id} />
-            </CardHeader>
-            <CardContent>
-              <IssueChat
-                issueId={issue.id}
-                initialMessages={messages ?? []}
-                initialRunStatus={issue.run_status}
-                initialPrUrl={issue.pr_url}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Relations</CardTitle>
-              <CardDescription>
-                Connect issues that block or depend on this work.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <IssueRelations
-                issueId={issue.id}
-                relations={relations}
-                candidates={relationCandidates}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Attachments</CardTitle>
-              <CardDescription>
-                Files attached here are passed to the agent along with your
-                prompt.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Attachments issueId={issue.id} attachments={attachments} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Prompt</CardTitle>
-              <CardDescription>
-                Created {formatDateTime(issue.created_at)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {issue.prompt ? (
-                <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                  {issue.prompt}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No prompt provided.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Project</CardTitle>
-              <CardDescription>
-                Last updated {formatDateTime(issue.updated_at)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {issue.projects ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium">{issue.projects.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {issue.projects.repo}
+              </CardHeader>
+              <CardContent>
+                {issue.prompt ? (
+                  <div className="rounded-3xl bg-muted/40 p-5">
+                    <p className="whitespace-pre-wrap text-base leading-7">
+                      {issue.prompt}
                     </p>
                   </div>
-                  <Button asChild variant="outline">
-                    <Link
-                      href={`https://github.com/${issue.projects.repo}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <IconExternalLink />
-                      Open repo
-                    </Link>
-                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No prompt provided.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="grid gap-1.5">
+                  <CardTitle>Agent activity</CardTitle>
+                  <CardDescription>
+                    {agentProviderLabels[issue.agent_provider]} will run this
+                    issue when it moves to Todo.
+                  </CardDescription>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  This issue is not linked to an available project.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                <IssueResetAgentButton issueId={issue.id} />
+              </CardHeader>
+              <CardContent>
+                <IssueChat
+                  issueId={issue.id}
+                  initialMessages={messages ?? []}
+                  initialRunStatus={issue.run_status}
+                  initialPrUrl={issue.pr_url}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="grid gap-4 lg:sticky lg:top-6">
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Properties</CardTitle>
+                <CardDescription>
+                  Update state and review ownership details.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5">
+                <IssueStatusSelect issueId={issue.id} status={issue.status} />
+                <div className="grid gap-3 border-t pt-5">
+                  <DetailRow
+                    icon={IconRobot}
+                    label="Agent"
+                    value={agentProviderLabels[issue.agent_provider]}
+                  />
+                  <DetailRow
+                    icon={IconCalendar}
+                    label="Updated"
+                    value={formatDateTime(issue.updated_at)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Project</CardTitle>
+                <CardDescription>
+                  Repository linked to this issue.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {issue.projects ? (
+                  <div className="grid gap-4">
+                    <DetailRow
+                      icon={IconFolder}
+                      label="Project"
+                      value={issue.projects.name}
+                    />
+                    <div className="min-w-0 rounded-3xl bg-muted/40 p-3">
+                      <p className="truncate text-sm font-medium">
+                        {issue.projects.repo}
+                      </p>
+                    </div>
+                    <Button asChild variant="outline" className="w-full">
+                      <Link
+                        href={`https://github.com/${issue.projects.repo}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconExternalLink />
+                        Open repo
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This issue is not linked to an available project.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Relations</CardTitle>
+                <CardDescription>
+                  Connect issues that block or depend on this work.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <IssueRelations
+                  issueId={issue.id}
+                  relations={relations}
+                  candidates={relationCandidates}
+                />
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Attachments</CardTitle>
+                <CardDescription>
+                  Files passed to the agent with your prompt.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Attachments issueId={issue.id} attachments={attachments} />
+              </CardContent>
+            </Card>
+          </aside>
         </section>
       </div>
     </main>
