@@ -50,6 +50,7 @@ import { IssueRelations } from "./issue-relations"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
+const ATTACHMENT_THUMBNAIL_SIZE = 96
 
 type IssueStatus =
   | "draft"
@@ -219,13 +220,14 @@ export default async function IssueDetailPage({
 
   const { data: attachmentRows, error: attachmentsError } = await supabase
     .from("attachments")
-    .select("id,file_name,size_bytes,storage_path")
+    .select("id,file_name,content_type,size_bytes,storage_path")
     .eq("issue_id", id)
     .order("created_at", { ascending: true })
     .returns<
       Array<{
         id: string
         file_name: string
+        content_type: string | null
         size_bytes: number | null
         storage_path: string
       }>
@@ -242,18 +244,34 @@ export default async function IssueDetailPage({
 
   const attachments: Attachment[] = await Promise.all(
     (attachmentRows ?? []).map(async (attachment) => {
-      const { data: signed } = await supabase.storage
-        .from(ATTACHMENTS_BUCKET)
-        .createSignedUrl(
+      const isImage = attachment.content_type?.startsWith("image/") ?? false
+      const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
+      const [{ data: signed }, { data: thumbnail }] = await Promise.all([
+        storage.createSignedUrl(
           attachment.storage_path,
           ATTACHMENT_SIGNED_URL_TTL_SECONDS
-        )
+        ),
+        isImage
+          ? storage.createSignedUrl(
+              attachment.storage_path,
+              ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+              {
+                transform: {
+                  width: ATTACHMENT_THUMBNAIL_SIZE,
+                  height: ATTACHMENT_THUMBNAIL_SIZE,
+                  resize: "cover",
+                },
+              }
+            )
+          : Promise.resolve({ data: null }),
+      ])
 
       return {
         id: attachment.id,
         fileName: attachment.file_name,
         sizeBytes: attachment.size_bytes,
         url: signed?.signedUrl ?? null,
+        thumbnailUrl: thumbnail?.signedUrl ?? null,
       }
     })
   )
