@@ -70,10 +70,31 @@ project belongs to that user.
 
 Besides `.env`, settings can also live in a persisted config file at an
 OS-appropriate config directory (e.g. `~/.config/gentic/config.json` on
-Linux), written by a future `gentic login` command. `loadConfig()` merges
+Linux), written by `gentic auth login` (see below). `loadConfig()` merges
 both sources, with environment variables taking precedence over the config
 file for each key. This keeps `.env` usable for local development while
 giving an installed CLI a durable place to store settings and the API key.
+
+## Authentication
+
+`gentic auth login` prompts for the API URL and key and saves them to the
+config file:
+
+```bash
+gentic auth login
+```
+
+Pass both flags for non-interactive/scripted use:
+
+```bash
+gentic auth login --api-url https://gentic.chat/api/v1 --api-key <key>
+```
+
+`gentic auth status` shows whether credentials are configured (with the key
+masked) and `gentic auth logout` clears them (`--yes`/`-y` to skip the
+confirmation prompt). The hosted API currently has no read-only authenticated
+endpoint, so `login` saves the key without a live validation call; an
+incorrect key surfaces as a failure on the worker's first poll instead.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
