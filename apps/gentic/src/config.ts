@@ -42,7 +42,7 @@ export function loadConfig(): Config {
 
   if (!merged.GENTIC_API_KEY || !merged.GENTIC_API_URL) {
     throw new Error(
-      "Not authenticated. Run `gentic login` or set GENTIC_API_KEY and GENTIC_API_URL.",
+      "Not authenticated. Run `gentic auth login` or set GENTIC_API_KEY and GENTIC_API_URL.",
     )
   }
 
