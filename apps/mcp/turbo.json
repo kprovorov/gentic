@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "env": ["PORT"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "api/**"]
     }
   }
 }

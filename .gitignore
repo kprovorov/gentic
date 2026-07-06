@@ -20,6 +20,9 @@ out/
 build
 dist
 
+# generated Vercel function bundle (built by tsdown)
+apps/mcp/api/
+
 # misc
 .DS_Store
 *.pem
