@@ -42,7 +42,7 @@ Scope to one workspace with `--filter`, e.g. `pnpm --filter @gentic/web dev` or 
 - **`@gentic/supabase`** exposes three deliberately separate clients — pick by trust context:
   - `./client` — browser.
   - `./server` — Server Components / actions / route handlers; authenticates to Supabase's Data API with the **Clerk session token** so RLS runs as the user.
-  - `./service` — service-role key, **bypasses RLS**. Free of any `next` import so plain Node code (worker, MCP) can use it. Callers **must** authorize every query themselves.
+  - `./service` — Supabase secret key, **bypasses RLS**. Free of any `next` import so plain Node code (worker, MCP) can use it. Callers **must** authorize every query themselves.
 - **`@gentic/services`** — business logic over Supabase (`issues`, `projects`), used by both web and MCP.
 - **`@gentic/validators`** — shared Zod schemas (`auth`, `issues`, `projects`).
 - **`@gentic/ui`** — shared shadcn/Radix components; each is a subpath export (e.g. `@gentic/ui/button`).
@@ -52,7 +52,7 @@ Scope to one workspace with `--filter`, e.g. `pnpm --filter @gentic/web dev` or 
 
 **Clerk is the identity provider; Supabase is the database.** Clerk session tokens are passed to Supabase so RLS policies see the Clerk user. `user_id` columns store **Clerk user ids** (`user_...` strings) — early migrations referenced `auth.users`/`auth.uid()` but a later migration moved ownership to Clerk. Enable the Supabase integration in the Clerk dashboard so tokens carry `role: authenticated`.
 
-Two distinct authorization paths, because service-role code bypasses RLS:
+Two distinct authorization paths, because secret-key code bypasses RLS:
 - **User-facing** (web pages/actions): use the `./server` client and let RLS enforce ownership.
 - **Trusted server code** (agent API in `app/api/v1/agent/`, MCP): use the `./service` client and authorize manually via helpers like `ensureIssueOwned` / `ensureProjectOwned`, which check ownership through the `issues → projects.user_id` join (the `issues` table has no `user_id` of its own).
 
