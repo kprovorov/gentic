@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Popover } from "radix-ui"
-import { IconMenu2, IconPlus } from "@tabler/icons-react"
+import { IconMenu2 } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 
@@ -41,15 +41,6 @@ export function MobileNav({
                 </Link>
               </Popover.Close>
             ))}
-            <Popover.Close asChild>
-              <Link
-                href="/issues/new"
-                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium hover:bg-muted"
-              >
-                <IconPlus className="size-4" />
-                New issue
-              </Link>
-            </Popover.Close>
           </nav>
         </Popover.Content>
       </Popover.Portal>
