@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 
 import { registerRunCommand } from "./commands/run.js"
+import { logError } from "./log.js"
 
 function readPackageVersion(): string {
   const cliDir = dirname(fileURLToPath(import.meta.url))
@@ -32,6 +33,6 @@ program
 registerRunCommand(program)
 
 program.parseAsync(process.argv).catch((error: unknown) => {
-  console.error("[gentic] fatal:", describe(error))
+  logError("fatal:", describe(error))
   process.exit(1)
 })
