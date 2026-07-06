@@ -17,10 +17,51 @@ coding agent through the Agent Client Protocol.
 - Codex installed and authenticated in the worker environment for issues
   assigned to Codex.
 
+## Install a packaged build
+
+The fastest way to run the agent on a server or VM: install a standalone
+build (no Node, pnpm, or `node_modules` required) via Homebrew or apt, then
+skip straight to [Environment](#environment). Git access, Claude Code
+credentials, and Codex (if used) are still required as listed above.
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap kprovorov/gentic
+brew install kprovorov/gentic/gentic
+gentic --version
+```
+
+### apt (Debian/Ubuntu)
+
+Download `gentic_<version>_amd64.deb` (or `_arm64.deb`) from the
+[latest release](https://github.com/kprovorov/gentic/releases), then:
+
+```bash
+sudo apt install ./gentic_<version>_amd64.deb
+gentic --version
+```
+
+This installs `/usr/bin/gentic` and its `vendor/` sidecar (see
+[Standalone binary](#standalone-binary) below) at `/usr/lib/gentic/vendor`.
+It does not install or start a background service — run `gentic run`
+directly, or set one up yourself with `systemd`/`pm2` (see
+[Production process example](#production-process-example)).
+
+There's no real APT repository yet (`apt install gentic` after
+`add-apt-repository` doesn't work) — that's a follow-up, tracked as a
+stretch goal alongside this MVP path. Homebrew and apt packages are built
+by [`.github/workflows/gentic-release.yml`](../../.github/workflows/gentic-release.yml)
+on every `gentic-v*` tag push; see `apps/gentic/nfpm.yaml` and
+[`packaging/homebrew-gentic/`](../../packaging/homebrew-gentic) for the
+packaging configs.
+
 ## Upload or deploy the agent
 
 Run the agent on a server or VM that can keep secrets private and can reach both
-the Gentic API and GitHub.
+the Gentic API and GitHub. This is the source-based path — prefer
+[Install a packaged build](#install-a-packaged-build) above unless you need
+to run from a checkout.
 
 1. Upload or clone this repository to the server.
 2. Install Node.js and pnpm.
@@ -135,7 +176,10 @@ The output directory contains:
 
 Copy the whole output directory to the target machine and run
 `./gentic run` with `GENTIC_API_KEY`/`GENTIC_API_URL` in the environment —
-no install step needed.
+no install step needed. `vendor/` must ship in the same directory as
+`gentic` — `src/session.ts` (`resolveAgentEntry`) looks for it there first,
+then falls back to `/usr/lib/gentic/vendor` (the .deb layout) or
+`$GENTIC_VENDOR_DIR` if set.
 
 Cross-compiling the `claude` CLI sidecar for a platform other than the build
 host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`

@@ -1,0 +1,97 @@
+name: gentic release
+
+on:
+  push:
+    tags:
+      - "gentic-v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native claude CLI sidecar vendoring (scripts/resolve-native-claude.mjs)
+          # only finds the optionalDependency pnpm installed for the *host*
+          # running `pnpm install`, so each target builds on a runner that
+          # actually matches its OS/arch rather than cross-compiling.
+          - target: bun-linux-x64
+            runner: ubuntu-latest
+            deb_arch: amd64
+            nfpm_arch: x86_64
+          - target: bun-linux-arm64
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+            nfpm_arch: arm64
+          - target: bun-darwin-x64
+            runner: macos-13
+          - target: bun-darwin-arm64
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build standalone binary
+        working-directory: apps/gentic
+        run: ./scripts/build-binary.sh ${{ matrix.target }} dist/${{ matrix.target }}
+
+      - name: Archive
+        working-directory: apps/gentic/dist/${{ matrix.target }}
+        run: tar -czf ../../gentic-${{ matrix.target }}.tar.gz .
+
+      - name: Checksum
+        working-directory: apps/gentic
+        run: shasum -a 256 gentic-${{ matrix.target }}.tar.gz > gentic-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Build .deb (Linux only)
+        if: startsWith(matrix.target, 'bun-linux-')
+        working-directory: apps/gentic
+        env:
+          NFPM_VERSION: 2.47.0
+        run: |
+          curl -sSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_${{ matrix.nfpm_arch }}.tar.gz" \
+            | tar -xz -C /tmp nfpm
+          VERSION="${GITHUB_REF_NAME#gentic-v}" TARGET="${{ matrix.target }}" ARCH="${{ matrix.deb_arch }}" \
+            /tmp/nfpm package --config nfpm.yaml --packager deb --target "gentic_${VERSION}_${{ matrix.deb_arch }}.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gentic-${{ matrix.target }}
+          path: |
+            apps/gentic/gentic-${{ matrix.target }}.tar.gz
+            apps/gentic/gentic-${{ matrix.target }}.tar.gz.sha256
+            apps/gentic/*.deb
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Combine checksums
+        working-directory: artifacts
+        run: cat *.sha256 > checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.deb
+            artifacts/checksums.txt

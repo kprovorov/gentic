@@ -36,6 +36,12 @@ interface AgentEntry {
   sidecarDir: string | null
 }
 
+// Fixed sidecar location used by the .deb package (apps/gentic/nfpm.yaml):
+// /usr/bin/gentic is not next to its vendor/ directory the way a tar.gz
+// extraction or a Homebrew keg is, so nfpm installs vendor/ here instead and
+// this is checked as a fallback below.
+const DEB_VENDOR_ROOT = "/usr/lib/gentic/vendor"
+
 /**
  * In dev/pnpm mode the ACP agent is a plain ESM file under node_modules, run
  * with `node <file>` (`process.execPath` is the node binary). When gentic is
@@ -45,18 +51,39 @@ interface AgentEntry {
  * `node <file>` would just re-invoke gentic with a stray argument. The build
  * script (scripts/build-binary.sh) works around both problems by compiling
  * each ACP agent into its own standalone sidecar binary under
- * `vendor/<name>/<name>`, next to the gentic binary — so this prefers that
- * binary (run directly, no runtime needed) and falls back to the dev-mode
- * `require.resolve` + node-invocation path when no sidecar is present.
+ * `vendor/<name>/<name>`, shipped alongside the gentic binary.
+ *
+ * Package managers lay that vendor directory out differently, so sidecars
+ * are looked up in order:
+ * 1. `$GENTIC_VENDOR_DIR/<name>` — explicit override, for layouts that don't
+ *    fit the two cases below.
+ * 2. `<dir of the running executable>/vendor/<name>` — a plain tar.gz
+ *    extraction, and Homebrew (process.execPath resolves through the
+ *    `bin/gentic` symlink to the real file installed alongside `vendor/` in
+ *    the keg's `libexec/`, per Formula/gentic.rb).
+ * 3. `/usr/lib/gentic/vendor/<name>` — the .deb package (nfpm.yaml), whose
+ *    binary lives in `/usr/bin` separate from its data files.
+ *
+ * Falls back to the dev-mode `require.resolve` + node-invocation path when
+ * none of the above exist.
  */
 function resolveAgentEntry(
   sidecarName: "claude-agent-acp" | "codex-acp",
   packageEntry: string
 ): AgentEntry {
-  const sidecarDir = join(dirname(process.execPath), "vendor", sidecarName)
-  const sidecar = join(sidecarDir, sidecarName)
-  if (existsSync(sidecar)) {
-    return { command: sidecar, args: [], usingSidecar: true, sidecarDir }
+  const candidateDirs = [
+    process.env.GENTIC_VENDOR_DIR
+      ? join(process.env.GENTIC_VENDOR_DIR, sidecarName)
+      : null,
+    join(dirname(process.execPath), "vendor", sidecarName),
+    join(DEB_VENDOR_ROOT, sidecarName),
+  ].filter((dir): dir is string => dir !== null)
+
+  for (const sidecarDir of candidateDirs) {
+    const sidecar = join(sidecarDir, sidecarName)
+    if (existsSync(sidecar)) {
+      return { command: sidecar, args: [], usingSidecar: true, sidecarDir }
+    }
   }
 
   const require = createRequire(import.meta.url)
