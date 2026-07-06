@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Fragment } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
@@ -22,14 +23,7 @@ import {
 } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@gentic/ui/card"
+import { Table, TableBody, TableCell, TableRow } from "@gentic/ui/table"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
@@ -55,7 +49,6 @@ type IssueStatus =
 type Issue = {
   id: string
   title: string
-  prompt: string | null
   status: IssueStatus
   created_at: string
   projects: {
@@ -138,11 +131,14 @@ const statusOrder: Record<IssueStatus, number> = {
 }
 
 function formatDate(value: string) {
+  const date = new Date(value)
+  const now = new Date()
   return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
-    year: "numeric",
-  }).format(new Date(value))
+    year:
+      date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  }).format(date)
 }
 
 export const metadata: Metadata = {
@@ -159,7 +155,7 @@ export default async function HomePage() {
   const supabase = await createClient()
   const { data: issues, error } = await supabase
     .from("issues")
-    .select("id,title,prompt,status,created_at,projects(id,name,repo)")
+    .select("id,title,status,created_at,projects(id,name,repo)")
     .order("created_at", { ascending: false })
     .returns<Issue[]>()
 
@@ -173,6 +169,14 @@ export default async function HomePage() {
     supabase,
     issues.map((issue) => issue.id)
   )
+
+  const groups = (Object.keys(statusOrder) as IssueStatus[])
+    .sort((a, b) => statusOrder[a] - statusOrder[b])
+    .map((status) => ({
+      status,
+      issues: issues.filter((issue) => issue.status === status),
+    }))
+    .filter((group) => group.issues.length > 0)
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
@@ -206,55 +210,69 @@ export default async function HomePage() {
             </Button>
           </section>
         ) : (
-          <section className="grid gap-3">
-            {issues.map((issue) => {
-              const StatusIcon = statusIcons[issue.status]
+          <section className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableBody>
+                {groups.map((group) => {
+                  const GroupIcon = statusIcons[group.status]
 
-              return (
-                <Card key={issue.id} size="sm">
-                  <CardHeader>
-                    <CardTitle>
-                      <Link
-                        href={`/issues/${issue.id}`}
-                        className="hover:text-primary"
-                      >
-                        {issue.title}
-                      </Link>
-                    </CardTitle>
-                    <CardDescription>
-                      {issue.projects?.name ?? "Unknown project"} ·{" "}
-                      {formatDate(issue.created_at)}
-                    </CardDescription>
-                    <CardAction>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-                            statusStyles[issue.status]
-                          )}
-                        >
-                          <StatusIcon className="size-3.5" />
-                          {statusLabels[issue.status]}
-                        </span>
-                        {blockedIssueIds.has(issue.id) ? (
-                          <span className="inline-flex h-7 items-center gap-1 rounded-full bg-red-500/15 px-2.5 text-xs font-medium text-red-700 dark:text-red-300">
-                            <IconLock className="size-3.5" />
-                            Blocked
-                          </span>
-                        ) : null}
-                      </div>
-                    </CardAction>
-                  </CardHeader>
-                  {issue.prompt ? (
-                    <CardContent>
-                      <p className="line-clamp-2 text-sm text-muted-foreground">
-                        {issue.prompt}
-                      </p>
-                    </CardContent>
-                  ) : null}
-                </Card>
-              )
-            })}
+                  return (
+                    <Fragment key={group.status}>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableCell colSpan={3} className="py-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "inline-flex size-5 items-center justify-center rounded-md",
+                                statusStyles[group.status]
+                              )}
+                            >
+                              <GroupIcon className="size-3.5" />
+                            </span>
+                            <span className="text-sm font-medium">
+                              {statusLabels[group.status]}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {group.issues.length}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {group.issues.map((issue) => {
+                        const isBlocked = blockedIssueIds.has(issue.id)
+
+                        return (
+                          <TableRow key={issue.id}>
+                            <TableCell className="w-full py-2.5">
+                              <Link
+                                href={`/issues/${issue.id}`}
+                                className="group/link flex items-center gap-2 font-medium"
+                              >
+                                <span className="truncate group-hover/link:text-primary">
+                                  {issue.title}
+                                </span>
+                                {isBlocked ? (
+                                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+                                    <IconLock className="size-3" />
+                                    Blocked
+                                  </span>
+                                ) : null}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="hidden py-2.5 text-sm text-muted-foreground sm:table-cell">
+                              {issue.projects?.name ?? "Unknown project"}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-right text-sm text-muted-foreground tabular-nums">
+                              {formatDate(issue.created_at)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
           </section>
         )}
       </div>

@@ -11,6 +11,7 @@
     "./label": "./src/ui/label.tsx",
     "./select": "./src/ui/select.tsx",
     "./sonner": "./src/ui/sonner.tsx",
+    "./table": "./src/ui/table.tsx",
     "./textarea": "./src/ui/textarea.tsx",
     "./theme-provider": "./src/theme-provider.tsx",
     "./utils": "./src/utils.ts"
