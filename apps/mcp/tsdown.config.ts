@@ -9,13 +9,13 @@ export default defineConfig([
       js: ".cjs"
     })
   },
-  // Vercel function: one self-contained bundle with every dependency
-  // inlined. Vercel's node builder runs api/ files as-is (no bundling,
-  // ESM needs exact extensions), so the function file itself must not
-  // import anything at runtime.
+  // Payload for the Vercel function (api/index.cjs): one self-contained
+  // bundle with every dependency inlined. Vercel's node builder runs api/
+  // files as-is (no bundling, ESM needs exact extensions), so nothing the
+  // function loads may need node_modules at runtime.
   {
     entry: { index: "src/index.ts" },
-    outDir: "api",
+    outDir: "api/_bundle",
     format: ["cjs"],
     platform: "node",
     noExternal: () => true,
