@@ -6,6 +6,7 @@ import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
 import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
 import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git.js"
+import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import { runAgentSession, type PromptTurn } from "./session.js"
 
@@ -23,14 +24,14 @@ export async function runWorker(): Promise<void> {
   process.on("SIGINT", stop)
   process.on("SIGTERM", stop)
 
-  console.log(`[gentic] worker started; polling every ${config.POLL_INTERVAL_MS}ms`)
+  logInfo(`worker started; polling every ${config.POLL_INTERVAL_MS}ms`)
 
   while (running) {
     let issue: ClaimedIssue | null = null
     try {
       issue = await claimNextQueuedIssue(api)
     } catch (error) {
-      console.error("[gentic] failed to poll for queued issues:", describe(error))
+      logError("failed to poll for queued issues:", describe(error))
     }
 
     if (!issue) {
@@ -41,7 +42,7 @@ export async function runWorker(): Promise<void> {
     await processIssue(api, config, issue)
   }
 
-  console.log("[gentic] worker stopped")
+  logInfo("worker stopped")
 }
 
 /**
@@ -140,16 +141,16 @@ async function processIssue(
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
     })
-    console.log(`[gentic] issue ${issue.id} completed`)
+    logInfo(`issue ${issue.id} completed`)
   } catch (error) {
     const message = describe(error)
-    console.error(`[gentic] issue ${issue.id} failed:`, message)
+    logError(`issue ${issue.id} failed:`, message)
     await setRunState(api, issue.id, {
       run_status: "failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
     }).catch((updateError) => {
-      console.error("[gentic] failed to record run failure:", describe(updateError))
+      logError("failed to record run failure:", describe(updateError))
     })
   }
 }
