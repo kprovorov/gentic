@@ -6,6 +6,7 @@ import packageJson from "../package.json" with { type: "json" }
 import { registerAuthCommand } from "./commands/auth.js"
 import { registerRunCommand } from "./commands/run.js"
 import { registerServiceCommands } from "./commands/service.js"
+import { registerStatusCommand } from "./commands/status.js"
 import { logError } from "./log.js"
 
 function describe(error: unknown): string {
@@ -22,6 +23,7 @@ program
 registerAuthCommand(program)
 registerRunCommand(program)
 registerServiceCommands(program)
+registerStatusCommand(program)
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   logError("fatal:", describe(error))
