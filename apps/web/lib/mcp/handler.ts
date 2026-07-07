@@ -55,7 +55,7 @@ const issueIdInputSchema = {
     .describe("The issue id, from list_issues, create_issue, or get_issue."),
 }
 
-const handler = createMcpHandler(
+const mcpHandler = createMcpHandler(
   (server) => {
     server.registerTool(
       "whoami",
@@ -426,4 +426,4 @@ const handler = createMcpHandler(
   { basePath: "", disableSse: true }
 )
 
-export { handler as mcpHandler }
+export { mcpHandler }
