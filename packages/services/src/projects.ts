@@ -1,23 +1,23 @@
 import type { ProjectValues } from "@gentic/validators/projects"
 
-import { ServiceError } from "./errors"
+import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
 export async function listProjects(supabase: Supabase, userId: string) {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(
+    await supabase
+      .from("projects")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+  )
 }
 
-export async function getProject(supabase: Supabase, userId: string, id: string) {
+export async function getProject(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
@@ -40,17 +40,13 @@ export async function createProject(
   userId: string,
   input: ProjectValues
 ) {
-  const { data, error } = await supabase
+  const result = await supabase
     .from("projects")
     .insert({ ...input, user_id: userId })
     .select("*")
     .single()
 
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(result)
 }
 
 export async function updateProject(
@@ -77,7 +73,11 @@ export async function updateProject(
   return data
 }
 
-export async function deleteProject(supabase: Supabase, userId: string, id: string) {
+export async function deleteProject(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
   const { data, error } = await supabase
     .from("projects")
     .delete()
