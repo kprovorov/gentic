@@ -8,6 +8,7 @@ import { createClient } from "@gentic/supabase/server"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
 import * as projectsService from "@gentic/services/projects"
+import * as githubIntegrationsService from "@gentic/services/github-integrations"
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key)
@@ -58,6 +59,14 @@ export async function deleteProject(formData: FormData) {
   const id = idSchema.parse(getString(formData, "id"))
 
   await projectsService.deleteProject(supabase, userId, id)
+
+  revalidatePath("/settings")
+}
+
+export async function disconnectGithubIntegration() {
+  const { supabase, userId } = await getAuthenticatedSupabase()
+
+  await githubIntegrationsService.deleteGithubIntegration(supabase, userId)
 
   revalidatePath("/settings")
 }

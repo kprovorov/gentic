@@ -1,10 +1,19 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { redirect } from "next/navigation"
-import { IconBrandGithub, IconPlus, IconTrash } from "@tabler/icons-react"
+import {
+  IconBrandGithub,
+  IconCheck,
+  IconExternalLink,
+  IconPlugConnected,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react"
 
 import {
   createProject,
   deleteProject,
+  disconnectGithubIntegration,
   updateProject,
 } from "@/app/settings/actions"
 import { Button } from "@gentic/ui/button"
@@ -20,6 +29,7 @@ import { Label } from "@gentic/ui/label"
 import { Textarea } from "@gentic/ui/textarea"
 import { auth } from "@clerk/nextjs/server"
 import { createClient } from "@gentic/supabase/server"
+import * as githubIntegrationsService from "@gentic/services/github-integrations"
 
 type Project = {
   id: string
@@ -51,13 +61,83 @@ export default async function SettingsPage() {
     throw new Error(error.message)
   }
 
+  const githubIntegration =
+    await githubIntegrationsService.getGithubIntegration(supabase, userId)
+  const githubAppConfigured = Boolean(process.env.GITHUB_APP_SLUG)
+
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2 border-b pb-6">
           <p className="text-sm font-medium text-muted-foreground">Settings</p>
-          <h1 className="text-3xl">Projects</h1>
+          <h1 className="text-3xl">Workspace</h1>
         </header>
+
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted">
+                  <IconBrandGithub className="size-5" />
+                </div>
+                <div className="grid gap-1">
+                  <CardTitle>GitHub integration</CardTitle>
+                  <CardDescription>
+                    Connect a GitHub App installation for repository and pull
+                    request automation.
+                  </CardDescription>
+                </div>
+              </div>
+              {githubIntegration?.status === "connected" ? (
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-green-600/30 bg-green-600/10 px-2.5 py-1 text-sm text-green-700 dark:text-green-400">
+                  <IconCheck className="size-4" />
+                  Connected
+                </div>
+              ) : githubIntegration?.status === "pending" ? (
+                <div className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm text-muted-foreground">
+                  <IconPlugConnected className="size-4" />
+                  Pending approval
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm text-muted-foreground">
+                  Not connected
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {githubIntegration?.status === "connected"
+                ? `Installation ${githubIntegration.installation_id} is ready for future pull request status updates.`
+                : githubIntegration?.status === "pending"
+                  ? "GitHub recorded an install request that still needs organization approval."
+                  : githubAppConfigured
+                    ? "Install the configured GitHub App on the repositories Gentic should access."
+                    : "Set GITHUB_APP_SLUG before connecting a GitHub App."}
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {githubIntegration ? (
+                <form action={disconnectGithubIntegration}>
+                  <Button type="submit" variant="outline">
+                    Disconnect
+                  </Button>
+                </form>
+              ) : !githubAppConfigured ? (
+                <Button disabled>
+                  <IconExternalLink />
+                  Connect GitHub
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href="/api/integrations/github/setup">
+                    <IconExternalLink />
+                    Connect GitHub
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
           <Card>
