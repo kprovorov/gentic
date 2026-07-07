@@ -49,3 +49,17 @@ export function mcpErrorResult(error: unknown) {
     content: [{ type: "text" as const, text: "Internal server error" }],
   }
 }
+
+type McpToolContext = ReturnType<typeof getMcpToolContext>
+
+export function tool<Input, Output extends Record<string, unknown>>(
+  run: (ctx: McpToolContext, input: Input) => Promise<Output>
+) {
+  return async (input: Input, { authInfo }: { authInfo?: AuthInfo }) => {
+    try {
+      return mcpJsonResult(await run(getMcpToolContext(authInfo), input))
+    } catch (error) {
+      return mcpErrorResult(error)
+    }
+  }
+}
