@@ -28,7 +28,7 @@ Set these on the `apps/mcp` deployment:
 CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_SECRET_KEY=
 ```
 
 For local development, copy `apps/mcp/.env.example` to `apps/mcp/.env` and

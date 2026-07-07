@@ -48,12 +48,17 @@ Fill in these values:
 GENTIC_API_URL=https://gentic.chat/api/v1
 GENTIC_API_KEY=your-user-clerk-api-key
 GIT_REMOTE_BASE=git@github.com:
-WORKDIR=/tmp/gentic-workspaces
 POLL_INTERVAL_MS=3000
 ```
 
 For local web app development, `GENTIC_API_URL` can stay as
 `http://localhost:3000/api/v1`.
+
+`WORKDIR` is optional. If unset, it defaults to an OS-appropriate data
+directory (e.g. `~/.local/share/gentic/workspaces` on Linux, via
+[`env-paths`](https://github.com/sindresorhus/env-paths)). Set it explicitly
+to use a different location, such as `/tmp/gentic-workspaces` for a dev
+checkout.
 
 `GIT_REMOTE_BASE` is prepended to each project repo stored in Supabase. For a
 project repo of `owner/repo` and the default base of `git@github.com:`, the
@@ -62,6 +67,34 @@ agent clones `git@github.com:owner/repo`.
 `GENTIC_API_KEY` must be a user-scoped Clerk API key. The hosted Gentic API
 verifies it, identifies the Clerk user, and only returns or mutates issues whose
 project belongs to that user.
+
+Besides `.env`, settings can also live in a persisted config file at an
+OS-appropriate config directory (e.g. `~/.config/gentic/config.json` on
+Linux), written by `gentic auth login` (see below). `loadConfig()` merges
+both sources, with environment variables taking precedence over the config
+file for each key. This keeps `.env` usable for local development while
+giving an installed CLI a durable place to store settings and the API key.
+
+## Authentication
+
+`gentic auth login` prompts for the API URL and key and saves them to the
+config file:
+
+```bash
+gentic auth login
+```
+
+Pass both flags for non-interactive/scripted use:
+
+```bash
+gentic auth login --api-url https://gentic.chat/api/v1 --api-key <key>
+```
+
+`gentic auth status` shows whether credentials are configured (with the key
+masked) and `gentic auth logout` clears them (`--yes`/`-y` to skip the
+confirmation prompt). The hosted API currently has no read-only authenticated
+endpoint, so `login` saves the key without a live validation call; an
+incorrect key surfaces as a failure on the worker's first poll instead.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
@@ -97,6 +130,44 @@ Build the agent:
 pnpm --filter @gentic/gentic build
 ```
 
+## Standalone binary
+
+For deploying without Node, pnpm, or `node_modules` on the target machine,
+compile a single-file executable with [Bun](https://bun.sh) instead (Bun is
+a build-time dependency only — the output binary needs nothing at runtime):
+
+```bash
+pnpm install
+cd apps/gentic
+./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+```
+
+`bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, and `bun-darwin-arm64`
+are supported; check Bun's docs for the current list of `--compile` targets.
+The output directory contains:
+
+- `gentic` — the compiled CLI.
+- `vendor/claude-agent-acp/` — a compiled sidecar binary plus the native
+  `claude` CLI (both spawned as child processes per the Agent Client
+  Protocol; see `src/session.ts`), used for `claude_code` issues.
+- `vendor/codex-acp/` — a compiled sidecar binary, used for `codex` issues.
+  It still shells out to a system-installed `codex` (`CODEX_PATH` or PATH),
+  per the Codex prerequisite above.
+
+Copy the whole output directory to the target machine and run
+`./gentic run` with `GENTIC_API_KEY`/`GENTIC_API_URL` in the environment —
+no install step needed.
+
+Cross-compiling the `claude` CLI sidecar for a platform other than the build
+host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
+optionalDependency already present in `node_modules` (pnpm only installs the
+one matching the host by default); the build script fails with an actionable
+error rather than silently skipping it. Building each target on/for a
+matching host is the simplest way to satisfy this today.
+
+macOS binaries are not code-signed or notarized; Gatekeeper will warn on
+first run.
+
 ## Run locally
 
 Start the agent in watch mode:
@@ -130,8 +201,9 @@ exists and is what `pnpm --filter @gentic/gentic start` runs directly, for
 foreground use in development or inside another supervisor.
 
 ```bash
-pnpm --filter @gentic/gentic build
-node apps/gentic/dist/cli.js start
+cd apps/gentic
+./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+dist/linux-x64/gentic start
 ```
 
 `gentic start` installs and starts a real OS service for the current
@@ -166,8 +238,9 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
   content blocks for the first prompt: images and text files are embedded
   directly, everything else is downloaded next to (not inside) the repo
   clone and referenced by path.
-- `src/api.ts`, `src/config.ts`, `src/messages.ts`, `src/async-queue.ts` —
-  API, configuration, and transcript helpers.
+- `src/api.ts`, `src/config.ts`, `src/config-store.ts`, `src/messages.ts`,
+  `src/async-queue.ts` — API, configuration, persisted config file, and
+  transcript helpers.
 - `src/commands/service.ts` — `start` / `stop` / `restart` commands.
 - `src/service/` — one OS service backend per platform (`systemd.ts`,
   `launchd.ts`) plus a `fallback.ts` detached-process backend, selected by

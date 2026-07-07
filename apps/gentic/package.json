@@ -10,9 +10,10 @@
   "scripts": {
     "dev": "tsx watch src/cli.ts",
     "start": "node dist/cli.js run",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.55.0",

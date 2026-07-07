@@ -66,7 +66,7 @@ create policy "Users can read attachment files for their own issues"
       select 1
       from public.issues
       join public.projects on projects.id = issues.project_id
-      where issues.id::text = (storage.foldername(name))[1]
+      where issues.id::text = (storage.foldername(storage.objects.name))[1]
         and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
@@ -81,7 +81,7 @@ create policy "Users can upload attachment files for their own issues"
       select 1
       from public.issues
       join public.projects on projects.id = issues.project_id
-      where issues.id::text = (storage.foldername(name))[1]
+      where issues.id::text = (storage.foldername(storage.objects.name))[1]
         and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
@@ -96,7 +96,7 @@ create policy "Users can delete attachment files for their own issues"
       select 1
       from public.issues
       join public.projects on projects.id = issues.project_id
-      where issues.id::text = (storage.foldername(name))[1]
+      where issues.id::text = (storage.foldername(storage.objects.name))[1]
         and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );

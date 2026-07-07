@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { Show, UserButton } from "@clerk/nextjs"
-import { IconPlus } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 
@@ -54,12 +53,6 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <Show when="signed-in">
-            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
-              <Link href="/issues/new">
-                <IconPlus />
-                New issue
-              </Link>
-            </Button>
             <UserButton />
           </Show>
           <Show when="signed-out">

@@ -17,6 +17,7 @@ export type Attachment = {
   fileName: string
   sizeBytes: number | null
   url: string | null
+  thumbnailUrl: string | null
 }
 
 function formatSize(bytes: number | null): string {
@@ -65,7 +66,7 @@ export function Attachments({
           type="file"
           name="files"
           multiple
-          className="text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
+          className="min-w-0 text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
         <Button type="submit" variant="outline" size="sm">
           <IconUpload />
@@ -104,11 +105,26 @@ function AttachmentRow({
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
       <div className="flex min-w-0 items-center gap-2">
-        <IconPaperclip className="size-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">{attachment.fileName}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {formatSize(attachment.sizeBytes)}
-        </span>
+        {attachment.thumbnailUrl ? (
+          // Supabase signs this URL with Image Transformation options.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={attachment.thumbnailUrl}
+            alt=""
+            className="size-12 shrink-0 rounded-md border object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+            <IconPaperclip className="size-4" />
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="truncate">{attachment.fileName}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatSize(attachment.sizeBytes)}
+          </p>
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {attachment.url ? (
