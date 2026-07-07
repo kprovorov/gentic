@@ -63,3 +63,4 @@ The **agent API** authenticates with a Clerk **API key** (`Authorization: Bearer
 - Prettier: **no semicolons**, double quotes, 2-space, `printWidth` 80, `trailingComma: es5`. Tailwind classes are auto-sorted; `cn`/`cva` are registered Tailwind functions.
 - ESLint 9 flat config from `@gentic/eslint-config` (`/base` for libs, `/next` for web). `apps/mcp` lints with `--max-warnings 0`.
 - Zod version is pinned via a pnpm `overrides` entry (`zod: 4.4.3`) — keep imports on that major.
+- **Pull request titles** must follow [Conventional Commits](https://www.conventionalcommits.org/): prefix every PR title with a type such as `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `build:`, or `ci:` (e.g. `feat: add issue assignment API`). PRs are squash-merged, so the title becomes the commit message that CI/CD and release tooling parse — an unprefixed title breaks that pipeline.
