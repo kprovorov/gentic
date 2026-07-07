@@ -18,7 +18,7 @@ jobs:
       version: ${{ steps.bump-version.outputs.version }}
     steps:
       - name: Checkout default branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
@@ -55,7 +55,7 @@ jobs:
             COMMITS=$(git log --pretty=format:"%s%n%b")
           fi
 
-          COMMIT_COUNT=$(printf '%s\n' "$COMMITS" | grep -v '^$' | wc -l)
+          COMMIT_COUNT=$(printf '%s\n' "$COMMITS" | awk 'NF { count++ } END { print count + 0 }')
           echo "Analyzing $COMMIT_COUNT commit lines"
           printf '%s\n' "$COMMITS"
 
@@ -166,7 +166,7 @@ jobs:
           git push origin HEAD:${{ github.event.repository.default_branch }}
           echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: changelog.md
@@ -191,13 +191,13 @@ jobs:
             runner: macos-15
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.commit_sha }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -218,7 +218,7 @@ jobs:
         working-directory: apps/gentic
         run: shasum -a 256 gentic-${{ matrix.target }}.tar.gz > gentic-${{ matrix.target }}.tar.gz.sha256
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: gentic-${{ matrix.target }}
           path: |
@@ -234,13 +234,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.commit_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
