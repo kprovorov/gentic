@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./errors": "./src/errors.ts",
+    "./github-integrations": "./src/github-integrations.ts",
     "./issues": "./src/issues.ts",
     "./projects": "./src/projects.ts",
     "./types": "./src/types.ts"
