@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useTransition } from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { IconExternalLink, IconGitPullRequest, IconSend } from "@tabler/icons-react"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
@@ -9,6 +9,7 @@ import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 
 import { sendIssueMessage } from "@/app/issues/actions"
+import { queryKeys } from "@/app/query-keys"
 
 export type ChatMessage = {
   id: string
@@ -73,8 +74,14 @@ export function IssueChat({
   const [runStatus, setRunStatus] = useState<RunStatus>(initialRunStatus)
   const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
   const [draft, setDraft] = useState("")
-  const [isPending, startTransition] = useTransition()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: sendIssueMessage,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+    },
+  })
 
   const supabase = useSupabaseClient()
 
@@ -130,7 +137,7 @@ export function IssueChat({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = draft.trim()
-    if (!content || isPending) {
+    if (!content || mutation.isPending) {
       return
     }
 
@@ -138,9 +145,7 @@ export function IssueChat({
     formData.set("issue_id", issueId)
     formData.set("content", content)
     setDraft("")
-    startTransition(() => {
-      void sendIssueMessage(formData)
-    })
+    mutation.mutate(formData)
   }
 
   return (
@@ -201,7 +206,11 @@ export function IssueChat({
           placeholder="Message the agent…"
           className="min-h-9 w-full resize-none rounded-3xl border border-transparent bg-input/50 px-4 py-2 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
         />
-        <Button type="submit" size="icon" disabled={isPending || !draft.trim()}>
+        <Button
+          type="submit"
+          size="icon"
+          disabled={mutation.isPending || !draft.trim()}
+        >
           <IconSend />
         </Button>
       </form>

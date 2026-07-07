@@ -1,8 +1,9 @@
 "use client"
 
-import { useTransition } from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { updateIssueStatus } from "@/app/issues/actions"
+import { queryKeys } from "@/app/query-keys"
 import {
   Select,
   SelectContent,
@@ -53,19 +54,26 @@ export function IssueStatusSelect({
   issueId: string
   status: IssueStatus
 }) {
-  const [isPending, startTransition] = useTransition()
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: updateIssueStatus,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+      ])
+    },
+  })
 
   function handleValueChange(nextStatus: string) {
-    if (nextStatus === status) {
+    if (nextStatus === status || mutation.isPending) {
       return
     }
 
     const formData = new FormData()
     formData.set("id", issueId)
     formData.set("status", nextStatus)
-    startTransition(() => {
-      void updateIssueStatus(formData)
-    })
+    mutation.mutate(formData)
   }
 
   return (
@@ -79,7 +87,7 @@ export function IssueStatusSelect({
       <Select
         value={status}
         onValueChange={handleValueChange}
-        disabled={isPending}
+        disabled={mutation.isPending}
       >
         <SelectTrigger id="issue-status" className="max-w-xs">
           <SelectValue />

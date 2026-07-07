@@ -1,6 +1,7 @@
 "use client"
 
-import { useTransition } from "react"
+import type React from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconDownload,
   IconPaperclip,
@@ -11,6 +12,7 @@ import {
 import { Button } from "@gentic/ui/button"
 
 import { deleteAttachment, uploadAttachments } from "@/app/issues/actions"
+import { queryKeys } from "@/app/query-keys"
 
 export type Attachment = {
   id: string
@@ -40,6 +42,20 @@ export function Attachments({
   issueId: string
   attachments: Attachment[]
 }) {
+  const queryClient = useQueryClient()
+  const uploadMutation = useMutation({
+    mutationFn: uploadAttachments,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+    },
+  })
+
+  function handleUpload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    uploadMutation.mutate(new FormData(event.currentTarget))
+    event.currentTarget.reset()
+  }
+
   return (
     <div className="grid gap-4">
       {attachments.length === 0 ? (
@@ -57,7 +73,7 @@ export function Attachments({
       )}
 
       <form
-        action={uploadAttachments}
+        onSubmit={handleUpload}
         encType="multipart/form-data"
         className="flex flex-wrap items-center gap-2"
       >
@@ -68,7 +84,12 @@ export function Attachments({
           multiple
           className="min-w-0 text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
-        <Button type="submit" variant="outline" size="sm">
+        <Button
+          type="submit"
+          variant="outline"
+          size="sm"
+          disabled={uploadMutation.isPending}
+        >
           <IconUpload />
           Upload
         </Button>
@@ -84,10 +105,16 @@ function AttachmentRow({
   issueId: string
   attachment: Attachment
 }) {
-  const [isPending, startTransition] = useTransition()
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: deleteAttachment,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+    },
+  })
 
   function handleDelete() {
-    if (isPending) {
+    if (mutation.isPending) {
       return
     }
     if (!window.confirm(`Delete "${attachment.fileName}"?`)) {
@@ -97,9 +124,7 @@ function AttachmentRow({
     const formData = new FormData()
     formData.set("id", attachment.id)
     formData.set("issue_id", issueId)
-    startTransition(() => {
-      void deleteAttachment(formData)
-    })
+    mutation.mutate(formData)
   }
 
   return (
@@ -144,7 +169,7 @@ function AttachmentRow({
           variant="ghost"
           size="icon-sm"
           onClick={handleDelete}
-          disabled={isPending}
+          disabled={mutation.isPending}
         >
           <IconTrash />
         </Button>
