@@ -37,6 +37,8 @@ import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 import * as issuesService from "@gentic/services/issues"
 
+import { RealtimeRefresh } from "@/components/realtime-refresh"
+
 import { IssueStatusSelect } from "./issue-status-select"
 import { IssueDeleteButton } from "./issue-delete-button"
 import { IssueResetAgentButton } from "./issue-reset-agent-button"
@@ -286,6 +288,10 @@ export default async function IssueDetailPage({
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+      <RealtimeRefresh
+        channelName={`issue-${issue.id}-detail`}
+        tables={["issues", "issue_relations", "attachments"]}
+      />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-col gap-5 border-b pb-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -37,6 +37,8 @@ import { createClient } from "@gentic/supabase/server"
 import { cn } from "@gentic/ui/utils"
 import * as issuesService from "@gentic/services/issues"
 
+import { RealtimeRefresh } from "@/components/realtime-refresh"
+
 type IssueStatus =
   | "draft"
   | "todo"
@@ -194,6 +196,10 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+      <RealtimeRefresh
+        channelName="home-issues"
+        tables={["issues", "issue_relations"]}
+      />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-2">
