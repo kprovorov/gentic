@@ -1,12 +1,10 @@
 # MCP server: Clerk OAuth setup
 
-Gentic's remote MCP server now lives in the separate Express app at
-`apps/mcp`. Deploy it as its own service and point `mcp.gentic.chat` at that
-deployment.
+Gentic's remote MCP server lives in the Next.js web app at `apps/web`.
+Deploy the web app and connect MCP clients to `https://gentic.chat/mcp`.
 
 The app uses Clerk as its OAuth 2.1 authorization server via
-`@clerk/mcp-tools/express`, and serves the MCP protocol through
-`mcp-handler`.
+`@clerk/mcp-tools/next`, and serves the MCP protocol through `mcp-handler`.
 
 ## Dashboard steps
 
@@ -22,22 +20,21 @@ etc.) register itself with Clerk the first time a user connects.
 
 ## Environment variables
 
-Set these on the `apps/mcp` deployment:
+Set these on the `apps/web` deployment:
 
 ```bash
-CLERK_PUBLISHABLE_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 SUPABASE_URL=
 SUPABASE_SECRET_KEY=
 ```
 
-For local development, copy `apps/mcp/.env.example` to `apps/mcp/.env` and
+For local development, copy `apps/web/.env.example` to `apps/web/.env` and
 fill in the same values.
 
 ## Endpoints
 
-- `GET /health` returns a basic health check.
-- `POST /` is the Streamable HTTP MCP endpoint.
+- `POST /mcp` is the Streamable HTTP MCP endpoint.
 - `GET /.well-known/oauth-protected-resource[/...]` serves RFC 9728 protected
   resource metadata for OAuth-capable MCP clients.
 - `GET /.well-known/oauth-authorization-server` serves Clerk authorization
@@ -46,16 +43,16 @@ fill in the same values.
 ## Local verification
 
 ```bash
-pnpm --filter @gentic/mcp dev
+pnpm --filter @gentic/web dev
 
 # Discovery metadata, unauthenticated
 curl -i http://localhost:3000/.well-known/oauth-protected-resource
 
 # No token -> 401 with a WWW-Authenticate challenge
-curl -i http://localhost:3000/
+curl -i http://localhost:3000/mcp
 
 # Garbage token -> 401
-curl -i http://localhost:3000/ -H "Authorization: Bearer garbage"
+curl -i http://localhost:3000/mcp -H "Authorization: Bearer garbage"
 ```
 
 To test the full OAuth handshake against a local dev server, tunnel it
