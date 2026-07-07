@@ -166,7 +166,7 @@ jobs:
           git push origin HEAD:${{ github.event.repository.default_branch }}
           echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: changelog.md
@@ -218,7 +218,7 @@ jobs:
         working-directory: apps/gentic
         run: shasum -a 256 gentic-${{ matrix.target }}.tar.gz > gentic-${{ matrix.target }}.tar.gz.sha256
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: gentic-${{ matrix.target }}
           path: |
