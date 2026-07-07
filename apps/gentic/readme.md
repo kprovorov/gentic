@@ -195,19 +195,34 @@ agent on the next poll interval.
 
 ## Production process example
 
-Example `pm2` command from the repository root:
+`gentic` manages its own background service, so no separate process manager
+(`pm2`, a hand-written `systemd` unit, etc.) is required. `gentic run` still
+exists and is what `pnpm --filter @gentic/gentic start` runs directly, for
+foreground use in development or inside another supervisor.
 
 ```bash
-pnpm --filter @gentic/gentic build
-pm2 start "pnpm --filter @gentic/gentic start" --name gentic-agent
+cd apps/gentic
+./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+dist/linux-x64/gentic start
 ```
 
-Example `systemd` service command:
+`gentic start` installs and starts a real OS service for the current
+platform — a systemd user unit on Linux (`~/.config/systemd/user/gentic.service`)
+or a launchd agent on macOS (`~/Library/LaunchAgents/dev.gentic.agent.plist`) —
+so the worker restarts automatically on crash and starts again on boot. Pass
+`--system` on Linux to install a system-wide unit under
+`/etc/systemd/system/` instead (useful for package-manager postinstall
+scripts, which typically run as root); pass `--no-boot` to skip enabling the
+service at boot/login. On platforms without a native service manager, `gentic
+start` falls back to a detached background process and pidfile, and warns
+that it won't survive a reboot or restart itself on crash.
 
-```ini
-ExecStart=/usr/bin/pnpm --filter @gentic/gentic start
-WorkingDirectory=/path/to/gentic
-EnvironmentFile=/path/to/gentic/apps/gentic/.env
+```bash
+gentic start            # install (if needed) and start the service
+gentic stop              # stop the service
+gentic restart           # restart the service
+gentic start --no-boot   # start without enabling boot/login autostart
+gentic start --system    # install a system-wide unit (Linux/systemd only)
 ```
 
 ## Source layout
@@ -226,6 +241,10 @@ EnvironmentFile=/path/to/gentic/apps/gentic/.env
 - `src/api.ts`, `src/config.ts`, `src/config-store.ts`, `src/messages.ts`,
   `src/async-queue.ts` — API, configuration, persisted config file, and
   transcript helpers.
+- `src/commands/service.ts` — `start` / `stop` / `restart` commands.
+- `src/service/` — one OS service backend per platform (`systemd.ts`,
+  `launchd.ts`) plus a `fallback.ts` detached-process backend, selected by
+  `src/service/index.ts`.
 
 A run stays open for one poll interval after the agent goes quiet so follow-up
 messages sent while it works are handled in the same session; once the
