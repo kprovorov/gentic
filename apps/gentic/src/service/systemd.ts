@@ -5,6 +5,7 @@ import { homedir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
 
+import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceScope, ServiceStatus } from "./types.js"
 
@@ -19,6 +20,10 @@ function describe(error: unknown): string {
     if (stderr && stderr.trim().length > 0) return stderr.trim()
   }
   return error instanceof Error ? error.message : String(error)
+}
+
+function quoteSystemdEnv(name: string, value: string): string {
+  return `"${name}=${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
 }
 
 export class SystemdBackend implements ServiceBackend {
@@ -51,6 +56,7 @@ export class SystemdBackend implements ServiceBackend {
   private unitFileContents(): string {
     const { command, args } = resolveGenticExecutable()
     const execStart = [command, ...args, "run"].map((arg) => `"${arg.replaceAll('"', '\\"')}"`).join(" ")
+    const servicePath = buildServicePath()
     return `[Unit]
 Description=Gentic agent worker
 After=network-online.target
@@ -59,7 +65,7 @@ After=network-online.target
 ExecStart=${execStart}
 Restart=on-failure
 RestartSec=5
-Environment=NODE_ENV=production
+Environment=${quoteSystemdEnv("NODE_ENV", "production")} ${quoteSystemdEnv("PATH", servicePath)}
 
 [Install]
 WantedBy=default.target

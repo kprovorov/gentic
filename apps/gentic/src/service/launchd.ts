@@ -5,6 +5,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
 
+import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
 
@@ -50,6 +51,7 @@ export class LaunchdBackend implements ServiceBackend {
   private plistContents(enableOnBoot: boolean): string {
     const { command, args } = resolveGenticExecutable()
     const log = logPath()
+    const path = buildServicePath()
     const programArguments = [command, ...args, "run"]
       .map((arg) => `    <string>${escapeXml(arg)}</string>`)
       .join("\n")
@@ -62,6 +64,10 @@ export class LaunchdBackend implements ServiceBackend {
   <array>
 ${programArguments}
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>${escapeXml(path)}</string>
+  </dict>
   <key>KeepAlive</key><true/>
   <key>RunAtLoad</key><${enableOnBoot ? "true" : "false"}/>
   <key>StandardOutPath</key><string>${escapeXml(log)}</string>
