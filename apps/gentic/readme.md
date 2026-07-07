@@ -138,7 +138,7 @@ Copy the whole output directory to the target machine and run
 no install step needed.
 
 Pushing a `v*` tag (e.g. `v0.0.1`) runs
-[`.github/workflows/gentic-release.yml`](../../.github/workflows/gentic-release.yml),
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml),
 which builds all 4 targets and publishes them as
 `gentic-<target>.tar.gz` archives plus a `checksums.txt` on a GitHub
 Release, so you don't have to build one yourself.
