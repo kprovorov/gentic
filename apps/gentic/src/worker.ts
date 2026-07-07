@@ -29,7 +29,10 @@ export async function runWorker(): Promise<void> {
   while (running) {
     let issue: ClaimedIssue | null = null
     try {
-      issue = await claimNextQueuedIssue(api)
+      // Atomically claims the oldest queued issue by flipping it to `cloning`.
+      // The conditional update (`run_status = 'queued'`) makes the claim safe
+      // if more than one worker is polling.
+      issue = await api.claimNextQueuedIssue()
     } catch (error) {
       logError("failed to poll for queued issues:", describe(error))
     }
@@ -43,15 +46,6 @@ export async function runWorker(): Promise<void> {
   }
 
   logInfo("worker stopped")
-}
-
-/**
- * Atomically claims the oldest queued issue by flipping it to `cloning`. The
- * conditional update (`run_status = 'queued'`) makes the claim safe if more
- * than one worker is polling.
- */
-async function claimNextQueuedIssue(api: AgentApi): Promise<ClaimedIssue | null> {
-  return await api.claimNextQueuedIssue()
 }
 
 async function processIssue(
@@ -102,7 +96,7 @@ async function processIssue(
     let firstPrompt = true
     const nextPrompt = async (): Promise<PromptTurn | null> => {
       for (;;) {
-        const messages = await fetchUserMessagesAfter(api, issue.id, cursor)
+        const messages = await api.fetchUserMessagesAfter(issue.id, cursor)
         const next = messages[0]
         if (next) {
           idleChecked = false
@@ -153,14 +147,6 @@ async function processIssue(
       logError("failed to record run failure:", describe(updateError))
     })
   }
-}
-
-async function fetchUserMessagesAfter(
-  api: AgentApi,
-  issueId: string,
-  cursor: string
-): Promise<Array<{ content: string | null; created_at: string }>> {
-  return await api.fetchUserMessagesAfter(issueId, cursor)
 }
 
 function describe(error: unknown): string {
