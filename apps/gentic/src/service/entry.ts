@@ -1,20 +1,30 @@
 export interface GenticExecutable {
-  /** Absolute path to the node binary running this process. */
+  /** Absolute path to the executable running this process. */
   command: string
-  /** Absolute path to the currently running gentic entry point (e.g. dist/cli.js). */
-  entry: string
+  /** Arguments needed before the gentic subcommand, e.g. ["dist/cli.js"] for Node. */
+  args: string[]
+}
+
+interface RuntimeEntry {
+  execPath: string
+  argv: string[]
 }
 
 /**
  * Resolves the executable that services should launch to invoke `gentic run`.
- * Uses `process.argv[1]` (the script path Node was invoked with) rather than
- * `which gentic` so installed services keep pointing at the exact entry point
- * that installed them, the same way session.ts re-spawns agent entries.
+ * For Node, `process.execPath` is the Node binary and `process.argv[1]` is the
+ * script path. For Bun-compiled executables, `process.execPath` is already the
+ * gentic binary and `process.argv[1]` can be a virtual `/$bunfs/...` path; that
+ * virtual path must not be passed back to the CLI because Commander treats it
+ * as an unknown command.
  */
-export function resolveGenticExecutable(): GenticExecutable {
-  const entry = process.argv[1]
+export function resolveGenticExecutable(runtime: RuntimeEntry = process): GenticExecutable {
+  const entry = runtime.argv[1]
+  if (entry?.startsWith("/$bunfs/")) {
+    return { command: runtime.execPath, args: [] }
+  }
   if (!entry) {
     throw new Error("Unable to resolve the running gentic entry point")
   }
-  return { command: process.execPath, entry }
+  return { command: runtime.execPath, args: [entry] }
 }

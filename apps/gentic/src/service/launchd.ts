@@ -48,8 +48,11 @@ export class LaunchdBackend implements ServiceBackend {
   }
 
   private plistContents(enableOnBoot: boolean): string {
-    const { command, entry } = resolveGenticExecutable()
+    const { command, args } = resolveGenticExecutable()
     const log = logPath()
+    const programArguments = [command, ...args, "run"]
+      .map((arg) => `    <string>${escapeXml(arg)}</string>`)
+      .join("\n")
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -57,9 +60,7 @@ export class LaunchdBackend implements ServiceBackend {
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${escapeXml(command)}</string>
-    <string>${escapeXml(entry)}</string>
-    <string>run</string>
+${programArguments}
   </array>
   <key>KeepAlive</key><true/>
   <key>RunAtLoad</key><${enableOnBoot ? "true" : "false"}/>

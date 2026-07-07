@@ -49,13 +49,14 @@ export class SystemdBackend implements ServiceBackend {
   }
 
   private unitFileContents(): string {
-    const { command, entry } = resolveGenticExecutable()
+    const { command, args } = resolveGenticExecutable()
+    const execStart = [command, ...args, "run"].map((arg) => `"${arg.replaceAll('"', '\\"')}"`).join(" ")
     return `[Unit]
 Description=Gentic agent worker
 After=network-online.target
 
 [Service]
-ExecStart="${command}" "${entry}" run
+ExecStart=${execStart}
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
