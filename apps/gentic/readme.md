@@ -164,6 +164,13 @@ which builds all 4 targets and publishes them as
 `gentic-<target>.tar.gz` archives plus a `checksums.txt` on a GitHub
 Release, so you don't have to build one yourself.
 
+To cut a release from GitHub, run the
+[`bump version`](../../.github/workflows/bump-version.yml) workflow manually.
+It bumps every workspace `package.json` version, commits the change, creates a
+matching `v*` tag, pushes both, and dispatches the release workflow for that
+tag. If the repository needs to trigger release jobs from a personal access
+token instead of `GITHUB_TOKEN`, add it as the `VERSION_BUMP_TOKEN` secret.
+
 Cross-compiling the `claude` CLI sidecar for a platform other than the build
 host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
 optionalDependency already present in `node_modules` (pnpm only installs the

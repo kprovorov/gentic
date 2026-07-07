@@ -1,0 +1,136 @@
+name: bump version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type.
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: Exact version to use instead of the bump type, without a leading v.
+        required: false
+        type: string
+
+concurrency:
+  group: bump-version
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.VERSION_BUMP_TOKEN || github.token }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump package versions
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { readdir, readFile, writeFile } from "node:fs/promises"
+          import path from "node:path"
+
+          const root = process.cwd()
+          const bump = process.env.BUMP
+          const requestedVersion = process.env.VERSION?.trim()
+
+          function parseVersion(version) {
+            const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/)
+            if (!match) {
+              throw new Error(`Expected a semver version like 1.2.3, got "${version}"`)
+            }
+            return match.slice(1).map(Number)
+          }
+
+          function nextVersion(current, bumpType) {
+            const [major, minor, patch] = parseVersion(current)
+            if (bumpType === "major") return `${major + 1}.0.0`
+            if (bumpType === "minor") return `${major}.${minor + 1}.0`
+            if (bumpType === "patch") return `${major}.${minor}.${patch + 1}`
+            throw new Error(`Unsupported bump type "${bumpType}"`)
+          }
+
+          async function packageJsonFiles(...segments) {
+            const dir = path.join(root, ...segments)
+            const entries = await readdir(dir, { withFileTypes: true })
+            return entries
+              .filter((entry) => entry.isDirectory())
+              .map((entry) => path.join(dir, entry.name, "package.json"))
+          }
+
+          const packageFiles = [
+            path.join(root, "package.json"),
+            ...(await packageJsonFiles("apps")),
+            ...(await packageJsonFiles("packages")),
+          ]
+
+          const rootPackagePath = packageFiles[0]
+          const rootPackage = JSON.parse(await readFile(rootPackagePath, "utf8"))
+          const newVersion = requestedVersion || nextVersion(rootPackage.version, bump)
+          parseVersion(newVersion)
+
+          for (const packageFile of packageFiles) {
+            const source = await readFile(packageFile, "utf8")
+            const packageJson = JSON.parse(source)
+            if (!packageJson.version) continue
+            packageJson.version = newVersion
+            await writeFile(packageFile, `${JSON.stringify(packageJson, null, 2)}\n`)
+          }
+
+          await writeFile(process.env.GITHUB_OUTPUT, `version=${newVersion}\ntag=v${newVersion}\n`, {
+            flag: "a",
+          })
+          EOF
+
+      - name: Verify version changes
+        run: git diff --check
+
+      - name: Commit and tag version
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+            exit 1
+          fi
+
+          git add package.json apps/*/package.json packages/*/package.json
+          git commit -m "chore: bump version to $VERSION"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "$TAG"
+
+      - name: Trigger release workflow
+        env:
+          GH_TOKEN: ${{ secrets.VERSION_BUMP_TOKEN || github.token }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: gh workflow run release.yml --ref "$TAG"
