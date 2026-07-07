@@ -224,7 +224,7 @@ export async function createIssue(
       status: input.status,
       agent_provider: input.agent_provider,
     })
-    .select("id")
+    .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
 
   if (error) {
@@ -240,19 +240,21 @@ export async function updateIssue(
   id: string,
   input: UpdateIssueValues
 ) {
-  await ensureIssueOwned(supabase, userId, id)
-
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider")
+    .select("agent_provider, projects!inner(user_id)")
     .eq("id", id)
-    .single<{ agent_provider: string }>()
+    .eq("projects.user_id", userId)
+    .maybeSingle<{ agent_provider: string }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
   }
+  if (!current) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("issues")
     .update({
       title: input.title,
@@ -264,10 +266,14 @@ export async function updateIssue(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
+    .select(ISSUE_WITH_PROJECT_SELECT)
+    .single()
 
   if (error) {
     throw new ServiceError("internal", error.message)
   }
+
+  return data
 }
 
 export async function deleteIssue(supabase: Supabase, userId: string, id: string) {
@@ -285,16 +291,18 @@ export async function resetIssueAgent(
   userId: string,
   id: string
 ) {
-  await ensureIssueOwned(supabase, userId, id)
-
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("title,prompt")
+    .select("title,prompt,projects!inner(user_id)")
     .eq("id", id)
-    .single<{ title: string; prompt: string | null }>()
+    .eq("projects.user_id", userId)
+    .maybeSingle<{ title: string; prompt: string | null }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
+  }
+  if (!current) {
+    throw new ServiceError("not_found", "Issue not found")
   }
 
   const { error: deleteMessagesError } = await supabase
@@ -417,16 +425,18 @@ export async function updateIssueStatus(
   id: string,
   status: IssueStatus
 ) {
-  await ensureIssueOwned(supabase, userId, id)
-
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("status,title,prompt")
+    .select("status,title,prompt,projects!inner(user_id)")
     .eq("id", id)
-    .single<{ status: string; title: string; prompt: string | null }>()
+    .eq("projects.user_id", userId)
+    .maybeSingle<{ status: string; title: string; prompt: string | null }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
+  }
+  if (!current) {
+    throw new ServiceError("not_found", "Issue not found")
   }
 
   // Moving an issue from Draft to Todo queues an agent run: the remote
@@ -434,10 +444,12 @@ export async function updateIssueStatus(
   // Supabase and drives the issue's selected coding agent against a fresh clone.
   const startsRun = current.status === "draft" && status === "todo"
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("issues")
     .update(startsRun ? { status, run_status: "queued" } : { status })
     .eq("id", id)
+    .select(ISSUE_WITH_PROJECT_SELECT)
+    .single()
 
   if (error) {
     throw new ServiceError("internal", error.message)
@@ -458,6 +470,8 @@ export async function updateIssueStatus(
       throw new ServiceError("internal", messageError.message)
     }
   }
+
+  return data
 }
 
 export async function sendIssueMessage(
