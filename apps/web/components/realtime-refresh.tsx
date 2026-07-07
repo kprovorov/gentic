@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 
@@ -13,12 +14,15 @@ import { useSupabaseClient } from "@gentic/supabase/client"
 export function RealtimeRefresh({
   channelName,
   tables,
+  queryKey,
 }: {
   channelName: string
   tables: string[]
+  queryKey?: QueryKey
 }) {
   const supabase = useSupabaseClient()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const tableKey = tables.join(",")
 
   useEffect(() => {
@@ -28,6 +32,9 @@ export function RealtimeRefresh({
         clearTimeout(refreshTimer)
       }
       refreshTimer = setTimeout(() => router.refresh(), 150)
+      if (queryKey) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
     }
 
     let channel = supabase.channel(channelName)
@@ -46,7 +53,7 @@ export function RealtimeRefresh({
       }
       void supabase.removeChannel(channel)
     }
-  }, [supabase, router, channelName, tableKey])
+  }, [supabase, router, queryClient, channelName, tableKey, queryKey])
 
   return null
 }

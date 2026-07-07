@@ -1,5 +1,8 @@
+"use client"
+
 import Link from "next/link"
 import type React from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { IconArrowRight, IconLink, IconTrash } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
@@ -15,6 +18,7 @@ import {
   addIssueRelation,
   deleteIssueRelation,
 } from "@/app/issues/actions"
+import { queryKeys } from "@/app/query-keys"
 import type {
   IssueRelation,
   IssueRelationIssue,
@@ -35,6 +39,22 @@ function RelationRow({
   relation: IssueRelation
   relatedIssue: IssueRelationIssue
 }) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: deleteIssueRelation,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+      ])
+    },
+  })
+
+  function handleDelete(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    mutation.mutate(new FormData(event.currentTarget))
+  }
+
   return (
     <li className="flex items-center justify-between gap-3 rounded-2xl bg-muted/40 px-3 py-2">
       <Link
@@ -43,7 +63,7 @@ function RelationRow({
       >
         <span className="line-clamp-1">{relatedIssue.title}</span>
       </Link>
-      <form action={deleteIssueRelation}>
+      <form onSubmit={handleDelete}>
         <input type="hidden" name="id" value={relation.id} />
         <input type="hidden" name="issue_id" value={issueId} />
         <Button
@@ -51,6 +71,7 @@ function RelationRow({
           variant="ghost"
           size="icon-xs"
           aria-label={`Remove relation to ${relatedIssue.title}`}
+          disabled={mutation.isPending}
         >
           <IconTrash />
         </Button>
@@ -89,6 +110,22 @@ export function IssueRelations({
   relations,
   candidates,
 }: IssueRelationsProps) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: addIssueRelation,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+      ])
+    },
+  })
+  function handleAdd(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    mutation.mutate(new FormData(event.currentTarget))
+    event.currentTarget.reset()
+  }
+
   const blocking = relations.filter(
     (relation) => relation.source_issue_id === issueId
   )
@@ -98,7 +135,7 @@ export function IssueRelations({
 
   return (
     <div className="grid gap-5">
-      <form action={addIssueRelation} className="grid gap-3">
+      <form onSubmit={handleAdd} className="grid gap-3">
         <input type="hidden" name="issue_id" value={issueId} />
         <div className="grid gap-3">
           <Select
@@ -130,7 +167,10 @@ export function IssueRelations({
               <SelectItem value="blocked_by">is blocked by</SelectItem>
             </SelectContent>
           </Select>
-          <Button type="submit" disabled={candidates.length === 0}>
+          <Button
+            type="submit"
+            disabled={candidates.length === 0 || mutation.isPending}
+          >
             <IconLink />
             Add
           </Button>
