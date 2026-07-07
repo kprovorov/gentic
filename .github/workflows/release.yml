@@ -1,12 +1,181 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      commit_sha: ${{ steps.commit-version.outputs.commit_sha }}
+      tag: ${{ steps.bump-version.outputs.tag }}
+      version: ${{ steps.bump-version.outputs.version }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Detect previous tag
+        id: previous-tag
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || true)
+          echo "tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Previous tag: $PREVIOUS_TAG"
+          else
+            echo "Previous tag: none"
+          fi
+
+      - name: Detect bump type
+        id: bump
+        run: |
+          PREVIOUS_TAG="${{ steps.previous-tag.outputs.tag }}"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%s%n%b" "$PREVIOUS_TAG"..HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"%s%n%b")
+          fi
+
+          COMMIT_COUNT=$(printf '%s\n' "$COMMITS" | grep -v '^$' | wc -l)
+          echo "Analyzing $COMMIT_COUNT commit lines"
+          printf '%s\n' "$COMMITS"
+
+          if printf '%s\n' "$COMMITS" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
+            BUMP="major"
+          elif printf '%s\n' "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          echo "type=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Detected bump type: $BUMP"
+
+      - name: Bump package versions
+        id: bump-version
+        run: |
+          BUMP_TYPE="${{ steps.bump.outputs.type }}"
+          OLD_VERSION=$(node -p "require('./apps/gentic/package.json').version")
+          NEW_VERSION=$(node -e "
+            const bump = process.argv[1]
+            const [major, minor, patch] = require('./apps/gentic/package.json').version.split('.').map(Number)
+            if (bump === 'major') console.log([major + 1, 0, 0].join('.'))
+            else if (bump === 'minor') console.log([major, minor + 1, 0].join('.'))
+            else console.log([major, minor, patch + 1].join('.'))
+          " "$BUMP_TYPE")
+
+          node -e "
+            const fs = require('node:fs')
+            const version = process.argv[1]
+            for (const file of ['package.json', 'apps/gentic/package.json']) {
+              const json = JSON.parse(fs.readFileSync(file, 'utf8'))
+              json.version = version
+              fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n')
+            }
+          " "$NEW_VERSION"
+
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped $OLD_VERSION -> $NEW_VERSION"
+
+      - name: Verify tag does not exist
+        run: |
+          TAG="${{ steps.bump-version.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
+
+      - name: Generate changelog
+        run: |
+          PREVIOUS_TAG="${{ steps.previous-tag.outputs.tag }}"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%s" "$PREVIOUS_TAG"..HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"%s")
+          fi
+
+          BREAKING=""
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+
+          while IFS= read -r msg; do
+            if printf '%s\n' "$msg" | grep -qE '^$|auto-bump version|\[skip ci\]'; then
+              continue
+            fi
+
+            if printf '%s\n' "$msg" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
+              BREAKING="$BREAKING"$'\n'"- $msg"
+            elif printf '%s\n' "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              FEATURES="$FEATURES"$'\n'"- $msg"
+            elif printf '%s\n' "$msg" | grep -qE '^fix(\(.+\))?:'; then
+              FIXES="$FIXES"$'\n'"- $msg"
+            else
+              OTHER="$OTHER"$'\n'"- $msg"
+            fi
+          done <<< "$COMMITS"
+
+          CHANGELOG="## What's Changed"
+
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Breaking Changes"$'\n'"$BREAKING"
+          fi
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### New Features"$'\n'"$FEATURES"
+          fi
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Bug Fixes"$'\n'"$FIXES"
+          fi
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Other Changes"$'\n'"$OTHER"
+          fi
+          if [ "$CHANGELOG" = "## What's Changed" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"No notable changes."
+          fi
+
+          printf '%s\n' "$CHANGELOG" > changelog.md
+          cat changelog.md
+
+      - name: Commit and push version bump
+        id: commit-version
+        run: |
+          VERSION="${{ steps.bump-version.outputs.version }}"
+          git add package.json apps/gentic/package.json
+          git commit -m "chore: auto-bump version to $VERSION [skip ci]"
+          git push origin HEAD:${{ github.event.repository.default_branch }}
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: changelog.md
+
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -26,6 +195,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit_sha }}
 
       - uses: pnpm/action-setup@v4
 
@@ -58,22 +229,51 @@ jobs:
             apps/gentic/gentic-${{ matrix.target }}.tar.gz.sha256
 
   release:
-    needs: build
+    needs:
+      - prepare
+      - build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.commit_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
 
-      - name: Combine checksums
-        working-directory: artifacts
-        run: cat *.sha256 > checksums.txt
+      - name: Stage release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name '*.tar.gz' -exec cp {} release-assets/ \;
+          find artifacts -name '*.sha256' -exec cat {} + > release-assets/checksums.txt
+          cp artifacts/release-notes/changelog.md release-assets/changelog.md
+          ls -la release-assets
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            artifacts/*.tar.gz
-            artifacts/checksums.txt
+      - name: Create and push tag
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
+
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Created and pushed tag $TAG"
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-assets/changelog.md \
+            release-assets/*.tar.gz \
+            release-assets/checksums.txt
