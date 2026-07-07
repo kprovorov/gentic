@@ -55,8 +55,9 @@ const issueIdInputSchema = {
     .describe("The issue id, from list_issues, create_issue, or get_issue."),
 }
 
-const handler = createMcpHandler(
-  (server) => {
+function createGenticMcpHandler(basePath: string) {
+  return createMcpHandler(
+    (server) => {
     server.registerTool(
       "whoami",
       {
@@ -422,8 +423,10 @@ const handler = createMcpHandler(
       }
     )
   },
-  {},
-  { basePath: "", disableSse: true }
-)
+    {},
+    { basePath, disableSse: true }
+  )
+}
 
-export { handler as mcpHandler }
+export const apiMcpHandler = createGenticMcpHandler("/api")
+export const rootMcpHandler = createGenticMcpHandler("")
