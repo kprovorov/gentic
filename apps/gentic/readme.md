@@ -158,6 +158,12 @@ Copy the whole output directory to the target machine and run
 `./gentic run` with `GENTIC_API_KEY`/`GENTIC_API_URL` in the environment —
 no install step needed.
 
+Pushing a `v*` tag (e.g. `v0.0.1`) runs
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml),
+which builds all 4 targets and publishes them as
+`gentic-<target>.tar.gz` archives plus a `checksums.txt` on a GitHub
+Release, so you don't have to build one yourself.
+
 Cross-compiling the `claude` CLI sidecar for a platform other than the build
 host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
 optionalDependency already present in `node_modules` (pnpm only installs the

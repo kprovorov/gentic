@@ -1,0 +1,79 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native claude CLI sidecar vendoring (scripts/resolve-native-claude.mjs)
+          # only finds the optionalDependency pnpm installed for the *host*
+          # running `pnpm install`, so each target builds on a runner that
+          # actually matches its OS/arch rather than cross-compiling.
+          - target: bun-linux-x64
+            runner: ubuntu-latest
+          - target: bun-linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: bun-darwin-x64
+            runner: macos-13
+          - target: bun-darwin-arm64
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build standalone binary
+        working-directory: apps/gentic
+        run: ./scripts/build-binary.sh ${{ matrix.target }} dist/${{ matrix.target }}
+
+      - name: Archive
+        working-directory: apps/gentic/dist/${{ matrix.target }}
+        run: tar -czf ../../gentic-${{ matrix.target }}.tar.gz .
+
+      - name: Checksum
+        working-directory: apps/gentic
+        run: shasum -a 256 gentic-${{ matrix.target }}.tar.gz > gentic-${{ matrix.target }}.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gentic-${{ matrix.target }}
+          path: |
+            apps/gentic/gentic-${{ matrix.target }}.tar.gz
+            apps/gentic/gentic-${{ matrix.target }}.tar.gz.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Combine checksums
+        working-directory: artifacts
+        run: cat *.sha256 > checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/checksums.txt
