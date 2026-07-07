@@ -1,34 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
-import { auth } from "@clerk/nextjs/server"
-
-import { createClient } from "@gentic/supabase/server"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
 import * as projectsService from "@gentic/services/projects"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 
-function getString(formData: FormData, key: string) {
-  const value = formData.get(key)
-  return typeof value === "string" ? value : ""
-}
-
-async function getAuthenticatedSupabase() {
-  const { userId } = await auth()
-
-  if (!userId) {
-    redirect("/login")
-  }
-
-  const supabase = await createClient()
-
-  return { supabase, userId }
-}
+import { getAuthenticatedContext } from "../_lib/auth-context"
+import { getString } from "../_lib/form-data"
 
 export async function createProject(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const project = projectSchema.parse({
     name: getString(formData, "name"),
     repo: getString(formData, "repo"),
@@ -41,7 +23,7 @@ export async function createProject(formData: FormData) {
 }
 
 export async function updateProject(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const id = idSchema.parse(getString(formData, "id"))
   const project = projectSchema.parse({
     name: getString(formData, "name"),
@@ -55,7 +37,7 @@ export async function updateProject(formData: FormData) {
 }
 
 export async function deleteProject(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
   const id = idSchema.parse(getString(formData, "id"))
 
   await projectsService.deleteProject(supabase, userId, id)
@@ -64,7 +46,7 @@ export async function deleteProject(formData: FormData) {
 }
 
 export async function disconnectGithubIntegration() {
-  const { supabase, userId } = await getAuthenticatedSupabase()
+  const { supabase, userId } = await getAuthenticatedContext()
 
   await githubIntegrationsService.deleteGithubIntegration(supabase, userId)
 

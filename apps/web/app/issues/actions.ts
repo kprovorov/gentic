@@ -5,9 +5,7 @@ import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
-import { auth } from "@clerk/nextjs/server"
 
-import { createClient } from "@gentic/supabase/server"
 import {
   addIssueRelationSchema,
   createIssueSchema,
@@ -19,27 +17,15 @@ import {
 
 import * as issuesService from "@gentic/services/issues"
 
+import { getAuthenticatedContext } from "../_lib/auth-context"
+import { getString } from "../_lib/form-data"
+
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 function sanitizeFileName(name: string): string {
   const base = name.split(/[/\\]/).pop() || "file"
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file"
-}
-
-function getString(formData: FormData, key: string) {
-  const value = formData.get(key)
-  return typeof value === "string" ? value : ""
-}
-
-async function getAuthenticatedContext() {
-  const { userId } = await auth()
-
-  if (!userId) {
-    redirect("/login")
-  }
-
-  return { supabase: await createClient(), userId }
 }
 
 export async function createIssue(formData: FormData) {
