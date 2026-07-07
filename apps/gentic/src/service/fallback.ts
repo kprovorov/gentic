@@ -72,9 +72,9 @@ export class FallbackBackend implements ServiceBackend {
     await mkdir(paths.data, { recursive: true })
     await mkdir(paths.log, { recursive: true })
 
-    const { command, entry } = resolveGenticExecutable()
+    const { command, args } = resolveGenticExecutable()
     const logFd = openSync(LOG_FILE, "a")
-    const child = spawn(command, [entry, "run"], {
+    const child = spawn(command, [...args, "run"], {
       detached: true,
       stdio: ["ignore", logFd, logFd],
     })
