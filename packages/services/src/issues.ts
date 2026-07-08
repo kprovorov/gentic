@@ -5,7 +5,7 @@ import type {
   UpdateIssueValues,
 } from "@gentic/validators/issues"
 
-import { ServiceError } from "./errors"
+import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
 const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
@@ -74,15 +74,13 @@ async function ensureIssuesOwned(
   issueIds: string[]
 ) {
   const uniqueIds = Array.from(new Set(issueIds))
-  const { data, error } = await supabase
-    .from("issues")
-    .select("id, projects!inner(user_id)")
-    .in("id", uniqueIds)
-    .eq("projects.user_id", userId)
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  const data = unwrap(
+    await supabase
+      .from("issues")
+      .select("id, projects!inner(user_id)")
+      .in("id", uniqueIds)
+      .eq("projects.user_id", userId)
+  )
   if ((data?.length ?? 0) !== uniqueIds.length) {
     throw new ServiceError("not_found", "Issue not found")
   }
@@ -107,13 +105,7 @@ export async function listIssues(
     query = query.eq("project_id", filters.projectId)
   }
 
-  const { data, error } = await query
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(await query)
 }
 
 export async function getIssue(supabase: Supabase, userId: string, id: string) {
@@ -141,19 +133,15 @@ export async function listIssueRelationCandidates(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const { data, error } = await supabase
-    .from("issues")
-    .select("id,title,status,projects!inner(user_id)")
-    .eq("projects.user_id", userId)
-    .neq("id", issueId)
-    .order("created_at", { ascending: false })
-    .returns<IssueRelationIssue[]>()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(
+    await supabase
+      .from("issues")
+      .select("id,title,status,projects!inner(user_id)")
+      .eq("projects.user_id", userId)
+      .neq("id", issueId)
+      .order("created_at", { ascending: false })
+      .returns<IssueRelationIssue[]>()
+  )
 }
 
 export async function listIssueRelations(
@@ -163,20 +151,16 @@ export async function listIssueRelations(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const { data, error } = await supabase
-    .from("issue_relations")
-    .select(
-      "id,source_issue_id,target_issue_id,type,created_at,source_issue:issues!issue_relations_source_issue_id_fkey(id,title,status),target_issue:issues!issue_relations_target_issue_id_fkey(id,title,status)"
-    )
-    .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
-    .order("created_at", { ascending: false })
-    .returns<IssueRelation[]>()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(
+    await supabase
+      .from("issue_relations")
+      .select(
+        "id,source_issue_id,target_issue_id,type,created_at,source_issue:issues!issue_relations_source_issue_id_fkey(id,title,status),target_issue:issues!issue_relations_target_issue_id_fkey(id,title,status)"
+      )
+      .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
+      .order("created_at", { ascending: false })
+      .returns<IssueRelation[]>()
+  )
 }
 
 export async function listBlockedIssueIds(
@@ -187,17 +171,17 @@ export async function listBlockedIssueIds(
     return new Set<string>()
   }
 
-  const { data, error } = await supabase
-    .from("issue_relations")
-    .select(
-      "target_issue_id, source_issue:issues!issue_relations_source_issue_id_fkey(status)"
-    )
-    .in("target_issue_id", issueIds)
-    .returns<{ target_issue_id: string; source_issue: { status: string } }[]>()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  const data = unwrap(
+    await supabase
+      .from("issue_relations")
+      .select(
+        "target_issue_id, source_issue:issues!issue_relations_source_issue_id_fkey(status)"
+      )
+      .in("target_issue_id", issueIds)
+      .returns<
+        { target_issue_id: string; source_issue: { status: string } }[]
+      >()
+  )
 
   const blockedIssueIds = new Set<string>()
   for (const relation of data) {
@@ -219,7 +203,7 @@ export async function createIssue(
 ) {
   await ensureProjectOwned(supabase, userId, input.project_id)
 
-  const { data, error } = await supabase
+  const result = await supabase
     .from("issues")
     .insert({
       project_id: input.project_id,
@@ -231,11 +215,7 @@ export async function createIssue(
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
 
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(result)
 }
 
 export async function updateIssue(
@@ -258,7 +238,7 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  const { data, error } = await supabase
+  const result = await supabase
     .from("issues")
     .update({
       title: input.title,
@@ -273,21 +253,17 @@ export async function updateIssue(
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
 
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(result)
 }
 
-export async function deleteIssue(supabase: Supabase, userId: string, id: string) {
+export async function deleteIssue(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
   await ensureIssueOwned(supabase, userId, id)
 
-  const { error } = await supabase.from("issues").delete().eq("id", id)
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  unwrap(await supabase.from("issues").delete().eq("id", id))
 }
 
 export async function resetIssueAgent(
@@ -309,47 +285,36 @@ export async function resetIssueAgent(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  const { error: deleteMessagesError } = await supabase
-    .from("messages")
-    .delete()
-    .eq("issue_id", id)
-
-  if (deleteMessagesError) {
-    throw new ServiceError("internal", deleteMessagesError.message)
-  }
+  unwrap(await supabase.from("messages").delete().eq("issue_id", id))
 
   const now = new Date().toISOString()
-  const { error: updateError } = await supabase
-    .from("issues")
-    .update({
-      status: "todo",
-      run_status: "queued",
-      session_id: null,
-      run_error: null,
-      run_started_at: null,
-      run_finished_at: null,
-      pr_url: null,
-      updated_at: now,
-    })
-    .eq("id", id)
-
-  if (updateError) {
-    throw new ServiceError("internal", updateError.message)
-  }
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        status: "todo",
+        run_status: "queued",
+        session_id: null,
+        run_error: null,
+        run_started_at: null,
+        run_finished_at: null,
+        pr_url: null,
+        updated_at: now,
+      })
+      .eq("id", id)
+  )
 
   const messageContent = current.prompt
     ? `${current.title}\n\n${current.prompt}`
     : current.title
 
-  const { error: messageError } = await supabase.from("messages").insert({
-    issue_id: id,
-    role: "user",
-    content: messageContent,
-  })
-
-  if (messageError) {
-    throw new ServiceError("internal", messageError.message)
-  }
+  unwrap(
+    await supabase.from("messages").insert({
+      issue_id: id,
+      role: "user",
+      content: messageContent,
+    })
+  )
 }
 
 export async function addIssueRelation(
@@ -413,14 +378,7 @@ export async function deleteIssueRelation(
     relation.target_issue_id,
   ])
 
-  const { error } = await supabase
-    .from("issue_relations")
-    .delete()
-    .eq("id", relationId)
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  unwrap(await supabase.from("issue_relations").delete().eq("id", relationId))
 }
 
 export async function updateIssueStatus(
@@ -448,31 +406,27 @@ export async function updateIssueStatus(
   // Supabase and drives the issue's selected coding agent against a fresh clone.
   const startsRun = current.status === "draft" && status === "todo"
 
-  const { data, error } = await supabase
+  const result = await supabase
     .from("issues")
     .update(startsRun ? { status, run_status: "queued" } : { status })
     .eq("id", id)
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
 
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  const data = unwrap(result)
 
   if (startsRun) {
     const messageContent = current.prompt
       ? `${current.title}\n\n${current.prompt}`
       : current.title
 
-    const { error: messageError } = await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: messageContent,
-    })
-
-    if (messageError) {
-      throw new ServiceError("internal", messageError.message)
-    }
+    unwrap(
+      await supabase.from("messages").insert({
+        issue_id: id,
+        role: "user",
+        content: messageContent,
+      })
+    )
   }
 
   return data
@@ -488,18 +442,14 @@ export async function updateIssueStatusByPrUrl(
   prUrl: string,
   status: IssueStatus
 ) {
-  const { data, error } = await supabase
-    .from("issues")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("pr_url", prUrl)
-    .select("id")
-    .maybeSingle()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data
+  return unwrap(
+    await supabase
+      .from("issues")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("pr_url", prUrl)
+      .select("id")
+      .maybeSingle()
+  )
 }
 
 export async function sendIssueMessage(
@@ -510,25 +460,21 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const { error } = await supabase.from("messages").insert({
-    issue_id: issueId,
-    role: "user",
-    content,
-  })
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  unwrap(
+    await supabase.from("messages").insert({
+      issue_id: issueId,
+      role: "user",
+      content,
+    })
+  )
 
   // A finished run has no worker polling for it anymore. Re-queue so the
   // `@gentic/gentic` agent picks this follow-up up and resumes the session.
-  const { error: requeueError } = await supabase
-    .from("issues")
-    .update({ run_status: "queued", updated_at: new Date().toISOString() })
-    .eq("id", issueId)
-    .in("run_status", ["completed", "failed", "cancelled"])
-
-  if (requeueError) {
-    throw new ServiceError("internal", requeueError.message)
-  }
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ run_status: "queued", updated_at: new Date().toISOString() })
+      .eq("id", issueId)
+      .in("run_status", ["completed", "failed", "cancelled"])
+  )
 }

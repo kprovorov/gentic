@@ -1,4 +1,4 @@
-import { ServiceError } from "./errors"
+import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
 export type GithubIntegrationStatus = "connected" | "pending"
@@ -14,21 +14,14 @@ export type GithubIntegration = {
   updated_at: string
 }
 
-export async function getGithubIntegration(
-  supabase: Supabase,
-  userId: string
-) {
-  const { data, error } = await supabase
-    .from("github_integrations")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data as GithubIntegration | null
+export async function getGithubIntegration(supabase: Supabase, userId: string) {
+  return unwrap(
+    await supabase
+      .from("github_integrations")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle()
+  ) as GithubIntegration | null
 }
 
 export async function createGithubIntegrationState(
@@ -37,15 +30,13 @@ export async function createGithubIntegrationState(
   state: string
 ) {
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
-  const { error } = await supabase.from("github_integration_states").insert({
-    state,
-    user_id: userId,
-    expires_at: expiresAt,
-  })
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  unwrap(
+    await supabase.from("github_integration_states").insert({
+      state,
+      user_id: userId,
+      expires_at: expiresAt,
+    })
+  )
 }
 
 export async function consumeGithubIntegrationState(
@@ -66,7 +57,10 @@ export async function consumeGithubIntegrationState(
     throw new ServiceError("internal", error.message)
   }
   if (!data) {
-    throw new ServiceError("validation", "Invalid or expired GitHub setup state")
+    throw new ServiceError(
+      "validation",
+      "Invalid or expired GitHub setup state"
+    )
   }
 }
 
@@ -80,39 +74,30 @@ export async function upsertGithubIntegration(
   }
 ) {
   const now = new Date().toISOString()
-  const { data, error } = await supabase
-    .from("github_integrations")
-    .upsert(
-      {
-        user_id: userId,
-        installation_id: input.installationId,
-        setup_action: input.setupAction,
-        status: input.status,
-        connected_at: input.status === "connected" ? now : null,
-        updated_at: now,
-      },
-      { onConflict: "user_id" }
-    )
-    .select("*")
-    .single()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
-
-  return data as GithubIntegration
+  return unwrap(
+    await supabase
+      .from("github_integrations")
+      .upsert(
+        {
+          user_id: userId,
+          installation_id: input.installationId,
+          setup_action: input.setupAction,
+          status: input.status,
+          connected_at: input.status === "connected" ? now : null,
+          updated_at: now,
+        },
+        { onConflict: "user_id" }
+      )
+      .select("*")
+      .single()
+  ) as GithubIntegration
 }
 
 export async function deleteGithubIntegration(
   supabase: Supabase,
   userId: string
 ) {
-  const { error } = await supabase
-    .from("github_integrations")
-    .delete()
-    .eq("user_id", userId)
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  unwrap(
+    await supabase.from("github_integrations").delete().eq("user_id", userId)
+  )
 }
