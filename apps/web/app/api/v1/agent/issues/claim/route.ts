@@ -10,6 +10,17 @@ export const runtime = "nodejs"
 const CLAIM_ISSUE_SELECT =
   "id, agent_provider, session_id, run_finished_at, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
+type ClaimCandidateRow = {
+  id: string
+  agent_provider: "claude_code" | "codex"
+  session_id: string | null
+  run_finished_at: string | null
+  projects: {
+    repo: string
+    setup_script: string | null
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
@@ -31,6 +42,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     .order("updated_at", { ascending: true })
     .limit(1)
     .maybeSingle()
+    .returns<ClaimCandidateRow | null>()
 
   if (candidateError) {
     throw new Error(candidateError.message)
@@ -39,7 +51,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     return null
   }
 
-  const id = (candidate as { id: string }).id
+  const { id } = candidate
   const now = new Date().toISOString()
   const { data: claimed, error: claimError } = await supabase
     .from("issues")
@@ -63,32 +75,16 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     return null
   }
 
-  const project = extractProject(candidate)
+  if (!candidate.projects.repo) {
+    throw new Error("Issue has no associated project repo")
+  }
 
   return {
     id,
-    agentProvider:
-      (candidate as { agent_provider: "claude_code" | "codex" }).agent_provider,
-    repo: project.repo,
-    setupScript: project.setup_script,
-    sessionId: (candidate as { session_id: string | null }).session_id,
-    runFinishedAt: (candidate as { run_finished_at: string | null })
-      .run_finished_at,
+    agentProvider: candidate.agent_provider,
+    repo: candidate.projects.repo,
+    setupScript: candidate.projects.setup_script,
+    sessionId: candidate.session_id,
+    runFinishedAt: candidate.run_finished_at,
   }
-}
-
-function extractProject(row: unknown): {
-  repo: string
-  setup_script: string | null
-} {
-  const projects = (row as { projects?: unknown }).projects
-  const project = Array.isArray(projects) ? projects[0] : projects
-  const repo = (project as { repo?: string } | undefined)?.repo
-  if (!repo) {
-    throw new Error("Issue has no associated project repo")
-  }
-  const setup_script =
-    (project as { setup_script?: string | null } | undefined)?.setup_script ??
-    null
-  return { repo, setup_script }
 }
