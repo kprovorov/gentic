@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { auth } from "@clerk/nextjs/server"
-
-import { LoginForm } from "@/components/auth/login-form"
+import { SignIn } from "@clerk/nextjs"
 
 export const metadata: Metadata = {
   title: "Log in",
@@ -15,5 +14,5 @@ export default async function LoginPage() {
     redirect("/")
   }
 
-  return <LoginForm />
+  return <SignIn path="/login" signUpUrl="/register" />
 }
