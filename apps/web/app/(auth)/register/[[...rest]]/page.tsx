@@ -1,19 +1,18 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { auth } from "@clerk/nextjs/server"
-
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form"
+import { SignUp } from "@clerk/nextjs"
 
 export const metadata: Metadata = {
-  title: "Reset password",
+  title: "Create account",
 }
 
-export default async function ForgotPasswordPage() {
+export default async function RegisterPage() {
   const { userId } = await auth()
 
   if (userId) {
     redirect("/")
   }
 
-  return <ForgotPasswordForm />
+  return <SignUp path="/register" signInUrl="/login" />
 }
