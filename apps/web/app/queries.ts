@@ -31,10 +31,13 @@ export type IssueStatus =
   | "completed"
   | "cancelled"
 
+export type IssueType = "feature" | "bug" | "feedback" | "idea"
+
 export type HomeIssue = {
   id: string
   title: string
   status: IssueStatus
+  type: IssueType
   created_at: string
   projects: {
     id: string
@@ -58,6 +61,7 @@ export type IssueDetail = {
   title: string
   prompt: string | null
   agent_provider: "claude_code" | "codex"
+  type: IssueType
   status: IssueStatus
   run_status: RunStatus
   pr_url: string | null
@@ -68,7 +72,7 @@ export type IssueDetail = {
 
 export type IssueEdit = Pick<
   IssueDetail,
-  "id" | "title" | "prompt" | "agent_provider"
+  "id" | "title" | "prompt" | "agent_provider" | "type"
 >
 
 export type HomeData = {
@@ -94,7 +98,7 @@ export async function getHomeData(): Promise<HomeData> {
   const { supabase } = await getAuthenticatedContext()
   const { data: issues, error } = await supabase
     .from("issues")
-    .select("id,title,status,created_at,projects(id,name,repo)")
+    .select("id,title,status,type,created_at,projects(id,name,repo)")
     .order("created_at", { ascending: false })
     .returns<HomeIssue[]>()
 
@@ -141,7 +145,7 @@ export async function getIssueEditData(id: string): Promise<IssueEdit> {
   const { supabase } = await getAuthenticatedContext()
   const { data: issue, error } = await supabase
     .from("issues")
-    .select("id,title,prompt,agent_provider")
+    .select("id,title,prompt,agent_provider,type")
     .eq("id", id)
     .maybeSingle()
     .returns<IssueEdit | null>()
@@ -164,7 +168,7 @@ export async function getIssueDetailData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,agent_provider,status,run_status,pr_url,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,agent_provider,type,status,run_status,pr_url,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()

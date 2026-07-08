@@ -24,12 +24,17 @@ export const agentProviderSchema = z.enum(["claude_code", "codex"])
 
 export type AgentProvider = z.infer<typeof agentProviderSchema>
 
+export const issueTypeSchema = z.enum(["feature", "bug", "feedback", "idea"])
+
+export type IssueType = z.infer<typeof issueTypeSchema>
+
 export const createIssueSchema = z.object({
   project_id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
   agent_provider: agentProviderSchema.default("claude_code"),
+  type: issueTypeSchema.default("feature"),
 })
 
 export type CreateIssueValues = z.infer<typeof createIssueSchema>
@@ -39,6 +44,7 @@ export const updateIssueSchema = z.object({
   title: z.string().trim().min(1).max(160),
   prompt: z.string().trim().optional(),
   agent_provider: agentProviderSchema,
+  type: issueTypeSchema,
 })
 
 export type UpdateIssueValues = z.infer<typeof updateIssueSchema>

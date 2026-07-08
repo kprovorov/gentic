@@ -104,6 +104,21 @@ export function NewIssueView({
                 </div>
 
                 <div className="grid gap-2">
+                  <Label htmlFor="issue-type">Type</Label>
+                  <Select name="type" required defaultValue="feature">
+                    <SelectTrigger id="issue-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="bug">Bug</SelectItem>
+                      <SelectItem value="feedback">Feedback</SelectItem>
+                      <SelectItem value="idea">Idea</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
                   <Label htmlFor="issue-agent-provider">Agent</Label>
                   <Select
                     name="agent_provider"

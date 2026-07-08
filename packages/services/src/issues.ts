@@ -211,6 +211,7 @@ export async function createIssue(
       prompt: input.prompt ?? null,
       status: input.status,
       agent_provider: input.agent_provider,
+      type: input.type,
     })
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
@@ -244,6 +245,7 @@ export async function updateIssue(
       title: input.title,
       prompt: input.prompt ?? null,
       agent_provider: input.agent_provider,
+      type: input.type,
       ...(current.agent_provider !== input.agent_provider
         ? { session_id: null }
         : {}),
