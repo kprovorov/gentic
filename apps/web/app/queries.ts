@@ -1,13 +1,12 @@
 "use server"
 
-import { notFound, redirect } from "next/navigation"
-import { auth } from "@clerk/nextjs/server"
+import { notFound } from "next/navigation"
 
-import { createClient } from "@gentic/supabase/server"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
 
+import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[id]/attachments"
 import type { ChatMessage, RunStatus } from "./issues/[id]/issue-chat"
 
@@ -89,16 +88,6 @@ export type IssueDetailData = {
   attachments: Attachment[]
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
-}
-
-async function getAuthenticatedContext() {
-  const { userId } = await auth()
-
-  if (!userId) {
-    redirect("/login")
-  }
-
-  return { supabase: await createClient(), userId }
 }
 
 export async function getHomeData(): Promise<HomeData> {
