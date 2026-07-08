@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto"
 
 import { clerkClient } from "@clerk/nextjs/server"
+import { ServiceError } from "@gentic/services/errors"
+import { ensureIssueOwned } from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 import { z } from "zod"
 
 import { getRedis } from "@/lib/redis"
+
+export { ensureIssueOwned }
 
 export type Supabase = ReturnType<typeof createServiceClient>
 
@@ -69,26 +73,6 @@ export async function getAgentContext(request: Request): Promise<{
   }
 }
 
-export async function ensureIssueOwned(
-  supabase: Supabase,
-  userId: string,
-  issueId: string
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("issues")
-    .select("id, projects!inner(user_id)")
-    .eq("id", issueId)
-    .eq("projects.user_id", userId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-  if (!data) {
-    throw new ApiError(404, "Issue not found")
-  }
-}
-
 export async function ensureMessageOwned(
   supabase: Supabase,
   userId: string,
@@ -113,9 +97,25 @@ export async function ensureMessageOwned(
   await ensureIssueOwned(supabase, userId, data.issue_id)
 }
 
+const SERVICE_ERROR_STATUS: Record<ServiceError["code"], number> = {
+  not_found: 404,
+  validation: 400,
+  forbidden: 403,
+  internal: 500,
+}
+
 export function handleAgentError(error: unknown): Response {
   if (error instanceof ApiError) {
     return json({ error: error.message }, { status: error.status })
+  }
+  if (error instanceof ServiceError) {
+    if (error.code === "internal") {
+      console.error("[agent-api] request failed:", error)
+    }
+    return json(
+      { error: error.message },
+      { status: SERVICE_ERROR_STATUS[error.code] }
+    )
   }
   if (error instanceof z.ZodError) {
     return json({ error: "Invalid request" }, { status: 400 })

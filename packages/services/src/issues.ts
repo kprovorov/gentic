@@ -48,7 +48,11 @@ async function ensureProjectOwned(
 
 // The `issues` table has no `user_id` of its own, so ownership is checked via
 // a join to `projects`, whose `user_id` column does carry the Clerk user id.
-async function ensureIssueOwned(supabase: Supabase, userId: string, issueId: string) {
+export async function ensureIssueOwned(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
   const { data, error } = await supabase
     .from("issues")
     .select("id, projects!inner(user_id)")
