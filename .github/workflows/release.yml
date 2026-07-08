@@ -274,3 +274,58 @@ jobs:
             --notes-file release-assets/changelog.md \
             release-assets/*.tar.gz \
             release-assets/checksums.txt
+
+  homebrew:
+    needs:
+      - prepare
+      - release
+    runs-on: ubuntu-latest
+    env:
+      # Homebrew tap the gentic formula is published to. Requires the
+      # HOMEBREW_TAP_TOKEN secret: a PAT with contents:write on this repo.
+      # See packaging/homebrew-gentic/README.md.
+      TAP_REPO: kprovorov/homebrew-tap
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.commit_sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Download release checksums
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ needs.prepare.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern checksums.txt \
+            --dir .
+
+      - name: Render Homebrew formula
+        run: |
+          node packaging/homebrew-gentic/render-formula.mjs \
+            --version "${{ needs.prepare.outputs.version }}" \
+            --checksums checksums.txt > gentic.rb
+          cat gentic.rb
+
+      - name: Publish formula to tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
+          cp gentic.rb tap/Formula/gentic.rb
+          cd tap
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          if git diff --quiet -- Formula/gentic.rb; then
+            echo "Formula already at ${VERSION}; nothing to publish"
+            exit 0
+          fi
+          git add Formula/gentic.rb
+          git commit -m "gentic ${VERSION}"
+          git push
