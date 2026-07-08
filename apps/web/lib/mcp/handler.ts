@@ -314,7 +314,7 @@ const mcpHandler = createMcpHandler(
       async (input, { authInfo }) => {
         try {
           const { supabase, userId } = getMcpToolContext(authInfo)
-          const created = await issuesService.createIssue(
+          const issue = await issuesService.createIssue(
             supabase,
             userId,
             createIssueSchema.parse({
@@ -323,7 +323,6 @@ const mcpHandler = createMcpHandler(
               agent_provider: input.agent_provider ?? "claude_code",
             })
           )
-          const issue = await issuesService.getIssue(supabase, userId, created.id)
           return mcpJsonResult({ issue })
         } catch (error) {
           return mcpErrorResult(error)
@@ -360,13 +359,12 @@ const mcpHandler = createMcpHandler(
         try {
           const { id, ...values } = input
           const { supabase, userId } = getMcpToolContext(authInfo)
-          await issuesService.updateIssue(
+          const issue = await issuesService.updateIssue(
             supabase,
             userId,
             id,
             updateIssueSchema.parse({ id, ...values })
           )
-          const issue = await issuesService.getIssue(supabase, userId, id)
           return mcpJsonResult({ issue })
         } catch (error) {
           return mcpErrorResult(error)
@@ -413,8 +411,12 @@ const mcpHandler = createMcpHandler(
           const { id, status } = input
           const { supabase, userId } = getMcpToolContext(authInfo)
           const values = updateIssueStatusSchema.parse({ id, status })
-          await issuesService.updateIssueStatus(supabase, userId, values.id, values.status)
-          const issue = await issuesService.getIssue(supabase, userId, id)
+          const issue = await issuesService.updateIssueStatus(
+            supabase,
+            userId,
+            values.id,
+            values.status
+          )
           return mcpJsonResult({ issue })
         } catch (error) {
           return mcpErrorResult(error)
