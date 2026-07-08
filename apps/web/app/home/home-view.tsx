@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query"
 import {
   IconAlertOctagon,
   IconAlertTriangle,
+  IconBug,
+  IconBulb,
   IconCalendar,
   IconCircleCheck,
   IconCircleDashed,
@@ -22,10 +24,16 @@ import {
   IconPlus,
   IconRocket,
   IconShieldCheck,
+  IconSparkles,
   IconThumbUp,
 } from "@tabler/icons-react"
 
-import { getHomeData, type HomeData, type IssueStatus } from "@/app/queries"
+import {
+  getHomeData,
+  type HomeData,
+  type IssueStatus,
+  type IssueType,
+} from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
@@ -85,6 +93,27 @@ const statusIcons = {
   validating: IconShieldCheck,
   completed: IconCircleCheck,
   cancelled: IconCircleX,
+}
+
+const issueTypeLabels: Record<IssueType, string> = {
+  feature: "Feature",
+  bug: "Bug",
+  feedback: "Feedback",
+  idea: "Idea",
+}
+
+const issueTypeIcons = {
+  feature: IconSparkles,
+  bug: IconBug,
+  feedback: IconMessage2,
+  idea: IconBulb,
+}
+
+const issueTypeStyles: Record<IssueType, string> = {
+  feature: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  bug: "bg-red-500/15 text-red-700 dark:text-red-300",
+  feedback: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  idea: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 }
 
 const statusOrder: Record<IssueStatus, number> = {
@@ -250,6 +279,7 @@ export function HomeView({ initialData }: { initialData: HomeData }) {
                         </TableRow>
                         {group.issues.map((issue) => {
                           const isBlocked = blockedIssueIds.has(issue.id)
+                          const TypeIcon = issueTypeIcons[issue.type]
 
                           return (
                             <TableRow key={issue.id} className="group/row">
@@ -261,6 +291,15 @@ export function HomeView({ initialData }: { initialData: HomeData }) {
                                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                                     <span className="truncate font-medium group-hover/row:text-primary">
                                       {issue.title}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                                        issueTypeStyles[issue.type]
+                                      )}
+                                    >
+                                      <TypeIcon className="size-3" />
+                                      {issueTypeLabels[issue.type]}
                                     </span>
                                     {isBlocked ? (
                                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">

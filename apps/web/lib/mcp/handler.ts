@@ -2,6 +2,7 @@ import {
   agentProviderSchema,
   createIssueSchema,
   issueStatusSchema,
+  issueTypeSchema,
   updateIssueSchema,
   updateIssueStatusSchema,
 } from "@gentic/validators/issues"
@@ -293,6 +294,12 @@ const mcpHandler = createMcpHandler(
             .optional()
             .default("claude_code")
             .describe("Coding agent to run for this issue. Defaults to Claude Code."),
+          type: issueTypeSchema
+            .optional()
+            .default("feature")
+            .describe(
+              "Issue type: feature, bug, feedback, or idea. Defaults to feature."
+            ),
         },
         outputSchema: issueOutputSchema,
       },
@@ -305,6 +312,7 @@ const mcpHandler = createMcpHandler(
             prompt?: string
             status?: z.infer<typeof issueStatusSchema>
             agent_provider?: z.infer<typeof agentProviderSchema>
+            type?: z.infer<typeof issueTypeSchema>
           }
         ) => {
           const issue = await issuesService.createIssue(
@@ -314,6 +322,7 @@ const mcpHandler = createMcpHandler(
               ...input,
               status: input.status ?? "draft",
               agent_provider: input.agent_provider ?? "claude_code",
+              type: input.type ?? "feature",
             })
           )
           return { issue }
@@ -343,6 +352,9 @@ const mcpHandler = createMcpHandler(
           agent_provider: agentProviderSchema.describe(
             "Coding agent to run for this issue."
           ),
+          type: issueTypeSchema.describe(
+            "Issue type: feature, bug, feedback, or idea."
+          ),
         },
         outputSchema: issueOutputSchema,
       },
@@ -354,6 +366,7 @@ const mcpHandler = createMcpHandler(
             title: string
             prompt?: string
             agent_provider: z.infer<typeof agentProviderSchema>
+            type: z.infer<typeof issueTypeSchema>
           }
         ) => {
           const { id, ...values } = input

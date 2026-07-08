@@ -6,6 +6,8 @@ import {
   IconAlertOctagon,
   IconAlertTriangle,
   IconArrowLeft,
+  IconBug,
+  IconBulb,
   IconCalendar,
   IconCircleCheck,
   IconCircleDashed,
@@ -23,6 +25,7 @@ import {
   IconRobot,
   IconRocket,
   IconShieldCheck,
+  IconSparkles,
   IconThumbUp,
 } from "@tabler/icons-react"
 
@@ -112,6 +115,27 @@ const agentProviderLabels: Record<
   codex: "Codex",
 }
 
+const issueTypeLabels: Record<IssueDetailData["issue"]["type"], string> = {
+  feature: "Feature",
+  bug: "Bug",
+  feedback: "Feedback",
+  idea: "Idea",
+}
+
+const issueTypeIcons = {
+  feature: IconSparkles,
+  bug: IconBug,
+  feedback: IconMessage2,
+  idea: IconBulb,
+}
+
+const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
+  feature: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  bug: "bg-red-500/15 text-red-700 dark:text-red-300",
+  feedback: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  idea: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -158,6 +182,7 @@ export function IssueDetailView({
   })
   const { issue, messages, attachments, relations, relationCandidates } = data
   const StatusIcon = statusIcons[issue.status]
+  const TypeIcon = issueTypeIcons[issue.type]
   const isBlocked = relations.some(
     (relation) =>
       relation.target_issue_id === issue.id &&
@@ -209,6 +234,15 @@ export function IssueDetailView({
               >
                 <StatusIcon className="size-3.5" />
                 {statusLabels[issue.status]}
+              </div>
+              <div
+                className={cn(
+                  "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
+                  issueTypeStyles[issue.type]
+                )}
+              >
+                <TypeIcon className="size-3.5" />
+                {issueTypeLabels[issue.type]}
               </div>
               {isBlocked ? (
                 <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-red-500/15 px-2.5 text-xs font-medium text-red-700 dark:text-red-300">
@@ -287,6 +321,11 @@ export function IssueDetailView({
               <CardContent className="grid gap-5">
                 <IssueStatusSelect issueId={issue.id} status={issue.status} />
                 <div className="grid gap-3 border-t pt-5">
+                  <DetailRow
+                    icon={TypeIcon}
+                    label="Type"
+                    value={issueTypeLabels[issue.type]}
+                  />
                   <DetailRow
                     icon={IconRobot}
                     label="Agent"
