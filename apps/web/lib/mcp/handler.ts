@@ -12,7 +12,7 @@ import { z } from "zod"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
 
-import { getMcpToolContext, mcpErrorResult, mcpJsonResult, resolveMcpUserId } from "./lib"
+import { resolveMcpUserId, tool } from "./lib"
 
 const jsonObjectSchema = z.record(z.string(), z.unknown())
 
@@ -86,15 +86,10 @@ const mcpHandler = createMcpHandler(
         inputSchema: {},
         outputSchema: projectsOutputSchema,
       },
-      async (_input, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
-          const projects = await projectsService.listProjects(supabase, userId)
-          return mcpJsonResult({ projects })
-        } catch (error) {
-          return mcpErrorResult(error)
-        }
-      }
+      tool(async ({ supabase, userId }) => {
+        const projects = await projectsService.listProjects(supabase, userId)
+        return { projects }
+      })
     )
 
     server.registerTool(
@@ -106,15 +101,10 @@ const mcpHandler = createMcpHandler(
         inputSchema: projectIdInputSchema,
         outputSchema: projectOutputSchema,
       },
-      async ({ id }, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
-          const project = await projectsService.getProject(supabase, userId, id)
-          return mcpJsonResult({ project })
-        } catch (error) {
-          return mcpErrorResult(error)
-        }
-      }
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        const project = await projectsService.getProject(supabase, userId, id)
+        return { project }
+      })
     )
 
     server.registerTool(
@@ -146,9 +136,11 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: projectOutputSchema,
       },
-      async (input, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
+      tool(
+        async (
+          { supabase, userId },
+          input: { name: string; repo: string; setup_script?: string | null }
+        ) => {
           const project = await projectsService.createProject(
             supabase,
             userId,
@@ -157,11 +149,9 @@ const mcpHandler = createMcpHandler(
               setup_script: input.setup_script ?? null,
             })
           )
-          return mcpJsonResult({ project })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { project }
         }
-      }
+      )
     )
 
     server.registerTool(
@@ -193,21 +183,26 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: projectOutputSchema,
       },
-      async (input, { authInfo }) => {
-        try {
+      tool(
+        async (
+          { supabase, userId },
+          input: {
+            id: string
+            name: string
+            repo: string
+            setup_script: string | null
+          }
+        ) => {
           const { id, ...values } = input
-          const { supabase, userId } = getMcpToolContext(authInfo)
           const project = await projectsService.updateProject(
             supabase,
             userId,
             id,
             projectSchema.parse(values)
           )
-          return mcpJsonResult({ project })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { project }
         }
-      }
+      )
     )
 
     server.registerTool(
@@ -219,15 +214,10 @@ const mcpHandler = createMcpHandler(
         inputSchema: projectIdInputSchema,
         outputSchema: deletedOutputSchema,
       },
-      async ({ id }, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
-          await projectsService.deleteProject(supabase, userId, id)
-          return mcpJsonResult({ id, deleted: true })
-        } catch (error) {
-          return mcpErrorResult(error)
-        }
-      }
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        await projectsService.deleteProject(supabase, userId, id)
+        return { id, deleted: true as const }
+      })
     )
 
     server.registerTool(
@@ -245,17 +235,17 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: issuesOutputSchema,
       },
-      async ({ project_id }, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
+      tool(
+        async (
+          { supabase, userId },
+          { project_id }: { project_id?: string }
+        ) => {
           const issues = await issuesService.listIssues(supabase, userId, {
             projectId: project_id,
           })
-          return mcpJsonResult({ issues })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { issues }
         }
-      }
+      )
     )
 
     server.registerTool(
@@ -267,15 +257,10 @@ const mcpHandler = createMcpHandler(
         inputSchema: issueIdInputSchema,
         outputSchema: issueOutputSchema,
       },
-      async ({ id }, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
-          const issue = await issuesService.getIssue(supabase, userId, id)
-          return mcpJsonResult({ issue })
-        } catch (error) {
-          return mcpErrorResult(error)
-        }
-      }
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        const issue = await issuesService.getIssue(supabase, userId, id)
+        return { issue }
+      })
     )
 
     server.registerTool(
@@ -311,9 +296,17 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: issueOutputSchema,
       },
-      async (input, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
+      tool(
+        async (
+          { supabase, userId },
+          input: {
+            project_id: string
+            title: string
+            prompt?: string
+            status?: z.infer<typeof issueStatusSchema>
+            agent_provider?: z.infer<typeof agentProviderSchema>
+          }
+        ) => {
           const issue = await issuesService.createIssue(
             supabase,
             userId,
@@ -323,11 +316,9 @@ const mcpHandler = createMcpHandler(
               agent_provider: input.agent_provider ?? "claude_code",
             })
           )
-          return mcpJsonResult({ issue })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { issue }
         }
-      }
+      )
     )
 
     server.registerTool(
@@ -355,21 +346,26 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: issueOutputSchema,
       },
-      async (input, { authInfo }) => {
-        try {
+      tool(
+        async (
+          { supabase, userId },
+          input: {
+            id: string
+            title: string
+            prompt?: string
+            agent_provider: z.infer<typeof agentProviderSchema>
+          }
+        ) => {
           const { id, ...values } = input
-          const { supabase, userId } = getMcpToolContext(authInfo)
           const issue = await issuesService.updateIssue(
             supabase,
             userId,
             id,
             updateIssueSchema.parse({ id, ...values })
           )
-          return mcpJsonResult({ issue })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { issue }
         }
-      }
+      )
     )
 
     server.registerTool(
@@ -381,15 +377,10 @@ const mcpHandler = createMcpHandler(
         inputSchema: issueIdInputSchema,
         outputSchema: deletedOutputSchema,
       },
-      async ({ id }, { authInfo }) => {
-        try {
-          const { supabase, userId } = getMcpToolContext(authInfo)
-          await issuesService.deleteIssue(supabase, userId, id)
-          return mcpJsonResult({ id, deleted: true })
-        } catch (error) {
-          return mcpErrorResult(error)
-        }
-      }
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        await issuesService.deleteIssue(supabase, userId, id)
+        return { id, deleted: true as const }
+      })
     )
 
     server.registerTool(
@@ -406,10 +397,12 @@ const mcpHandler = createMcpHandler(
         },
         outputSchema: issueOutputSchema,
       },
-      async (input, { authInfo }) => {
-        try {
+      tool(
+        async (
+          { supabase, userId },
+          input: { id: string; status: z.infer<typeof issueStatusSchema> }
+        ) => {
           const { id, status } = input
-          const { supabase, userId } = getMcpToolContext(authInfo)
           const values = updateIssueStatusSchema.parse({ id, status })
           const issue = await issuesService.updateIssueStatus(
             supabase,
@@ -417,11 +410,9 @@ const mcpHandler = createMcpHandler(
             values.id,
             values.status
           )
-          return mcpJsonResult({ issue })
-        } catch (error) {
-          return mcpErrorResult(error)
+          return { issue }
         }
-      }
+      )
     )
   },
   {},
