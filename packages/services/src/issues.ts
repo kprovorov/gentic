@@ -474,6 +474,30 @@ export async function updateIssueStatus(
   return data
 }
 
+// Called from the GitHub webhook route, which is trusted server code
+// authenticated by the webhook signature rather than a Clerk user — there is
+// no `userId` to check ownership against. `pr_url` is the exact URL the agent
+// wrote back onto the issue, so it uniquely identifies the issue a PR event
+// belongs to (or matches nothing, if the PR isn't tracked by Gentic).
+export async function updateIssueStatusByPrUrl(
+  supabase: Supabase,
+  prUrl: string,
+  status: IssueStatus
+) {
+  const { data, error } = await supabase
+    .from("issues")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("pr_url", prUrl)
+    .select("id")
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data
+}
+
 export async function sendIssueMessage(
   supabase: Supabase,
   userId: string,
