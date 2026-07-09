@@ -7,7 +7,7 @@ import * as projectsService from "@gentic/services/projects"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
-import { getString } from "../_lib/form-data"
+import { getCheckbox, getString } from "../_lib/form-data"
 
 export async function createProject(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
@@ -15,6 +15,7 @@ export async function createProject(formData: FormData) {
     name: getString(formData, "name"),
     repo: getString(formData, "repo"),
     setup_script: getString(formData, "setup_script"),
+    auto_respond_to_reviews: getCheckbox(formData, "auto_respond_to_reviews"),
   })
 
   await projectsService.createProject(supabase, userId, project)
@@ -29,6 +30,7 @@ export async function updateProject(formData: FormData) {
     name: getString(formData, "name"),
     repo: getString(formData, "repo"),
     setup_script: getString(formData, "setup_script"),
+    auto_respond_to_reviews: getCheckbox(formData, "auto_respond_to_reviews"),
   })
 
   await projectsService.updateProject(supabase, userId, id, project)

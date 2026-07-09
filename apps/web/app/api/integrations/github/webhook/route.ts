@@ -4,6 +4,8 @@ import { createServiceClient } from "@gentic/supabase/service"
 import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
+import { fetchPullRequestReviewComments } from "@/lib/github-app"
+
 export const runtime = "nodejs"
 
 type PullRequestPayload = {
@@ -17,10 +19,25 @@ type PullRequestPayload = {
 type PullRequestReviewPayload = {
   action: string
   review: {
+    id: number
     state: string
+    body: string | null
+    user: {
+      login: string
+    }
   }
   pull_request: {
     html_url: string
+    number: number
+  }
+  repository: {
+    name: string
+    owner: {
+      login: string
+    }
+  }
+  installation?: {
+    id: number
   }
 }
 
@@ -125,5 +142,57 @@ async function handlePullRequestReviewEvent(
     supabase,
     payload.pull_request.html_url,
     status
+  )
+
+  if (payload.review.state === "changes_requested") {
+    await applyChangesRequestedReview(supabase, payload)
+  }
+}
+
+// Fetches the review's inline comments (not present on the webhook payload
+// itself) and feeds the whole review back to the issue's agent session. Never
+// throws past this point — a comment-fetch failure falls back to the review
+// body alone rather than dropping the event.
+async function applyChangesRequestedReview(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: PullRequestReviewPayload
+) {
+  let comments: Awaited<
+    ReturnType<typeof fetchPullRequestReviewComments>
+  > = []
+
+  const installationId = payload.installation?.id
+
+  if (installationId) {
+    try {
+      comments = await fetchPullRequestReviewComments(
+        String(installationId),
+        payload.repository.owner.login,
+        payload.repository.name,
+        payload.pull_request.number,
+        payload.review.id
+      )
+    } catch (error) {
+      console.error(
+        "[github-webhook] failed to fetch review comments, falling back to review body only",
+        error
+      )
+    }
+  }
+
+  await issuesService.applyChangesRequestedReview(
+    supabase,
+    payload.pull_request.html_url,
+    {
+      id: payload.review.id,
+      reviewerLogin: payload.review.user.login,
+      body: payload.review.body,
+      comments: comments.map((comment) => ({
+        path: comment.path,
+        line: comment.line,
+        diffHunk: comment.diff_hunk,
+        body: comment.body,
+      })),
+    }
   )
 }

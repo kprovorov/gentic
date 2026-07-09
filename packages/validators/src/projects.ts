@@ -15,6 +15,7 @@ export const projectSchema = z.object({
     .max(10000)
     .transform((value) => (value.length > 0 ? value : null))
     .nullable(),
+  auto_respond_to_reviews: z.boolean(),
 })
 
 export type ProjectValues = z.infer<typeof projectSchema>
