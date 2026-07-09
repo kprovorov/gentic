@@ -12,7 +12,7 @@ const navItems = [
 
 function Logo() {
   return (
-    <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className="size-6" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clip-path="url(#clip0_2_36)">
     <rect width="1024" height="1024" rx="238.933" fill="white"/>
     <rect width="1024" height="1024" fill="#9AE600"/>
