@@ -25,6 +25,16 @@ test("extracts same-day time-only reset times", () => {
   )
 })
 
+test("extracts Claude Code session-limit reset times in UTC", () => {
+  assert.equal(
+    getUsageLimitResetAt(
+      new Error("You've hit your session limit · resets 2:50pm (UTC)"),
+      new Date("2026-07-09T14:00:00.000Z")
+    ),
+    "2026-07-09T14:50:00.000Z"
+  )
+})
+
 test("rolls time-only reset times to tomorrow when already passed", () => {
   assert.equal(
     getUsageLimitResetAt(

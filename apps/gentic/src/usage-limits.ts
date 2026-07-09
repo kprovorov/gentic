@@ -1,5 +1,6 @@
 const LIMIT_MARKERS = [
   "usage limit",
+  "session limit",
   "rate limit",
   "quota",
   "too many requests",
@@ -69,7 +70,7 @@ function parseAbsoluteReset(message: string, now: Date): Date | null {
 
 function parseTimeOnlyReset(message: string, now: Date): Date | null {
   const match = message.match(
-    /(?:reset(?:s)?|retry|try again|available)(?:\s+\w+){0,3}\s+(?:at|after|by)?\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)?/i
+    /(?:reset(?:s)?|retry|try again|available)(?:\s+\w+){0,3}\s+(?:at|after|by)?\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)?(?:\s*\((UTC)\))?/i
   )
   if (!match) {
     return null
@@ -88,10 +89,30 @@ function parseTimeOnlyReset(message: string, now: Date): Date | null {
     hours = 0
   }
 
-  const resetAt = new Date(now)
-  resetAt.setHours(hours, minutes, 0, 0)
+  const resetAt =
+    match[4]?.toLowerCase() === "utc"
+      ? new Date(
+          Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate(),
+            hours,
+            minutes,
+            0,
+            0
+          )
+        )
+      : new Date(now)
+
+  if (!match[4]) {
+    resetAt.setHours(hours, minutes, 0, 0)
+  }
   if (resetAt <= now) {
-    resetAt.setDate(resetAt.getDate() + 1)
+    if (match[4]?.toLowerCase() === "utc") {
+      resetAt.setUTCDate(resetAt.getUTCDate() + 1)
+    } else {
+      resetAt.setDate(resetAt.getDate() + 1)
+    }
   }
 
   return resetAt
