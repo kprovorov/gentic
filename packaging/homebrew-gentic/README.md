@@ -9,12 +9,14 @@ just the publish target.
 
 The `release` workflow (`.github/workflows/release.yml`) already builds a
 single-file, dependency-free binary per platform with `bun build --compile`
-plus the ACP agent sidecars, and uploads them to a GitHub Release as:
+plus the ACP agent sidecars, and uploads them to a GitHub Release as
+(`X.Y.Z` is the release version):
 
-- `gentic-bun-darwin-arm64.tar.gz`
-- `gentic-bun-darwin-x64.tar.gz`
-- `gentic-bun-linux-arm64.tar.gz`
-- `gentic-bun-linux-x64.tar.gz`
+- `gentic-X.Y.Z-darwin-arm64.tar.gz`
+- `gentic-X.Y.Z-darwin-x64.tar.gz`
+- `gentic-X.Y.Z-linux-arm64.tar.gz`
+- `gentic-X.Y.Z-linux-x64.tar.gz`
+- `.deb`/`.rpm`/`.apk` packages for each `linux-*` asset
 - `checksums.txt`
 
 The `homebrew` job then runs after the release is published and:

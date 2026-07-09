@@ -30,7 +30,7 @@ if (!version || !checksumsPath) {
   process.exit(1)
 }
 
-// bun-compile target -> template placeholder suffix.
+// asset os-arch slug -> template placeholder suffix.
 const targets = {
   "darwin-arm64": "DARWIN_ARM64",
   "darwin-x64": "DARWIN_X64",
@@ -38,10 +38,16 @@ const targets = {
   "linux-x64": "LINUX_X64",
 }
 
-// checksums.txt lines look like: "<sha256>  gentic-bun-<target>.tar.gz"
+// checksums.txt tarball lines look like:
+//   "<sha256>  gentic-<version>-<os-arch>.tar.gz"
+// (the file also carries .deb/.rpm/.apk lines, which this regex skips).
+const versionPattern = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const tarballRe = new RegExp(
+  `^([0-9a-f]{64})\\s+gentic-${versionPattern}-(\\S+?)\\.tar\\.gz\\s*$`
+)
 const shas = {}
 for (const line of readFileSync(checksumsPath, "utf8").split("\n")) {
-  const match = line.match(/^([0-9a-f]{64})\s+gentic-bun-(\S+?)\.tar\.gz\s*$/)
+  const match = line.match(tarballRe)
   if (match) shas[match[2]] = match[1]
 }
 
@@ -53,7 +59,7 @@ for (const [target, key] of Object.entries(targets)) {
   const sha = shas[target]
   if (!sha) {
     console.error(
-      `error: no checksum for gentic-bun-${target}.tar.gz in ${checksumsPath}`
+      `error: no checksum for gentic-${version}-${target}.tar.gz in ${checksumsPath}`
     )
     process.exit(1)
   }
