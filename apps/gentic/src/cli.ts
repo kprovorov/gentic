@@ -4,6 +4,7 @@ import { Command } from "commander"
 
 import packageJson from "../package.json" with { type: "json" }
 import { registerAuthCommand } from "./commands/auth.js"
+import { registerLogsCommand } from "./commands/logs.js"
 import { registerRunCommand } from "./commands/run.js"
 import { registerServiceCommands } from "./commands/service.js"
 import { registerStatusCommand } from "./commands/status.js"
@@ -21,6 +22,7 @@ program
   .version(packageJson.version ?? "0.0.0")
 
 registerAuthCommand(program)
+registerLogsCommand(program)
 registerRunCommand(program)
 registerServiceCommands(program)
 registerStatusCommand(program)
