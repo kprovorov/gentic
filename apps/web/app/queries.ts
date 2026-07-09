@@ -8,7 +8,7 @@ import * as projectsService from "@gentic/services/projects"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[id]/attachments"
-import type { ChatMessage, RunStatus } from "./issues/[id]/issue-chat"
+import type { ChatMessage } from "./issues/[id]/issue-chat"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
@@ -16,7 +16,9 @@ const ATTACHMENT_THUMBNAIL_SIZE = 96
 
 export type IssueStatus =
   | "draft"
-  | "todo"
+  | "queued"
+  | "held"
+  | "cloning"
   | "in-progress"
   | "waiting-for-input"
   | "testing"
@@ -28,6 +30,7 @@ export type IssueStatus =
   | "deploying"
   | "deploy-failed"
   | "validating"
+  | "run-failed"
   | "completed"
   | "cancelled"
 
@@ -64,7 +67,6 @@ export type IssueDetail = {
   agent_provider: "claude_code" | "codex"
   type: IssueType
   status: IssueStatus
-  run_status: RunStatus
   usage_limit_reset_at: string | null
   pr_url: string | null
   created_at: string
@@ -170,7 +172,7 @@ export async function getIssueDetailData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,agent_provider,type,status,run_status,usage_limit_reset_at,pr_url,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,agent_provider,type,status,usage_limit_reset_at,pr_url,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()

@@ -20,14 +20,13 @@ export interface MessageUpdateFields {
 }
 
 export interface RunStateFields {
-  run_status?:
-    | "queued"
-    | "held"
+  status?:
     | "cloning"
-    | "running"
-    | "completed"
-    | "failed"
-    | "cancelled"
+    | "in-progress"
+    | "held"
+    | "run-failed"
+    | "ready-for-review"
+    | "waiting-for-input"
   session_id?: string | null
   run_error?: string | null
   run_started_at?: string | null

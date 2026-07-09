@@ -14,7 +14,9 @@ import {
 
 type IssueStatus =
   | "draft"
-  | "todo"
+  | "queued"
+  | "held"
+  | "cloning"
   | "in-progress"
   | "waiting-for-input"
   | "testing"
@@ -26,12 +28,15 @@ type IssueStatus =
   | "deploying"
   | "deploy-failed"
   | "validating"
+  | "run-failed"
   | "completed"
   | "cancelled"
 
 const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
-  { value: "todo", label: "Todo" },
+  { value: "queued", label: "Queued" },
+  { value: "held", label: "On hold" },
+  { value: "cloning", label: "Cloning repo" },
   { value: "in-progress", label: "In progress" },
   { value: "waiting-for-input", label: "Waiting for input" },
   { value: "testing", label: "Testing" },
@@ -43,6 +48,7 @@ const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "deploying", label: "Deploying" },
   { value: "deploy-failed", label: "Deploy failed" },
   { value: "validating", label: "Validating" },
+  { value: "run-failed", label: "Run failed" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ]

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
+  IconAlertCircle,
   IconAlertOctagon,
   IconAlertTriangle,
   IconArrowLeft,
@@ -13,6 +14,7 @@ import {
   IconCircleDashed,
   IconCircleX,
   IconClock,
+  IconDownload,
   IconExternalLink,
   IconEye,
   IconFlask,
@@ -22,6 +24,7 @@ import {
   IconMessage2,
   IconMessageQuestion,
   IconPencil,
+  IconPlayerPause,
   IconRobot,
   IconRocket,
   IconShieldCheck,
@@ -55,7 +58,9 @@ import { IssueStatusSelect } from "./issue-status-select"
 
 const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
-  todo: "Todo",
+  queued: "Queued",
+  held: "On hold",
+  cloning: "Cloning repo",
   "in-progress": "In progress",
   "waiting-for-input": "Waiting for input",
   testing: "Testing",
@@ -67,13 +72,16 @@ const statusLabels: Record<IssueStatus, string> = {
   deploying: "Deploying",
   "deploy-failed": "Deploy failed",
   validating: "Validating",
+  "run-failed": "Run failed",
   completed: "Completed",
   cancelled: "Cancelled",
 }
 
 const statusStyles: Record<IssueStatus, string> = {
   draft: "bg-muted/60 text-muted-foreground",
-  todo: "bg-muted text-muted-foreground",
+  queued: "bg-muted text-muted-foreground",
+  held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  cloning: "bg-primary/15 text-primary-foreground",
   "in-progress": "bg-primary/15 text-primary-foreground",
   "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
@@ -85,13 +93,16 @@ const statusStyles: Record<IssueStatus, string> = {
   deploying: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   "deploy-failed": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   validating: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+  "run-failed": "bg-destructive/15 text-destructive",
   completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   cancelled: "bg-muted text-muted-foreground",
 }
 
 const statusIcons = {
   draft: IconPencil,
-  todo: IconCircleDashed,
+  queued: IconCircleDashed,
+  held: IconPlayerPause,
+  cloning: IconDownload,
   "in-progress": IconClock,
   "waiting-for-input": IconMessageQuestion,
   testing: IconFlask,
@@ -103,6 +114,7 @@ const statusIcons = {
   deploying: IconRocket,
   "deploy-failed": IconAlertOctagon,
   validating: IconShieldCheck,
+  "run-failed": IconAlertCircle,
   completed: IconCircleCheck,
   cancelled: IconCircleX,
 }
@@ -294,7 +306,7 @@ export function IssueDetailView({
                   <CardTitle>Agent activity</CardTitle>
                   <CardDescription>
                     {agentProviderLabels[issue.agent_provider]} will run this
-                    issue when it moves to Todo.
+                    issue when it moves to Queued.
                   </CardDescription>
                 </div>
                 <IssueResetAgentButton issueId={issue.id} />
@@ -303,7 +315,7 @@ export function IssueDetailView({
                 <IssueChat
                   issueId={issue.id}
                   initialMessages={messages}
-                  initialRunStatus={issue.run_status}
+                  initialStatus={issue.status}
                   initialUsageLimitResetAt={issue.usage_limit_reset_at}
                   initialPrUrl={issue.pr_url}
                 />
