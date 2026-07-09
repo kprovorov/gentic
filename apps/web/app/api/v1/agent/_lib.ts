@@ -138,11 +138,11 @@ export class ApiError extends Error {
   }
 }
 
-// TEMPORARY: hard-coded special API key for testing. Bypasses Clerk verification
-// entirely and authenticates as a fixed user. Remove before shipping.
-const SPECIAL_TEST_API_KEY =
-  "sk_test_special_daa5a240828072a93c14d91dc0c524d58f1227cbb8e7ee0a"
-const SPECIAL_TEST_USER_ID = "user_3G0FELxFD7i8MpytFENs1TN1h4c"
+// TEMPORARY: special API key for testing. Bypasses Clerk verification entirely
+// and authenticates as a fixed user. Only active when both env vars are set, so
+// it stays disabled anywhere they aren't configured. Remove before shipping.
+const SPECIAL_TEST_API_KEY = process.env.SPECIAL_TEST_API_KEY
+const SPECIAL_TEST_USER_ID = process.env.SPECIAL_TEST_USER_ID
 
 async function authenticateApiKey(request: Request): Promise<string> {
   const authorization = request.headers.get("authorization")
@@ -153,7 +153,11 @@ async function authenticateApiKey(request: Request): Promise<string> {
   }
 
   // TEMPORARY testing bypass — see note above.
-  if (token === SPECIAL_TEST_API_KEY) {
+  if (
+    SPECIAL_TEST_API_KEY &&
+    SPECIAL_TEST_USER_ID &&
+    token === SPECIAL_TEST_API_KEY
+  ) {
     return SPECIAL_TEST_USER_ID
   }
 
