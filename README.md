@@ -34,6 +34,10 @@ pnpm lint
 pnpm typecheck
 ```
 
+## Product specs
+
+- [Search, filters, and saved views](docs/search-filters-saved-views.md)
+
 ## Supabase configuration
 
 Password reset emails (`/forgot-password`) link back to `/auth/confirm`,
