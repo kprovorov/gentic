@@ -154,7 +154,9 @@ export function NewIssueView({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="queued">Queued</SelectItem>
+                      <SelectItem value="held">On hold</SelectItem>
+                      <SelectItem value="cloning">Cloning repo</SelectItem>
                       <SelectItem value="in-progress">In progress</SelectItem>
                       <SelectItem value="waiting-for-input">
                         Waiting for input
@@ -174,6 +176,7 @@ export function NewIssueView({
                         Deploy failed
                       </SelectItem>
                       <SelectItem value="validating">Validating</SelectItem>
+                      <SelectItem value="run-failed">Run failed</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>

@@ -31,7 +31,7 @@ export async function runWorker(): Promise<void> {
     let issue: ClaimedIssue | null = null
     try {
       // Atomically claims the oldest queued issue by flipping it to `cloning`.
-      // The conditional update (`run_status = 'queued'`) makes the claim safe
+      // The conditional update (`status = 'queued'`) makes the claim safe
       // if more than one worker is polling.
       issue = await api.claimNextQueuedIssue()
     } catch (error) {
@@ -72,7 +72,7 @@ async function processIssue(
       await runSetupScript({ script: issue.setupScript, dir })
     }
 
-    await setRunState(api, issue.id, { run_status: "running" })
+    await setRunState(api, issue.id, { status: "in-progress" })
 
     // Built fresh each run: images and text files are embedded directly,
     // everything else downloaded into `attachmentsDir` and referenced by
@@ -132,7 +132,7 @@ async function processIssue(
 
     const prUrl = await getPullRequestUrl(dir)
     await setRunState(api, issue.id, {
-      run_status: "completed",
+      status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
     })
@@ -145,7 +145,7 @@ async function processIssue(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
       await setRunState(api, issue.id, {
-        run_status: "held",
+        status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
         usage_limit_reset_at: usageLimitResetAt,
@@ -157,7 +157,7 @@ async function processIssue(
 
     logError(`issue ${issue.id} failed:`, message)
     await setRunState(api, issue.id, {
-      run_status: "failed",
+      status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
       usage_limit_reset_at: null,

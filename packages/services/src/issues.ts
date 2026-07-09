@@ -294,8 +294,7 @@ export async function resetIssueAgent(
     await supabase
       .from("issues")
       .update({
-        status: "todo",
-        run_status: "queued",
+        status: "queued",
         session_id: null,
         run_error: null,
         run_started_at: null,
@@ -404,18 +403,14 @@ export async function updateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  // Moving an issue from Draft to Todo queues an agent run: the remote
-  // `@gentic/gentic` agent picks up `run_status = 'queued'` issues over
-  // Supabase and drives the issue's selected coding agent against a fresh clone.
-  const startsRun = current.status === "draft" && status === "todo"
+  // Moving an issue from Draft to Queued starts an agent run: the remote
+  // `@gentic/gentic` agent picks up `status = 'queued'` issues over Supabase
+  // and drives the issue's selected coding agent against a fresh clone.
+  const startsRun = current.status === "draft" && status === "queued"
 
   const result = await supabase
     .from("issues")
-    .update(
-      startsRun
-        ? { status, run_status: "queued", usage_limit_reset_at: null }
-        : { status }
-    )
+    .update(startsRun ? { status, usage_limit_reset_at: null } : { status })
     .eq("id", id)
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
@@ -476,16 +471,17 @@ export async function sendIssueMessage(
   )
 
   // A finished run has no worker polling for it anymore. Re-queue so the
-  // `@gentic/gentic` agent picks this follow-up up and resumes the session.
+  // `@gentic/gentic` agent picks this follow-up up and resumes the session,
+  // unless the issue never ran (draft) or a run is already queued/in flight.
   unwrap(
     await supabase
       .from("issues")
       .update({
-        run_status: "queued",
+        status: "queued",
         usage_limit_reset_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", issueId)
-      .in("run_status", ["completed", "failed", "cancelled"])
+      .not("status", "in", "(draft,queued,held,cloning,in-progress)")
   )
 }
