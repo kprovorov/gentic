@@ -26,6 +26,8 @@ import type { AgentApi } from "./api.js"
 
 export type AgentProvider = "claude_code" | "codex"
 
+const MAX_CAPTURED_STDERR_BYTES = 16 * 1024
+
 /** How to launch one ACP agent's child process. */
 interface AgentEntry {
   command: string
@@ -103,11 +105,13 @@ export interface RunSessionInput {
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
   const agent = getAgentProviderConfig(input.agentProvider)
+  const stderr = new AgentStderrBuffer()
   const child = spawn(agent.entry.command, agent.entry.args, {
     cwd: input.cwd,
-    stdio: ["pipe", "pipe", "inherit"],
+    stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, ...agent.env },
   })
+  child.stderr?.on("data", (chunk: Buffer) => stderr.append(chunk))
 
   try {
     const stream = ndJsonStream(
@@ -145,9 +149,39 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         await runTurn(session, input.api, input.issueId, prompt)
       }
     })
+  } catch (error) {
+    throw appendAgentStderr(error, stderr.toString())
   } finally {
     child.kill()
   }
+}
+
+class AgentStderrBuffer {
+  private output = ""
+
+  append(chunk: Buffer): void {
+    const text = chunk.toString("utf8")
+    process.stderr.write(text)
+    this.output = `${this.output}${text}`.slice(-MAX_CAPTURED_STDERR_BYTES)
+  }
+
+  toString(): string {
+    return this.output.trim()
+  }
+}
+
+function appendAgentStderr(error: unknown, stderr: string): Error {
+  if (!stderr) {
+    return error instanceof Error ? error : new Error(String(error))
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+  const next = new Error(`${message}\n\nAgent stderr:\n${stderr}`)
+  next.name = error instanceof Error ? error.name : "Error"
+  if (error instanceof Error && error.stack) {
+    next.stack = `${error.stack}\n\nAgent stderr:\n${stderr}`
+  }
+  return next
 }
 
 interface AgentProviderConfig {
