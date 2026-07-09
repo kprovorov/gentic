@@ -89,7 +89,7 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
   }
 
   return (
-    <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+    <div className="bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2 border-b pb-6">
           <p className="text-sm font-medium text-muted-foreground">Settings</p>
@@ -327,6 +327,6 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

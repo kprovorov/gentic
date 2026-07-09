@@ -1,70 +1,31 @@
-import Link from "next/link"
-import { Show, UserButton } from "@clerk/nextjs"
+"use client"
 
-import { Button } from "@gentic/ui/button"
+import { usePathname } from "next/navigation"
 
-import { MobileNav } from "./mobile-nav"
+import { Separator } from "@gentic/ui/separator"
+import { SidebarTrigger } from "@gentic/ui/sidebar"
 
-const navItems = [
-  { href: "/home", label: "Issues" },
-  { href: "/settings", label: "Projects" },
-]
-
-function Logo() {
-  return (
-    <svg className="size-6" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <g clip-path="url(#clip0_2_36)">
-    <rect width="1024" height="1024" rx="238.933" fill="white"/>
-    <rect width="1024" height="1024" fill="#9AE600"/>
-    <path d="M516.996 845C469.976 845 425.703 836.462 384.179 819.385C343.265 802.308 307.542 778.827 277.01 748.942C246.477 718.448 222.356 683.074 204.647 642.821C187.549 601.959 179 558.047 179 511.085C179 464.124 187.854 420.516 205.563 380.264C223.272 340.011 247.698 304.942 278.842 275.058C310.596 244.563 347.54 221.082 389.675 204.615C431.81 187.538 476.998 179 525.24 179C580.809 179 631.188 189.063 676.376 209.19C722.175 229.316 760.035 257.066 789.957 292.44L691.948 390.327C671.186 363.492 646.759 343.365 618.669 329.948C590.579 316.53 558.826 309.821 523.408 309.821C485.547 309.821 451.656 318.36 421.734 335.437C391.812 351.904 368.302 375.385 351.204 405.879C334.716 435.764 326.472 470.832 326.472 511.085C326.472 551.338 334.716 586.712 351.204 617.206C367.691 647.701 390.286 671.486 418.986 688.563C447.687 705.64 480.662 714.179 517.912 714.179C555.772 714.179 587.832 707.165 614.09 693.137C640.958 678.5 661.415 657.764 675.46 630.929C690.116 603.484 697.444 570.245 697.444 531.212L792.705 595.25L504.172 590.676V469.003H844V490.044C844 567.5 829.955 632.758 801.865 685.819C774.386 738.269 735.915 777.912 686.452 804.747C637.6 831.582 581.114 845 516.996 845Z" fill="#35530E"/>
-    </g>
-    <defs>
-    <clipPath id="clip0_2_36">
-    <rect width="1024" height="1024" rx="238.933" fill="white"/>
-    </clipPath>
-    </defs>
-    </svg>
-  )
+function pageTitle(pathname: string) {
+  if (pathname === "/home") return "Issues"
+  if (pathname === "/settings") return "Projects"
+  if (pathname === "/issues/new") return "New issue"
+  if (/^\/issues\/[^/]+\/edit$/.test(pathname)) return "Edit issue"
+  if (/^\/issues\/[^/]+$/.test(pathname)) return "Issue"
+  return "Gentic"
 }
 
 export function SiteHeader() {
-  return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 md:px-8">
-        <div className="flex items-center gap-6">
-          <Show when="signed-in">
-            <MobileNav navItems={navItems} />
-          </Show>
-          <Link href="/" className="flex items-center gap-2">
-            <Logo />
-            <span className="font-heading text-base font-semibold tracking-tight">
-              Gentic
-            </span>
-          </Link>
-          <Show when="signed-in">
-            <nav className="hidden items-center gap-1 sm:flex">
-              {navItems.map((item) => (
-                <Button key={item.href} asChild variant="ghost" size="sm">
-                  <Link href={item.href}>{item.label}</Link>
-                </Button>
-              ))}
-            </nav>
-          </Show>
-        </div>
+  const pathname = usePathname()
 
-        <div className="flex items-center gap-2">
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
-          <Show when="signed-out">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/register">Sign up</Link>
-            </Button>
-          </Show>
-        </div>
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
+      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mx-2 data-[orientation=vertical]:h-4"
+        />
+        <h1 className="text-base font-medium">{pageTitle(pathname)}</h1>
       </div>
     </header>
   )
