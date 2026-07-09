@@ -27,6 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@gentic/ui/card"
+import { Checkbox } from "@gentic/ui/checkbox"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
 import { Textarea } from "@gentic/ui/textarea"
@@ -207,6 +208,19 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                     className="font-mono"
                   />
                 </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="project-auto-respond"
+                    name="auto_respond_to_reviews"
+                    defaultChecked
+                  />
+                  <Label
+                    htmlFor="project-auto-respond"
+                    className="font-normal"
+                  >
+                    Auto-respond to review feedback
+                  </Label>
+                </div>
                 <Button
                   type="submit"
                   className="mt-2"
@@ -272,6 +286,19 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                           rows={4}
                           className="font-mono"
                         />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`auto-respond-${project.id}`}
+                          name="auto_respond_to_reviews"
+                          defaultChecked={project.auto_respond_to_reviews}
+                        />
+                        <Label
+                          htmlFor={`auto-respond-${project.id}`}
+                          className="font-normal"
+                        >
+                          Auto-respond to review feedback
+                        </Label>
                       </div>
                       <div className="flex gap-2">
                         <Button

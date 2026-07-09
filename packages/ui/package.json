@@ -6,6 +6,7 @@
   "exports": {
     "./button": "./src/ui/button.tsx",
     "./card": "./src/ui/card.tsx",
+    "./checkbox": "./src/ui/checkbox.tsx",
     "./form": "./src/ui/form.tsx",
     "./input": "./src/ui/input.tsx",
     "./label": "./src/ui/label.tsx",

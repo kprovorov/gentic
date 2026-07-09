@@ -54,6 +54,7 @@ export type ProjectOption = {
 
 export type SettingsProject = ProjectOption & {
   setup_script: string | null
+  auto_respond_to_reviews: boolean
 }
 
 export type IssueDetail = {
