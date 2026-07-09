@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { IconExternalLink, IconGitPullRequest, IconSend } from "@tabler/icons-react"
+import {
+  IconExternalLink,
+  IconGitPullRequest,
+  IconSend,
+} from "@tabler/icons-react"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
@@ -22,6 +26,7 @@ export type ChatMessage = {
 
 export type RunStatus =
   | "queued"
+  | "held"
   | "cloning"
   | "running"
   | "completed"
@@ -31,6 +36,7 @@ export type RunStatus =
 
 const runStatusLabels: Record<NonNullable<RunStatus>, string> = {
   queued: "Queued",
+  held: "On hold",
   cloning: "Cloning repo",
   running: "Agent running",
   completed: "Completed",
@@ -40,6 +46,7 @@ const runStatusLabels: Record<NonNullable<RunStatus>, string> = {
 
 const runStatusStyles: Record<NonNullable<RunStatus>, string> = {
   queued: "bg-muted text-muted-foreground",
+  held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   cloning: "bg-primary/15 text-primary-foreground",
   running: "bg-primary/15 text-primary-foreground",
   completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -63,15 +70,20 @@ export function IssueChat({
   issueId,
   initialMessages,
   initialRunStatus,
+  initialUsageLimitResetAt,
   initialPrUrl,
 }: {
   issueId: string
   initialMessages: ChatMessage[]
   initialRunStatus: RunStatus
+  initialUsageLimitResetAt: string | null
   initialPrUrl: string | null
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [runStatus, setRunStatus] = useState<RunStatus>(initialRunStatus)
+  const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
+    initialUsageLimitResetAt
+  )
   const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
   const [draft, setDraft] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -118,8 +130,13 @@ export function IssueChat({
           filter: `id=eq.${issueId}`,
         },
         (payload) => {
-          const next = payload.new as { run_status: RunStatus; pr_url: string | null }
+          const next = payload.new as {
+            run_status: RunStatus
+            usage_limit_reset_at: string | null
+            pr_url: string | null
+          }
           setRunStatus(next.run_status)
+          setUsageLimitResetAt(next.usage_limit_reset_at)
           setPrUrl(next.pr_url)
         }
       )
@@ -160,6 +177,11 @@ export function IssueChat({
               )}
             >
               {runStatusLabels[runStatus]}
+            </div>
+          ) : null}
+          {usageLimitResetAt && runStatus === "held" ? (
+            <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+              Resets {formatDateTime(usageLimitResetAt)}
             </div>
           ) : null}
           {prUrl ? (
@@ -216,6 +238,13 @@ export function IssueChat({
       </form>
     </div>
   )
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value))
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {

@@ -22,6 +22,7 @@ export interface MessageUpdateFields {
 export interface RunStateFields {
   run_status?:
     | "queued"
+    | "held"
     | "cloning"
     | "running"
     | "completed"
@@ -31,6 +32,7 @@ export interface RunStateFields {
   run_error?: string | null
   run_started_at?: string | null
   run_finished_at?: string | null
+  usage_limit_reset_at?: string | null
   pr_url?: string | null
 }
 

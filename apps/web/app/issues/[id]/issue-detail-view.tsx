@@ -304,6 +304,7 @@ export function IssueDetailView({
                   issueId={issue.id}
                   initialMessages={messages}
                   initialRunStatus={issue.run_status}
+                  initialUsageLimitResetAt={issue.usage_limit_reset_at}
                   initialPrUrl={issue.pr_url}
                 />
               </CardContent>
