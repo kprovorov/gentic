@@ -2,6 +2,8 @@ import type { Command } from "commander"
 
 import { getServiceBackend } from "../service/index.js"
 import type { ServiceScope, ServiceStatus } from "../service/index.js"
+import { formatToolStatus, getToolStatuses } from "../tools.js"
+import type { ToolStatuses } from "../tools.js"
 import { log, note } from "../ui.js"
 import { getAuthState } from "./auth.js"
 
@@ -26,6 +28,22 @@ function formatUptime(since: Date): string {
   if (hours > 0) return `${hours}h ${minutes}m`
   if (minutes > 0) return `${minutes}m ${seconds}s`
   return `${seconds}s`
+}
+
+function toolsJson(tools: ToolStatuses) {
+  return {
+    github: tools.github,
+    claude: tools.claude,
+    codex: tools.codex,
+  }
+}
+
+function formatToolLines(tools: ToolStatuses): string[] {
+  return [
+    `GitHub CLI: ${formatToolStatus(tools.github)}`,
+    `Claude:     ${formatToolStatus(tools.claude)}`,
+    `Codex:      ${formatToolStatus(tools.codex)}`,
+  ]
 }
 
 function formatServiceLine(
@@ -57,13 +75,17 @@ export function registerStatusCommand(program: Command): void {
 
 async function status(opts: StatusOptions): Promise<void> {
   const auth = getAuthState()
+  const tools = await getToolStatuses()
 
   if (!auth.authenticated) {
     if (opts.json) {
-      console.log(JSON.stringify({ auth: "not-configured" }))
+      console.log(
+        JSON.stringify({ auth: "not-configured", tools: toolsJson(tools) })
+      )
       return
     }
     log.warn('Auth: not configured — run "gentic auth login"')
+    note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
 
@@ -87,11 +109,13 @@ async function status(opts: StatusOptions): Promise<void> {
           apiUrl: auth.apiUrl,
           maskedApiKey: auth.maskedApiKey,
           serviceError: describe(error),
+          tools: toolsJson(tools),
         })
       )
       return
     }
     log.warn(`Service: unable to determine status (${describe(error)})`)
+    note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
 
@@ -117,6 +141,7 @@ async function status(opts: StatusOptions): Promise<void> {
           : undefined,
         bootEnabled,
         lastRun,
+        tools: toolsJson(tools),
       })
     )
     return
@@ -128,6 +153,7 @@ async function status(opts: StatusOptions): Promise<void> {
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,
       `Last run: ${lastRun}`,
+      ...formatToolLines(tools),
     ].join("\n"),
     "gentic status"
   )
