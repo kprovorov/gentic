@@ -1,0 +1,29 @@
+# nfpm config for the gentic worker Linux packages (.deb/.rpm/.apk), built by
+# the `build` job in .github/workflows/release.yml. Expects these env vars:
+#   VERSION   release version, e.g. 0.4.2
+#   PKG_ARCH  nfpm arch: amd64 | arm64
+#   STAGE     dir holding the compiled `gentic` binary + `vendor/` sidecars,
+#             i.e. apps/gentic/dist/<os-arch> from build-binary.sh
+#
+# Layout mirrors the Homebrew keg: everything lands in /usr/lib/gentic so the
+# ACP sidecars stay next to the binary (src/session.ts resolves them via
+# dirname(process.execPath)/vendor), and /usr/bin/gentic is a symlink onto it
+# (process.execPath resolves through the symlink to the real file).
+name: gentic
+arch: ${PKG_ARCH}
+platform: linux
+version: ${VERSION}
+maintainer: "Kirill Provorov <kirill@provorov.dev>"
+description: |
+  Gentic agent: runs Claude Code or Codex over ACP for queued issues.
+vendor: "Gentic"
+homepage: "https://github.com/kprovorov/gentic"
+license: "MIT"
+contents:
+  - src: ${STAGE}/gentic
+    dst: /usr/lib/gentic/gentic
+  - src: ${STAGE}/vendor
+    dst: /usr/lib/gentic/vendor
+  - src: /usr/lib/gentic/gentic
+    dst: /usr/bin/gentic
+    type: symlink

@@ -177,19 +177,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `bun_target` is the triple `bun build --compile` needs; `asset` is the
+          # OS/arch slug baked into the published filenames (no "bun" prefix).
           # Native claude CLI sidecar vendoring (scripts/resolve-native-claude.mjs)
           # only finds the optionalDependency pnpm installed for the *host*
           # running `pnpm install`, so each target builds on a runner that
           # actually matches its OS/arch rather than cross-compiling.
-          - target: bun-linux-x64
+          - bun_target: bun-linux-x64
+            asset: linux-x64
             runner: ubuntu-latest
-          - target: bun-linux-arm64
+            pkg_arch: amd64
+          - bun_target: bun-linux-arm64
+            asset: linux-arm64
             runner: ubuntu-24.04-arm
-          - target: bun-darwin-x64
+            pkg_arch: arm64
+          - bun_target: bun-darwin-x64
+            asset: darwin-x64
             runner: macos-15-intel
-          - target: bun-darwin-arm64
+          - bun_target: bun-darwin-arm64
+            asset: darwin-arm64
             runner: macos-15
     runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -208,22 +218,61 @@ jobs:
 
       - name: Build standalone binary
         working-directory: apps/gentic
-        run: ./scripts/build-binary.sh ${{ matrix.target }} dist/${{ matrix.target }}
+        run: ./scripts/build-binary.sh ${{ matrix.bun_target }} dist/${{ matrix.asset }}
 
       - name: Archive
-        working-directory: apps/gentic/dist/${{ matrix.target }}
-        run: tar -czf ../../gentic-${{ matrix.target }}.tar.gz .
+        working-directory: apps/gentic/dist/${{ matrix.asset }}
+        run: tar -czf "../../gentic-${VERSION}-${{ matrix.asset }}.tar.gz" .
+
+      # Linux-only: build .deb/.rpm/.apk from the compiled binary + vendored
+      # sidecars using nfpm. The layout mirrors the Homebrew keg — everything
+      # lands in /usr/lib/gentic so dirname(execPath)/vendor still resolves —
+      # with /usr/bin/gentic a symlink onto it (process.execPath follows it).
+      - name: Set up Go (nfpm)
+        if: matrix.pkg_arch != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Install nfpm
+        if: matrix.pkg_arch != ''
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.35.0
+
+      - name: Build Linux packages
+        if: matrix.pkg_arch != ''
+        working-directory: apps/gentic
+        env:
+          STAGE: dist/${{ matrix.asset }}
+          PKG_ARCH: ${{ matrix.pkg_arch }}
+        run: |
+          for packager in deb rpm apk; do
+            "$(go env GOPATH)/bin/nfpm" package \
+              --config packaging/nfpm.yaml \
+              --packager "$packager" \
+              --target "gentic-${VERSION}-${{ matrix.asset }}.${packager}"
+          done
 
       - name: Checksum
         working-directory: apps/gentic
-        run: shasum -a 256 gentic-${{ matrix.target }}.tar.gz > gentic-${{ matrix.target }}.tar.gz.sha256
+        run: |
+          for f in gentic-"${VERSION}"-${{ matrix.asset }}.*; do
+            case "$f" in *.sha256) continue ;; esac
+            shasum -a 256 "$f"
+          done > "gentic-${VERSION}-${{ matrix.asset }}.sha256"
+          cat "gentic-${VERSION}-${{ matrix.asset }}.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: gentic-${{ matrix.target }}
+          name: gentic-${{ matrix.asset }}
+          # Packages only exist for the linux assets; darwin uploads just the
+          # tarball + checksum, so a missing .deb/.rpm/.apk must not fail.
+          if-no-files-found: warn
           path: |
-            apps/gentic/gentic-${{ matrix.target }}.tar.gz
-            apps/gentic/gentic-${{ matrix.target }}.tar.gz.sha256
+            apps/gentic/gentic-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}.tar.gz
+            apps/gentic/gentic-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}.deb
+            apps/gentic/gentic-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}.rpm
+            apps/gentic/gentic-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}.apk
+            apps/gentic/gentic-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}.sha256
 
   release:
     needs:
@@ -247,7 +296,9 @@ jobs:
       - name: Stage release assets
         run: |
           mkdir -p release-assets
-          find artifacts -name '*.tar.gz' -exec cp {} release-assets/ \;
+          find artifacts \
+            \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' -o -name '*.apk' \) \
+            -exec cp {} release-assets/ \;
           find artifacts -name '*.sha256' -exec cat {} + > release-assets/checksums.txt
           cp artifacts/release-notes/changelog.md release-assets/changelog.md
           ls -la release-assets
@@ -273,6 +324,9 @@ jobs:
             --title "$TAG" \
             --notes-file release-assets/changelog.md \
             release-assets/*.tar.gz \
+            release-assets/*.deb \
+            release-assets/*.rpm \
+            release-assets/*.apk \
             release-assets/checksums.txt
 
   homebrew:
