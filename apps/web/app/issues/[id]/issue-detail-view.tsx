@@ -203,7 +203,7 @@ export function IssueDetailView({
   )
 
   return (
-    <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+    <div className="bg-background px-4 py-8 md:px-8">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={["issues", "issue_relations", "attachments", "messages"]}
@@ -422,6 +422,6 @@ export function IssueDetailView({
           </aside>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

@@ -1,12 +1,16 @@
 import type { Metadata } from "next"
 import { Geist_Mono, Inter, Outfit } from "next/font/google"
-import { ClerkProvider } from "@clerk/nextjs"
+import { ClerkProvider, Show } from "@clerk/nextjs"
 
 import "./globals.css"
 import { Providers } from "./providers"
+import { AppSidebar } from "@/components/app-sidebar"
+import { PublicHeader } from "@/components/public-header"
 import { SiteHeader } from "@/components/site-header"
+import { SidebarInset, SidebarProvider } from "@gentic/ui/sidebar"
 import { ThemeProvider } from "@gentic/ui/theme-provider"
 import { Toaster } from "@gentic/ui/sonner"
+import { TooltipProvider } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
 
 export const metadata: Metadata = {
@@ -54,11 +58,24 @@ export default function RootLayout({
       >
         <body>
           <ThemeProvider>
-            <Providers>
-              <SiteHeader />
-              {children}
-            </Providers>
-            <Toaster />
+            <TooltipProvider>
+              <Providers>
+                <Show when="signed-in">
+                  <SidebarProvider>
+                    <AppSidebar variant="inset" />
+                    <SidebarInset>
+                      <SiteHeader />
+                      {children}
+                    </SidebarInset>
+                  </SidebarProvider>
+                </Show>
+                <Show when="signed-out">
+                  <PublicHeader />
+                  {children}
+                </Show>
+              </Providers>
+              <Toaster />
+            </TooltipProvider>
           </ThemeProvider>
         </body>
       </html>

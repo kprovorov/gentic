@@ -185,7 +185,7 @@ export function HomeView({ initialData }: { initialData: HomeData }) {
     .filter((group) => group.issues.length > 0)
 
   return (
-    <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+    <div className="bg-background px-4 py-8 md:px-8">
       <RealtimeRefresh
         channelName="home-issues"
         tables={["issues", "issue_relations"]}
@@ -353,6 +353,6 @@ export function HomeView({ initialData }: { initialData: HomeData }) {
           </section>
         )}
       </div>
-    </main>
+    </div>
   )
 }
