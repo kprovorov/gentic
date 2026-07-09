@@ -13,6 +13,7 @@ import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 
 import { sendIssueMessage } from "@/app/issues/actions"
+import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
 export type ChatMessage = {
@@ -66,18 +67,48 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
   return next
 }
 
+function mergePullRequest(
+  list: IssuePullRequest[],
+  incoming: IssuePullRequest
+) {
+  if (list.some((pullRequest) => pullRequest.id === incoming.id)) {
+    return list.map((pullRequest) =>
+      pullRequest.id === incoming.id ? incoming : pullRequest
+    )
+  }
+
+  return [incoming, ...list].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  )
+}
+
+function formatPullRequestLabel(url: string) {
+  try {
+    const [, owner, repo, , number] = new URL(url).pathname.split("/")
+    if (owner && repo && number) {
+      return `${owner}/${repo}#${number}`
+    }
+  } catch {
+    // Fall back to a generic label for malformed historical data.
+  }
+
+  return "Pull request"
+}
+
 export function IssueChat({
   issueId,
   initialMessages,
   initialRunStatus,
   initialUsageLimitResetAt,
   initialPrUrl,
+  initialPullRequests,
 }: {
   issueId: string
   initialMessages: ChatMessage[]
   initialRunStatus: RunStatus
   initialUsageLimitResetAt: string | null
   initialPrUrl: string | null
+  initialPullRequests: IssuePullRequest[]
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [runStatus, setRunStatus] = useState<RunStatus>(initialRunStatus)
@@ -85,6 +116,8 @@ export function IssueChat({
     initialUsageLimitResetAt
   )
   const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
+  const [pullRequests, setPullRequests] =
+    useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
@@ -140,6 +173,27 @@ export function IssueChat({
           setPrUrl(next.pr_url)
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "issue_pull_requests",
+          filter: `issue_id=eq.${issueId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const removed = payload.old as { id: string }
+            setPullRequests((current) =>
+              current.filter((pullRequest) => pullRequest.id !== removed.id)
+            )
+            return
+          }
+          setPullRequests((current) =>
+            mergePullRequest(current, payload.new as IssuePullRequest)
+          )
+        }
+      )
       .subscribe()
 
     return () => {
@@ -167,7 +221,7 @@ export function IssueChat({
 
   return (
     <div className="flex flex-col gap-4">
-      {runStatus || prUrl ? (
+      {runStatus || prUrl || pullRequests.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {runStatus ? (
             <div
@@ -184,7 +238,20 @@ export function IssueChat({
               Resets {formatDateTime(usageLimitResetAt)}
             </div>
           ) : null}
-          {prUrl ? (
+          {pullRequests.map((pullRequest) => (
+            <a
+              key={pullRequest.id}
+              href={pullRequest.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+            >
+              <IconGitPullRequest className="size-3.5" />
+              {formatPullRequestLabel(pullRequest.url)}
+              <IconExternalLink className="size-3.5" />
+            </a>
+          ))}
+          {prUrl && pullRequests.length === 0 ? (
             <a
               href={prUrl}
               target="_blank"
@@ -192,7 +259,7 @@ export function IssueChat({
               className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
             >
               <IconGitPullRequest className="size-3.5" />
-              Pull request
+              {formatPullRequestLabel(prUrl)}
               <IconExternalLink className="size-3.5" />
             </a>
           ) : null}

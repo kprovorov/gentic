@@ -146,6 +146,19 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
+function formatPullRequestLabel(url: string) {
+  try {
+    const [, owner, repo, , number] = new URL(url).pathname.split("/")
+    if (owner && repo && number) {
+      return `${owner}/${repo}#${number}`
+    }
+  } catch {
+    // Fall back to a generic label for malformed historical data.
+  }
+
+  return "Pull request"
+}
+
 function DetailRow({
   icon: Icon,
   label,
@@ -180,9 +193,29 @@ export function IssueDetailView({
     queryFn: () => getIssueDetailData(issueId),
     initialData,
   })
-  const { issue, messages, attachments, relations, relationCandidates } = data
+  const {
+    issue,
+    messages,
+    attachments,
+    pullRequests,
+    relations,
+    relationCandidates,
+  } = data
   const StatusIcon = statusIcons[issue.status]
   const TypeIcon = issueTypeIcons[issue.type]
+  const displayedPullRequests =
+    pullRequests.length > 0
+      ? pullRequests
+      : issue.pr_url
+        ? [
+            {
+              id: "legacy-pr-url",
+              issue_id: issue.id,
+              url: issue.pr_url,
+              created_at: issue.updated_at,
+            },
+          ]
+        : []
   const isBlocked = relations.some(
     (relation) =>
       relation.target_issue_id === issue.id &&
@@ -194,7 +227,13 @@ export function IssueDetailView({
     <main className="min-h-svh bg-background px-4 py-8 md:px-8">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
-        tables={["issues", "issue_relations", "attachments", "messages"]}
+        tables={[
+          "issues",
+          "issue_pull_requests",
+          "issue_relations",
+          "attachments",
+          "messages",
+        ]}
         queryKey={queryKeys.issue(issue.id)}
       />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
@@ -207,14 +246,18 @@ export function IssueDetailView({
               </Link>
             </Button>
             <div className="flex flex-wrap items-center gap-2">
-              {issue.pr_url ? (
-                <Button asChild variant="outline">
-                  <Link href={issue.pr_url} target="_blank" rel="noreferrer">
+              {displayedPullRequests.map((pullRequest) => (
+                <Button key={pullRequest.id} asChild variant="outline">
+                  <Link
+                    href={pullRequest.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     <IconExternalLink />
-                    Pull request
+                    {formatPullRequestLabel(pullRequest.url)}
                   </Link>
                 </Button>
-              ) : null}
+              ))}
               <Button asChild variant="outline">
                 <Link href={`/issues/${issue.id}/edit`}>
                   <IconPencil />
@@ -306,6 +349,7 @@ export function IssueDetailView({
                   initialRunStatus={issue.run_status}
                   initialUsageLimitResetAt={issue.usage_limit_reset_at}
                   initialPrUrl={issue.pr_url}
+                  initialPullRequests={pullRequests}
                 />
               </CardContent>
             </Card>

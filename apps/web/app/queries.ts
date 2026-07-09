@@ -71,6 +71,8 @@ export type IssueDetail = {
   projects: ProjectOption | null
 }
 
+export type IssuePullRequest = issuesService.IssuePullRequest
+
 export type IssueEdit = Pick<
   IssueDetail,
   "id" | "title" | "prompt" | "agent_provider" | "type"
@@ -91,6 +93,7 @@ export type IssueDetailData = {
   issue: IssueDetail
   messages: ChatMessage[]
   attachments: Attachment[]
+  pullRequests: IssuePullRequest[]
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
 }
@@ -186,6 +189,7 @@ export async function getIssueDetailData(
   const [
     { data: messages, error: messagesError },
     { data: attachmentRows, error: attachmentsError },
+    pullRequests,
     relations,
     relationCandidates,
   ] = await Promise.all([
@@ -209,6 +213,7 @@ export async function getIssueDetailData(
           storage_path: string
         }>
       >(),
+    issuesService.listIssuePullRequests(supabase, userId, id),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
   ])
@@ -258,6 +263,7 @@ export async function getIssueDetailData(
     issue,
     messages: messages ?? [],
     attachments,
+    pullRequests,
     relations,
     relationCandidates,
   }
