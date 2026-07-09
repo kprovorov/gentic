@@ -300,6 +300,7 @@ export async function resetIssueAgent(
         run_error: null,
         run_started_at: null,
         run_finished_at: null,
+        usage_limit_reset_at: null,
         pr_url: null,
         updated_at: now,
       })
@@ -410,7 +411,11 @@ export async function updateIssueStatus(
 
   const result = await supabase
     .from("issues")
-    .update(startsRun ? { status, run_status: "queued" } : { status })
+    .update(
+      startsRun
+        ? { status, run_status: "queued", usage_limit_reset_at: null }
+        : { status }
+    )
     .eq("id", id)
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
@@ -475,7 +480,11 @@ export async function sendIssueMessage(
   unwrap(
     await supabase
       .from("issues")
-      .update({ run_status: "queued", updated_at: new Date().toISOString() })
+      .update({
+        run_status: "queued",
+        usage_limit_reset_at: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", issueId)
       .in("run_status", ["completed", "failed", "cancelled"])
   )

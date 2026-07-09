@@ -9,6 +9,7 @@ import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import { runAgentSession, type PromptTurn } from "./session.js"
+import { getUsageLimitResetAt } from "./usage-limits.js"
 
 export async function runWorker(): Promise<void> {
   const config = loadConfig()
@@ -138,11 +139,28 @@ async function processIssue(
     logInfo(`issue ${issue.id} completed`)
   } catch (error) {
     const message = describe(error)
+    const usageLimitResetAt = getUsageLimitResetAt(error)
+    if (usageLimitResetAt) {
+      logInfo(
+        `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
+      )
+      await setRunState(api, issue.id, {
+        run_status: "held",
+        run_error: message,
+        run_finished_at: new Date().toISOString(),
+        usage_limit_reset_at: usageLimitResetAt,
+      }).catch((updateError) => {
+        logError("failed to record usage-limit hold:", describe(updateError))
+      })
+      return
+    }
+
     logError(`issue ${issue.id} failed:`, message)
     await setRunState(api, issue.id, {
       run_status: "failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
+      usage_limit_reset_at: null,
     }).catch((updateError) => {
       logError("failed to record run failure:", describe(updateError))
     })

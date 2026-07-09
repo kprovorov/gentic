@@ -31,13 +31,20 @@ export async function POST(request: Request) {
 }
 
 async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
+  const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
-    .eq("run_status", "queued")
+    .or(
+      `run_status.eq.queued,and(run_status.eq.held,usage_limit_reset_at.lte.${now})`
+    )
     .eq("projects.user_id", userId)
     .eq("unfinished_blockers.type", "blocks")
-    .not("unfinished_blockers.source_issue.status", "in", "(completed,cancelled)")
+    .not(
+      "unfinished_blockers.source_issue.status",
+      "in",
+      "(completed,cancelled)"
+    )
     .is("unfinished_blockers", null)
     .order("updated_at", { ascending: true })
     .limit(1)
@@ -52,7 +59,6 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   }
 
   const { id } = candidate
-  const now = new Date().toISOString()
   const { data: claimed, error: claimError } = await supabase
     .from("issues")
     .update({
@@ -61,10 +67,11 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
       run_started_at: now,
       run_error: null,
       run_finished_at: null,
+      usage_limit_reset_at: null,
       updated_at: now,
     })
     .eq("id", id)
-    .eq("run_status", "queued")
+    .in("run_status", ["queued", "held"])
     .select("id")
     .maybeSingle()
 
