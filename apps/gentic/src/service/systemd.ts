@@ -41,16 +41,37 @@ export class SystemdBackend implements ServiceBackend {
     return this.scope === "system" ? [] : ["--user"]
   }
 
+  // `systemctl --user` locates the per-user bus via XDG_RUNTIME_DIR
+  // (/run/user/<uid>/bus). That variable is often absent in SSH and other
+  // non-login shells, which makes systemctl fail with "Failed to connect to
+  // bus: No medium found". Default it to the standard runtime dir when the
+  // directory exists so user-scoped commands work without a login session.
+  private userRuntimeDir(): string | undefined {
+    if (process.env.XDG_RUNTIME_DIR) return process.env.XDG_RUNTIME_DIR
+    const runtimeDir = `/run/user/${userInfo().uid}`
+    return existsSync(runtimeDir) ? runtimeDir : undefined
+  }
+
+  private execEnv(): NodeJS.ProcessEnv {
+    if (this.scope === "system") return process.env
+    const runtimeDir = this.userRuntimeDir()
+    if (!runtimeDir || runtimeDir === process.env.XDG_RUNTIME_DIR) return process.env
+    return { ...process.env, XDG_RUNTIME_DIR: runtimeDir }
+  }
+
   private async systemctl(...args: string[]): Promise<{ stdout: string; stderr: string }> {
     try {
-      return await execFile("systemctl", [...this.scopeArgs(), ...args])
+      return await execFile("systemctl", [...this.scopeArgs(), ...args], { env: this.execEnv() })
     } catch (error) {
       throw new Error(`systemctl ${args.join(" ")} failed: ${describe(error)}`)
     }
   }
 
   isAvailable(): boolean {
-    return existsSync("/run/systemd/system")
+    if (!existsSync("/run/systemd/system")) return false
+    // A user-scoped install is useless without a reachable per-user bus.
+    if (this.scope === "user" && !this.userRuntimeDir()) return false
+    return true
   }
 
   private unitFileContents(): string {
