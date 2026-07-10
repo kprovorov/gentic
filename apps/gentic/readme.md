@@ -232,6 +232,14 @@ gentic start --no-boot   # start without enabling boot/login autostart
 gentic start --system    # install a system-wide unit (Linux/systemd only)
 ```
 
+After upgrading gentic through a package manager, run `gentic start` once to
+rewrite the service definition and relaunch the worker on the new binary.
+Units written by 0.6.0 and earlier pinned the versioned install path of the
+binary (e.g. Homebrew's `Cellar/gentic/<version>/...`), so an upgrade that
+removed the old version left the service failing with `status=203/EXEC` until
+`gentic start` reinstalled it; newer units point at the stable `gentic`
+symlink on `PATH` and survive upgrades.
+
 ## Source layout
 
 - `src/index.ts` — worker entrypoint. Polls the Gentic API, claims one queued issue at
