@@ -1,4 +1,4 @@
-create table public.issue_pull_requests (
+create table if not exists public.issue_pull_requests (
   id uuid primary key default gen_random_uuid(),
   issue_id uuid not null references public.issues(id) on delete cascade,
   url text not null,
@@ -7,7 +7,7 @@ create table public.issue_pull_requests (
   constraint issue_pull_requests_url_unique unique (url)
 );
 
-create index issue_pull_requests_issue_id_idx
+create index if not exists issue_pull_requests_issue_id_idx
   on public.issue_pull_requests(issue_id);
 
 insert into public.issue_pull_requests (issue_id, url)
@@ -20,6 +20,9 @@ grant select, delete on public.issue_pull_requests to authenticated;
 grant select, insert, update, delete on public.issue_pull_requests to service_role;
 
 alter table public.issue_pull_requests enable row level security;
+
+drop policy if exists "Users can read pull requests for their own issues"
+  on public.issue_pull_requests;
 
 create policy "Users can read pull requests for their own issues"
   on public.issue_pull_requests
@@ -34,6 +37,9 @@ create policy "Users can read pull requests for their own issues"
         and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
+
+drop policy if exists "Users can delete pull requests for their own issues"
+  on public.issue_pull_requests;
 
 create policy "Users can delete pull requests for their own issues"
   on public.issue_pull_requests
@@ -51,4 +57,15 @@ create policy "Users can delete pull requests for their own issues"
 
 alter table public.issue_pull_requests replica identity full;
 
-alter publication supabase_realtime add table public.issue_pull_requests;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'issue_pull_requests'
+  ) then
+    alter publication supabase_realtime add table public.issue_pull_requests;
+  end if;
+end $$;
