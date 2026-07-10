@@ -6,7 +6,8 @@ import { Separator } from "@gentic/ui/separator"
 import { SidebarTrigger } from "@gentic/ui/sidebar"
 
 function pageTitle(pathname: string) {
-  if (pathname === "/home") return "Issues"
+  if (pathname === "/home") return "Home"
+  if (pathname === "/issues") return "Issues"
   if (pathname === "/settings") return "Projects"
   if (pathname === "/issues/new") return "New issue"
   if (/^\/issues\/[^/]+\/edit$/.test(pathname)) return "Edit issue"

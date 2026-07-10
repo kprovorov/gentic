@@ -1,5 +1,6 @@
 export const queryKeys = {
   home: ["home"] as const,
+  issues: ["issues"] as const,
   settings: ["settings"] as const,
   newIssue: ["issues", "new"] as const,
   issue: (id: string) => ["issues", id] as const,
