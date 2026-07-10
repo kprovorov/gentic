@@ -245,9 +245,14 @@ jobs:
           STAGE: dist/${{ matrix.asset }}
           PKG_ARCH: ${{ matrix.pkg_arch }}
         run: |
+          # nfpm only expands env vars in a fixed set of top-level fields
+          # (arch, version, ...) — never in contents[].src/dst — so render the
+          # config through envsubst first to resolve ${STAGE} in the file paths.
+          envsubst '${STAGE} ${PKG_ARCH} ${VERSION}' \
+            < packaging/nfpm.yaml > nfpm.generated.yaml
           for packager in deb rpm apk; do
             "$(go env GOPATH)/bin/nfpm" package \
-              --config packaging/nfpm.yaml \
+              --config nfpm.generated.yaml \
               --packager "$packager" \
               --target "gentic-${VERSION}-${{ matrix.asset }}.${packager}"
           done
