@@ -58,9 +58,9 @@ import { IssueStatusSelect } from "./issue-status-select"
 
 const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
+  todo: "To do",
   queued: "Queued",
   held: "On hold",
-  cloning: "Cloning repo",
   "in-progress": "In progress",
   "waiting-for-input": "Waiting for input",
   testing: "Testing",
@@ -79,9 +79,9 @@ const statusLabels: Record<IssueStatus, string> = {
 
 const statusStyles: Record<IssueStatus, string> = {
   draft: "bg-muted/60 text-muted-foreground",
-  queued: "bg-muted text-muted-foreground",
+  todo: "bg-muted text-muted-foreground",
+  queued: "bg-primary/15 text-primary-foreground",
   held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  cloning: "bg-primary/15 text-primary-foreground",
   "in-progress": "bg-primary/15 text-primary-foreground",
   "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
@@ -100,9 +100,9 @@ const statusStyles: Record<IssueStatus, string> = {
 
 const statusIcons = {
   draft: IconPencil,
-  queued: IconCircleDashed,
+  todo: IconCircleDashed,
+  queued: IconDownload,
   held: IconPlayerPause,
-  cloning: IconDownload,
   "in-progress": IconClock,
   "waiting-for-input": IconMessageQuestion,
   testing: IconFlask,

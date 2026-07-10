@@ -154,9 +154,9 @@ export function NewIssueView({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="todo">To do</SelectItem>
                       <SelectItem value="queued">Queued</SelectItem>
                       <SelectItem value="held">On hold</SelectItem>
-                      <SelectItem value="cloning">Cloning repo</SelectItem>
                       <SelectItem value="in-progress">In progress</SelectItem>
                       <SelectItem value="waiting-for-input">
                         Waiting for input

@@ -14,9 +14,9 @@ import {
 
 type IssueStatus =
   | "draft"
+  | "todo"
   | "queued"
   | "held"
-  | "cloning"
   | "in-progress"
   | "waiting-for-input"
   | "testing"
@@ -34,9 +34,9 @@ type IssueStatus =
 
 const statusOptions: { value: IssueStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
+  { value: "todo", label: "To do" },
   { value: "queued", label: "Queued" },
   { value: "held", label: "On hold" },
-  { value: "cloning", label: "Cloning repo" },
   { value: "in-progress", label: "In progress" },
   { value: "waiting-for-input", label: "Waiting for input" },
   { value: "testing", label: "Testing" },

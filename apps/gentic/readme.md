@@ -1,7 +1,7 @@
 # Gentic Agent
 
 The Gentic agent is the background worker for the Gentic app. It polls the
-hosted Gentic API for issues with `run_status = 'queued'`, clones the configured
+hosted Gentic API for issues with `status = 'todo'`, clones the configured
 GitHub repository into a local work directory, and runs the issue's selected
 coding agent through the Agent Client Protocol.
 
@@ -196,9 +196,10 @@ To queue work from the web app:
 2. Create an issue as `Draft`.
 3. Move the issue to `Todo`.
 
-Moving an issue from `Draft` to `Todo` sets `run_status = 'queued'` and inserts
+Moving an issue from `Draft` to `Todo` sets `status = 'todo'` and inserts
 the initial user message. The hosted Gentic API returns it to an authenticated
-agent on the next poll interval.
+agent on the next poll interval, flipping it to `queued` once claimed and
+`in-progress` once the clone and agent session start.
 
 ## Production process example
 
@@ -234,7 +235,7 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
 
 ## Source layout
 
-- `src/index.ts` — worker entrypoint. Polls the Gentic API, claims one queued issue at
+- `src/worker.ts` — worker entrypoint. Polls the Gentic API, claims one todo issue at
   a time, clones its repo, and drives an agent session per issue.
 - `src/session.ts` — spawns Claude Code or Codex over the Agent Client Protocol and
   streams assistant output into the issue transcript, one prompt turn per user
@@ -255,7 +256,9 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
 
 A run stays open for one poll interval after the agent goes quiet so follow-up
 messages sent while it works are handled in the same session; once the
-transcript is idle the run is marked `completed`. Sending a message to an
-issue whose run has already ended (`completed`, `failed`, or `cancelled`)
-re-queues it; the agent resumes the same ACP session (via its stored
-`session_id`) so the conversation continues with prior context.
+transcript is idle the run resolves to `ready-for-review` or
+`waiting-for-input`. Sending a message to an issue whose run has already
+ended (i.e. its status isn't `draft`, `todo`, `queued`, `held`, or
+`in-progress`) moves it back to `todo`; the agent resumes the same ACP
+session (via its stored `session_id`) so the conversation continues with
+prior context.

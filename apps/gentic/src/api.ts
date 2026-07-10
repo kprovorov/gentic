@@ -21,7 +21,6 @@ export interface MessageUpdateFields {
 
 export interface RunStateFields {
   status?:
-    | "cloning"
     | "in-progress"
     | "held"
     | "run-failed"

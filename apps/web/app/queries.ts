@@ -16,9 +16,9 @@ const ATTACHMENT_THUMBNAIL_SIZE = 96
 
 export type IssueStatus =
   | "draft"
+  | "todo"
   | "queued"
   | "held"
-  | "cloning"
   | "in-progress"
   | "waiting-for-input"
   | "testing"

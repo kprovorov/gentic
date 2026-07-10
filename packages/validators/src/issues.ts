@@ -2,9 +2,9 @@ import { z } from "zod"
 
 export const issueStatusSchema = z.enum([
   "draft",
+  "todo",
   "queued",
   "held",
-  "cloning",
   "in-progress",
   "waiting-for-input",
   "testing",
