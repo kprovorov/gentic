@@ -4,6 +4,7 @@ import { clerkClient } from "@clerk/nextjs/server"
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
+import { issueStatusSchema } from "@gentic/validators/issues"
 import { z } from "zod"
 
 import { getRedis } from "@/lib/redis"
@@ -12,19 +13,21 @@ export { ensureIssueOwned }
 
 export type Supabase = ReturnType<typeof createServiceClient>
 
-export const runStatusSchema = z.enum([
-  "queued",
-  "held",
+// The statuses a worker run is allowed to move an issue into via `/run-state`.
+// Everything else (e.g. `merged`, `approved`) is set by the user or the
+// GitHub webhook, not the agent run itself.
+export const runStateStatusSchema = issueStatusSchema.extract([
   "cloning",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
+  "in-progress",
+  "held",
+  "run-failed",
+  "ready-for-review",
+  "waiting-for-input",
 ])
 
 export const runStateSchema = z
   .object({
-    run_status: runStatusSchema.optional(),
+    status: runStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
     run_error: z.string().nullable().optional(),
     run_started_at: z.string().datetime().nullable().optional(),

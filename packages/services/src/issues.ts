@@ -319,8 +319,7 @@ export async function resetIssueAgent(
     await supabase
       .from("issues")
       .update({
-        status: "todo",
-        run_status: "queued",
+        status: "queued",
         session_id: null,
         run_error: null,
         run_started_at: null,
@@ -429,18 +428,14 @@ export async function updateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  // Moving an issue from Draft to Todo queues an agent run: the remote
-  // `@gentic/gentic` agent picks up `run_status = 'queued'` issues over
-  // Supabase and drives the issue's selected coding agent against a fresh clone.
-  const startsRun = current.status === "draft" && status === "todo"
+  // Moving an issue from Draft to Queued starts an agent run: the remote
+  // `@gentic/gentic` agent picks up `status = 'queued'` issues over Supabase
+  // and drives the issue's selected coding agent against a fresh clone.
+  const startsRun = current.status === "draft" && status === "queued"
 
   const result = await supabase
     .from("issues")
-    .update(
-      startsRun
-        ? { status, run_status: "queued", usage_limit_reset_at: null }
-        : { status }
-    )
+    .update(startsRun ? { status, usage_limit_reset_at: null } : { status })
     .eq("id", id)
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
@@ -536,7 +531,106 @@ export async function sendIssueMessage(
   )
 
   // A finished run has no worker polling for it anymore. Re-queue so the
-  // `@gentic/gentic` agent picks this follow-up up and resumes the session.
+  // `@gentic/gentic` agent picks this follow-up up and resumes the session,
+  // unless the issue never ran (draft) or a run is already queued/in flight.
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        status: "queued",
+        usage_limit_reset_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issueId)
+      .not("status", "in", "(draft,queued,held,cloning,in-progress)")
+  )
+}
+
+export type ChangesRequestedReviewComment = {
+  path: string
+  line: number | null
+  diffHunk: string
+  body: string
+}
+
+export type ChangesRequestedReview = {
+  id: number
+  reviewerLogin: string
+  body: string | null
+  comments: ChangesRequestedReviewComment[]
+}
+
+function formatChangesRequestedMessage(
+  prUrl: string,
+  review: ChangesRequestedReview
+): string {
+  const lines = [
+    `@${review.reviewerLogin} requested changes on ${prUrl}.`,
+    "Push fixes to the same branch — do not open a new pull request.",
+  ]
+
+  if (review.body) {
+    lines.push("", review.body)
+  }
+
+  for (const comment of review.comments) {
+    lines.push(
+      "",
+      `**${comment.path}:${comment.line ?? "?"}**`,
+      "```diff",
+      comment.diffHunk,
+      "```",
+      comment.body
+    )
+  }
+
+  return lines.join("\n")
+}
+
+// Called from the GitHub webhook route (trusted, HMAC-authenticated server
+// code — no `userId`) when a review comes back as "changes requested". Feeds
+// the review back into the issue's transcript and re-queues the run so the
+// same agent session picks up the feedback, instead of leaving the issue
+// sitting in `changes-requested` until a human re-triggers it.
+export async function applyChangesRequestedReview(
+  supabase: Supabase,
+  prUrl: string,
+  review: ChangesRequestedReview
+) {
+  const { data: issue, error } = await supabase
+    .from("issues")
+    .select("id, projects!inner(auto_respond_to_reviews)")
+    .eq("pr_url", prUrl)
+    .maybeSingle<{
+      id: string
+      projects: { auto_respond_to_reviews: boolean }
+    }>()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  // No issue tracks this PR, or the project opted out — leave the
+  // status-only behavior the webhook route already applied in place.
+  if (!issue || !issue.projects.auto_respond_to_reviews) {
+    return
+  }
+
+  const { error: insertError } = await supabase.from("messages").insert({
+    issue_id: issue.id,
+    role: "user",
+    content: formatChangesRequestedMessage(prUrl, review),
+    github_review_id: review.id,
+  })
+
+  if (insertError) {
+    // Unique violation on (issue_id, github_review_id): GitHub redelivered
+    // a webhook we already processed. Skip both the insert and the requeue.
+    if (insertError.code === "23505") {
+      return
+    }
+    throw new ServiceError("internal", insertError.message)
+  }
+
   unwrap(
     await supabase
       .from("issues")
@@ -545,7 +639,7 @@ export async function sendIssueMessage(
         usage_limit_reset_at: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", issueId)
+      .eq("id", issue.id)
       .in("run_status", ["completed", "failed", "cancelled"])
   )
 }

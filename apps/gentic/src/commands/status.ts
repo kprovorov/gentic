@@ -2,6 +2,8 @@ import type { Command } from "commander"
 
 import { getServiceBackend } from "../service/index.js"
 import type { ServiceScope, ServiceStatus } from "../service/index.js"
+import { formatToolStatus, getToolStatuses } from "../tools.js"
+import type { ToolStatus, ToolStatuses } from "../tools.js"
 import { log, note } from "../ui.js"
 import { getAuthState } from "./auth.js"
 
@@ -26,6 +28,44 @@ function formatUptime(since: Date): string {
   if (hours > 0) return `${hours}h ${minutes}m`
   if (minutes > 0) return `${minutes}m ${seconds}s`
   return `${seconds}s`
+}
+
+function toolsJson(tools: ToolStatuses) {
+  return {
+    github: tools.github,
+    claude: tools.claude,
+    codex: tools.codex,
+  }
+}
+
+// Only colorize when stdout is a real terminal and the user hasn't opted out
+// (https://no-color.org), matching how most CLIs decide whether to emit ANSI.
+const useColor = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR
+
+function colorize(code: number, text: string): string {
+  return useColor ? `\x1b[${code}m${text}\x1b[0m` : text
+}
+
+function statusIcon(status: ToolStatus): string {
+  if (!status.installed) return colorize(31, "✗") // red ✗
+  if (!status.authenticated) return colorize(33, "⚠") // yellow/orange ⚠
+  return colorize(32, "✓") // green ✓
+}
+
+function formatToolLines(tools: ToolStatuses): string[] {
+  const rows: [string, ToolStatus][] = [
+    ["GitHub CLI", tools.github],
+    ["Claude", tools.claude],
+    ["Codex", tools.codex],
+  ]
+  const labelWidth = Math.max(...rows.map(([label]) => label.length))
+
+  return rows.map(([label, tool]) => {
+    const version = tool.version ? ` (v${tool.version})` : ""
+    const icon = statusIcon(tool)
+    const status = formatToolStatus(tool)
+    return `${icon} ${label.padEnd(labelWidth)}  ${status}${version}`
+  })
 }
 
 function formatServiceLine(
@@ -57,13 +97,17 @@ export function registerStatusCommand(program: Command): void {
 
 async function status(opts: StatusOptions): Promise<void> {
   const auth = getAuthState()
+  const tools = await getToolStatuses()
 
   if (!auth.authenticated) {
     if (opts.json) {
-      console.log(JSON.stringify({ auth: "not-configured" }))
+      console.log(
+        JSON.stringify({ auth: "not-configured", tools: toolsJson(tools) })
+      )
       return
     }
     log.warn('Auth: not configured — run "gentic auth login"')
+    note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
 
@@ -87,11 +131,13 @@ async function status(opts: StatusOptions): Promise<void> {
           apiUrl: auth.apiUrl,
           maskedApiKey: auth.maskedApiKey,
           serviceError: describe(error),
+          tools: toolsJson(tools),
         })
       )
       return
     }
     log.warn(`Service: unable to determine status (${describe(error)})`)
+    note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
 
@@ -117,6 +163,7 @@ async function status(opts: StatusOptions): Promise<void> {
           : undefined,
         bootEnabled,
         lastRun,
+        tools: toolsJson(tools),
       })
     )
     return
@@ -128,6 +175,7 @@ async function status(opts: StatusOptions): Promise<void> {
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,
       `Last run: ${lastRun}`,
+      ...formatToolLines(tools),
     ].join("\n"),
     "gentic status"
   )

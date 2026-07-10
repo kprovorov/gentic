@@ -36,7 +36,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
     .or(
-      `run_status.eq.queued,and(run_status.eq.held,usage_limit_reset_at.lte.${now})`
+      `status.eq.queued,and(status.eq.held,usage_limit_reset_at.lte.${now})`
     )
     .eq("projects.user_id", userId)
     .eq("unfinished_blockers.type", "blocks")
@@ -62,8 +62,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const { data: claimed, error: claimError } = await supabase
     .from("issues")
     .update({
-      status: "in-progress",
-      run_status: "cloning",
+      status: "cloning",
       run_started_at: now,
       run_error: null,
       run_finished_at: null,
@@ -71,7 +70,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
       updated_at: now,
     })
     .eq("id", id)
-    .in("run_status", ["queued", "held"])
+    .in("status", ["queued", "held"])
     .select("id")
     .maybeSingle()
 

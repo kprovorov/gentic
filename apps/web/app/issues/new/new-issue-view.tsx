@@ -38,7 +38,7 @@ export function NewIssueView({
   const { projects } = data
 
   return (
-    <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+    <div className="bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
           <Button asChild variant="ghost" className="w-fit">
@@ -154,7 +154,9 @@ export function NewIssueView({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="queued">Queued</SelectItem>
+                      <SelectItem value="held">On hold</SelectItem>
+                      <SelectItem value="cloning">Cloning repo</SelectItem>
                       <SelectItem value="in-progress">In progress</SelectItem>
                       <SelectItem value="waiting-for-input">
                         Waiting for input
@@ -174,6 +176,7 @@ export function NewIssueView({
                         Deploy failed
                       </SelectItem>
                       <SelectItem value="validating">Validating</SelectItem>
+                      <SelectItem value="run-failed">Run failed</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
@@ -194,6 +197,6 @@ export function NewIssueView({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </div>
   )
 }

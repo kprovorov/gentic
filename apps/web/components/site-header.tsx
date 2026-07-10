@@ -1,69 +1,31 @@
-import Link from "next/link"
-import { Show, UserButton } from "@clerk/nextjs"
+"use client"
 
-import { Button } from "@gentic/ui/button"
+import { usePathname } from "next/navigation"
 
-import { MobileNav } from "./mobile-nav"
+import { Separator } from "@gentic/ui/separator"
+import { SidebarTrigger } from "@gentic/ui/sidebar"
 
-const navItems = [
-  { href: "/home", label: "Issues" },
-  { href: "/settings", label: "Projects" },
-]
-
-function Logo() {
-  return (
-    <svg
-      viewBox="0 0 64 64"
-      aria-hidden="true"
-      className="size-6 shrink-0 rounded-md"
-    >
-      <rect width="64" height="64" rx="14" fill="#9aff00" />
-      <path
-        d="M33 11c-13 0-23 9.5-23 21.5S20 54 33 54c7.4 0 13.7-3 17.7-7.8V30.5H32.3v9.4h7.8v2.5c-1.9 1.4-4.4 2.2-7.1 2.2-7.1 0-12.5-5.2-12.5-12.1S25.9 20.4 33 20.4c4.2 0 7.8 1.8 10.1 4.7l7.7-6.3C46.6 13.9 40.4 11 33 11Z"
-        fill="#244d16"
-      />
-    </svg>
-  )
+function pageTitle(pathname: string) {
+  if (pathname === "/home") return "Issues"
+  if (pathname === "/settings") return "Projects"
+  if (pathname === "/issues/new") return "New issue"
+  if (/^\/issues\/[^/]+\/edit$/.test(pathname)) return "Edit issue"
+  if (/^\/issues\/[^/]+$/.test(pathname)) return "Issue"
+  return "Gentic"
 }
 
 export function SiteHeader() {
-  return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 md:px-8">
-        <div className="flex items-center gap-6">
-          <Show when="signed-in">
-            <MobileNav navItems={navItems} />
-          </Show>
-          <Link href="/" className="flex items-center gap-2">
-            <Logo />
-            <span className="font-heading text-base font-semibold tracking-tight">
-              Gentic
-            </span>
-          </Link>
-          <Show when="signed-in">
-            <nav className="hidden items-center gap-1 sm:flex">
-              {navItems.map((item) => (
-                <Button key={item.href} asChild variant="ghost" size="sm">
-                  <Link href={item.href}>{item.label}</Link>
-                </Button>
-              ))}
-            </nav>
-          </Show>
-        </div>
+  const pathname = usePathname()
 
-        <div className="flex items-center gap-2">
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
-          <Show when="signed-out">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/register">Sign up</Link>
-            </Button>
-          </Show>
-        </div>
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
+      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mx-2 data-[orientation=vertical]:h-4"
+        />
+        <h1 className="text-base font-medium">{pageTitle(pathname)}</h1>
       </div>
     </header>
   )

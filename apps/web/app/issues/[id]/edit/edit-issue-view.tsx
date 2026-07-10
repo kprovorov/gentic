@@ -39,7 +39,7 @@ export function EditIssueView({
   })
 
   return (
-    <main className="min-h-svh bg-background px-4 py-8 md:px-8">
+    <div className="bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
           <Button asChild variant="ghost" className="w-fit">
@@ -132,6 +132,6 @@ export function EditIssueView({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </div>
   )
 }

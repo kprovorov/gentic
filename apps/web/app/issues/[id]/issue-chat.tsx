@@ -11,6 +11,7 @@ import {
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
+import type { IssueStatus } from "@gentic/validators/issues"
 
 import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
@@ -23,36 +24,6 @@ export type ChatMessage = {
   content: string | null
   status: "streaming" | "complete" | "error"
   created_at: string
-}
-
-export type RunStatus =
-  | "queued"
-  | "held"
-  | "cloning"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | null
-
-const runStatusLabels: Record<NonNullable<RunStatus>, string> = {
-  queued: "Queued",
-  held: "On hold",
-  cloning: "Cloning repo",
-  running: "Agent running",
-  completed: "Completed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-}
-
-const runStatusStyles: Record<NonNullable<RunStatus>, string> = {
-  queued: "bg-muted text-muted-foreground",
-  held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  cloning: "bg-primary/15 text-primary-foreground",
-  running: "bg-primary/15 text-primary-foreground",
-  completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  failed: "bg-destructive/15 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
 }
 
 function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
@@ -98,20 +69,20 @@ function formatPullRequestLabel(url: string) {
 export function IssueChat({
   issueId,
   initialMessages,
-  initialRunStatus,
+  initialStatus,
   initialUsageLimitResetAt,
   initialPrUrl,
   initialPullRequests,
 }: {
   issueId: string
   initialMessages: ChatMessage[]
-  initialRunStatus: RunStatus
+  initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
   initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [runStatus, setRunStatus] = useState<RunStatus>(initialRunStatus)
+  const [status, setStatus] = useState<IssueStatus>(initialStatus)
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
   )
@@ -164,11 +135,11 @@ export function IssueChat({
         },
         (payload) => {
           const next = payload.new as {
-            run_status: RunStatus
+            status: IssueStatus
             usage_limit_reset_at: string | null
             pr_url: string | null
           }
-          setRunStatus(next.run_status)
+          setStatus(next.status)
           setUsageLimitResetAt(next.usage_limit_reset_at)
           setPrUrl(next.pr_url)
         }
@@ -221,19 +192,11 @@ export function IssueChat({
 
   return (
     <div className="flex flex-col gap-4">
-      {runStatus || prUrl || pullRequests.length > 0 ? (
+      {(usageLimitResetAt && status === "held") ||
+      prUrl ||
+      pullRequests.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          {runStatus ? (
-            <div
-              className={cn(
-                "inline-flex h-7 w-fit items-center gap-1 rounded-full px-2.5 text-xs font-medium",
-                runStatusStyles[runStatus]
-              )}
-            >
-              {runStatusLabels[runStatus]}
-            </div>
-          ) : null}
-          {usageLimitResetAt && runStatus === "held" ? (
+          {usageLimitResetAt && status === "held" ? (
             <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
               Resets {formatDateTime(usageLimitResetAt)}
             </div>
@@ -272,7 +235,7 @@ export function IssueChat({
       >
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No messages yet. Move this issue to Todo to start the agent.
+            No messages yet. Move this issue to Queued to start the agent.
           </p>
         ) : (
           messages.map((message) => (
@@ -293,7 +256,7 @@ export function IssueChat({
           }}
           rows={2}
           placeholder="Message the agent…"
-          className="min-h-9 w-full resize-none rounded-3xl border border-transparent bg-input/50 px-4 py-2 text-sm transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="min-h-9 w-full resize-none rounded-3xl border border-transparent bg-input/50 px-4 py-2 text-base transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
         />
         <Button
           type="submit"
