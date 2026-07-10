@@ -4,6 +4,8 @@ import { spawn } from "node:child_process"
 export interface ToolStatus {
   installed: boolean
   authenticated: boolean
+  /** Version reported by the CLI, or null if not installed/unparseable. */
+  version: string | null
 }
 
 export interface ToolStatuses {
@@ -51,34 +53,47 @@ function runCommand(command: string, args: string[]): Promise<CommandResult> {
   })
 }
 
+function parseVersion(pattern: RegExp, output: string): string | null {
+  return pattern.exec(output)?.[1] ?? null
+}
+
 async function checkGithub(): Promise<ToolStatus> {
-  const version = await runCommand("gh", ["--version"])
-  if (version.missing) return { installed: false, authenticated: false }
+  const versionResult = await runCommand("gh", ["--version"])
+  if (versionResult.missing) {
+    return { installed: false, authenticated: false, version: null }
+  }
+  const version = parseVersion(/gh version (\S+)/, versionResult.stdout)
 
   const auth = await runCommand("gh", ["auth", "status"])
-  return { installed: true, authenticated: auth.code === 0 }
+  return { installed: true, authenticated: auth.code === 0, version }
 }
 
 async function checkClaude(): Promise<ToolStatus> {
-  const version = await runCommand("claude", ["--version"])
-  if (version.missing) return { installed: false, authenticated: false }
+  const versionResult = await runCommand("claude", ["--version"])
+  if (versionResult.missing) {
+    return { installed: false, authenticated: false, version: null }
+  }
+  const version = parseVersion(/^(\S+)/, versionResult.stdout)
 
   const auth = await runCommand("claude", ["auth", "status", "--json"])
-  if (auth.code !== 0) return { installed: true, authenticated: false }
+  if (auth.code !== 0) return { installed: true, authenticated: false, version }
   try {
     const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean }
-    return { installed: true, authenticated: parsed.loggedIn === true }
+    return { installed: true, authenticated: parsed.loggedIn === true, version }
   } catch {
-    return { installed: true, authenticated: false }
+    return { installed: true, authenticated: false, version }
   }
 }
 
 async function checkCodex(): Promise<ToolStatus> {
-  const version = await runCommand("codex", ["--version"])
-  if (version.missing) return { installed: false, authenticated: false }
+  const versionResult = await runCommand("codex", ["--version"])
+  if (versionResult.missing) {
+    return { installed: false, authenticated: false, version: null }
+  }
+  const version = parseVersion(/codex-cli (\S+)/, versionResult.stdout)
 
   const auth = await runCommand("codex", ["login", "status"])
-  return { installed: true, authenticated: auth.code === 0 }
+  return { installed: true, authenticated: auth.code === 0, version }
 }
 
 /**

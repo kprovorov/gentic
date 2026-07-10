@@ -3,7 +3,7 @@ import type { Command } from "commander"
 import { getServiceBackend } from "../service/index.js"
 import type { ServiceScope, ServiceStatus } from "../service/index.js"
 import { formatToolStatus, getToolStatuses } from "../tools.js"
-import type { ToolStatuses } from "../tools.js"
+import type { ToolStatus, ToolStatuses } from "../tools.js"
 import { log, note } from "../ui.js"
 import { getAuthState } from "./auth.js"
 
@@ -38,12 +38,34 @@ function toolsJson(tools: ToolStatuses) {
   }
 }
 
+// Only colorize when stdout is a real terminal and the user hasn't opted out
+// (https://no-color.org), matching how most CLIs decide whether to emit ANSI.
+const useColor = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR
+
+function colorize(code: number, text: string): string {
+  return useColor ? `\x1b[${code}m${text}\x1b[0m` : text
+}
+
+function statusIcon(status: ToolStatus): string {
+  if (!status.installed) return colorize(31, "✗") // red ✗
+  if (!status.authenticated) return colorize(33, "⚠") // yellow/orange ⚠
+  return colorize(32, "✓") // green ✓
+}
+
 function formatToolLines(tools: ToolStatuses): string[] {
-  return [
-    `GitHub CLI: ${formatToolStatus(tools.github)}`,
-    `Claude:     ${formatToolStatus(tools.claude)}`,
-    `Codex:      ${formatToolStatus(tools.codex)}`,
+  const rows: [string, ToolStatus][] = [
+    ["GitHub CLI", tools.github],
+    ["Claude", tools.claude],
+    ["Codex", tools.codex],
   ]
+  const labelWidth = Math.max(...rows.map(([label]) => label.length))
+
+  return rows.map(([label, tool]) => {
+    const version = tool.version ? ` (v${tool.version})` : ""
+    const icon = statusIcon(tool)
+    const status = formatToolStatus(tool)
+    return `${icon} ${label.padEnd(labelWidth)}  ${status}${version}`
+  })
 }
 
 function formatServiceLine(
