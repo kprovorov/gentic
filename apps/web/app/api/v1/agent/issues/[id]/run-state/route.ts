@@ -1,3 +1,5 @@
+import * as issuesService from "@gentic/services/issues"
+
 import {
   ensureIssueOwned,
   getAgentContext,
@@ -29,6 +31,10 @@ export async function PATCH(
 
     if (error) {
       throw new Error(error.message)
+    }
+
+    if (fields.pr_url) {
+      await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
     }
 
     return json({ ok: true })

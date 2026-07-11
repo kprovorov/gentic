@@ -26,6 +26,13 @@ export type IssueRelation = {
   target_issue: IssueRelationIssue
 }
 
+export type IssuePullRequest = {
+  id: string
+  issue_id: string
+  url: string
+  created_at: string
+}
+
 async function ensureProjectOwned(
   supabase: Supabase,
   userId: string,
@@ -163,6 +170,23 @@ export async function listIssueRelations(
   )
 }
 
+export async function listIssuePullRequests(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  return unwrap(
+    await supabase
+      .from("issue_pull_requests")
+      .select("id,issue_id,url,created_at")
+      .eq("issue_id", issueId)
+      .order("created_at", { ascending: false })
+      .returns<IssuePullRequest[]>()
+  )
+}
+
 export async function listBlockedIssueIds(
   supabase: Supabase,
   issueIds: string[]
@@ -288,6 +312,7 @@ export async function resetIssueAgent(
   }
 
   unwrap(await supabase.from("messages").delete().eq("issue_id", id))
+  unwrap(await supabase.from("issue_pull_requests").delete().eq("issue_id", id))
 
   const now = new Date().toISOString()
   unwrap(
@@ -435,15 +460,35 @@ export async function updateIssueStatus(
 }
 
 // Called from the GitHub webhook route, which is trusted server code
-// authenticated by the webhook signature rather than a Clerk user — there is
-// no `userId` to check ownership against. `pr_url` is the exact URL the agent
-// wrote back onto the issue, so it uniquely identifies the issue a PR event
-// belongs to (or matches nothing, if the PR isn't tracked by Gentic).
+// authenticated by the webhook signature rather than a Clerk user. There is no
+// `userId` to check ownership against, so the exact PR URL is used to find a
+// tracked issue pull request, with a fallback to the legacy `issues.pr_url`.
 export async function updateIssueStatusByPrUrl(
   supabase: Supabase,
   prUrl: string,
   status: IssueStatus
 ) {
+  const { data: pullRequest, error: pullRequestError } = await supabase
+    .from("issue_pull_requests")
+    .select("issue_id")
+    .eq("url", prUrl)
+    .maybeSingle<{ issue_id: string }>()
+
+  if (pullRequestError) {
+    throw new ServiceError("internal", pullRequestError.message)
+  }
+
+  if (pullRequest) {
+    return unwrap(
+      await supabase
+        .from("issues")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", pullRequest.issue_id)
+        .select("id")
+        .maybeSingle()
+    )
+  }
+
   return unwrap(
     await supabase
       .from("issues")
@@ -451,6 +496,21 @@ export async function updateIssueStatusByPrUrl(
       .eq("pr_url", prUrl)
       .select("id")
       .maybeSingle()
+  )
+}
+
+export async function attachIssuePullRequest(
+  supabase: Supabase,
+  issueId: string,
+  prUrl: string
+) {
+  return unwrap(
+    await supabase
+      .from("issue_pull_requests")
+      .upsert(
+        { issue_id: issueId, url: prUrl },
+        { onConflict: "url", ignoreDuplicates: true }
+      )
   )
 }
 
