@@ -40,7 +40,6 @@ import {
 import { queryKeys } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@gentic/ui/card"
 import { Table, TableBody, TableCell, TableRow } from "@gentic/ui/table"
 import { cn } from "@gentic/ui/utils"
 
@@ -169,12 +168,6 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     (a, b) => statusOrder[a.status] - statusOrder[b.status]
   )
   const blockedIssueIds = new Set(data.blockedIssueIds)
-  const activeIssueCount = issues.filter(
-    (issue) =>
-      issue.status !== "completed" &&
-      issue.status !== "cancelled" &&
-      issue.status !== "merged"
-  ).length
   const groups = (Object.keys(statusOrder) as IssueStatus[])
     .sort((a, b) => statusOrder[a] - statusOrder[b])
     .map((status) => ({
@@ -224,45 +217,6 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
           </section>
         ) : (
           <section className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Total
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-medium tabular-nums">
-                    {issues.length}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Active
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-medium tabular-nums">
-                    {activeIssueCount}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Blocked
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-medium tabular-nums">
-                    {blockedIssueIds.size}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
             <div className="overflow-hidden rounded-4xl border bg-card shadow-sm">
               <Table>
                 <TableBody>
