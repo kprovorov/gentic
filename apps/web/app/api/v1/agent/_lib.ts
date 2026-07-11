@@ -17,7 +17,6 @@ export type Supabase = ReturnType<typeof createServiceClient>
 // Everything else (e.g. `merged`, `approved`) is set by the user or the
 // GitHub webhook, not the agent run itself.
 export const runStateStatusSchema = issueStatusSchema.extract([
-  "cloning",
   "in-progress",
   "held",
   "run-failed",

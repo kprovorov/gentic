@@ -30,8 +30,8 @@ export async function runWorker(): Promise<void> {
   while (running) {
     let issue: ClaimedIssue | null = null
     try {
-      // Atomically claims the oldest queued issue by flipping it to `cloning`.
-      // The conditional update (`status = 'queued'`) makes the claim safe
+      // Atomically claims the oldest todo issue by flipping it to `queued`.
+      // The conditional update (`status = 'todo'`) makes the claim safe
       // if more than one worker is polling.
       issue = await api.claimNextQueuedIssue()
     } catch (error) {

@@ -294,7 +294,7 @@ export async function resetIssueAgent(
     await supabase
       .from("issues")
       .update({
-        status: "queued",
+        status: "todo",
         session_id: null,
         run_error: null,
         run_started_at: null,
@@ -403,10 +403,10 @@ export async function updateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  // Moving an issue from Draft to Queued starts an agent run: the remote
-  // `@gentic/gentic` agent picks up `status = 'queued'` issues over Supabase
+  // Moving an issue from Draft to Todo starts an agent run: the remote
+  // `@gentic/gentic` agent picks up `status = 'todo'` issues over Supabase
   // and drives the issue's selected coding agent against a fresh clone.
-  const startsRun = current.status === "draft" && status === "queued"
+  const startsRun = current.status === "draft" && status === "todo"
 
   const result = await supabase
     .from("issues")
@@ -472,17 +472,18 @@ export async function sendIssueMessage(
 
   // A finished run has no worker polling for it anymore. Re-queue so the
   // `@gentic/gentic` agent picks this follow-up up and resumes the session,
-  // unless the issue never ran (draft) or a run is already queued/in flight.
+  // unless the issue never ran (draft) or a run is already todo/queued/in
+  // flight.
   unwrap(
     await supabase
       .from("issues")
       .update({
-        status: "queued",
+        status: "todo",
         usage_limit_reset_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", issueId)
-      .not("status", "in", "(draft,queued,held,cloning,in-progress)")
+      .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
 }
 
@@ -571,15 +572,18 @@ export async function applyChangesRequestedReview(
     throw new ServiceError("internal", insertError.message)
   }
 
+  // The webhook route already flipped `status` to `changes-requested` via
+  // `updateIssueStatusByPrUrl` right before calling this — re-queue from
+  // there so the same agent session picks the review back up.
   unwrap(
     await supabase
       .from("issues")
       .update({
-        run_status: "queued",
+        status: "todo",
         usage_limit_reset_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", issue.id)
-      .in("run_status", ["completed", "failed", "cancelled"])
+      .eq("status", "changes-requested")
   )
 }
