@@ -42,6 +42,7 @@ export async function createIssue(formData: FormData) {
   const created = await issuesService.createIssue(supabase, userId, issue)
 
   revalidatePath("/home")
+  revalidatePath("/issues")
   redirect(`/issues/${created.id}`)
 }
 
@@ -64,6 +65,7 @@ export async function updateIssue(formData: FormData) {
   })
 
   revalidatePath("/home")
+  revalidatePath("/issues")
   revalidatePath(`/issues/${id}`)
   redirect(`/issues/${id}`)
 }
@@ -75,7 +77,8 @@ export async function deleteIssue(formData: FormData) {
   await issuesService.deleteIssue(supabase, userId, id)
 
   revalidatePath("/home")
-  redirect("/home")
+  revalidatePath("/issues")
+  redirect("/issues")
 }
 
 export async function resetIssueAgent(formData: FormData) {
@@ -85,6 +88,7 @@ export async function resetIssueAgent(formData: FormData) {
   await issuesService.resetIssueAgent(supabase, userId, id)
 
   revalidatePath("/home")
+  revalidatePath("/issues")
   revalidatePath(`/issues/${id}`)
 }
 
@@ -96,6 +100,7 @@ export async function updateIssueStatus(formData: FormData) {
   await issuesService.updateIssueStatus(supabase, userId, id, status)
 
   revalidatePath("/home")
+  revalidatePath("/issues")
   revalidatePath(`/issues/${id}`)
 }
 
@@ -116,6 +121,8 @@ export async function addIssueRelation(formData: FormData) {
     direction
   )
 
+  revalidatePath("/home")
+  revalidatePath("/issues")
   revalidatePath(`/issues/${issue_id}`)
 }
 
@@ -128,6 +135,8 @@ export async function deleteIssueRelation(formData: FormData) {
 
   await issuesService.deleteIssueRelation(supabase, userId, id, issue_id)
 
+  revalidatePath("/home")
+  revalidatePath("/issues")
   revalidatePath(`/issues/${issue_id}`)
 }
 

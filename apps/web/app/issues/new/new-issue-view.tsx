@@ -42,7 +42,7 @@ export function NewIssueView({
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
           <Button asChild variant="ghost" className="w-fit">
-            <Link href="/home">
+            <Link href="/issues">
               <IconArrowLeft />
               Back
             </Link>
@@ -185,7 +185,7 @@ export function NewIssueView({
 
                 <div className="flex justify-end gap-2">
                   <Button asChild variant="outline">
-                    <Link href="/home">Cancel</Link>
+                    <Link href="/issues">Cancel</Link>
                   </Button>
                   <Button type="submit">
                     <IconPlus />

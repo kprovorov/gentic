@@ -86,6 +86,8 @@ export type HomeData = {
   blockedIssueIds: string[]
 }
 
+export type IssuesData = HomeData
+
 export type SettingsData = {
   projects: SettingsProject[]
   githubIntegration: githubIntegrationsService.GithubIntegration | null
@@ -122,6 +124,10 @@ export async function getHomeData(): Promise<HomeData> {
     issues,
     blockedIssueIds: Array.from(blockedIssueIds),
   }
+}
+
+export async function getIssuesData(): Promise<IssuesData> {
+  return getHomeData()
 }
 
 export async function getSettingsData(): Promise<SettingsData> {

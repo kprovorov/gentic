@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { IconFolder, IconListDetails } from "@tabler/icons-react"
+import { IconFolder, IconHome, IconListDetails } from "@tabler/icons-react"
 
 import {
   Sidebar,
@@ -18,7 +18,8 @@ import { NavMain } from "./nav-main"
 import { NavUser } from "./nav-user"
 
 const navMain = [
-  { title: "Issues", href: "/home", icon: IconListDetails },
+  { title: "Home", href: "/home", icon: IconHome },
+  { title: "Issues", href: "/issues", icon: IconListDetails },
   { title: "Projects", href: "/settings", icon: IconFolder },
 ]
 

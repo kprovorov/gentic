@@ -252,9 +252,9 @@ export function IssueDetailView({
         <header className="flex flex-col gap-5 border-b pb-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button asChild variant="ghost" className="w-fit">
-              <Link href="/home">
+              <Link href="/issues">
                 <IconArrowLeft />
-                My issues
+                Issues
               </Link>
             </Button>
             <div className="flex flex-wrap items-center gap-2">
