@@ -9,6 +9,7 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   type ActiveSession,
+  type ActiveSessionMessage,
   type ClientContext,
   type ContentBlock,
   type NewSessionResponse,
@@ -151,7 +152,14 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           prompt = prependInstructions(prompt, input.existingPrUrl)
           shouldPrependInstructions = false
         }
-        await runTurn(session, input.api, input.issueId, input.channel, prompt)
+        await runTurn(
+          session,
+          input.api,
+          input.issueId,
+          input.channel,
+          prompt,
+          () => ctx.notify("session/cancel", { sessionId: session.sessionId })
+        )
       }
     })
   } finally {
@@ -270,14 +278,78 @@ async function resumeSession(
   } satisfies NewSessionResponse)
 }
 
+/**
+ * Ceiling on silence between session updates within one prompt turn. The
+ * Claude Code ACP agent can wedge when its Task tool polls a hung
+ * background sub-agent (upstream issue #680) and then never emit another
+ * update or the turn's `stop` message. That agent's own forced-cancel
+ * recovery only runs once it receives `session/cancel`, so treat a gap this
+ * long as a stall and send it ourselves rather than block the run — and a
+ * worker slot — forever.
+ */
+const STALL_TIMEOUT_MS = 15 * 60 * 1000
+/** Extra time given to `session/cancel` to unwedge the turn before giving up. */
+const STALL_CANCEL_GRACE_MS = 60 * 1000
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number
+): Promise<{ timedOut: true } | { timedOut: false; value: T }> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve({ timedOut: true }), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve({ timedOut: false, value })
+      },
+      (error: unknown) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
+/**
+ * Waits for the next session update, sending `session/cancel` if none
+ * arrives within `stallTimeoutMs` and failing the turn if that doesn't
+ * unwedge it within `stallCancelGraceMs` either.
+ */
+async function nextUpdateOrStall(
+  session: ActiveSession,
+  requestCancel: () => Promise<void>,
+  stallTimeoutMs: number,
+  stallCancelGraceMs: number
+): Promise<ActiveSessionMessage> {
+  const pending = session.nextUpdate()
+
+  const first = await withTimeout(pending, stallTimeoutMs)
+  if (!first.timedOut) return first.value
+
+  await requestCancel().catch(() => {})
+
+  const second = await withTimeout(pending, stallCancelGraceMs)
+  if (!second.timedOut) return second.value
+
+  throw new Error(
+    `Session ${session.sessionId} produced no update for over ${stallTimeoutMs + stallCancelGraceMs}ms and did not respond to session/cancel; treating the run as stalled.`
+  )
+}
+
 /** Sends one prompt and streams updates into the transcript until it stops. */
 export async function runTurn(
   session: ActiveSession,
   api: AgentApi,
   issueId: string,
   channel: IssueRealtimeChannel,
-  prompt: PromptTurn
+  prompt: PromptTurn,
+  requestCancel: () => Promise<void>,
+  stallTimeouts: { stallTimeoutMs?: number; stallCancelGraceMs?: number } = {}
 ): Promise<void> {
+  const {
+    stallTimeoutMs = STALL_TIMEOUT_MS,
+    stallCancelGraceMs = STALL_CANCEL_GRACE_MS,
+  } = stallTimeouts
   const promptDone = session.prompt(prompt)
 
   let current: StreamingAssistantMessage | null = null
@@ -307,7 +379,12 @@ export async function runTurn(
 
   try {
     for (;;) {
-      const message = await session.nextUpdate()
+      const message = await nextUpdateOrStall(
+        session,
+        requestCancel,
+        stallTimeoutMs,
+        stallCancelGraceMs
+      )
       if (message.kind === "stop") {
         break
       }

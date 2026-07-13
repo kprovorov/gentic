@@ -106,7 +106,15 @@ test("run error path best-effort persists the current partial", async () => {
   }
 
   await assert.rejects(
-    () => runTurn(session as never, api, ISSUE_ID, channel, "prompt"),
+    () =>
+      runTurn(
+        session as never,
+        api,
+        ISSUE_ID,
+        channel,
+        "prompt",
+        async () => {}
+      ),
     /agent crashed/
   )
 
@@ -115,6 +123,35 @@ test("run error path best-effort persists the current partial", async () => {
   assert.equal(api.inserted[0]?.message.content, "partial output")
   assert.equal(api.inserted[0]?.message.status, "error")
   assert.equal(channel.messages.at(-1)?.status, "error")
+})
+
+test("a wedged sub-agent stall triggers session/cancel then fails the turn", async () => {
+  const api = fakeApi()
+  const channel = fakeChannel()
+  let cancelCalls = 0
+  const session = {
+    prompt: () => new Promise(() => {}),
+    nextUpdate: () => new Promise(() => {}), // simulates a wedged Task-tool poll
+  }
+
+  await assert.rejects(
+    () =>
+      runTurn(
+        session as never,
+        api,
+        ISSUE_ID,
+        channel,
+        "prompt",
+        async () => {
+          cancelCalls += 1
+        },
+        { stallTimeoutMs: 5, stallCancelGraceMs: 5 }
+      ),
+    /stalled/
+  )
+
+  assert.equal(cancelCalls, 1)
+  assert.equal(api.inserted.length, 0)
 })
 
 test("issue run instructions update an existing pull request on follow-up", () => {
