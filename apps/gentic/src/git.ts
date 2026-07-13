@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 import { mkdir, rm } from "node:fs/promises"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
+
+/** Whether `dir` already holds a git checkout, e.g. from an earlier run. */
+export function hasLocalCheckout(dir: string): boolean {
+  return existsSync(join(dir, ".git"))
+}
 
 /**
  * Clones a project repo into a fresh directory. Any existing directory at
