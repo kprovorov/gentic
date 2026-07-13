@@ -10,5 +10,5 @@ alter table public.issues
   alter column title drop not null;
 
 alter table public.issues
-  add constraint issues_title_not_blank
+  add constraint issues_title_valid
   check (title is null or length(trim(title)) between 1 and 160);
