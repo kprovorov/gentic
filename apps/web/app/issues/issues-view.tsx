@@ -257,8 +257,14 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                                   className="grid gap-2"
                                 >
                                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                    <span className="truncate font-medium group-hover/row:text-primary">
-                                      {issue.title}
+                                    <span
+                                      className={cn(
+                                        "truncate font-medium group-hover/row:text-primary",
+                                        !issue.title &&
+                                          "text-muted-foreground italic"
+                                      )}
+                                    >
+                                      {issue.title ?? "Generating title…"}
                                     </span>
                                     <span
                                       className={cn(

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto"
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { after } from "next/server"
 import { z } from "zod"
 
 import {
@@ -17,6 +18,7 @@ import {
 } from "@gentic/validators/issues"
 
 import * as issuesService from "@gentic/services/issues"
+import { createServiceClient } from "@gentic/supabase/service"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
@@ -44,13 +46,26 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     type: getString(formData, "type") || "feature",
   })
-  const issue = createIssueSchema.parse({
-    ...fields,
-    status,
-    title: await generateIssueTitle(fields.prompt),
-  })
 
-  const created = await issuesService.createIssue(supabase, userId, issue)
+  // Save the issue with no title right away rather than blocking on the AI
+  // Gateway call — title generation runs after the response is sent (via
+  // `after`), so it still completes even if the user closes the tab, and the
+  // service-role client is used since there's no request-scoped session by
+  // then. `issues` is realtime-enabled, so the title fills in live for
+  // anyone still on the page.
+  const created = await issuesService.createIssue(
+    supabase,
+    userId,
+    createIssueSchema.parse({ ...fields, status })
+  )
+
+  after(async () => {
+    const title = await generateIssueTitle(fields.prompt).catch((error) => {
+      console.error(`Failed to generate title for issue ${created.id}:`, error)
+      return fields.prompt.slice(0, 160)
+    })
+    await issuesService.setIssueTitle(createServiceClient(), created.id, title)
+  })
 
   revalidatePath("/home")
   revalidatePath("/issues")

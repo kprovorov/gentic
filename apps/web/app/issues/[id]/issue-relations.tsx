@@ -50,7 +50,9 @@ function RelationRow({
         href={`/issues/${relatedIssue.id}`}
         className="min-w-0 text-sm font-medium hover:text-primary"
       >
-        <span className="line-clamp-1">{relatedIssue.title}</span>
+        <span className="line-clamp-1">
+          {relatedIssue.title ?? "Generating title…"}
+        </span>
       </Link>
       <form onSubmit={handleDelete}>
         <input type="hidden" name="id" value={relation.id} />
@@ -59,7 +61,7 @@ function RelationRow({
           type="submit"
           variant="ghost"
           size="icon-xs"
-          aria-label={`Remove relation to ${relatedIssue.title}`}
+          aria-label={`Remove relation to ${relatedIssue.title ?? "issue"}`}
           disabled={mutation.isPending}
         >
           <IconTrash />
@@ -140,7 +142,7 @@ export function IssueRelations({
             </NativeSelectOption>
             {candidates.map((candidate) => (
               <NativeSelectOption key={candidate.id} value={candidate.id}>
-                {candidate.title}
+                {candidate.title ?? "Generating title…"}
               </NativeSelectOption>
             ))}
           </NativeSelect>
