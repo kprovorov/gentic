@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
@@ -24,6 +24,14 @@ export function RealtimeRefresh({
   const router = useRouter()
   const queryClient = useQueryClient()
   const tableKey = tables.join(",")
+  // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
+  // a new array reference every render. Read the latest value through a ref
+  // so the effect below doesn't tear down and resubscribe the channel (and
+  // risk dropping events) on every unrelated re-render.
+  const queryKeyRef = useRef(queryKey)
+  useEffect(() => {
+    queryKeyRef.current = queryKey
+  })
 
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
@@ -32,8 +40,8 @@ export function RealtimeRefresh({
         clearTimeout(refreshTimer)
       }
       refreshTimer = setTimeout(() => router.refresh(), 150)
-      if (queryKey) {
-        void queryClient.invalidateQueries({ queryKey })
+      if (queryKeyRef.current) {
+        void queryClient.invalidateQueries({ queryKey: queryKeyRef.current })
       }
     }
 
@@ -53,7 +61,7 @@ export function RealtimeRefresh({
       }
       void supabase.removeChannel(channel)
     }
-  }, [supabase, router, queryClient, channelName, tableKey, queryKey])
+  }, [supabase, router, queryClient, channelName, tableKey])
 
   return null
 }
