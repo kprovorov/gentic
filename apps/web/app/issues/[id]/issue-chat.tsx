@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconExternalLink,
@@ -44,6 +44,10 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
   const next = [...list]
   next[index] = incoming
   return next
+}
+
+function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
+  return incoming.reduce(mergeMessage, list)
 }
 
 function mergePullRequest(
@@ -169,6 +173,14 @@ export function IssueChat({
   })
 
   const supabase = useSupabaseClient()
+  const displayedMessages = useMemo(
+    () => mergeMessages(messages, initialMessages),
+    [messages, initialMessages]
+  )
+  const displayedPullRequests = useMemo(
+    () => initialPullRequests.reduce(mergePullRequest, pullRequests),
+    [pullRequests, initialPullRequests]
+  )
 
   useEffect(() => {
     const channel = supabase
@@ -316,7 +328,7 @@ export function IssueChat({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [messages])
+  }, [displayedMessages])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -336,14 +348,14 @@ export function IssueChat({
     <div className="flex flex-col gap-4">
       {(usageLimitResetAt && status === "held") ||
       prUrl ||
-      pullRequests.length > 0 ? (
+      displayedPullRequests.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {usageLimitResetAt && status === "held" ? (
             <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
               Resets {formatDateTime(usageLimitResetAt)}
             </div>
           ) : null}
-          {pullRequests.map((pullRequest) => (
+          {displayedPullRequests.map((pullRequest) => (
             <a
               key={pullRequest.id}
               href={pullRequest.url}
@@ -356,7 +368,7 @@ export function IssueChat({
               <IconExternalLink className="size-3.5" />
             </a>
           ))}
-          {prUrl && pullRequests.length === 0 ? (
+          {prUrl && displayedPullRequests.length === 0 ? (
             <a
               href={prUrl}
               target="_blank"
@@ -375,12 +387,12 @@ export function IssueChat({
         ref={scrollRef}
         className="flex max-h-[28rem] flex-col gap-3 overflow-y-auto"
       >
-        {messages.length === 0 ? (
+        {displayedMessages.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No messages yet. Move this issue to Queued to start the agent.
           </p>
         ) : (
-          messages.map((message) => (
+          displayedMessages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))
         )}
