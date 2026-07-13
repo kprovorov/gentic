@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Inter, Outfit } from "next/font/google"
 import { ClerkProvider, Show } from "@clerk/nextjs"
 
@@ -21,12 +21,21 @@ export const metadata: Metadata = {
   description:
     "Gentic helps teams create coding issues, assign them to agents, and track pull requests through review.",
   applicationName: "Gentic",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Gentic",
+  },
   openGraph: {
     title: "Gentic",
     description:
       "Create coding issues, assign them to agents, and track pull requests through review.",
     type: "website",
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
 }
 
 const outfitHeading = Outfit({ subsets: ["latin"], variable: "--font-heading" })
