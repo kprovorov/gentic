@@ -8,6 +8,7 @@ import {
   IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
+import { Streamdown } from "streamdown"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
@@ -457,6 +458,8 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
   const isTool = message.kind === "tool"
   const isMarker = message.role === "system" || message.kind === "thinking"
+  const content = message.content ?? ""
+  const isStreaming = message.status === "streaming"
 
   if (isMarker) {
     return (
@@ -472,8 +475,27 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
               </MarkerIcon>
             ) : null}
             <MarkerContent>
-              {message.content || "Thinking..."}
-              {message.status === "streaming" ? (
+              {content ? (
+                <Streamdown
+                  className="chat-markdown"
+                  controls={{
+                    code: { copy: true, download: false },
+                    mermaid: false,
+                    table: {
+                      copy: true,
+                      download: false,
+                      fullscreen: false,
+                    },
+                  }}
+                  isAnimating={isStreaming}
+                  mode={isStreaming ? "streaming" : "static"}
+                >
+                  {content}
+                </Streamdown>
+              ) : (
+                "Thinking..."
+              )}
+              {isStreaming ? (
                 <span className="ml-0.5 animate-pulse">▍</span>
               ) : null}
             </MarkerContent>
@@ -504,8 +526,23 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
               isTool && "font-mono text-xs text-muted-foreground"
             )}
           >
-            {message.content}
-            {message.status === "streaming" ? (
+            {isTool ? (
+              content
+            ) : (
+              <Streamdown
+                className="chat-markdown"
+                controls={{
+                  code: { copy: true, download: false },
+                  mermaid: false,
+                  table: { copy: true, download: false, fullscreen: false },
+                }}
+                isAnimating={isStreaming}
+                mode={isStreaming ? "streaming" : "static"}
+              >
+                {content}
+              </Streamdown>
+            )}
+            {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
           </BubbleContent>

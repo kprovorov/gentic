@@ -4,13 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { updateIssueStatus } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gentic/ui/select"
+import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 type IssueStatus =
   | "draft"
@@ -91,22 +85,19 @@ export function IssueStatusSelect({
       >
         Status
       </label>
-      <Select
+      <NativeSelect
         value={status}
-        onValueChange={handleValueChange}
+        onChange={(event) => handleValueChange(event.target.value)}
         disabled={mutation.isPending}
+        id="issue-status"
+        className="w-full max-w-xs"
       >
-        <SelectTrigger id="issue-status" className="max-w-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {statusOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {statusOptions.map((option) => (
+          <NativeSelectOption key={option.value} value={option.value}>
+            {option.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
     </div>
   )
 }

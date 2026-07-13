@@ -71,6 +71,14 @@ function resolveAgentEntry(
 // issue's own instructions to say so.
 const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. Title the pull request following the Conventional Commits spec: prefix it with a type such as \`feat:\`, \`fix:\`, \`chore:\`, \`docs:\`, \`refactor:\`, \`test:\`, \`perf:\`, \`build:\`, or \`ci:\` (for example, \`feat: add issue assignment API\`), so it produces a clean squash-merge commit message for CI/CD. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
 
+export function issueRunInstructions(existingPrUrl?: string | null): string {
+  if (existingPrUrl) {
+    return `This follow-up run already has an existing pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. Do not open a new pull request. Skip committing and pushing only if you made no changes.`
+  }
+
+  return COMMIT_AND_PR_INSTRUCTIONS
+}
+
 /** One prompt turn: plain text, or text plus attachment content blocks. */
 export type PromptTurn = string | ContentBlock[]
 
@@ -86,6 +94,8 @@ export interface RunSessionInput {
    * resumes with its prior conversation context instead of starting fresh.
    */
   resumeSessionId?: string | null
+  /** Existing pull request for the issue, if a previous run already opened one. */
+  existingPrUrl?: string | null
   /** Called once with the ACP session id after the session starts. */
   onSessionId: (sessionId: string) => Promise<void>
   /**
@@ -138,7 +148,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           break
         }
         if (shouldPrependInstructions) {
-          prompt = prependInstructions(prompt)
+          prompt = prependInstructions(prompt, input.existingPrUrl)
           shouldPrependInstructions = false
         }
         await runTurn(session, input.api, input.issueId, input.channel, prompt)
@@ -216,7 +226,7 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
             systemPrompt: {
               type: "preset",
               preset: "claude_code",
-              append: COMMIT_AND_PR_INSTRUCTIONS,
+              append: issueRunInstructions(input.existingPrUrl),
             },
             ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
           },
@@ -226,8 +236,11 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
   }
 }
 
-function prependInstructions(prompt: PromptTurn): PromptTurn {
-  const instructions = `System instructions for this issue run:\n${COMMIT_AND_PR_INSTRUCTIONS}\n\nUser request:\n`
+function prependInstructions(
+  prompt: PromptTurn,
+  existingPrUrl?: string | null
+): PromptTurn {
+  const instructions = `System instructions for this issue run:\n${issueRunInstructions(existingPrUrl)}\n\nUser request:\n`
 
   if (typeof prompt === "string") {
     return `${instructions}${prompt}`

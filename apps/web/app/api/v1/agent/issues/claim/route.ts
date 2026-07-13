@@ -8,13 +8,14 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, agent_provider, session_id, run_finished_at, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, agent_provider, session_id, run_finished_at, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 type ClaimCandidateRow = {
   id: string
   agent_provider: "claude_code" | "codex"
   session_id: string | null
   run_finished_at: string | null
+  pr_url: string | null
   projects: {
     repo: string
     setup_script: string | null
@@ -90,5 +91,6 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
     runFinishedAt: candidate.run_finished_at,
+    prUrl: candidate.pr_url,
   }
 }

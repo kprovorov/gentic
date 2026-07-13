@@ -15,6 +15,7 @@
     "./marker": "./src/ui/marker.tsx",
     "./message": "./src/ui/message.tsx",
     "./message-scroller": "./src/ui/message-scroller.tsx",
+    "./native-select": "./src/ui/native-select.tsx",
     "./select": "./src/ui/select.tsx",
     "./separator": "./src/ui/separator.tsx",
     "./sheet": "./src/ui/sheet.tsx",
