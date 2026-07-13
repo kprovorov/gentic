@@ -2,9 +2,13 @@
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { IconArrowLeft, IconPlus } from "@tabler/icons-react"
+import {
+  IconArrowLeft,
+  IconDeviceFloppy,
+  IconPlayerPlay,
+} from "@tabler/icons-react"
 
-import { createIssue } from "@/app/issues/actions"
+import { runIssue, saveIssueDraft } from "@/app/issues/actions"
 import { getNewIssueData, type ProjectOption } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
@@ -64,7 +68,7 @@ export function NewIssueView({
                 </Button>
               </div>
             ) : (
-              <form action={createIssue} className="grid gap-5">
+              <form action={saveIssueDraft} className="grid gap-5">
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
                   <NativeSelect
@@ -130,75 +134,17 @@ export function NewIssueView({
                   />
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="issue-status">Status</Label>
-                  <NativeSelect
-                    name="status"
-                    required
-                    defaultValue="draft"
-                    id="issue-status"
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="draft">Draft</NativeSelectOption>
-                    <NativeSelectOption value="todo">To do</NativeSelectOption>
-                    <NativeSelectOption value="queued">
-                      Queued
-                    </NativeSelectOption>
-                    <NativeSelectOption value="held">
-                      On hold
-                    </NativeSelectOption>
-                    <NativeSelectOption value="in-progress">
-                      In progress
-                    </NativeSelectOption>
-                    <NativeSelectOption value="waiting-for-input">
-                      Waiting for input
-                    </NativeSelectOption>
-                    <NativeSelectOption value="testing">
-                      Testing
-                    </NativeSelectOption>
-                    <NativeSelectOption value="tests-failed">
-                      Tests failed
-                    </NativeSelectOption>
-                    <NativeSelectOption value="ready-for-review">
-                      Ready for review
-                    </NativeSelectOption>
-                    <NativeSelectOption value="changes-requested">
-                      Changes requested
-                    </NativeSelectOption>
-                    <NativeSelectOption value="approved">
-                      Approved
-                    </NativeSelectOption>
-                    <NativeSelectOption value="merged">
-                      Merged
-                    </NativeSelectOption>
-                    <NativeSelectOption value="deploying">
-                      Deploying
-                    </NativeSelectOption>
-                    <NativeSelectOption value="deploy-failed">
-                      Deploy failed
-                    </NativeSelectOption>
-                    <NativeSelectOption value="validating">
-                      Validating
-                    </NativeSelectOption>
-                    <NativeSelectOption value="run-failed">
-                      Run failed
-                    </NativeSelectOption>
-                    <NativeSelectOption value="completed">
-                      Completed
-                    </NativeSelectOption>
-                    <NativeSelectOption value="cancelled">
-                      Cancelled
-                    </NativeSelectOption>
-                  </NativeSelect>
-                </div>
-
                 <div className="flex justify-end gap-2">
                   <Button asChild variant="outline">
                     <Link href="/issues">Cancel</Link>
                   </Button>
-                  <Button type="submit">
-                    <IconPlus />
-                    Create issue
+                  <Button type="submit" variant="secondary">
+                    <IconDeviceFloppy />
+                    Save draft
+                  </Button>
+                  <Button type="submit" formAction={runIssue}>
+                    <IconPlayerPlay />
+                    Run
                   </Button>
                 </div>
               </form>
