@@ -5,7 +5,12 @@ import { setTimeout as sleep } from "node:timers/promises"
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
 import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
-import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git.js"
+import {
+  checkoutPullRequest,
+  cloneRepo,
+  getPullRequestUrl,
+  runSetupScript,
+} from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import {
@@ -124,6 +129,10 @@ async function processIssue(
       dir,
     })
 
+    if (issue.prUrl) {
+      await checkoutPullRequest({ prUrl: issue.prUrl, dir })
+    }
+
     if (issue.setupScript) {
       await runSetupScript({ script: issue.setupScript, dir })
     }
@@ -199,6 +208,7 @@ async function processIssue(
       agentProvider: issue.agentProvider,
       cwd: dir,
       resumeSessionId: issue.sessionId,
+      existingPrUrl: issue.prUrl,
       onSessionId: (sessionId) =>
         setRunState(api, channel, issue.id, { session_id: sessionId }),
       nextPrompt,

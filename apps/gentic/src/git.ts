@@ -21,6 +21,17 @@ export async function cloneRepo(options: {
 }
 
 /**
+ * Checks out the branch for an existing pull request so follow-up runs update
+ * that PR instead of creating a second one.
+ */
+export async function checkoutPullRequest(options: {
+  prUrl: string
+  dir: string
+}): Promise<void> {
+  await run("gh", ["pr", "checkout", options.prUrl], { cwd: options.dir })
+}
+
+/**
  * Runs a project's configured setup script (e.g. `npm install`) in the
  * cloned repo before the agent session starts.
  */
