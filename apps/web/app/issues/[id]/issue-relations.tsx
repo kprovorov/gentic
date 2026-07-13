@@ -46,6 +46,7 @@ function RelationRow({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
     },
   })
@@ -117,6 +118,7 @@ export function IssueRelations({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
     },
   })
