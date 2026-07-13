@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./bubble": "./src/ui/bubble.tsx",
     "./button": "./src/ui/button.tsx",
     "./card": "./src/ui/card.tsx",
     "./checkbox": "./src/ui/checkbox.tsx",
@@ -11,6 +12,9 @@
     "./form": "./src/ui/form.tsx",
     "./input": "./src/ui/input.tsx",
     "./label": "./src/ui/label.tsx",
+    "./marker": "./src/ui/marker.tsx",
+    "./message": "./src/ui/message.tsx",
+    "./message-scroller": "./src/ui/message-scroller.tsx",
     "./native-select": "./src/ui/native-select.tsx",
     "./select": "./src/ui/select.tsx",
     "./separator": "./src/ui/separator.tsx",
@@ -30,6 +34,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shadcn/react": "0.2.1",
     "@tabler/icons-react": "^3.44.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
