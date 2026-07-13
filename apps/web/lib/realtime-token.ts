@@ -33,6 +33,11 @@ export async function mintRealtimeToken(userId: string): Promise<RealtimeToken> 
   }
 
   const jwk = JSON.parse(privateKeyJwk) as JsonWebKey & { kid: string }
+  // Supabase's exported signing-key JWK carries a `key_ops` that lists
+  // "verify"; jose forwards key_ops verbatim to WebCrypto, which then rejects
+  // importing a private ECDSA key with a non-"sign" usage ("Unsupported key
+  // usage for a ECDSA key"). Drop it so jose derives ["sign"] from `d`.
+  delete jwk.key_ops
   const privateKey = await importJWK(jwk, "ES256")
 
   const now = Math.floor(Date.now() / 1000)
