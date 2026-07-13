@@ -19,9 +19,14 @@ import * as issuesService from "@gentic/services/issues"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
+import { generateIssueTitle } from "./title"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+const createIssueFormSchema = createIssueSchema.omit({ title: true }).extend({
+  prompt: z.string().trim().min(1).max(10_000),
+})
 
 function sanitizeFileName(name: string): string {
   const base = name.split(/[/\\]/).pop() || "file"
@@ -30,13 +35,16 @@ function sanitizeFileName(name: string): string {
 
 export async function createIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issue = createIssueSchema.parse({
+  const fields = createIssueFormSchema.parse({
     project_id: getString(formData, "project_id"),
-    title: getString(formData, "title"),
-    prompt: getString(formData, "prompt") || undefined,
+    prompt: getString(formData, "prompt"),
     status: getString(formData, "status") || "draft",
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     type: getString(formData, "type") || "feature",
+  })
+  const issue = createIssueSchema.parse({
+    ...fields,
+    title: await generateIssueTitle(fields.prompt),
   })
 
   const created = await issuesService.createIssue(supabase, userId, issue)
