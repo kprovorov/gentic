@@ -38,7 +38,7 @@ export type IssueType = "feature" | "bug" | "feedback" | "idea"
 
 export type HomeIssue = {
   id: string
-  title: string
+  title: string | null
   status: IssueStatus
   type: IssueType
   created_at: string
@@ -62,7 +62,7 @@ export type SettingsProject = ProjectOption & {
 
 export type IssueDetail = {
   id: string
-  title: string
+  title: string | null
   prompt: string | null
   agent_provider: "claude_code" | "codex"
   type: IssueType

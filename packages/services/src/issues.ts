@@ -12,7 +12,7 @@ const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
 
 export type IssueRelationIssue = {
   id: string
-  title: string
+  title: string | null
   status: string
 }
 
@@ -231,7 +231,7 @@ export async function createIssue(
     .from("issues")
     .insert({
       project_id: input.project_id,
-      title: input.title,
+      title: input.title ?? null,
       prompt: input.prompt ?? null,
       status: input.status,
       agent_provider: input.agent_provider,
@@ -247,7 +247,10 @@ export async function createIssue(
       await supabase.from("messages").insert({
         issue_id: issue.id,
         role: "user",
-        content: kickoffMessageContent(input.title, input.prompt ?? null),
+        content: kickoffMessageContent(
+          input.title ?? null,
+          input.prompt ?? null
+        ),
       })
     )
   }
@@ -255,8 +258,35 @@ export async function createIssue(
   return issue
 }
 
-function kickoffMessageContent(title: string, prompt: string | null): string {
+// The title may still be null here: the web app generates it in the
+// background after the issue is saved (see apps/web/app/issues/actions.ts),
+// so an issue can reach `todo` status before its title exists.
+function kickoffMessageContent(
+  title: string | null,
+  prompt: string | null
+): string {
+  if (!title) {
+    return prompt ?? ""
+  }
   return prompt ? `${title}\n\n${prompt}` : title
+}
+
+// Called from the background title-generation step after an issue is saved
+// with no title (see apps/web/app/issues/actions.ts). Runs outside the
+// request lifecycle with a service-role client, so there's no `userId` to
+// check ownership against — the issue id alone is used, since it was only
+// just created by an already-authorized request.
+export async function setIssueTitle(
+  supabase: Supabase,
+  issueId: string,
+  title: string
+) {
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ title, updated_at: new Date().toISOString() })
+      .eq("id", issueId)
+  )
 }
 
 export async function updateIssue(
@@ -318,7 +348,7 @@ export async function resetIssueAgent(
     .select("title,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ title: string; prompt: string | null }>()
+    .maybeSingle<{ title: string | null; prompt: string | null }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -431,7 +461,11 @@ export async function updateIssueStatus(
     .select("status,title,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ status: string; title: string; prompt: string | null }>()
+    .maybeSingle<{
+      status: string
+      title: string | null
+      prompt: string | null
+    }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)

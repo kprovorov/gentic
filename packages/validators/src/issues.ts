@@ -33,7 +33,10 @@ export type IssueType = z.infer<typeof issueTypeSchema>
 
 export const createIssueSchema = z.object({
   project_id: z.string().uuid(),
-  title: z.string().trim().min(1).max(160),
+  // Omitted by the web app's create-issue form: the title is generated in
+  // the background after the issue is saved. Trusted callers that already
+  // know the title (e.g. the MCP `create_issue` tool) may still supply one.
+  title: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
   agent_provider: agentProviderSchema.default("claude_code"),

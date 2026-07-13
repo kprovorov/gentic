@@ -62,7 +62,7 @@ export function EditIssueView({
                 <Input
                   id="issue-title"
                   name="title"
-                  defaultValue={issue.title}
+                  defaultValue={issue.title ?? ""}
                   placeholder="Review onboarding flow"
                   required
                   maxLength={160}

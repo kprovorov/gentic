@@ -310,8 +310,13 @@ export function IssueDetailView({
                 Agent: {agentProviderLabels[issue.agent_provider]}
               </div>
             </div>
-            <h1 className="text-3xl leading-tight md:text-4xl">
-              {issue.title}
+            <h1
+              className={cn(
+                "text-3xl leading-tight md:text-4xl",
+                !issue.title && "text-muted-foreground italic"
+              )}
+            >
+              {issue.title ?? "Generating title…"}
             </h1>
             <p className="text-sm text-muted-foreground">
               Created {formatDateTime(issue.created_at)}
