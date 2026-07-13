@@ -9,6 +9,7 @@ export interface ConfigFile {
   GIT_REMOTE_BASE?: string
   WORKDIR?: string
   POLL_INTERVAL_MS?: number
+  MAX_CONCURRENT_ISSUES?: number
 }
 
 const paths = envPaths("gentic", { suffix: "" })
