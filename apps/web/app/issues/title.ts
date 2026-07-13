@@ -1,27 +1,11 @@
 import "server-only"
 
-import { createGateway, generateText } from "ai"
+import { gateway, generateText } from "ai"
 
 const ISSUE_TITLE_MODEL =
   process.env.ISSUE_TITLE_MODEL ?? "openai/gpt-4.1-mini"
 
-function getOidcToken(): string {
-  const token = process.env.VERCEL_OIDC_TOKEN
-
-  if (!token) {
-    throw new Error(
-      "VERCEL_OIDC_TOKEN is required to generate issue titles through AI Gateway"
-    )
-  }
-
-  return token
-}
-
 export async function generateIssueTitle(prompt: string): Promise<string> {
-  const gateway = createGateway({
-    apiKey: getOidcToken(),
-  })
-
   const { text } = await generateText({
     model: gateway(ISSUE_TITLE_MODEL),
     system:
