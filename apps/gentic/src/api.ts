@@ -5,6 +5,7 @@ export interface ClaimedIssue {
   setupScript: string | null
   sessionId: string | null
   runFinishedAt: string | null
+  prUrl: string | null
 }
 
 export interface RunStateFields {

@@ -4,7 +4,7 @@ import { test } from "node:test"
 import type { AgentApi, InsertMessageInput } from "../api.js"
 import { StreamingAssistantMessage, publishMessage } from "../messages.js"
 import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
-import { runTurn } from "../session.js"
+import { issueRunInstructions, runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
 
@@ -115,6 +115,14 @@ test("run error path best-effort persists the current partial", async () => {
   assert.equal(api.inserted[0]?.message.content, "partial output")
   assert.equal(api.inserted[0]?.message.status, "error")
   assert.equal(channel.messages.at(-1)?.status, "error")
+})
+
+test("issue run instructions update an existing pull request on follow-up", () => {
+  const instructions = issueRunInstructions("https://github.com/acme/app/pull/7")
+
+  assert.match(instructions, /existing pull request branch/)
+  assert.match(instructions, /Do not open a new pull request/)
+  assert.doesNotMatch(instructions, /open a pull request against/)
 })
 
 function fakeChannel(): IssueRealtimeChannel & {
