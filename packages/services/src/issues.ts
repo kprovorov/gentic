@@ -240,7 +240,23 @@ export async function createIssue(
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
 
-  return unwrap(result)
+  const issue = unwrap(result)
+
+  if (input.status === "todo") {
+    unwrap(
+      await supabase.from("messages").insert({
+        issue_id: issue.id,
+        role: "user",
+        content: kickoffMessageContent(input.title, input.prompt ?? null),
+      })
+    )
+  }
+
+  return issue
+}
+
+function kickoffMessageContent(title: string, prompt: string | null): string {
+  return prompt ? `${title}\n\n${prompt}` : title
 }
 
 export async function updateIssue(
@@ -331,15 +347,11 @@ export async function resetIssueAgent(
       .eq("id", id)
   )
 
-  const messageContent = current.prompt
-    ? `${current.title}\n\n${current.prompt}`
-    : current.title
-
   unwrap(
     await supabase.from("messages").insert({
       issue_id: id,
       role: "user",
-      content: messageContent,
+      content: kickoffMessageContent(current.title, current.prompt),
     })
   )
 }
@@ -443,15 +455,11 @@ export async function updateIssueStatus(
   const data = unwrap(result)
 
   if (startsRun) {
-    const messageContent = current.prompt
-      ? `${current.title}\n\n${current.prompt}`
-      : current.title
-
     unwrap(
       await supabase.from("messages").insert({
         issue_id: id,
         role: "user",
-        content: messageContent,
+        content: kickoffMessageContent(current.title, current.prompt),
       })
     )
   }
