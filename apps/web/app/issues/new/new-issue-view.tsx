@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@gentic/ui/card"
-import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
 import {
   Select,
@@ -93,17 +92,6 @@ export function NewIssueView({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="issue-title">Title</Label>
-                  <Input
-                    id="issue-title"
-                    name="title"
-                    placeholder="Review onboarding flow"
-                    required
-                    maxLength={160}
-                  />
-                </div>
-
-                <div className="grid gap-2">
                   <Label htmlFor="issue-type">Type</Label>
                   <Select name="type" required defaultValue="feature">
                     <SelectTrigger id="issue-type">
@@ -141,7 +129,8 @@ export function NewIssueView({
                     id="issue-prompt"
                     name="prompt"
                     rows={6}
-                    placeholder="Add context, acceptance notes, or links."
+                    placeholder="Describe the issue, acceptance notes, or links."
+                    required
                     className="w-full resize-y rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base transition-[color,box-shadow,background-color] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                   />
                 </div>
