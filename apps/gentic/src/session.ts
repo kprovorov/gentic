@@ -18,6 +18,7 @@ import {
   type ResumeSessionResponse,
 } from "@agentclientprotocol/sdk"
 
+import type { AgentApi } from "./api.js"
 import { StreamingAssistantMessage, publishMessage } from "./messages.js"
 import type { IssueRealtimeChannel } from "./realtime.js"
 
@@ -74,6 +75,8 @@ const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, com
 export type PromptTurn = string | ContentBlock[]
 
 export interface RunSessionInput {
+  api: AgentApi
+  issueId: string
   channel: IssueRealtimeChannel
   agentProvider: AgentProvider
   /** Absolute path to the cloned repo the agent works in. */
@@ -138,7 +141,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           prompt = prependInstructions(prompt)
           shouldPrependInstructions = false
         }
-        await runTurn(session, input.channel, prompt)
+        await runTurn(session, input.api, input.issueId, input.channel, prompt)
       }
     })
   } finally {
@@ -255,8 +258,10 @@ async function resumeSession(
 }
 
 /** Sends one prompt and streams updates into the transcript until it stops. */
-async function runTurn(
+export async function runTurn(
   session: ActiveSession,
+  api: AgentApi,
+  issueId: string,
   channel: IssueRealtimeChannel,
   prompt: PromptTurn
 ): Promise<void> {
@@ -273,7 +278,7 @@ async function runTurn(
       current = null
     }
     if (!current) {
-      current = new StreamingAssistantMessage(channel, kind)
+      current = new StreamingAssistantMessage(api, issueId, channel, kind)
       currentKind = kind
     }
     return current
@@ -287,36 +292,44 @@ async function runTurn(
     }
   }
 
-  for (;;) {
-    const message = await session.nextUpdate()
-    if (message.kind === "stop") {
-      break
+  try {
+    for (;;) {
+      const message = await session.nextUpdate()
+      if (message.kind === "stop") {
+        break
+      }
+
+      const update = message.update
+      if (update.sessionUpdate === "agent_message_chunk") {
+        const text = textOf(update.content)
+        if (text) {
+          await (await streamInto("text")).append(text)
+        }
+      } else if (update.sessionUpdate === "agent_thought_chunk") {
+        const text = textOf(update.content)
+        if (text) {
+          await (await streamInto("thinking")).append(text)
+        }
+      } else if (update.sessionUpdate === "tool_call") {
+        // Flush any streaming text first so the transcript keeps its ordering.
+        await finalizeCurrent()
+        await publishMessage(api, issueId, channel, {
+          kind: "tool",
+          content: update.title,
+        })
+      }
     }
 
-    const update = message.update
-    if (update.sessionUpdate === "agent_message_chunk") {
-      const text = textOf(update.content)
-      if (text) {
-        await (await streamInto("text")).append(text)
-      }
-    } else if (update.sessionUpdate === "agent_thought_chunk") {
-      const text = textOf(update.content)
-      if (text) {
-        await (await streamInto("thinking")).append(text)
-      }
-    } else if (update.sessionUpdate === "tool_call") {
-      // Flush any streaming text first so the transcript keeps its ordering.
-      await finalizeCurrent()
-      await publishMessage(channel, {
-        kind: "tool",
-        content: update.title,
-      })
+    await finalizeCurrent()
+    // Surface any prompt-turn error (the loop above already saw the stop).
+    await promptDone
+  } catch (error) {
+    const partial = current as StreamingAssistantMessage | null
+    if (partial) {
+      await partial.persistPartialError()
     }
+    throw error
   }
-
-  await finalizeCurrent()
-  // Surface any prompt-turn error (the loop above already saw the stop).
-  await promptDone
 }
 
 function textOf(content: ContentBlock): string {

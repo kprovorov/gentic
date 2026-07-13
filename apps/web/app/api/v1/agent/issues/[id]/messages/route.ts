@@ -54,21 +54,30 @@ export async function POST(
 
     const { data, error } = await supabase
       .from("messages")
-      .insert({
-        issue_id: id,
-        role: fields.role,
-        kind: fields.kind ?? "text",
-        content: fields.content,
-        status: fields.status ?? "complete",
-      })
+      .upsert(
+        {
+          ...(fields.id ? { id: fields.id } : {}),
+          issue_id: id,
+          role: fields.role,
+          kind: fields.kind ?? "text",
+          content: fields.content,
+          status: fields.status ?? "complete",
+        },
+        { onConflict: "id", ignoreDuplicates: true }
+      )
       .select("id")
-      .single<{ id: string }>()
+      .maybeSingle<{ id: string }>()
 
     if (error) {
       throw new Error(error.message)
     }
 
-    return json({ id: data.id })
+    const messageId = data?.id ?? fields.id
+    if (!messageId) {
+      throw new Error("Message insert did not return an id")
+    }
+
+    return json({ id: messageId })
   } catch (error) {
     return handleAgentError(error)
   }

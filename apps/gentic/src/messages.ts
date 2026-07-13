@@ -1,13 +1,22 @@
 import { randomUUID } from "node:crypto"
+import { setTimeout as sleep } from "node:timers/promises"
 
 import type { AgentApi, RunStateFields } from "./api.js"
+import { logError } from "./log.js"
 import type { IssueRealtimeChannel } from "./realtime.js"
+
+const DEFAULT_PERSIST_RETRY_DELAYS_MS = [250, 1_000, 3_000]
+
+interface PersistOptions {
+  retryDelaysMs?: readonly number[]
+}
 
 /**
  * An assistant message streamed into the issue transcript incrementally as
  * the agent produces text. Each chunk publishes a full-content `message`
- * snapshot to the issue's realtime channel, throttled so the browser sees
- * growth without a broadcast per token. `finalize` publishes it `complete`.
+ * snapshot to the issue's realtime channel, throttled so the browser sees growth
+ * without a broadcast per token. `finalize` publishes it `complete`, then
+ * persists the completed message once using the same id.
  */
 export class StreamingAssistantMessage {
   private readonly id = randomUUID()
@@ -16,11 +25,15 @@ export class StreamingAssistantMessage {
   private dirty = false
   private timer: ReturnType<typeof setTimeout> | null = null
   private started = false
+  private finalized = false
 
   constructor(
+    private readonly api: AgentApi,
+    private readonly issueId: string,
     private readonly channel: IssueRealtimeChannel,
     private readonly kind: "text" | "thinking" = "text",
-    private readonly flushIntervalMs = 150
+    private readonly flushIntervalMs = 150,
+    private readonly persistOptions: PersistOptions = {}
   ) {}
 
   async append(text: string): Promise<void> {
@@ -62,10 +75,49 @@ export class StreamingAssistantMessage {
       clearTimeout(this.timer)
       this.timer = null
     }
-    if (!this.started) {
+    if (!this.started || this.finalized) {
       return
     }
+    this.finalized = true
     await this.publish("complete")
+    await persistMessageWithRetry(
+      this.api,
+      this.issueId,
+      {
+        id: this.id,
+        role: "assistant",
+        kind: this.kind,
+        content: this.content,
+        status: "complete",
+      },
+      this.persistOptions
+    )
+  }
+
+  async persistPartialError(): Promise<void> {
+    if (!this.started || this.finalized) {
+      return
+    }
+    this.finalized = true
+    if (this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+    await this.publish("error").catch((error) => {
+      logError("failed to publish errored assistant message:", describe(error))
+    })
+    await persistMessageWithRetry(
+      this.api,
+      this.issueId,
+      {
+        id: this.id,
+        role: "assistant",
+        kind: this.kind,
+        content: this.content,
+        status: "error",
+      },
+      this.persistOptions
+    )
   }
 
   private async publish(
@@ -85,21 +137,38 @@ export class StreamingAssistantMessage {
 
 /** Publishes a single, already-complete assistant message (e.g. a tool call). */
 export async function publishMessage(
+  api: AgentApi,
+  issueId: string,
   channel: IssueRealtimeChannel,
   fields: {
     kind?: "text" | "tool" | "thinking"
     content: string
-    status?: "streaming" | "complete" | "error"
+    status?: "complete" | "error"
+    persistOptions?: PersistOptions
   }
 ): Promise<void> {
+  const id = randomUUID()
+  const status = fields.status ?? "complete"
   await channel.publishMessage({
-    id: randomUUID(),
+    id,
     seq: 1,
     role: "assistant",
     kind: fields.kind ?? "text",
     content: fields.content,
-    status: fields.status ?? "complete",
+    status,
   })
+  await persistMessageWithRetry(
+    api,
+    issueId,
+    {
+      id,
+      role: "assistant",
+      kind: fields.kind ?? "text",
+      content: fields.content,
+      status,
+    },
+    fields.persistOptions
+  )
 }
 
 /**
@@ -123,4 +192,43 @@ export async function setRunState(
       run_error: fields.run_error ?? null,
     })
   }
+}
+
+async function persistMessageWithRetry(
+  api: AgentApi,
+  issueId: string,
+  message: {
+    id: string
+    role: "assistant" | "system"
+    kind: "text" | "tool" | "thinking"
+    content: string
+    status: "complete" | "error"
+  },
+  options: PersistOptions = {}
+): Promise<void> {
+  const retryDelaysMs =
+    options.retryDelaysMs ?? DEFAULT_PERSIST_RETRY_DELAYS_MS
+  let attempt = 0
+
+  for (;;) {
+    try {
+      await api.insertMessage(issueId, message)
+      return
+    } catch (error) {
+      const delay = retryDelaysMs[attempt]
+      if (delay === undefined) {
+        logError(
+          `failed to persist finalized message ${message.id}:`,
+          describe(error)
+        )
+        return
+      }
+      attempt += 1
+      await sleep(delay)
+    }
+  }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

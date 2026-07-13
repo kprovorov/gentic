@@ -193,6 +193,8 @@ async function processIssue(
     }
 
     await runAgentSession({
+      api,
+      issueId: issue.id,
       channel,
       agentProvider: issue.agentProvider,
       cwd: dir,
