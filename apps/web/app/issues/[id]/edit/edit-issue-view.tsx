@@ -17,13 +17,7 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gentic/ui/select"
+import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 export function EditIssueView({
   issueId,
@@ -89,34 +83,38 @@ export function EditIssueView({
 
               <div className="grid gap-2">
                 <Label htmlFor="issue-type">Type</Label>
-                <Select name="type" required defaultValue={issue.type}>
-                  <SelectTrigger id="issue-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="bug">Bug</SelectItem>
-                    <SelectItem value="feedback">Feedback</SelectItem>
-                    <SelectItem value="idea">Idea</SelectItem>
-                  </SelectContent>
-                </Select>
+                <NativeSelect
+                  name="type"
+                  required
+                  defaultValue={issue.type}
+                  id="issue-type"
+                  className="w-full"
+                >
+                  <NativeSelectOption value="feature">
+                    Feature
+                  </NativeSelectOption>
+                  <NativeSelectOption value="bug">Bug</NativeSelectOption>
+                  <NativeSelectOption value="feedback">
+                    Feedback
+                  </NativeSelectOption>
+                  <NativeSelectOption value="idea">Idea</NativeSelectOption>
+                </NativeSelect>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="issue-agent-provider">Agent</Label>
-                <Select
+                <NativeSelect
                   name="agent_provider"
                   required
                   defaultValue={issue.agent_provider}
+                  id="issue-agent-provider"
+                  className="w-full"
                 >
-                  <SelectTrigger id="issue-agent-provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="claude_code">Claude Code</SelectItem>
-                    <SelectItem value="codex">Codex</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <NativeSelectOption value="claude_code">
+                    Claude Code
+                  </NativeSelectOption>
+                  <NativeSelectOption value="codex">Codex</NativeSelectOption>
+                </NativeSelect>
               </div>
 
               <div className="flex justify-end gap-2">

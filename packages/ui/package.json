@@ -11,6 +11,7 @@
     "./form": "./src/ui/form.tsx",
     "./input": "./src/ui/input.tsx",
     "./label": "./src/ui/label.tsx",
+    "./native-select": "./src/ui/native-select.tsx",
     "./select": "./src/ui/select.tsx",
     "./separator": "./src/ui/separator.tsx",
     "./sheet": "./src/ui/sheet.tsx",
