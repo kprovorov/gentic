@@ -65,7 +65,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     const [title, type] = await Promise.all([
       generateIssueTitle(fields.prompt).catch((error) => {
         console.error(`Failed to generate title for issue ${created.id}:`, error)
-        return fields.prompt.slice(0, 160)
+        return fields.prompt.slice(0, 60)
       }),
       generateIssueType(fields.prompt).catch((error) => {
         console.error(`Failed to generate type for issue ${created.id}:`, error)
