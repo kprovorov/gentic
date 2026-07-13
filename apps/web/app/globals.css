@@ -1,8 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "streamdown/styles.css";
 
 @source "../../../packages/ui/src";
+@source "../../../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -161,4 +163,34 @@
   code, kbd, pre, samp {
     @apply font-mono text-sm;
     }
+}
+
+@layer components {
+  .chat-markdown {
+    @apply text-sm leading-6;
+  }
+
+  .chat-markdown [data-streamdown="heading-1"] {
+    @apply mt-4 mb-2 text-lg leading-snug;
+  }
+
+  .chat-markdown [data-streamdown="heading-2"] {
+    @apply mt-4 mb-2 text-base leading-snug;
+  }
+
+  .chat-markdown [data-streamdown="heading-3"],
+  .chat-markdown [data-streamdown="heading-4"],
+  .chat-markdown [data-streamdown="heading-5"],
+  .chat-markdown [data-streamdown="heading-6"] {
+    @apply mt-3 mb-1.5 text-sm leading-snug;
+  }
+
+  .chat-markdown [data-streamdown="code-block"],
+  .chat-markdown [data-streamdown="table-container"] {
+    @apply my-3;
+  }
+
+  .chat-markdown [data-streamdown="table-scroll"] {
+    @apply max-w-full;
+  }
 }

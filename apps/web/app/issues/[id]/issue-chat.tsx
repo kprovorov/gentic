@@ -7,6 +7,7 @@ import {
   IconGitPullRequest,
   IconSend,
 } from "@tabler/icons-react"
+import { Streamdown } from "streamdown"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
@@ -434,22 +435,40 @@ function formatDateTime(value: string): string {
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
   const isTool = message.kind === "tool"
+  const content = message.content ?? ""
+  const isStreaming = message.status === "streaming"
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap",
+          "max-w-[85%] rounded-2xl px-4 py-2 text-sm",
           isUser
             ? "bg-primary/15 text-primary-foreground"
             : isTool
               ? "bg-muted/60 font-mono text-xs text-muted-foreground"
               : "bg-muted text-foreground",
+          isTool && "whitespace-pre-wrap",
           message.status === "error" && "bg-destructive/15 text-destructive"
         )}
       >
-        {message.content}
-        {message.status === "streaming" ? (
+        {isTool ? (
+          content
+        ) : (
+          <Streamdown
+            className="chat-markdown"
+            controls={{
+              code: { copy: true, download: false },
+              mermaid: false,
+              table: { copy: true, download: false, fullscreen: false },
+            }}
+            isAnimating={isStreaming}
+            mode={isStreaming ? "streaming" : "static"}
+          >
+            {content}
+          </Streamdown>
+        )}
+        {isStreaming ? (
           <span className="ml-0.5 animate-pulse">▍</span>
         ) : null}
       </div>
