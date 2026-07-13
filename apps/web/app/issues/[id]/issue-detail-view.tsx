@@ -17,6 +17,7 @@ import {
   IconDownload,
   IconExternalLink,
   IconEye,
+  IconFileDescription,
   IconFlask,
   IconFolder,
   IconGitMerge,
@@ -128,6 +129,7 @@ const agentProviderLabels: Record<
 }
 
 const issueTypeLabels: Record<IssueDetailData["issue"]["type"], string> = {
+  issue: "Issue",
   feature: "Feature",
   bug: "Bug",
   feedback: "Feedback",
@@ -135,6 +137,7 @@ const issueTypeLabels: Record<IssueDetailData["issue"]["type"], string> = {
 }
 
 const issueTypeIcons = {
+  issue: IconFileDescription,
   feature: IconSparkles,
   bug: IconBug,
   feedback: IconMessage2,
@@ -142,6 +145,7 @@ const issueTypeIcons = {
 }
 
 const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
+  issue: "bg-muted text-muted-foreground",
   feature: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   bug: "bg-red-500/15 text-red-700 dark:text-red-300",
   feedback: "bg-sky-500/15 text-sky-700 dark:text-sky-300",

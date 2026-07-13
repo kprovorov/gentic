@@ -87,26 +87,6 @@ export function NewIssueView({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="issue-type">Type</Label>
-                  <NativeSelect
-                    name="type"
-                    required
-                    defaultValue="feature"
-                    id="issue-type"
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="feature">
-                      Feature
-                    </NativeSelectOption>
-                    <NativeSelectOption value="bug">Bug</NativeSelectOption>
-                    <NativeSelectOption value="feedback">
-                      Feedback
-                    </NativeSelectOption>
-                    <NativeSelectOption value="idea">Idea</NativeSelectOption>
-                  </NativeSelect>
-                </div>
-
-                <div className="grid gap-2">
                   <Label htmlFor="issue-agent-provider">Agent</Label>
                   <NativeSelect
                     name="agent_provider"

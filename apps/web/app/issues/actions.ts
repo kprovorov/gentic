@@ -23,12 +23,13 @@ import { createServiceClient } from "@gentic/supabase/service"
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
 import { generateIssueTitle } from "./title"
+import { generateIssueType } from "./type"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 const createIssueFormSchema = createIssueSchema
-  .omit({ title: true, status: true })
+  .omit({ title: true, status: true, type: true })
   .extend({
     prompt: z.string().trim().min(1).max(10_000),
   })
@@ -44,15 +45,14 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     project_id: getString(formData, "project_id"),
     prompt: getString(formData, "prompt"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
-    type: getString(formData, "type") || "feature",
   })
 
-  // Save the issue with no title right away rather than blocking on the AI
-  // Gateway call — title generation runs after the response is sent (via
-  // `after`), so it still completes even if the user closes the tab, and the
-  // service-role client is used since there's no request-scoped session by
-  // then. `issues` is realtime-enabled, so the title fills in live for
-  // anyone still on the page.
+  // Save the issue with no title and the default "issue" type right away
+  // rather than blocking on the AI Gateway calls — both are generated after
+  // the response is sent (via `after`), so they still complete even if the
+  // user closes the tab, and the service-role client is used since there's
+  // no request-scoped session by then. `issues` is realtime-enabled, so both
+  // fields fill in live for anyone still on the page.
   const created = await issuesService.createIssue(
     supabase,
     userId,
@@ -60,11 +60,23 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   )
 
   after(async () => {
-    const title = await generateIssueTitle(fields.prompt).catch((error) => {
-      console.error(`Failed to generate title for issue ${created.id}:`, error)
-      return fields.prompt.slice(0, 160)
-    })
-    await issuesService.setIssueTitle(createServiceClient(), created.id, title)
+    const serviceClient = createServiceClient()
+
+    const [title, type] = await Promise.all([
+      generateIssueTitle(fields.prompt).catch((error) => {
+        console.error(`Failed to generate title for issue ${created.id}:`, error)
+        return fields.prompt.slice(0, 160)
+      }),
+      generateIssueType(fields.prompt).catch((error) => {
+        console.error(`Failed to generate type for issue ${created.id}:`, error)
+        return null
+      }),
+    ])
+
+    await Promise.all([
+      issuesService.setIssueTitle(serviceClient, created.id, title),
+      type ? issuesService.setIssueType(serviceClient, created.id, type) : null,
+    ])
   })
 
   revalidatePath("/home")

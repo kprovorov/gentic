@@ -2,6 +2,7 @@ import type {
   CreateIssueValues,
   IssueRelationDirection,
   IssueStatus,
+  IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
 
@@ -285,6 +286,24 @@ export async function setIssueTitle(
     await supabase
       .from("issues")
       .update({ title, updated_at: new Date().toISOString() })
+      .eq("id", issueId)
+  )
+}
+
+// Called from the background type-classification step after an issue is
+// saved with the "issue" placeholder type (see apps/web/app/issues/actions.ts).
+// Runs outside the request lifecycle with a service-role client, so there's
+// no `userId` to check ownership against — the issue id alone is used, since
+// it was only just created by an already-authorized request.
+export async function setIssueType(
+  supabase: Supabase,
+  issueId: string,
+  type: IssueType
+) {
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ type, updated_at: new Date().toISOString() })
       .eq("id", issueId)
   )
 }
