@@ -25,7 +25,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from("messages")
-      .select("content, created_at")
+      .select("id, content, created_at")
       .eq("issue_id", id)
       .eq("role", "user")
       .gt("created_at", cursor)

@@ -147,9 +147,16 @@ export async function sendIssueMessage(formData: FormData) {
     content: getString(formData, "content"),
   })
 
-  await issuesService.sendIssueMessage(supabase, userId, issue_id, content)
+  const message = await issuesService.sendIssueMessage(
+    supabase,
+    userId,
+    issue_id,
+    content
+  )
 
   revalidatePath(`/issues/${issue_id}`)
+
+  return message
 }
 
 export async function uploadAttachments(formData: FormData) {

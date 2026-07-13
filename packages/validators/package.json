@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     "./issues": "./src/issues.ts",
-    "./projects": "./src/projects.ts"
+    "./projects": "./src/projects.ts",
+    "./realtime": "./src/realtime.ts"
   },
   "scripts": {
     "lint": "eslint .",

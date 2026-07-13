@@ -18,11 +18,8 @@ import {
   type ResumeSessionResponse,
 } from "@agentclientprotocol/sdk"
 
-import {
-  StreamingAssistantMessage,
-  insertMessage,
-} from "./messages.js"
-import type { AgentApi } from "./api.js"
+import { StreamingAssistantMessage, publishMessage } from "./messages.js"
+import type { IssueRealtimeChannel } from "./realtime.js"
 
 export type AgentProvider = "claude_code" | "codex"
 
@@ -77,8 +74,7 @@ const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, com
 export type PromptTurn = string | ContentBlock[]
 
 export interface RunSessionInput {
-  api: AgentApi
-  issueId: string
+  channel: IssueRealtimeChannel
   agentProvider: AgentProvider
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
@@ -142,7 +138,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           prompt = prependInstructions(prompt)
           shouldPrependInstructions = false
         }
-        await runTurn(session, input.api, input.issueId, prompt)
+        await runTurn(session, input.channel, prompt)
       }
     })
   } finally {
@@ -261,8 +257,7 @@ async function resumeSession(
 /** Sends one prompt and streams updates into the transcript until it stops. */
 async function runTurn(
   session: ActiveSession,
-  api: AgentApi,
-  issueId: string,
+  channel: IssueRealtimeChannel,
   prompt: PromptTurn
 ): Promise<void> {
   const promptDone = session.prompt(prompt)
@@ -278,7 +273,7 @@ async function runTurn(
       current = null
     }
     if (!current) {
-      current = new StreamingAssistantMessage(api, issueId, kind)
+      current = new StreamingAssistantMessage(channel, kind)
       currentKind = kind
     }
     return current
@@ -312,8 +307,7 @@ async function runTurn(
     } else if (update.sessionUpdate === "tool_call") {
       // Flush any streaming text first so the transcript keeps its ordering.
       await finalizeCurrent()
-      await insertMessage(api, issueId, {
-        role: "assistant",
+      await publishMessage(channel, {
         kind: "tool",
         content: update.title,
       })

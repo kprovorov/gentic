@@ -20,6 +20,7 @@
     "@agentclientprotocol/codex-acp": "^1.1.0",
     "@agentclientprotocol/sdk": "^1.1.0",
     "@clack/prompts": "^1.6.0",
+    "@supabase/supabase-js": "^2.110.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.7",
     "env-paths": "^4.0.0",

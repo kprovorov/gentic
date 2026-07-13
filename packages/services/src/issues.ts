@@ -522,12 +522,16 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  unwrap(
-    await supabase.from("messages").insert({
-      issue_id: issueId,
-      role: "user",
-      content,
-    })
+  const message = unwrap(
+    await supabase
+      .from("messages")
+      .insert({
+        issue_id: issueId,
+        role: "user",
+        content,
+      })
+      .select("id, created_at")
+      .single<{ id: string; created_at: string }>()
   )
 
   // A finished run has no worker polling for it anymore. Re-queue so the
@@ -545,6 +549,8 @@ export async function sendIssueMessage(
       .eq("id", issueId)
       .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
+
+  return message
 }
 
 export type ChangesRequestedReviewComment = {

@@ -1,22 +1,26 @@
-import type { AgentApi, MessageFields, RunStateFields } from "./api.js"
+import { randomUUID } from "node:crypto"
+
+import type { AgentApi, RunStateFields } from "./api.js"
+import type { IssueRealtimeChannel } from "./realtime.js"
 
 /**
- * An assistant message that is written to the issue transcript incrementally as
- * the agent streams text. The first chunk inserts a `streaming` row; later
- * chunks throttle-update its content so the browser sees growth without a write
- * per token. `finalize` marks the row `complete`.
+ * An assistant message streamed into the issue transcript incrementally as
+ * the agent produces text. Each chunk publishes a full-content `message`
+ * snapshot to the issue's realtime channel, throttled so the browser sees
+ * growth without a broadcast per token. `finalize` publishes it `complete`.
  */
 export class StreamingAssistantMessage {
-  private id: string | null = null
+  private readonly id = randomUUID()
+  private seq = 0
   private content = ""
   private dirty = false
   private timer: ReturnType<typeof setTimeout> | null = null
+  private started = false
 
   constructor(
-    private readonly api: AgentApi,
-    private readonly issueId: string,
+    private readonly channel: IssueRealtimeChannel,
     private readonly kind: "text" | "thinking" = "text",
-    private readonly flushIntervalMs = 250
+    private readonly flushIntervalMs = 150
   ) {}
 
   async append(text: string): Promise<void> {
@@ -25,13 +29,9 @@ export class StreamingAssistantMessage {
     }
     this.content += text
 
-    if (!this.id) {
-      this.id = await this.api.insertMessage(this.issueId, {
-        role: "assistant",
-        kind: this.kind,
-        content: this.content,
-        status: "streaming",
-      })
+    if (!this.started) {
+      this.started = true
+      await this.publish("streaming")
       return
     }
 
@@ -50,11 +50,11 @@ export class StreamingAssistantMessage {
 
   private async flush(): Promise<void> {
     this.timer = null
-    if (!this.dirty || !this.id) {
+    if (!this.dirty) {
       return
     }
     this.dirty = false
-    await this.api.updateMessage(this.id, { content: this.content })
+    await this.publish("streaming")
   }
 
   async finalize(): Promise<void> {
@@ -62,36 +62,65 @@ export class StreamingAssistantMessage {
       clearTimeout(this.timer)
       this.timer = null
     }
-    if (!this.id) {
+    if (!this.started) {
       return
     }
-    await this.api.updateMessage(this.id, {
-      content: this.content,
-      status: "complete",
-    })
+    await this.publish("complete")
   }
 
-  get started(): boolean {
-    return this.id !== null
+  private async publish(
+    status: "streaming" | "complete" | "error"
+  ): Promise<void> {
+    this.seq += 1
+    await this.channel.publishMessage({
+      id: this.id,
+      seq: this.seq,
+      role: "assistant",
+      kind: this.kind,
+      content: this.content,
+      status,
+    })
   }
 }
 
-export async function insertMessage(
-  api: AgentApi,
-  issueId: string,
-  fields: MessageFields
+/** Publishes a single, already-complete assistant message (e.g. a tool call). */
+export async function publishMessage(
+  channel: IssueRealtimeChannel,
+  fields: {
+    kind?: "text" | "tool" | "thinking"
+    content: string
+    status?: "streaming" | "complete" | "error"
+  }
 ): Promise<void> {
-  await api.insertMessage(issueId, {
-    kind: "text",
-    status: "complete",
-    ...fields,
+  await channel.publishMessage({
+    id: randomUUID(),
+    seq: 1,
+    role: "assistant",
+    kind: fields.kind ?? "text",
+    content: fields.content,
+    status: fields.status ?? "complete",
   })
 }
 
+/**
+ * Persists run state via the REST PATCH (the source of truth) and, when a
+ * channel is available and the update includes a status transition,
+ * additionally broadcasts it for instant UI updates.
+ */
 export async function setRunState(
   api: AgentApi,
+  channel: IssueRealtimeChannel | null,
   issueId: string,
   fields: RunStateFields
 ): Promise<void> {
   await api.setRunState(issueId, fields)
+
+  if (channel && fields.status) {
+    await channel.publishRunState({
+      status: fields.status,
+      pr_url: fields.pr_url ?? null,
+      usage_limit_reset_at: fields.usage_limit_reset_at ?? null,
+      run_error: fields.run_error ?? null,
+    })
+  }
 }
