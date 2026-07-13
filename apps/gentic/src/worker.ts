@@ -35,9 +35,20 @@ export async function runWorker(): Promise<void> {
   process.on("SIGINT", stop)
   process.on("SIGTERM", stop)
 
-  logInfo(`worker started; polling every ${config.POLL_INTERVAL_MS}ms`)
+  logInfo(
+    `worker started; polling every ${config.POLL_INTERVAL_MS}ms with up to ${config.MAX_CONCURRENT_ISSUES} concurrent issues`
+  )
+
+  const activeRuns = new Set<Promise<void>>()
 
   while (running) {
+    if (activeRuns.size >= config.MAX_CONCURRENT_ISSUES) {
+      // Wake promptly when a run frees a slot, but periodically re-check the
+      // stop flag when every slot remains occupied.
+      await Promise.race([Promise.race(activeRuns), sleep(config.POLL_INTERVAL_MS)])
+      continue
+    }
+
     let issue: ClaimedIssue | null = null
     try {
       // Atomically claims the oldest todo issue by flipping it to `queued`.
@@ -53,7 +64,24 @@ export async function runWorker(): Promise<void> {
       continue
     }
 
-    await processIssue(api, config, issue)
+    const run = processIssue(api, config, issue)
+      .catch((error) => {
+        // processIssue records ordinary failures itself. This protects the
+        // pool from an unexpected failure in its cleanup path.
+        logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
+      })
+      .finally(() => {
+        activeRuns.delete(run)
+      })
+    activeRuns.add(run)
+    logInfo(
+      `issue ${issue.id} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+    )
+  }
+
+  if (activeRuns.size > 0) {
+    logInfo(`waiting for ${activeRuns.size} active issue run(s) to finish`)
+    await Promise.all(activeRuns)
   }
 
   logInfo("worker stopped")

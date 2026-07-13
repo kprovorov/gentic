@@ -13,6 +13,7 @@ const configSchema = z.object({
   GIT_REMOTE_BASE: z.string().default("git@github.com:"),
   WORKDIR: z.string().default(join(paths.data, "workspaces")),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
+  MAX_CONCURRENT_ISSUES: z.coerce.number().int().positive().default(1),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -23,6 +24,7 @@ const CONFIG_KEYS = [
   "GIT_REMOTE_BASE",
   "WORKDIR",
   "POLL_INTERVAL_MS",
+  "MAX_CONCURRENT_ISSUES",
 ] as const satisfies readonly (keyof ConfigFile)[]
 
 function pickPresentEnvKeys(env: NodeJS.ProcessEnv): Partial<ConfigFile> {

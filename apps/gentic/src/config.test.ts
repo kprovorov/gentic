@@ -10,6 +10,7 @@ const CONFIG_KEYS = [
   "GIT_REMOTE_BASE",
   "WORKDIR",
   "POLL_INTERVAL_MS",
+  "MAX_CONCURRENT_ISSUES",
 ] as const
 
 // `env-paths` resolves the config directory once, at module-evaluation time,
@@ -50,6 +51,7 @@ test("loadConfig works with only env vars set (no config file)", () => {
   assert.equal(loaded.GENTIC_API_URL, "https://env.example.com")
   assert.equal(loaded.GIT_REMOTE_BASE, "git@github.com:")
   assert.equal(loaded.POLL_INTERVAL_MS, 3000)
+  assert.equal(loaded.MAX_CONCURRENT_ISSUES, 1)
 })
 
 test("loadConfig works with only the config file set", () => {
@@ -73,4 +75,12 @@ test("loadConfig prefers env over the config file for the same key", () => {
   const loaded = loadConfig()
   assert.equal(loaded.GENTIC_API_KEY, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
+})
+
+test("loadConfig accepts a concurrent-issue limit", () => {
+  process.env.GENTIC_API_KEY = "env-key"
+  process.env.GENTIC_API_URL = "https://env.example.com"
+  process.env.MAX_CONCURRENT_ISSUES = "3"
+
+  assert.equal(loadConfig().MAX_CONCURRENT_ISSUES, 3)
 })
