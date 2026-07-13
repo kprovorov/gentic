@@ -9,6 +9,7 @@ import {
   checkoutPullRequest,
   cloneRepo,
   getPullRequestUrl,
+  hasLocalCheckout,
   runSetupScript,
 } from "./git.js"
 import { logError, logInfo } from "./log.js"
@@ -151,14 +152,26 @@ async function processIssue(
 
     await rm(attachmentsDir, { recursive: true, force: true })
 
-    await cloneRepo({
-      remoteBase: config.GIT_REMOTE_BASE,
-      repo: issue.repo,
-      dir,
-    })
+    // A follow-up message resumes `issue.sessionId`'s ACP conversation. If
+    // this same worker already has that issue's repo checked out from the
+    // run that session belongs to, keep it as-is rather than wiping it —
+    // otherwise any local commits (or uncommitted work) the agent left
+    // between turns are destroyed and the follow-up effectively starts over
+    // in a brand new workspace. A fresh clone only happens for a genuinely
+    // new run (no session yet) or when no local checkout survived (e.g. a
+    // different worker machine claimed this follow-up).
+    const resumingLocalCheckout =
+      Boolean(issue.sessionId) && hasLocalCheckout(dir)
+    if (!resumingLocalCheckout) {
+      await cloneRepo({
+        remoteBase: config.GIT_REMOTE_BASE,
+        repo: issue.repo,
+        dir,
+      })
 
-    if (issue.prUrl) {
-      await checkoutPullRequest({ prUrl: issue.prUrl, dir })
+      if (issue.prUrl) {
+        await checkoutPullRequest({ prUrl: issue.prUrl, dir })
+      }
     }
 
     if (issue.setupScript) {
