@@ -8,6 +8,11 @@ import { loadConfig, type Config } from "./config.js"
 import { cloneRepo, getPullRequestUrl, runSetupScript } from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
+import {
+  connectIssueChannel,
+  type IssueRealtimeChannel,
+  type RealtimeUserMessageEvent,
+} from "./realtime.js"
 import { runAgentSession, type PromptTurn } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 
@@ -49,6 +54,9 @@ export async function runWorker(): Promise<void> {
   logInfo("worker stopped")
 }
 
+/** One pending user follow-up, queued for the next prompt turn. */
+type QueuedMessage = { id: string; content: string; created_at: string }
+
 async function processIssue(
   api: AgentApi,
   config: Config,
@@ -59,7 +67,55 @@ async function processIssue(
   // never end up swept into the commit the agent is instructed to make.
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
+  let channel: IssueRealtimeChannel | null = null
+
   try {
+    // Push queue for user follow-ups, ordered by `created_at`. Fed by two
+    // sources deduped by message id: a one-shot REST backlog fetch below,
+    // and live `user_message` broadcast events for the rest of the run.
+    const seenMessageIds = new Set<string>()
+    const queue: QueuedMessage[] = []
+    let queueWaiter: (() => void) | null = null
+
+    const enqueue = (message: {
+      id: string
+      content: string | null
+      created_at: string
+    }): void => {
+      if (seenMessageIds.has(message.id)) {
+        return
+      }
+      seenMessageIds.add(message.id)
+      const entry: QueuedMessage = {
+        id: message.id,
+        content: message.content ?? "",
+        created_at: message.created_at,
+      }
+      const index = queue.findIndex(
+        (existing) => existing.created_at > entry.created_at
+      )
+      if (index === -1) {
+        queue.push(entry)
+      } else {
+        queue.splice(index, 0, entry)
+      }
+      if (queueWaiter) {
+        const resolve = queueWaiter
+        queueWaiter = null
+        resolve()
+      }
+    }
+
+    // Join the channel before doing anything else, so no follow-up sent
+    // from here on is missed between the seed fetch below and going live.
+    // A join failure fails the run like any other startup error — no
+    // silent REST fallback in this phase.
+    channel = await connectIssueChannel(
+      api,
+      issue.id,
+      (event: RealtimeUserMessageEvent) => enqueue(event)
+    )
+
     await rm(attachmentsDir, { recursive: true, force: true })
 
     await cloneRepo({
@@ -72,7 +128,7 @@ async function processIssue(
       await runSetupScript({ script: issue.setupScript, dir })
     }
 
-    await setRunState(api, issue.id, { status: "in-progress" })
+    await setRunState(api, channel, issue.id, { status: "in-progress" })
 
     // Built fresh each run: images and text files are embedded directly,
     // everything else downloaded into `attachmentsDir` and referenced by
@@ -83,26 +139,43 @@ async function processIssue(
       attachmentsDir
     )
 
-    // Feed user messages to the session oldest-first. Follow-ups sent while the
-    // agent is working are picked up after the current turn; once the transcript
-    // is quiet for one poll interval the session ends. When resuming a session
-    // that already consumed messages, start the cursor at that run's end so
-    // they aren't replayed. A session-less retry (e.g. clone failed before the
+    // Seed the queue with follow-ups sent before the channel connected
+    // (including the issue's initial prompt). When resuming a session that
+    // already consumed messages, start the cursor at that run's end so they
+    // aren't replayed. A session-less retry (e.g. clone failed before the
     // agent started) has consumed nothing, so it replays from the beginning.
-    let cursor =
+    const seedCursor =
       issue.sessionId && issue.runFinishedAt
         ? issue.runFinishedAt
         : new Date(0).toISOString()
+    const backlog = await api.fetchUserMessagesAfter(issue.id, seedCursor)
+    for (const message of backlog) {
+      enqueue(message)
+    }
+
+    const waitForQueueOrTimeout = (ms: number): Promise<void> =>
+      new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          queueWaiter = null
+          resolve()
+        }, ms)
+        queueWaiter = () => {
+          clearTimeout(timer)
+          resolve()
+        }
+      })
+
+    // Feed user messages to the session oldest-first. Follow-ups pushed while
+    // the agent is working are picked up after the current turn; once the
+    // transcript is quiet for one poll interval the session ends.
     let idleChecked = false
     let firstPrompt = true
     const nextPrompt = async (): Promise<PromptTurn | null> => {
       for (;;) {
-        const messages = await api.fetchUserMessagesAfter(issue.id, cursor)
-        const next = messages[0]
+        const next = queue.shift()
         if (next) {
           idleChecked = false
-          cursor = next.created_at
-          const content = next.content ?? ""
+          const content = next.content
           if (firstPrompt) {
             firstPrompt = false
             if (attachmentBlocks.length > 0) {
@@ -115,23 +188,22 @@ async function processIssue(
           return null
         }
         idleChecked = true
-        await sleep(config.POLL_INTERVAL_MS)
+        await waitForQueueOrTimeout(config.POLL_INTERVAL_MS)
       }
     }
 
     await runAgentSession({
-      api,
-      issueId: issue.id,
+      channel,
       agentProvider: issue.agentProvider,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       onSessionId: (sessionId) =>
-        setRunState(api, issue.id, { session_id: sessionId }),
+        setRunState(api, channel, issue.id, { session_id: sessionId }),
       nextPrompt,
     })
 
     const prUrl = await getPullRequestUrl(dir)
-    await setRunState(api, issue.id, {
+    await setRunState(api, channel, issue.id, {
       status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
@@ -144,7 +216,7 @@ async function processIssue(
       logInfo(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
-      await setRunState(api, issue.id, {
+      await setRunState(api, channel, issue.id, {
         status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
@@ -156,7 +228,7 @@ async function processIssue(
     }
 
     logError(`issue ${issue.id} failed:`, message)
-    await setRunState(api, issue.id, {
+    await setRunState(api, channel, issue.id, {
       status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
@@ -164,6 +236,12 @@ async function processIssue(
     }).catch((updateError) => {
       logError("failed to record run failure:", describe(updateError))
     })
+  } finally {
+    if (channel) {
+      await channel.close().catch((closeError) => {
+        logError("failed to close realtime channel:", describe(closeError))
+      })
+    }
   }
 }
 

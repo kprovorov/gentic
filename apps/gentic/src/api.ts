@@ -7,18 +7,6 @@ export interface ClaimedIssue {
   runFinishedAt: string | null
 }
 
-export interface MessageFields {
-  role: "assistant" | "system"
-  kind?: "text" | "tool" | "thinking"
-  content: string
-  status?: "streaming" | "complete" | "error"
-}
-
-export interface MessageUpdateFields {
-  content?: string
-  status?: "streaming" | "complete" | "error"
-}
-
 export interface RunStateFields {
   status?:
     | "in-progress"
@@ -35,8 +23,16 @@ export interface RunStateFields {
 }
 
 export interface UserMessage {
+  id: string
   content: string | null
   created_at: string
+}
+
+export interface RealtimeTokenResponse {
+  url: string
+  apiKey: string
+  token: string
+  expiresAt: string
 }
 
 export interface Attachment {
@@ -53,8 +49,7 @@ export interface AgentApi {
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
   fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
   fetchAttachments(issueId: string): Promise<Attachment[]>
-  insertMessage(issueId: string, fields: MessageFields): Promise<string>
-  updateMessage(messageId: string, fields: MessageUpdateFields): Promise<void>
+  fetchRealtimeToken(): Promise<RealtimeTokenResponse>
 }
 
 export function createAgentApi(input: {
@@ -126,20 +121,9 @@ export function createAgentApi(input: {
       )
       return data.attachments
     },
-    async insertMessage(issueId, fields) {
-      const data = await request<{ id: string }>(
-        `/agent/issues/${encodeURIComponent(issueId)}/messages`,
-        {
-          method: "POST",
-          body: fields,
-        }
-      )
-      return data.id
-    },
-    async updateMessage(messageId, fields) {
-      await request(`/agent/messages/${encodeURIComponent(messageId)}`, {
-        method: "PATCH",
-        body: fields,
+    async fetchRealtimeToken() {
+      return request<RealtimeTokenResponse>("/agent/realtime/token", {
+        method: "POST",
       })
     },
   }

@@ -12,6 +12,14 @@ import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus } from "@gentic/validators/issues"
+import {
+  issueRealtimeTopic,
+  messageEventSchema,
+  REALTIME_MESSAGE_EVENT,
+  REALTIME_RUN_STATE_EVENT,
+  REALTIME_USER_MESSAGE_EVENT,
+  runStateEventSchema,
+} from "@gentic/validators/realtime"
 
 import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
@@ -92,9 +100,29 @@ export function IssueChat({
   const [draft, setDraft] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+  // The private broadcast channel from the effect below, kept in a ref so
+  // `handleSubmit` can send on it without re-subscribing on every render.
+  const broadcastChannelRef = useRef<ReturnType<
+    ReturnType<typeof useSupabaseClient>["channel"]
+  > | null>(null)
+  const broadcastSubscribedRef = useRef(false)
+  // Last-seen `seq` per message id, so an out-of-order broadcast delivery
+  // can't regress a message back to older content.
+  const messageSeqRef = useRef(new Map<string, number>())
   const mutation = useMutation({
     mutationFn: sendIssueMessage,
-    onSuccess: async () => {
+    onSuccess: async (message, formData) => {
+      if (broadcastSubscribedRef.current && broadcastChannelRef.current) {
+        void broadcastChannelRef.current.send({
+          type: "broadcast",
+          event: REALTIME_USER_MESSAGE_EVENT,
+          payload: {
+            id: message.id,
+            content: String(formData.get("content") ?? ""),
+            created_at: message.created_at,
+          },
+        })
+      }
       await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
     },
   })
@@ -169,6 +197,79 @@ export function IssueChat({
 
     return () => {
       void supabase.removeChannel(channel)
+    }
+  }, [supabase, issueId])
+
+  // Private Realtime Broadcast channel: the low-latency transport (see
+  // docs/realtime-transport.md). Subscribed in addition to the
+  // `postgres_changes` effect above during rollout — upsert-by-id makes
+  // double delivery of the same message harmless.
+  useEffect(() => {
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    async function join() {
+      await supabase.realtime.setAuth()
+      if (cancelled) {
+        return
+      }
+
+      channel = supabase
+        .channel(issueRealtimeTopic(issueId), { config: { private: true } })
+        .on(
+          "broadcast",
+          { event: REALTIME_MESSAGE_EVENT },
+          ({ payload }) => {
+            const event = messageEventSchema.safeParse(payload)
+            if (!event.success) {
+              return
+            }
+            const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
+            if (event.data.seq <= lastSeq) {
+              return
+            }
+            messageSeqRef.current.set(event.data.id, event.data.seq)
+            setMessages((current) =>
+              mergeMessage(current, {
+                id: event.data.id,
+                role: event.data.role,
+                kind: event.data.kind,
+                content: event.data.content,
+                status: event.data.status,
+                created_at: event.data.ts,
+              })
+            )
+          }
+        )
+        .on(
+          "broadcast",
+          { event: REALTIME_RUN_STATE_EVENT },
+          ({ payload }) => {
+            const event = runStateEventSchema.safeParse(payload)
+            if (!event.success) {
+              return
+            }
+            setStatus(event.data.status)
+            setUsageLimitResetAt(event.data.usage_limit_reset_at)
+            setPrUrl(event.data.pr_url)
+          }
+        )
+        .subscribe((subscribeStatus) => {
+          broadcastSubscribedRef.current = subscribeStatus === "SUBSCRIBED"
+        })
+
+      broadcastChannelRef.current = channel
+    }
+
+    void join()
+
+    return () => {
+      cancelled = true
+      broadcastSubscribedRef.current = false
+      broadcastChannelRef.current = null
+      if (channel) {
+        void supabase.removeChannel(channel)
+      }
     }
   }, [supabase, issueId])
 
