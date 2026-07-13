@@ -111,19 +111,60 @@ export function IssueChat({
   const messageSeqRef = useRef(new Map<string, number>())
   const mutation = useMutation({
     mutationFn: sendIssueMessage,
-    onSuccess: async (message, formData) => {
+    onMutate: (formData) => {
+      const content = String(formData.get("content") ?? "")
+      const optimisticId = `optimistic-${crypto.randomUUID()}`
+
+      setMessages((current) =>
+        mergeMessage(current, {
+          id: optimisticId,
+          role: "user",
+          kind: "text",
+          content,
+          status: "complete",
+          created_at: new Date().toISOString(),
+        })
+      )
+
+      return { optimisticId }
+    },
+    onSuccess: async (message, formData, context) => {
+      const content = String(formData.get("content") ?? "")
+
+      setMessages((current) =>
+        mergeMessage(
+          current.filter(({ id }) => id !== context.optimisticId),
+          {
+            id: message.id,
+            role: "user",
+            kind: "text",
+            content,
+            status: "complete",
+            created_at: message.created_at,
+          }
+        )
+      )
+
       if (broadcastSubscribedRef.current && broadcastChannelRef.current) {
         void broadcastChannelRef.current.send({
           type: "broadcast",
           event: REALTIME_USER_MESSAGE_EVENT,
           payload: {
             id: message.id,
-            content: String(formData.get("content") ?? ""),
+            content,
             created_at: message.created_at,
           },
         })
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+    },
+    onError: (_error, formData, context) => {
+      if (context) {
+        setMessages((current) =>
+          current.filter(({ id }) => id !== context.optimisticId)
+        )
+      }
+      setDraft((current) => current || String(formData.get("content") ?? ""))
     },
   })
 
