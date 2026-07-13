@@ -17,13 +17,7 @@ import {
 } from "@gentic/ui/card"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gentic/ui/select"
+import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 export function NewIssueView({
   initialData,
@@ -74,22 +68,19 @@ export function NewIssueView({
               <form action={createIssue} className="grid gap-5">
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
-                  <Select
+                  <NativeSelect
                     name="project_id"
                     required
                     defaultValue={projects[0]?.id}
+                    id="issue-project"
+                    className="w-full"
                   >
-                    <SelectTrigger id="issue-project">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name} ({project.repo})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {projects.map((project) => (
+                      <NativeSelectOption key={project.id} value={project.id}>
+                        {project.name} ({project.repo})
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
                 </div>
 
                 <div className="grid gap-2">
@@ -105,34 +96,38 @@ export function NewIssueView({
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-type">Type</Label>
-                  <Select name="type" required defaultValue="feature">
-                    <SelectTrigger id="issue-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="bug">Bug</SelectItem>
-                      <SelectItem value="feedback">Feedback</SelectItem>
-                      <SelectItem value="idea">Idea</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <NativeSelect
+                    name="type"
+                    required
+                    defaultValue="feature"
+                    id="issue-type"
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="feature">
+                      Feature
+                    </NativeSelectOption>
+                    <NativeSelectOption value="bug">Bug</NativeSelectOption>
+                    <NativeSelectOption value="feedback">
+                      Feedback
+                    </NativeSelectOption>
+                    <NativeSelectOption value="idea">Idea</NativeSelectOption>
+                  </NativeSelect>
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-agent-provider">Agent</Label>
-                  <Select
+                  <NativeSelect
                     name="agent_provider"
                     required
                     defaultValue="claude_code"
+                    id="issue-agent-provider"
+                    className="w-full"
                   >
-                    <SelectTrigger id="issue-agent-provider">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="claude_code">Claude Code</SelectItem>
-                      <SelectItem value="codex">Codex</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <NativeSelectOption value="claude_code">
+                      Claude Code
+                    </NativeSelectOption>
+                    <NativeSelectOption value="codex">Codex</NativeSelectOption>
+                  </NativeSelect>
                 </div>
 
                 <div className="grid gap-2">
@@ -148,39 +143,64 @@ export function NewIssueView({
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-status">Status</Label>
-                  <Select name="status" required defaultValue="draft">
-                    <SelectTrigger id="issue-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="todo">To do</SelectItem>
-                      <SelectItem value="queued">Queued</SelectItem>
-                      <SelectItem value="held">On hold</SelectItem>
-                      <SelectItem value="in-progress">In progress</SelectItem>
-                      <SelectItem value="waiting-for-input">
-                        Waiting for input
-                      </SelectItem>
-                      <SelectItem value="testing">Testing</SelectItem>
-                      <SelectItem value="tests-failed">Tests failed</SelectItem>
-                      <SelectItem value="ready-for-review">
-                        Ready for review
-                      </SelectItem>
-                      <SelectItem value="changes-requested">
-                        Changes requested
-                      </SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="merged">Merged</SelectItem>
-                      <SelectItem value="deploying">Deploying</SelectItem>
-                      <SelectItem value="deploy-failed">
-                        Deploy failed
-                      </SelectItem>
-                      <SelectItem value="validating">Validating</SelectItem>
-                      <SelectItem value="run-failed">Run failed</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <NativeSelect
+                    name="status"
+                    required
+                    defaultValue="draft"
+                    id="issue-status"
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="draft">Draft</NativeSelectOption>
+                    <NativeSelectOption value="todo">To do</NativeSelectOption>
+                    <NativeSelectOption value="queued">
+                      Queued
+                    </NativeSelectOption>
+                    <NativeSelectOption value="held">
+                      On hold
+                    </NativeSelectOption>
+                    <NativeSelectOption value="in-progress">
+                      In progress
+                    </NativeSelectOption>
+                    <NativeSelectOption value="waiting-for-input">
+                      Waiting for input
+                    </NativeSelectOption>
+                    <NativeSelectOption value="testing">
+                      Testing
+                    </NativeSelectOption>
+                    <NativeSelectOption value="tests-failed">
+                      Tests failed
+                    </NativeSelectOption>
+                    <NativeSelectOption value="ready-for-review">
+                      Ready for review
+                    </NativeSelectOption>
+                    <NativeSelectOption value="changes-requested">
+                      Changes requested
+                    </NativeSelectOption>
+                    <NativeSelectOption value="approved">
+                      Approved
+                    </NativeSelectOption>
+                    <NativeSelectOption value="merged">
+                      Merged
+                    </NativeSelectOption>
+                    <NativeSelectOption value="deploying">
+                      Deploying
+                    </NativeSelectOption>
+                    <NativeSelectOption value="deploy-failed">
+                      Deploy failed
+                    </NativeSelectOption>
+                    <NativeSelectOption value="validating">
+                      Validating
+                    </NativeSelectOption>
+                    <NativeSelectOption value="run-failed">
+                      Run failed
+                    </NativeSelectOption>
+                    <NativeSelectOption value="completed">
+                      Completed
+                    </NativeSelectOption>
+                    <NativeSelectOption value="cancelled">
+                      Cancelled
+                    </NativeSelectOption>
+                  </NativeSelect>
                 </div>
 
                 <div className="flex justify-end gap-2">

@@ -6,23 +6,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { IconArrowRight, IconLink, IconTrash } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gentic/ui/select"
+import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
-import {
-  addIssueRelation,
-  deleteIssueRelation,
-} from "@/app/issues/actions"
+import { addIssueRelation, deleteIssueRelation } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
-import type {
-  IssueRelation,
-  IssueRelationIssue,
-} from "@gentic/services/issues"
+import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 
 type IssueRelationsProps = {
   issueId: string
@@ -140,35 +128,36 @@ export function IssueRelations({
       <form onSubmit={handleAdd} className="grid gap-3">
         <input type="hidden" name="issue_id" value={issueId} />
         <div className="grid gap-3">
-          <Select
+          <NativeSelect
             name="related_issue_id"
             disabled={candidates.length === 0}
             required
+            aria-label="Related issue"
+            className="w-full min-w-0"
           >
-            <SelectTrigger className="min-w-0" aria-label="Related issue">
-              <SelectValue placeholder="Select issue" />
-            </SelectTrigger>
-            <SelectContent>
-              {candidates.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
+            <NativeSelectOption value="" disabled>
+              Select issue
+            </NativeSelectOption>
+            {candidates.map((candidate) => (
+              <NativeSelectOption key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <NativeSelect
             name="direction"
             disabled={candidates.length === 0}
             defaultValue="blocking"
+            aria-label="Relation direction"
+            className="w-full"
           >
-            <SelectTrigger aria-label="Relation direction">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="blocking">is blocking</SelectItem>
-              <SelectItem value="blocked_by">is blocked by</SelectItem>
-            </SelectContent>
-          </Select>
+            <NativeSelectOption value="blocking">
+              is blocking
+            </NativeSelectOption>
+            <NativeSelectOption value="blocked_by">
+              is blocked by
+            </NativeSelectOption>
+          </NativeSelect>
           <Button
             type="submit"
             disabled={candidates.length === 0 || mutation.isPending}
@@ -217,7 +206,9 @@ export function IssueRelations({
       {relations.length > 0 ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <IconArrowRight className="size-3.5" />
-          A relation points from the blocking issue to the blocked issue.
+          <span>
+            A relation points from the blocking issue to the blocked issue.
+          </span>
         </div>
       ) : null}
     </div>
