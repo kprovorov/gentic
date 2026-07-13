@@ -34,7 +34,7 @@ export type IssueStatus =
   | "completed"
   | "cancelled"
 
-export type IssueType = "feature" | "bug" | "feedback" | "idea"
+export type IssueType = "issue" | "feature" | "bug" | "feedback" | "idea"
 
 export type HomeIssue = {
   id: string

@@ -90,6 +90,7 @@ export function EditIssueView({
                   id="issue-type"
                   className="w-full"
                 >
+                  <NativeSelectOption value="issue">Issue</NativeSelectOption>
                   <NativeSelectOption value="feature">
                     Feature
                   </NativeSelectOption>

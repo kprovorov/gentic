@@ -27,7 +27,16 @@ export const agentProviderSchema = z.enum(["claude_code", "codex"])
 
 export type AgentProvider = z.infer<typeof agentProviderSchema>
 
-export const issueTypeSchema = z.enum(["feature", "bug", "feedback", "idea"])
+// "issue" is a placeholder used before the background classifier (see
+// apps/web/app/issues/type.ts) determines the real type — it is not a type
+// callers should pick deliberately.
+export const issueTypeSchema = z.enum([
+  "issue",
+  "feature",
+  "bug",
+  "feedback",
+  "idea",
+])
 
 export type IssueType = z.infer<typeof issueTypeSchema>
 
@@ -40,7 +49,10 @@ export const createIssueSchema = z.object({
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
   agent_provider: agentProviderSchema.default("claude_code"),
-  type: issueTypeSchema.default("feature"),
+  // Omitted by the web app's create-issue form the same way: the type is
+  // classified in the background after the issue is saved, so it defaults
+  // to the "issue" placeholder until then.
+  type: issueTypeSchema.default("issue"),
 })
 
 export type CreateIssueValues = z.infer<typeof createIssueSchema>
