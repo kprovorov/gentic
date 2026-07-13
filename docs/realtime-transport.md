@@ -1,7 +1,7 @@
 # Spec: Direct UI ↔ worker communication over Realtime Broadcast
 
-**Status:** draft
-**Scope:** replace the database-as-message-bus with a pub/sub transport between the browser and the Gentic worker. Message persistence is explicitly out of scope for this phase.
+**Status:** phase 2 being implemented
+**Scope:** keep live streaming on Supabase Realtime Broadcast and persist each worker transcript message once, when it finalizes.
 
 ## Summary
 
@@ -94,8 +94,6 @@ All payloads are JSON. Zod schemas live in a new shared module `@gentic/validato
 
 **Snapshot, not delta.** Each `message` event carries the *full content so far*, throttled (~150ms) exactly like today's `StreamingAssistantMessage` flush. Broadcast delivery is at-most-once; with snapshots a dropped event self-heals on the next flush, whereas a dropped delta would silently corrupt the transcript. `seq` lets receivers discard out-of-order snapshots. This also keeps the UI merge logic identical to the existing `mergeMessage` upsert-by-id.
 
-The protocol reserves a `sync_request` event name (browser asks the worker to re-emit all message snapshots from its in-memory transcript); implementation optional in this phase.
-
 ### Authorization
 
 Three parties, three trust levels:
@@ -161,7 +159,7 @@ Removed from the worker: `insertMessage`, `updateMessage`, and the in-run pollin
 
 1. **`issue-chat.tsx`:** subscribe to the private broadcast channel (in addition to `postgres_changes` during rollout). `message` events upsert by `id` with the `seq` guard (drop-in for `mergeMessage`); `run_state` events update status/pr_url/usage-limit.
 2. **`sendIssueMessage` flow becomes a dual write:** the server action keeps inserting the `messages` row (this is what re-queues a `waiting-for-input` issue and what seeds a later resumed session), and the client *additionally* broadcasts `user_message` on the channel for instant delivery. The row `id` is returned to the client and used as the event `id` so the worker can dedupe.
-3. **Agent API:** add the token route; add `id` to the messages GET response. (`POST /agent/issues/{id}/messages` and `PATCH /agent/messages/{id}` become unused by the worker but are NOT deleted in this phase.)
+3. **Agent API:** add the token route; add `id` to the messages GET response. In phase 1, `POST /agent/issues/{id}/messages` and `PATCH /agent/messages/{id}` became unused by the worker but remained temporarily for the phase-2 persistence handoff.
 
 ### What stays exactly as-is
 
@@ -169,18 +167,55 @@ Removed from the worker: `insertMessage`, `updateMessage`, and the in-run pollin
 - Run state as durable DB state via `PATCH /agent/issues/{id}/run-state`.
 - Attachments (REST + signed URLs).
 - `RealtimeRefresh` and board-level `postgres_changes` (out of scope).
-- Server-rendered initial transcript (`initialMessages`) — it just contains less during/after a run.
+- Server-rendered initial transcript (`initialMessages`) — phase 2 restores finalized assistant/tool messages while an in-flight message remains broadcast-only until it finalizes.
 
-## Consequences — accepted gaps
+## Consequences — accepted gaps from phase 1
 
 1. **Refresh mid-run loses the streamed transcript.** The server render shows only persisted rows (user messages); everything the agent said so far is gone from that browser until new events arrive.
 2. **Completed runs have no transcript.** History views show user messages, run state, and the PR link only.
 3. **At-most-once delivery.** Snapshot semantics contain the damage for `message` events; a lost *final* snapshot leaves a message visually "streaming" until the next event or a refresh. A lost `user_message` event is covered by the DB row + seed fetch on the next run.
 4. **Multi-tab:** all tabs subscribe to the channel, so live view works everywhere; only transcript-since-subscribe differs per tab.
 
-## Future work (phase 2 — hybrid)
+## Phase 2 — persist-on-finalize (hybrid)
 
-The worker persists each message **once, on finalize** (one INSERT per message instead of INSERT + N UPDATEs) while streaming continues over broadcast. That restores durable transcripts, refresh-safety, and history for completed runs.
+Streaming stays entirely on broadcast; the worker persists each message **once, when it finalizes** — one INSERT per message via the existing `POST /agent/issues/{id}/messages` route, instead of the pre-realtime INSERT + N UPDATEs. Tool messages insert immediately (they are born complete). User messages are already persisted by the phase-1 dual write. The DB never sees a `streaming` row again.
+
+### Shared ids
+
+The worker already generates a uuid per message for broadcast. The insert endpoint **accepts that id** instead of generating its own, so a message is the same entity on both channels. Everything reconciles from that:
+
+- **Refresh mid-run is lossless.** Server render returns all persisted rows (finalized + user messages); the only thing missing is the in-flight streaming message, and the next snapshot (~150ms, full content) restores it completely via the existing upsert-by-id merge.
+- **Double delivery is harmless.** Broadcast event, `postgres_changes` event, and server-rendered row all carry the same id.
+- **The phase-1 seed-fetch and dedupe machinery is unchanged.**
+- **Idempotent retries.** The endpoint treats a duplicate id as success (return the existing id), so the worker can retry finalize INSERTs blindly.
+
+The `sync_request` event reserved in phase 1 becomes unnecessary — removed from the protocol.
+
+### Ordering
+
+The worker finalizes messages strictly in transcript order, so `created_at` (finalize time) ordering matches the conversation. No started-at column. The only visible artifact: a freshly refreshed page sorts the still-streaming message last, which is where it belongs.
+
+### Failure semantics
+
+1. **Finalize INSERT fails:** the message already reached the user via broadcast, so persistence failure must not kill the run. Retry with backoff; on terminal failure, log and continue — the cost is a gap in history, not a broken session. (Opposite priority from the pre-realtime design, where the DB write *was* the delivery.)
+2. **Worker crashes mid-message:** the partial is lost from history — accepted. Refinement: the run's error path best-effort persists the current partial with `status: "error"` so a failed run's transcript shows where it died.
+
+### Scope
+
+- Agent API: `POST /agent/issues/{id}/messages` accepts an optional client-supplied `id` (uuid) with idempotent conflict handling; delete `PATCH /agent/messages/[id]` (unused since phase 1).
+- Worker: finalize hook in `StreamingAssistantMessage` inserts the completed message; tool messages insert at emit time; error-path partial persist; remove `updateMessage` from `api.ts`.
+- Protocol: drop `sync_request` from `@gentic/validators/realtime`.
+- No migration, no auth changes, no UI changes.
+
+This closes phase 1's accepted gaps 1-4: durable transcripts, refresh-safety, completed-run history, and multi-tab convergence.
+
+### Sequencing
+
+Phase 2 lands **before** phase 1's cleanup step (the cleanup would otherwise delete the POST route phase 2 depends on). Final order:
+
+1. Phase 1, rollout steps 1-3 (broadcast transport) — done before this issue.
+2. Phase 2 (this issue: persist-on-finalize; deletes only the PATCH route).
+3. Cleanup (separate later issue): drop the `postgres_changes` `messages` subscription from `issue-chat.tsx` and replace the `issues` subscription with `run_state` broadcasts. The messages POST route stays — it is now the persistence path.
 
 ## Open questions
 

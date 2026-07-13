@@ -7,9 +7,6 @@ import { issueStatusSchema } from "./issues"
 export const REALTIME_MESSAGE_EVENT = "message"
 export const REALTIME_RUN_STATE_EVENT = "run_state"
 export const REALTIME_USER_MESSAGE_EVENT = "user_message"
-// Reserved for a future phase: the browser asks the worker to re-emit all
-// message snapshots from its in-memory transcript. Not implemented yet.
-export const REALTIME_SYNC_REQUEST_EVENT = "sync_request"
 
 export function issueRealtimeTopic(issueId: string): string {
   return `issue:${issueId}`

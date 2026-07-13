@@ -38,19 +38,12 @@ export const runStateSchema = z
   .refine((value) => Object.keys(value).length > 0)
 
 export const insertMessageSchema = z.object({
+  id: z.string().uuid().optional(),
   role: z.enum(["assistant", "system"]),
   kind: z.enum(["text", "tool", "thinking"]).optional(),
   content: z.string(),
-  status: z.enum(["streaming", "complete", "error"]).optional(),
+  status: z.enum(["complete", "error"]).optional(),
 })
-
-export const updateMessageSchema = z
-  .object({
-    content: z.string().optional(),
-    status: z.enum(["streaming", "complete", "error"]).optional(),
-  })
-  .strict()
-  .refine((value) => Object.keys(value).length > 0)
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against
 // Clerk bills one API-key usage and the worker polls constantly, so caching is
@@ -75,30 +68,6 @@ export async function getAgentContext(request: Request): Promise<{
     userId: await authenticateApiKey(request),
     supabase: createServiceClient(),
   }
-}
-
-export async function ensureMessageOwned(
-  supabase: Supabase,
-  userId: string,
-  messageId: string
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("issue_id, role")
-    .eq("id", messageId)
-    .maybeSingle<{ issue_id: string; role: string }>()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-  if (!data) {
-    throw new ApiError(404, "Message not found")
-  }
-  if (data.role === "user") {
-    throw new ApiError(403, "Cannot update user messages")
-  }
-
-  await ensureIssueOwned(supabase, userId, data.issue_id)
 }
 
 const SERVICE_ERROR_STATUS: Record<ServiceError["code"], number> = {

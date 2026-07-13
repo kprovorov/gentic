@@ -35,6 +35,14 @@ export interface RealtimeTokenResponse {
   expiresAt: string
 }
 
+export interface InsertMessageInput {
+  id: string
+  role: "assistant" | "system"
+  kind?: "text" | "tool" | "thinking"
+  content: string
+  status?: "complete" | "error"
+}
+
 export interface Attachment {
   id: string
   fileName: string
@@ -47,6 +55,7 @@ export interface Attachment {
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
+  insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
   fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
   fetchAttachments(issueId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
@@ -107,6 +116,16 @@ export function createAgentApi(input: {
         method: "PATCH",
         body: fields,
       })
+    },
+    async insertMessage(issueId, message) {
+      const data = await request<{ id: string }>(
+        `/agent/issues/${encodeURIComponent(issueId)}/messages`,
+        {
+          method: "POST",
+          body: message,
+        }
+      )
+      return data.id
     },
     async fetchUserMessagesAfter(issueId, cursor) {
       const params = new URLSearchParams({ after: cursor })
