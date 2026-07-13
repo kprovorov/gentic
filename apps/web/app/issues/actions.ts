@@ -13,6 +13,7 @@ import {
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueSchema,
+  type IssueStatus,
 } from "@gentic/validators/issues"
 
 import * as issuesService from "@gentic/services/issues"
@@ -24,26 +25,28 @@ import { generateIssueTitle } from "./title"
 const ATTACHMENTS_BUCKET = "attachments"
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
-const createIssueFormSchema = createIssueSchema.omit({ title: true }).extend({
-  prompt: z.string().trim().min(1).max(10_000),
-})
+const createIssueFormSchema = createIssueSchema
+  .omit({ title: true, status: true })
+  .extend({
+    prompt: z.string().trim().min(1).max(10_000),
+  })
 
 function sanitizeFileName(name: string): string {
   const base = name.split(/[/\\]/).pop() || "file"
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file"
 }
 
-export async function createIssue(formData: FormData) {
+async function createIssue(status: IssueStatus, formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const fields = createIssueFormSchema.parse({
     project_id: getString(formData, "project_id"),
     prompt: getString(formData, "prompt"),
-    status: getString(formData, "status") || "draft",
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     type: getString(formData, "type") || "feature",
   })
   const issue = createIssueSchema.parse({
     ...fields,
+    status,
     title: await generateIssueTitle(fields.prompt),
   })
 
@@ -52,6 +55,14 @@ export async function createIssue(formData: FormData) {
   revalidatePath("/home")
   revalidatePath("/issues")
   redirect(`/issues/${created.id}`)
+}
+
+export async function saveIssueDraft(formData: FormData) {
+  await createIssue("draft", formData)
+}
+
+export async function runIssue(formData: FormData) {
+  await createIssue("todo", formData)
 }
 
 export async function updateIssue(formData: FormData) {
