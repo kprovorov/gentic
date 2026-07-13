@@ -5,12 +5,24 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconExternalLink,
   IconGitPullRequest,
+  IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
 import { Streamdown } from "streamdown"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
+import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import { Button } from "@gentic/ui/button"
+import { Marker, MarkerContent, MarkerIcon } from "@gentic/ui/marker"
+import { Message, MessageContent } from "@gentic/ui/message"
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@gentic/ui/message-scroller"
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus } from "@gentic/validators/issues"
 import {
@@ -103,7 +115,6 @@ export function IssueChat({
   const [pullRequests, setPullRequests] =
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
-  const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   // The private broadcast channel from the effect below, kept in a ref so
   // `handleSubmit` can send on it without re-subscribing on every render.
@@ -327,10 +338,6 @@ export function IssueChat({
     }
   }, [supabase, issueId])
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [displayedMessages])
-
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = draft.trim()
@@ -384,20 +391,35 @@ export function IssueChat({
         </div>
       ) : null}
 
-      <div
-        ref={scrollRef}
-        className="flex max-h-[28rem] flex-col gap-3 overflow-y-auto"
-      >
-        {displayedMessages.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No messages yet. Move this issue to Queued to start the agent.
-          </p>
-        ) : (
-          displayedMessages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))
-        )}
-      </div>
+      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+        <MessageScroller className="h-[28rem] max-h-[28rem]">
+          <MessageScrollerViewport className="pr-1">
+            <MessageScrollerContent className="gap-3">
+              {displayedMessages.length === 0 ? (
+                <MessageScrollerItem messageId="empty">
+                  <Marker variant="border">
+                    <MarkerContent>
+                      No messages yet. Move this issue to Queued to start the
+                      agent.
+                    </MarkerContent>
+                  </Marker>
+                </MessageScrollerItem>
+              ) : (
+                displayedMessages.map((message) => (
+                  <MessageScrollerItem
+                    key={message.id}
+                    messageId={message.id}
+                    scrollAnchor={message.role === "user"}
+                  >
+                    <ChatMessageRow message={message} />
+                  </MessageScrollerItem>
+                ))
+              )}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <textarea
@@ -432,46 +454,100 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function ChatMessageRow({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
   const isTool = message.kind === "tool"
+  const isMarker = message.role === "system" || message.kind === "thinking"
   const content = message.content ?? ""
   const isStreaming = message.status === "streaming"
 
-  return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[85%] rounded-2xl px-4 py-2 text-sm",
-          isUser
-            ? "bg-primary/15 text-primary-foreground"
-            : isTool
-              ? "bg-muted/60 font-mono text-xs text-muted-foreground"
-              : "bg-muted text-foreground",
-          isTool && "whitespace-pre-wrap",
-          message.status === "error" && "bg-destructive/15 text-destructive"
-        )}
-      >
-        {isTool ? (
-          content
-        ) : (
-          <Streamdown
-            className="chat-markdown"
-            controls={{
-              code: { copy: true, download: false },
-              mermaid: false,
-              table: { copy: true, download: false, fullscreen: false },
-            }}
-            isAnimating={isStreaming}
-            mode={isStreaming ? "streaming" : "static"}
+  if (isMarker) {
+    return (
+      <Message>
+        <MessageContent>
+          <Marker
+            role={message.status === "streaming" ? "status" : undefined}
+            variant={message.role === "system" ? "border" : "default"}
           >
-            {content}
-          </Streamdown>
-        )}
-        {isStreaming ? (
-          <span className="ml-0.5 animate-pulse">▍</span>
-        ) : null}
-      </div>
-    </div>
+            {message.status === "streaming" ? (
+              <MarkerIcon>
+                <IconLoader2 className="animate-spin" />
+              </MarkerIcon>
+            ) : null}
+            <MarkerContent>
+              {content ? (
+                <Streamdown
+                  className="chat-markdown"
+                  controls={{
+                    code: { copy: true, download: false },
+                    mermaid: false,
+                    table: {
+                      copy: true,
+                      download: false,
+                      fullscreen: false,
+                    },
+                  }}
+                  isAnimating={isStreaming}
+                  mode={isStreaming ? "streaming" : "static"}
+                >
+                  {content}
+                </Streamdown>
+              ) : (
+                "Thinking..."
+              )}
+              {isStreaming ? (
+                <span className="ml-0.5 animate-pulse">▍</span>
+              ) : null}
+            </MarkerContent>
+          </Marker>
+        </MessageContent>
+      </Message>
+    )
+  }
+
+  return (
+    <Message align={isUser ? "end" : "start"}>
+      <MessageContent>
+        <Bubble
+          align={isUser ? "end" : "start"}
+          variant={
+            message.status === "error"
+              ? "destructive"
+              : isUser
+                ? "tinted"
+                : isTool
+                  ? "muted"
+                  : "secondary"
+          }
+        >
+          <BubbleContent
+            className={cn(
+              "whitespace-pre-wrap",
+              isTool && "font-mono text-xs text-muted-foreground"
+            )}
+          >
+            {isTool ? (
+              content
+            ) : (
+              <Streamdown
+                className="chat-markdown"
+                controls={{
+                  code: { copy: true, download: false },
+                  mermaid: false,
+                  table: { copy: true, download: false, fullscreen: false },
+                }}
+                isAnimating={isStreaming}
+                mode={isStreaming ? "streaming" : "static"}
+              >
+                {content}
+              </Streamdown>
+            )}
+            {isStreaming ? (
+              <span className="ml-0.5 animate-pulse">▍</span>
+            ) : null}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
