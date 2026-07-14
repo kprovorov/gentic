@@ -345,10 +345,22 @@ export function IssueChat({
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
   // session all happen first with no message to attach a spinner to. Show a
-  // standalone marker for that gap so "agent is working" isn't silent.
+  // standalone marker for that gap so "agent is working" isn't silent. Once a
+  // completed assistant text message is last in the transcript, suppress the
+  // marker even if issue status is briefly stale: that message is the agent's
+  // visible turn boundary, and a marker beneath it reads as lingering work.
+  const lastDisplayedMessage = displayedMessages.at(-1)
+  const hasStreamingMessage = displayedMessages.some(
+    (message) => message.status === "streaming"
+  )
+  const lastMessageCompletedAssistantTurn =
+    lastDisplayedMessage?.role === "assistant" &&
+    lastDisplayedMessage.kind === "text" &&
+    lastDisplayedMessage.status !== "streaming"
   const isAgentWorkingWithoutMessage =
     (status === "queued" || status === "in-progress") &&
-    !displayedMessages.some((message) => message.status === "streaming")
+    !hasStreamingMessage &&
+    !lastMessageCompletedAssistantTurn
 
   useEffect(() => {
     const channel = supabase
