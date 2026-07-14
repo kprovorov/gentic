@@ -22,6 +22,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@gentic/ui/message-scroller"
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus } from "@gentic/validators/issues"
@@ -126,6 +127,10 @@ export function IssueChat({
   const [pullRequests, setPullRequests] =
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
+  // Bumped on every submit to trigger a forced scroll-to-bottom, since the
+  // scroller's own follow-bottom heuristic only kicks in if the viewport was
+  // already at the bottom before the new message landed.
+  const [sendTick, setSendTick] = useState(0)
   const queryClient = useQueryClient()
   // The private broadcast channel from the effect below, kept in a ref so
   // `handleSubmit` can send on it without re-subscribing on every render.
@@ -369,6 +374,7 @@ export function IssueChat({
     formData.set("issue_id", issueId)
     formData.set("content", content)
     setDraft("")
+    setSendTick((tick) => tick + 1)
     mutation.mutate(formData)
   }
 
@@ -412,6 +418,7 @@ export function IssueChat({
       ) : null}
 
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+        <ScrollToEndOnSend sendTick={sendTick} />
         <MessageScroller className="h-[28rem] max-h-[28rem]">
           <MessageScrollerViewport className="pr-1">
             <MessageScrollerContent className="gap-3">
@@ -429,7 +436,6 @@ export function IssueChat({
                   <MessageScrollerItem
                     key={message.clientKey ?? message.id}
                     messageId={message.id}
-                    scrollAnchor={message.role === "user"}
                   >
                     <ChatMessageRow message={message} />
                   </MessageScrollerItem>
@@ -479,6 +485,21 @@ export function IssueChat({
       </form>
     </div>
   )
+}
+
+// Forces the viewport to the bottom on every send, even if the scroller's
+// own follow-bottom tracking had lapsed (e.g. the user had scrolled up to
+// read history before sending). Must render inside MessageScrollerProvider.
+function ScrollToEndOnSend({ sendTick }: { sendTick: number }) {
+  const { scrollToEnd } = useMessageScroller()
+
+  useEffect(() => {
+    if (sendTick > 0) {
+      scrollToEnd({ behavior: "smooth" })
+    }
+  }, [sendTick, scrollToEnd])
+
+  return null
 }
 
 function formatDateTime(value: string): string {
