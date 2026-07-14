@@ -116,6 +116,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   )
   const [globalFilter, setGlobalFilter] = useState("")
   const [pageIndex, setPageIndex] = useState(0)
+  const [collapsedStatuses, setCollapsedStatuses] = useState<
+    Set<HomeIssue["status"]>
+  >(() => new Set())
   const filteredIssues = useMemo(
     () =>
       data.issues
@@ -159,6 +162,20 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   function updateGlobalFilter(value: string) {
     setGlobalFilter(value)
     setPageIndex(0)
+  }
+
+  function toggleStatus(status: HomeIssue["status"]) {
+    setCollapsedStatuses((current) => {
+      const next = new Set(current)
+
+      if (next.has(status)) {
+        next.delete(status)
+      } else {
+        next.add(status)
+      }
+
+      return next
+    })
   }
 
   return (
@@ -219,20 +236,37 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
                 {groupedIssues.map(([status, issues]) => {
                   const StatusIcon = statusIcons[status]
+                  const isCollapsed = collapsedStatuses.has(status)
+                  const groupContentId = `issues-group-${status}`
 
                   return (
                     <section key={status} className="border-b last:border-b-0">
-                      <div className="flex items-center gap-3 bg-muted/55 px-4 py-3">
-                        <IconChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 bg-muted/55 px-4 py-3 text-left transition-colors hover:bg-muted/75 focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
+                        aria-expanded={!isCollapsed}
+                        aria-controls={groupContentId}
+                        onClick={() => toggleStatus(status)}
+                      >
+                        <IconChevronDown
+                          className={cn(
+                            "size-4 shrink-0 text-muted-foreground transition-transform",
+                            isCollapsed && "-rotate-90"
+                          )}
+                        />
                         <StatusIcon className="size-4 shrink-0 text-muted-foreground" />
-                        <h2 className="text-sm font-semibold">
+                        <span className="text-sm font-semibold">
                           {statusLabels[status]}
-                        </h2>
+                        </span>
                         <span className="text-sm text-muted-foreground">
                           {statusCounts.get(status) ?? issues.length}
                         </span>
-                      </div>
-                      <div className="divide-y">
+                      </button>
+                      <div
+                        id={groupContentId}
+                        className="divide-y"
+                        hidden={isCollapsed}
+                      >
                         {issues.map((issue) => (
                           <IssueRow
                             key={issue.id}
