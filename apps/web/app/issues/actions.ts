@@ -151,7 +151,17 @@ export async function resetIssueAgent(formData: FormData) {
     getString(formData, "agent_provider") || "claude_code"
   )
 
-  await issuesService.resetIssueAgent(supabase, userId, id, agentProvider)
+  await issuesService.ensureIssueOwned(supabase, userId, id)
+  await issuesService.resetIssueAgentTrusted(
+    createServiceClient(),
+    userId,
+    id,
+    agentProvider,
+    {
+      reason: "user_requested_agent_retry",
+      source: "web_server_action",
+    }
+  )
 
   revalidatePath("/home")
   revalidatePath("/issues")

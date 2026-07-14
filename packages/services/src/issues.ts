@@ -305,16 +305,25 @@ export async function updateIssue(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider, projects!inner(user_id)")
+    .select("agent_provider,run_started_at, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ agent_provider: string }>()
+    .maybeSingle<{ agent_provider: string; run_started_at: string | null }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
   }
   if (!current) {
     throw new ServiceError("not_found", "Issue not found")
+  }
+  if (
+    current.agent_provider !== input.agent_provider &&
+    current.run_started_at
+  ) {
+    throw new ServiceError(
+      "validation",
+      "Agent cannot be changed after an issue has started"
+    )
   }
 
   const result = await supabase
@@ -324,9 +333,6 @@ export async function updateIssue(
       prompt: input.prompt ?? null,
       agent_provider: input.agent_provider,
       type: input.type,
-      ...(current.agent_provider !== input.agent_provider
-        ? { session_id: null }
-        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -346,19 +352,23 @@ export async function deleteIssue(
   unwrap(await supabase.from("issues").delete().eq("id", id))
 }
 
-export async function resetIssueAgent(
+export async function resetIssueAgentTrusted(
   supabase: Supabase,
   userId: string,
   id: string,
-  agentProvider: AgentProvider
+  agentProvider: AgentProvider,
+  audit: {
+    reason: string
+    source: string
+  }
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider,projects!inner(user_id)")
+    .select("id,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle<{
-      agent_provider: AgentProvider
+      id: string
     }>()
 
   if (fetchError) {
@@ -369,9 +379,12 @@ export async function resetIssueAgent(
   }
 
   unwrap(
-    await supabase.rpc("reset_issue_run", {
+    await supabase.rpc("reset_issue_run_audited", {
       p_issue_id: id,
       p_agent_provider: agentProvider,
+      p_actor_user_id: userId,
+      p_reason: audit.reason,
+      p_source: audit.source,
     })
   )
 }
@@ -507,7 +520,6 @@ export async function updateIssueAgentProvider(
     .from("issues")
     .update({
       agent_provider: agentProvider,
-      session_id: null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

@@ -131,27 +131,12 @@ export class ApiError extends Error {
   }
 }
 
-// TEMPORARY: special API key for testing. Bypasses Clerk verification entirely
-// and authenticates as a fixed user. Only active when both env vars are set, so
-// it stays disabled anywhere they aren't configured. Remove before shipping.
-const SPECIAL_TEST_API_KEY = process.env.SPECIAL_TEST_API_KEY
-const SPECIAL_TEST_USER_ID = process.env.SPECIAL_TEST_USER_ID
-
 async function authenticateApiKey(request: Request): Promise<string> {
   const authorization = request.headers.get("authorization")
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   if (!token) {
     throw new ApiError(401, "Missing bearer token")
-  }
-
-  // TEMPORARY testing bypass — see note above.
-  if (
-    SPECIAL_TEST_API_KEY &&
-    SPECIAL_TEST_USER_ID &&
-    token === SPECIAL_TEST_API_KEY
-  ) {
-    return SPECIAL_TEST_USER_ID
   }
 
   const key = authCacheKey(token)
