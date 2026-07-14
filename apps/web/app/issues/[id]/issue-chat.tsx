@@ -44,6 +44,7 @@ import {
   ISSUE_RETRY_RESET_EVENT,
   type IssueRetryResetEventDetail,
 } from "./issue-retry-events"
+import { type ChatMessage, useIssueChat } from "./issue-chat-state"
 
 type SlashCommand = {
   name: string
@@ -118,42 +119,6 @@ function filterSlashCommands(
     .slice(0, 8)
 }
 
-export type ChatMessage = {
-  id: string
-  // Stable React key that survives the optimistic-id -> server-id swap in
-  // the send mutation's onSuccess. Without it, that swap changes the list
-  // item's `key` (id), so React unmounts/remounts its DOM node — which
-  // resets @shadcn/react's message-scroller anchor tracking and can snap
-  // the viewport to the first unhandled anchor message (the top of the
-  // conversation) instead of staying put.
-  clientKey?: string
-  role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
-  content: string | null
-  status: "streaming" | "complete" | "error"
-  created_at: string
-}
-
-function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
-  const index = list.findIndex((message) => message.id === incoming.id)
-  if (index === -1) {
-    return [...list, incoming].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at)
-    )
-  }
-  const next = [...list]
-  const existing = next[index]
-  next[index] = {
-    ...incoming,
-    clientKey: existing.clientKey ?? incoming.clientKey,
-  }
-  return next
-}
-
-function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
-  return incoming.reduce(mergeMessage, list)
-}
-
 function mergePullRequest(
   list: IssuePullRequest[],
   incoming: IssuePullRequest
@@ -199,7 +164,8 @@ export function IssueChat({
   initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const { messages: displayedMessages, dispatch } =
+    useIssueChat(initialMessages)
   const [status, setStatus] = useState<IssueStatus>(initialStatus)
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
@@ -221,17 +187,15 @@ export function IssueChat({
     ReturnType<typeof useSupabaseClient>["channel"]
   > | null>(null)
   const broadcastSubscribedRef = useRef(false)
-  // Last-seen `seq` per message id, so an out-of-order broadcast delivery
-  // can't regress a message back to older content.
-  const messageSeqRef = useRef(new Map<string, number>())
   const mutation = useMutation({
     mutationFn: sendIssueMessage,
     onMutate: (formData) => {
       const content = String(formData.get("content") ?? "")
       const optimisticId = `optimistic-${crypto.randomUUID()}`
 
-      setMessages((current) =>
-        mergeMessage(current, {
+      dispatch({
+        type: "optimistic_send",
+        message: {
           id: optimisticId,
           clientKey: optimisticId,
           role: "user",
@@ -239,28 +203,27 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: new Date().toISOString(),
-        })
-      )
+        },
+      })
 
       return { optimisticId }
     },
     onSuccess: async (message, formData, context) => {
       const content = String(formData.get("content") ?? "")
 
-      setMessages((current) =>
-        mergeMessage(
-          current.filter(({ id }) => id !== context.optimisticId),
-          {
-            id: message.id,
-            clientKey: context.optimisticId,
-            role: "user",
-            kind: "text",
-            content,
-            status: "complete",
-            created_at: message.created_at,
-          }
-        )
-      )
+      dispatch({
+        type: "persisted_insert_update",
+        optimisticId: context.optimisticId,
+        message: {
+          id: message.id,
+          clientKey: context.optimisticId,
+          role: "user",
+          kind: "text",
+          content,
+          status: "complete",
+          created_at: message.created_at,
+        },
+      })
 
       if (broadcastSubscribedRef.current && broadcastChannelRef.current) {
         void broadcastChannelRef.current.send({
@@ -277,28 +240,13 @@ export function IssueChat({
     },
     onError: (_error, formData, context) => {
       if (context) {
-        setMessages((current) =>
-          current.filter(({ id }) => id !== context.optimisticId)
-        )
+        dispatch({ type: "failure", optimisticId: context.optimisticId })
       }
       setDraft((current) => current || String(formData.get("content") ?? ""))
     },
   })
 
   const supabase = useSupabaseClient()
-  const isOptimisticRetryReset = initialMessages.some((message) =>
-    message.id.startsWith("optimistic-retry-")
-  )
-  const displayedMessages = useMemo(() => {
-    if (isOptimisticRetryReset) {
-      return initialMessages
-    }
-
-    return mergeMessages(
-      messages.filter((message) => !message.id.startsWith("optimistic-retry-")),
-      initialMessages
-    )
-  }, [messages, initialMessages, isOptimisticRetryReset])
   const displayedPullRequests = useMemo(
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
@@ -329,7 +277,7 @@ export function IssueChat({
         return
       }
 
-      setMessages([detail.message])
+      dispatch({ type: "reset", messages: [detail.message] })
       setStatus(detail.status)
       setUsageLimitResetAt(detail.usageLimitResetAt)
       setPrUrl(detail.prUrl)
@@ -340,7 +288,7 @@ export function IssueChat({
     return () => {
       window.removeEventListener(ISSUE_RETRY_RESET_EVENT, handleRetryReset)
     }
-  }, [issueId])
+  }, [dispatch, issueId])
 
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
@@ -365,27 +313,6 @@ export function IssueChat({
   useEffect(() => {
     const channel = supabase
       .channel(`issue-${issueId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `issue_id=eq.${issueId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            const removed = payload.old as { id: string }
-            setMessages((current) =>
-              current.filter((message) => message.id !== removed.id)
-            )
-            return
-          }
-          setMessages((current) =>
-            mergeMessage(current, payload.new as ChatMessage)
-          )
-        }
-      )
       .on(
         "postgres_changes",
         {
@@ -426,17 +353,22 @@ export function IssueChat({
           )
         }
       )
-      .subscribe()
+      .subscribe((subscribeStatus) => {
+        if (subscribeStatus === "SUBSCRIBED") {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.issue(issueId),
+          })
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [supabase, issueId])
+  }, [supabase, issueId, queryClient])
 
-  // Private Realtime Broadcast channel: the low-latency transport (see
-  // docs/realtime-transport.md). Subscribed in addition to the
-  // `postgres_changes` effect above during rollout — upsert-by-id makes
-  // double delivery of the same message harmless.
+  // Private Realtime Broadcast channel: the low-latency transcript transport
+  // (see docs/realtime-transport.md). Durable query hydration reconciles any
+  // missed persisted messages on initial load, navigation, and reconnect.
   useEffect(() => {
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -457,21 +389,13 @@ export function IssueChat({
             if (!event.success) {
               return
             }
-            const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
-            if (event.data.seq <= lastSeq) {
-              return
-            }
-            messageSeqRef.current.set(event.data.id, event.data.seq)
-            setMessages((current) =>
-              mergeMessage(current, {
-                id: event.data.id,
-                role: event.data.role,
-                kind: event.data.kind,
-                content: event.data.content,
-                status: event.data.status,
-                created_at: event.data.ts,
-              })
-            )
+            dispatch({
+              type:
+                event.data.status === "streaming"
+                  ? "stream_delta"
+                  : "finalization",
+              event: event.data,
+            })
           }
         )
         .on(
@@ -504,7 +428,7 @@ export function IssueChat({
         void supabase.removeChannel(channel)
       }
     }
-  }, [supabase, issueId])
+  }, [supabase, issueId, dispatch])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()

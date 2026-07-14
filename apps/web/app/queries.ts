@@ -8,7 +8,7 @@ import * as projectsService from "@gentic/services/projects"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[id]/attachments"
-import type { ChatMessage } from "./issues/[id]/issue-chat"
+import type { ChatMessage } from "./issues/[id]/issue-chat-state"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600

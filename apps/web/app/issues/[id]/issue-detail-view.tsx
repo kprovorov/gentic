@@ -249,7 +249,6 @@ export function IssueDetailView({
           "issue_pull_requests",
           "issue_relations",
           "attachments",
-          "messages",
         ]}
         queryKey={queryKeys.issue(issue.id)}
       />
