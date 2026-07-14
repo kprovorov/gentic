@@ -124,7 +124,7 @@ export function NewIssueView({
                       className="rounded-r-none border-r-primary-foreground/25"
                     >
                       <IconPlayerPlay />
-                      Run
+                      Run with Claude Code
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
