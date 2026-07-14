@@ -40,6 +40,13 @@ import { queryKeys } from "@/app/query-keys"
 
 export type ChatMessage = {
   id: string
+  // Stable React key that survives the optimistic-id -> server-id swap in
+  // the send mutation's onSuccess. Without it, that swap changes the list
+  // item's `key` (id), so React unmounts/remounts its DOM node — which
+  // resets @shadcn/react's message-scroller anchor tracking and can snap
+  // the viewport to the first unhandled anchor message (the top of the
+  // conversation) instead of staying put.
+  clientKey?: string
   role: "user" | "assistant" | "system"
   kind: "text" | "tool" | "thinking"
   content: string | null
@@ -55,7 +62,11 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
     )
   }
   const next = [...list]
-  next[index] = incoming
+  const existing = next[index]
+  next[index] = {
+    ...incoming,
+    clientKey: existing.clientKey ?? incoming.clientKey,
+  }
   return next
 }
 
@@ -134,6 +145,7 @@ export function IssueChat({
       setMessages((current) =>
         mergeMessage(current, {
           id: optimisticId,
+          clientKey: optimisticId,
           role: "user",
           kind: "text",
           content,
@@ -152,6 +164,7 @@ export function IssueChat({
           current.filter(({ id }) => id !== context.optimisticId),
           {
             id: message.id,
+            clientKey: context.optimisticId,
             role: "user",
             kind: "text",
             content,
@@ -407,7 +420,7 @@ export function IssueChat({
               ) : (
                 displayedMessages.map((message) => (
                   <MessageScrollerItem
-                    key={message.id}
+                    key={message.clientKey ?? message.id}
                     messageId={message.id}
                     scrollAnchor={message.role === "user"}
                   >
