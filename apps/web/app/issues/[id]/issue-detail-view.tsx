@@ -1,7 +1,4 @@
-"use client"
-
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
 import {
   IconAlertCircle,
   IconAlertOctagon,
@@ -33,9 +30,7 @@ import {
   IconThumbUp,
 } from "@tabler/icons-react"
 
-import { fetchIssueDetailData } from "@/app/client-queries"
 import type { IssueDetailData } from "@/app/queries"
-import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -49,12 +44,11 @@ import { cn } from "@gentic/ui/utils"
 import type { IssueStatus } from "@gentic/validators/issues"
 
 import { Attachments } from "./attachments"
-import { IssueAgentSelect } from "./issue-agent-select"
 import { IssueChat } from "./issue-chat"
 import { IssueDeleteButton } from "./issue-delete-button"
 import { IssueRelations } from "./issue-relations"
 import { IssueRetryAgentButton } from "./issue-retry-agent-button"
-import { IssueStatusSelect } from "./issue-status-select"
+import { IssueStatusControls } from "./issue-status-controls"
 
 const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
@@ -196,19 +190,7 @@ function DetailRow({
   )
 }
 
-export function IssueDetailView({
-  issueId,
-  initialData,
-}: {
-  issueId: string
-  initialData: IssueDetailData
-}) {
-  const { data } = useQuery({
-    queryKey: queryKeys.issue(issueId),
-    queryFn: () => fetchIssueDetailData(issueId),
-    initialData,
-    staleTime: queryStaleTimes.realtime,
-  })
+export function IssueDetailView({ data }: { data: IssueDetailData }) {
   const {
     issue,
     messages,
@@ -249,7 +231,6 @@ export function IssueDetailView({
           "issue_relations",
           "attachments",
         ]}
-        queryKey={queryKeys.issue(issue.id)}
       />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-col gap-5 border-b pb-6">
@@ -263,11 +244,7 @@ export function IssueDetailView({
             <div className="flex flex-wrap items-center gap-2">
               {displayedPullRequests.map((pullRequest) => (
                 <Button key={pullRequest.id} asChild variant="outline">
-                  <Link
-                    href={pullRequest.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  <Link href={pullRequest.url} target="_blank" rel="noreferrer">
                     <IconExternalLink />
                     {formatPullRequestLabel(pullRequest.url)}
                   </Link>
@@ -360,10 +337,7 @@ export function IssueDetailView({
                     issue when it moves to Queued.
                   </CardDescription>
                 </div>
-                <IssueRetryAgentButton
-                  issueId={issue.id}
-                  issuePrompt={issue.prompt}
-                />
+                <IssueRetryAgentButton issueId={issue.id} />
               </CardHeader>
               <CardContent>
                 <IssueChat
@@ -388,9 +362,9 @@ export function IssueDetailView({
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5">
-                <IssueStatusSelect issueId={issue.id} status={issue.status} />
-                <IssueAgentSelect
+                <IssueStatusControls
                   issueId={issue.id}
+                  status={issue.status}
                   agentProvider={issue.agent_provider}
                   disabled={Boolean(issue.run_started_at)}
                 />

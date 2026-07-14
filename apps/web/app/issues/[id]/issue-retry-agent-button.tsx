@@ -12,7 +12,6 @@ import {
 } from "@gentic/ui/dropdown-menu"
 
 import { resetIssueAgent } from "@/app/issues/actions"
-import type { IssueDetailData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
 import {
@@ -37,16 +36,7 @@ export function IssueRetryAgentButton({
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: resetIssueAgent,
-    onMutate: async (formData) => {
-      const agentProvider = String(
-        formData.get("agent_provider") ?? "claude_code"
-      ) as AgentProvider
-      const issueKey = queryKeys.issue(issueId)
-
-      await queryClient.cancelQueries({ queryKey: issueKey })
-
-      const previousIssue =
-        queryClient.getQueryData<IssueDetailData>(issueKey)
+    onMutate: async () => {
       const now = new Date().toISOString()
       const optimisticMessage = {
         id: `optimistic-retry-${now}`,
@@ -55,53 +45,20 @@ export function IssueRetryAgentButton({
         content: issuePrompt ?? "",
         status: "complete",
         created_at: now,
-      } satisfies IssueDetailData["messages"][number]
-
-      queryClient.setQueryData<IssueDetailData>(issueKey, (current) => {
-        if (!current) {
-          return current
-        }
-
-        return {
-          ...current,
-          issue: {
-            ...current.issue,
-            status: "todo",
-            agent_provider: agentProvider,
-            usage_limit_reset_at: null,
-            pr_url: null,
-            updated_at: now,
-          },
-          messages: [optimisticMessage],
-          pullRequests: [],
-        }
-      })
+      } as const
 
       window.dispatchEvent(
-        new CustomEvent<IssueRetryResetEventDetail>(
-          ISSUE_RETRY_RESET_EVENT,
-          {
-            detail: {
-              issueId,
-              message: optimisticMessage,
-              status: "todo",
-              usageLimitResetAt: null,
-              prUrl: null,
-              pullRequests: [],
-            },
-          }
-        )
+        new CustomEvent<IssueRetryResetEventDetail>(ISSUE_RETRY_RESET_EVENT, {
+          detail: {
+            issueId,
+            message: optimisticMessage,
+            status: "todo",
+            usageLimitResetAt: null,
+            prUrl: null,
+            pullRequests: [],
+          },
+        })
       )
-
-      return { previousIssue }
-    },
-    onError: (_error, _formData, context) => {
-      if (context?.previousIssue) {
-        queryClient.setQueryData(
-          queryKeys.issue(issueId),
-          context.previousIssue
-        )
-      }
     },
     onSuccess: async () => {
       await Promise.all([
