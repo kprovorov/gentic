@@ -358,47 +358,57 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <section key={status} className="border-b last:border-b-0">
                       <button
                         type="button"
-                        className="flex w-full items-center gap-3 bg-muted/55 px-4 py-3 text-left transition-colors hover:bg-muted/75 focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
+                        className="group flex w-full items-center gap-3 bg-muted/55 px-4 py-3 text-left transition-all duration-150 hover:bg-muted hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
                         aria-expanded={!isCollapsed}
                         aria-controls={groupContentId}
                         onClick={() => toggleStatus(status)}
                       >
-                        <IconChevronDown
-                          className={cn(
-                            "size-4 shrink-0 text-muted-foreground transition-transform",
-                            isCollapsed && "-rotate-90"
-                          )}
-                        />
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 group-hover:bg-background/80 group-hover:text-foreground">
+                          <IconChevronDown
+                            className={cn(
+                              "size-4 transition-transform duration-200 ease-out",
+                              isCollapsed && "-rotate-90"
+                            )}
+                          />
+                        </span>
                         <StatusIcon
                           className={cn(
-                            "size-4 shrink-0",
+                            "size-4 shrink-0 transition-colors duration-150 group-hover:text-foreground",
                             statusIconStyles[status]
                           )}
                         />
                         <span
                           className={cn(
-                            "text-sm font-semibold",
+                            "text-sm font-semibold transition-colors duration-150 group-hover:text-foreground",
                             statusIconStyles[status]
                           )}
                         >
                           {statusLabels[status]}
                         </span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors duration-150 group-hover:text-foreground">
                           {statusCounts.get(status) ?? issues.length}
                         </span>
                       </button>
                       <div
                         id={groupContentId}
-                        className="divide-y"
-                        hidden={isCollapsed}
+                        className={cn(
+                          "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+                          isCollapsed
+                            ? "grid-rows-[0fr] opacity-0"
+                            : "grid-rows-[1fr] opacity-100"
+                        )}
+                        aria-hidden={isCollapsed}
+                        inert={isCollapsed ? true : undefined}
                       >
-                        {issues.map((issue) => (
-                          <IssueRow
-                            key={issue.id}
-                            issue={issue}
-                            isBlocked={blockedIssueIds.has(issue.id)}
-                          />
-                        ))}
+                        <div className="min-h-0 divide-y overflow-hidden">
+                          {issues.map((issue) => (
+                            <IssueRow
+                              key={issue.id}
+                              issue={issue}
+                              isBlocked={blockedIssueIds.has(issue.id)}
+                            />
+                          ))}
+                        </div>
                       </div>
                     </section>
                   )
