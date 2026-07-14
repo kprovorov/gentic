@@ -401,7 +401,7 @@ const mcpHandler = createMcpHandler(
       {
         title: "Update Issue Status",
         description:
-          "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message from the issue title and prompt. Other status changes only update the workflow status.",
+          "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message from the issue prompt. Other status changes only update the workflow status.",
         inputSchema: {
           id: issueIdInputSchema.id,
           status: issueStatusSchema.describe(
