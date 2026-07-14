@@ -369,8 +369,18 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                             isCollapsed && "-rotate-90"
                           )}
                         />
-                        <StatusIcon className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="text-sm font-semibold">
+                        <StatusIcon
+                          className={cn(
+                            "size-4 shrink-0",
+                            statusIconStyles[status]
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            "text-sm font-semibold",
+                            statusIconStyles[status]
+                          )}
+                        >
                           {statusLabels[status]}
                         </span>
                         <span className="text-sm text-muted-foreground">
