@@ -6,14 +6,18 @@ import type { IssueType } from "@gentic/validators/issues"
 
 const ISSUE_TYPE_MODEL = process.env.ISSUE_TYPE_MODEL ?? "openai/gpt-4.1-mini"
 
-const ISSUE_TYPES = ["feature", "bug", "feedback", "idea"] as const
+// "feedback" is intentionally excluded: it was the most ambiguous of the
+// four original categories and pushed the model toward hedging, explanatory
+// responses (e.g. "This is general feedback about X, so: feedback") that
+// blew past the output token budget before the actual word appeared.
+const ISSUE_TYPES = ["feature", "bug", "idea"] as const
 
 export async function generateIssueType(prompt: string): Promise<IssueType> {
   const { text } = await generateText({
     model: gateway(ISSUE_TYPE_MODEL),
-    system: `Classify issue tracker prompts into exactly one type: ${ISSUE_TYPES.join(", ")}. Return only the type, lowercase, no punctuation, no other text.`,
+    system: `Classify issue tracker prompts into exactly one type: ${ISSUE_TYPES.join(", ")}. Reply with that single word only — no punctuation, no explanation.`,
     prompt: `Classify this issue prompt:\n\n${prompt}`,
-    maxOutputTokens: 8,
+    maxOutputTokens: 20,
     temperature: 0,
   })
 
