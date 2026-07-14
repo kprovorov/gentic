@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   IconArrowLeft,
@@ -22,6 +23,8 @@ import {
 import { Label } from "@gentic/ui/label"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
+import { AttachmentPromptField } from "../attachment-prompt-field"
+
 export function NewIssueView({
   initialData,
 }: {
@@ -33,6 +36,7 @@ export function NewIssueView({
     initialData,
   })
   const { projects } = data
+  const [prompt, setPrompt] = useState("")
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -68,7 +72,11 @@ export function NewIssueView({
                 </Button>
               </div>
             ) : (
-              <form action={saveIssueDraft} className="grid gap-5">
+              <form
+                action={saveIssueDraft}
+                encType="multipart/form-data"
+                className="grid gap-5"
+              >
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
                   <NativeSelect
@@ -104,13 +112,14 @@ export function NewIssueView({
 
                 <div className="grid gap-2">
                   <Label htmlFor="issue-prompt">Prompt</Label>
-                  <textarea
+                  <AttachmentPromptField
                     id="issue-prompt"
                     name="prompt"
+                    value={prompt}
+                    onChange={setPrompt}
                     rows={6}
                     placeholder="Describe the issue, acceptance notes, or links."
                     required
-                    className="w-full resize-y rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base transition-[color,box-shadow,background-color] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                   />
                 </div>
 

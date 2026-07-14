@@ -56,8 +56,14 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   const created = await issuesService.createIssue(
     supabase,
     userId,
-    createIssueSchema.parse({ ...fields, status })
+    createIssueSchema.parse({ ...fields, status: "draft" })
   )
+
+  await uploadIssueAttachments(supabase, created.id, getAttachmentFiles(formData))
+
+  if (status === "todo") {
+    await issuesService.updateIssueStatus(supabase, userId, created.id, "todo")
+  }
 
   after(async () => {
     const serviceClient = createServiceClient()
@@ -202,6 +208,9 @@ export async function sendIssueMessage(formData: FormData) {
     content: getString(formData, "content"),
   })
 
+  await issuesService.ensureIssueOwned(supabase, userId, issue_id)
+  await uploadIssueAttachments(supabase, issue_id, getAttachmentFiles(formData))
+
   const message = await issuesService.sendIssueMessage(
     supabase,
     userId,
@@ -215,12 +224,25 @@ export async function sendIssueMessage(formData: FormData) {
 }
 
 export async function uploadAttachments(formData: FormData) {
-  const { supabase } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
-  const files = formData
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+  await uploadIssueAttachments(supabase, issueId, getAttachmentFiles(formData))
+
+  revalidatePath(`/issues/${issueId}`)
+}
+
+function getAttachmentFiles(formData: FormData) {
+  return formData
     .getAll("files")
     .filter((value): value is File => value instanceof File && value.size > 0)
+}
 
+async function uploadIssueAttachments(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  issueId: string,
+  files: File[]
+) {
   for (const file of files) {
     if (file.size > MAX_ATTACHMENT_BYTES) {
       throw new Error(`"${file.name}" is larger than 25MB`)
@@ -251,8 +273,6 @@ export async function uploadAttachments(formData: FormData) {
       throw new Error(insertError.message)
     }
   }
-
-  revalidatePath(`/issues/${issueId}`)
 }
 
 const deleteAttachmentSchema = z.object({
