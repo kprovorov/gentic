@@ -24,6 +24,7 @@
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-devtools": "^5.101.2",
+    "@tanstack/react-table": "^8.21.3",
     "@upstash/redis": "^1.34.3",
     "ai": "^7.0.22",
     "jose": "^6.1.0",
