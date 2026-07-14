@@ -36,6 +36,13 @@ import {
 } from "@gentic/validators/realtime"
 
 import { sendIssueMessage } from "@/app/issues/actions"
+import {
+  type ChatMessage,
+  mergeBroadcastMessage,
+  mergeMessage,
+  mergeMessages,
+  mergePersistedMessages,
+} from "@/app/issues/issue-transcript"
 import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
@@ -44,6 +51,8 @@ import {
   ISSUE_RETRY_RESET_EVENT,
   type IssueRetryResetEventDetail,
 } from "./issue-retry-events"
+
+export type { ChatMessage } from "@/app/issues/issue-transcript"
 
 type SlashCommand = {
   name: string
@@ -118,42 +127,6 @@ function filterSlashCommands(
     .slice(0, 8)
 }
 
-export type ChatMessage = {
-  id: string
-  // Stable React key that survives the optimistic-id -> server-id swap in
-  // the send mutation's onSuccess. Without it, that swap changes the list
-  // item's `key` (id), so React unmounts/remounts its DOM node — which
-  // resets @shadcn/react's message-scroller anchor tracking and can snap
-  // the viewport to the first unhandled anchor message (the top of the
-  // conversation) instead of staying put.
-  clientKey?: string
-  role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
-  content: string | null
-  status: "streaming" | "complete" | "error"
-  created_at: string
-}
-
-function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
-  const index = list.findIndex((message) => message.id === incoming.id)
-  if (index === -1) {
-    return [...list, incoming].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at)
-    )
-  }
-  const next = [...list]
-  const existing = next[index]
-  next[index] = {
-    ...incoming,
-    clientKey: existing.clientKey ?? incoming.clientKey,
-  }
-  return next
-}
-
-function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
-  return incoming.reduce(mergeMessage, list)
-}
-
 function mergePullRequest(
   list: IssuePullRequest[],
   incoming: IssuePullRequest
@@ -224,6 +197,9 @@ export function IssueChat({
   // Last-seen `seq` per message id, so an out-of-order broadcast delivery
   // can't regress a message back to older content.
   const messageSeqRef = useRef(new Map<string, number>())
+  const persistedMessageIdsRef = useRef(
+    new Set(initialMessages.map((message) => message.id))
+  )
   const mutation = useMutation({
     mutationFn: sendIssueMessage,
     onMutate: (formData) => {
@@ -342,6 +318,12 @@ export function IssueChat({
     }
   }, [issueId])
 
+  useEffect(() => {
+    for (const message of initialMessages) {
+      persistedMessageIdsRef.current.add(message.id)
+    }
+  }, [initialMessages])
+
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
   // session all happen first with no message to attach a spinner to. Show a
@@ -376,13 +358,16 @@ export function IssueChat({
         (payload) => {
           if (payload.eventType === "DELETE") {
             const removed = payload.old as { id: string }
+            persistedMessageIdsRef.current.delete(removed.id)
             setMessages((current) =>
               current.filter((message) => message.id !== removed.id)
             )
             return
           }
+          const message = payload.new as ChatMessage
+          persistedMessageIdsRef.current.add(message.id)
           setMessages((current) =>
-            mergeMessage(current, payload.new as ChatMessage)
+            mergeMessage(current, message)
           )
         }
       )
@@ -441,6 +426,31 @@ export function IssueChat({
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
 
+    async function reconcilePersistedTranscript() {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("id,role,kind,content,status,created_at")
+        .eq("issue_id", issueId)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessage[]>()
+
+      if (cancelled) {
+        return
+      }
+      if (error) {
+        console.error("failed to reconcile issue transcript:", error)
+        return
+      }
+
+      setMessages((current) =>
+        mergePersistedMessages(
+          current,
+          data ?? [],
+          persistedMessageIdsRef.current
+        )
+      )
+    }
+
     async function join() {
       await supabase.realtime.setAuth()
       if (cancelled) {
@@ -457,20 +467,13 @@ export function IssueChat({
             if (!event.success) {
               return
             }
-            const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
-            if (event.data.seq <= lastSeq) {
-              return
-            }
-            messageSeqRef.current.set(event.data.id, event.data.seq)
             setMessages((current) =>
-              mergeMessage(current, {
-                id: event.data.id,
-                role: event.data.role,
-                kind: event.data.kind,
-                content: event.data.content,
-                status: event.data.status,
-                created_at: event.data.ts,
-              })
+              mergeBroadcastMessage(
+                current,
+                event.data,
+                messageSeqRef.current,
+                persistedMessageIdsRef.current
+              )
             )
           }
         )
@@ -489,6 +492,9 @@ export function IssueChat({
         )
         .subscribe((subscribeStatus) => {
           broadcastSubscribedRef.current = subscribeStatus === "SUBSCRIBED"
+          if (subscribeStatus === "SUBSCRIBED") {
+            void reconcilePersistedTranscript()
+          }
         })
 
       broadcastChannelRef.current = channel

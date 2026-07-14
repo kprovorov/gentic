@@ -15,8 +15,8 @@ interface PersistOptions {
  * An assistant message streamed into the issue transcript incrementally as
  * the agent produces text. Each chunk publishes a full-content `message`
  * snapshot to the issue's realtime channel, throttled so the browser sees growth
- * without a broadcast per token. `finalize` publishes it `complete`, then
- * persists the completed message once using the same id.
+ * without a broadcast per token. `finalize` persists the completed message once
+ * using the same id, then publishes the durable `complete` snapshot.
  */
 export class StreamingAssistantMessage {
   private readonly id = randomUUID()
@@ -78,8 +78,6 @@ export class StreamingAssistantMessage {
     if (!this.started || this.finalized) {
       return
     }
-    this.finalized = true
-    await this.publish("complete")
     await persistMessageWithRetry(
       this.api,
       this.issueId,
@@ -92,20 +90,18 @@ export class StreamingAssistantMessage {
       },
       this.persistOptions
     )
+    this.finalized = true
+    await this.publish("complete")
   }
 
   async persistPartialError(): Promise<void> {
     if (!this.started || this.finalized) {
       return
     }
-    this.finalized = true
     if (this.timer) {
       clearTimeout(this.timer)
       this.timer = null
     }
-    await this.publish("error").catch((error) => {
-      logError("failed to publish errored assistant message:", describe(error))
-    })
     await persistMessageWithRetry(
       this.api,
       this.issueId,
@@ -118,13 +114,17 @@ export class StreamingAssistantMessage {
       },
       this.persistOptions
     )
+    this.finalized = true
+    await this.publish("error").catch((error) => {
+      logError("failed to publish errored assistant message:", describe(error))
+    })
   }
 
   private async publish(
     status: "streaming" | "complete" | "error"
   ): Promise<void> {
     this.seq += 1
-    await this.channel.publishMessage({
+    await publishRealtimeMessage(this.channel, {
       id: this.id,
       seq: this.seq,
       role: "assistant",
@@ -149,14 +149,6 @@ export async function publishMessage(
 ): Promise<void> {
   const id = randomUUID()
   const status = fields.status ?? "complete"
-  await channel.publishMessage({
-    id,
-    seq: 1,
-    role: "assistant",
-    kind: fields.kind ?? "text",
-    content: fields.content,
-    status,
-  })
   await persistMessageWithRetry(
     api,
     issueId,
@@ -169,6 +161,14 @@ export async function publishMessage(
     },
     fields.persistOptions
   )
+  await publishRealtimeMessage(channel, {
+    id,
+    seq: 1,
+    role: "assistant",
+    kind: fields.kind ?? "text",
+    content: fields.content,
+    status,
+  })
 }
 
 /**
@@ -190,8 +190,19 @@ export async function setRunState(
       pr_url: fields.pr_url ?? null,
       usage_limit_reset_at: fields.usage_limit_reset_at ?? null,
       run_error: fields.run_error ?? null,
+    }).catch((error) => {
+      logError("failed to publish run state:", describe(error))
     })
   }
+}
+
+async function publishRealtimeMessage(
+  channel: IssueRealtimeChannel,
+  event: Parameters<IssueRealtimeChannel["publishMessage"]>[0]
+): Promise<void> {
+  await channel.publishMessage(event).catch((error) => {
+    logError("failed to publish assistant message:", describe(error))
+  })
 }
 
 async function persistMessageWithRetry(
@@ -221,7 +232,7 @@ async function persistMessageWithRetry(
           `failed to persist finalized message ${message.id}:`,
           describe(error)
         )
-        return
+        throw error
       }
       attempt += 1
       await sleep(delay)

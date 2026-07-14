@@ -19,6 +19,7 @@ import {
 } from "@agentclientprotocol/sdk"
 
 import type { AgentApi } from "./api.js"
+import { logError } from "./log.js"
 import { StreamingAssistantMessage, publishMessage } from "./messages.js"
 import type { IssueRealtimeChannel } from "./realtime.js"
 
@@ -339,7 +340,9 @@ export async function runTurn(
   } catch (error) {
     const partial = current as StreamingAssistantMessage | null
     if (partial) {
-      await partial.persistPartialError()
+      await partial.persistPartialError().catch((persistError) => {
+        logError("failed to persist errored assistant message:", persistError)
+      })
     }
     throw error
   }
