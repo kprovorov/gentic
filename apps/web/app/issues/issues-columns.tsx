@@ -52,7 +52,7 @@ export const statusLabels: Record<IssueStatus, string> = {
   cancelled: "Cancelled",
 }
 
-const statusStyles: Record<IssueStatus, string> = {
+export const statusStyles: Record<IssueStatus, string> = {
   draft: "bg-muted/60 text-muted-foreground",
   todo: "bg-muted text-muted-foreground",
   queued: "bg-primary/15 text-primary-foreground",
@@ -73,7 +73,7 @@ const statusStyles: Record<IssueStatus, string> = {
   cancelled: "bg-muted text-muted-foreground",
 }
 
-const statusIcons = {
+export const statusIcons = {
   draft: IconPencil,
   todo: IconCircleDashed,
   queued: IconDownload,
@@ -115,7 +115,7 @@ export const statusOrder: Record<IssueStatus, number> = {
   cancelled: 17,
 }
 
-const issueTypeLabels: Record<IssueType, string> = {
+export const issueTypeLabels: Record<IssueType, string> = {
   issue: "Issue",
   feature: "Feature",
   bug: "Bug",
@@ -123,7 +123,7 @@ const issueTypeLabels: Record<IssueType, string> = {
   idea: "Idea",
 }
 
-const issueTypeIcons = {
+export const issueTypeIcons = {
   issue: IconFileDescription,
   feature: IconSparkles,
   bug: IconBug,
@@ -131,7 +131,7 @@ const issueTypeIcons = {
   idea: IconBulb,
 }
 
-const issueTypeStyles: Record<IssueType, string> = {
+export const issueTypeStyles: Record<IssueType, string> = {
   issue: "bg-muted text-muted-foreground",
   feature: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   bug: "bg-red-500/15 text-red-700 dark:text-red-300",

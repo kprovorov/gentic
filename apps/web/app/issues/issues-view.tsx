@@ -4,23 +4,105 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type SortingState,
-} from "@tanstack/react-table"
-import { IconPlus, IconSearch } from "@tabler/icons-react"
+  IconChevronDown,
+  IconLock,
+  IconPlus,
+  IconSearch,
+} from "@tabler/icons-react"
 
-import { getIssuesData, type IssuesData } from "@/app/queries"
+import { getIssuesData, type HomeIssue, type IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
-import { DataTable } from "@gentic/ui/data-table"
 import { Input } from "@gentic/ui/input"
+import { cn } from "@gentic/ui/utils"
 
-import { getIssuesColumns } from "./issues-columns"
+import {
+  formatDate,
+  issueTypeIcons,
+  issueTypeLabels,
+  issueTypeStyles,
+  statusIcons,
+  statusLabels,
+  statusOrder,
+} from "./issues-columns"
+
+const pageSize = 20
+
+function matchesIssue(issue: HomeIssue, filterValue: string) {
+  const haystack = [issue.title, issue.projects?.name, issue.projects?.repo]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+
+  return haystack.includes(filterValue.toLowerCase())
+}
+
+function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
+  const statusDelta = statusOrder[issueA.status] - statusOrder[issueB.status]
+
+  if (statusDelta !== 0) {
+    return statusDelta
+  }
+
+  return (
+    new Date(issueB.created_at).getTime() - new Date(issueA.created_at).getTime()
+  )
+}
+
+function IssueRow({
+  issue,
+  isBlocked,
+}: {
+  issue: HomeIssue
+  isBlocked: boolean
+}) {
+  const TypeIcon = issueTypeIcons[issue.type]
+
+  return (
+    <Link
+      href={`/issues/${issue.id}`}
+      className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]"
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "min-w-0 truncate font-medium hover:text-primary",
+            !issue.title && "text-muted-foreground italic"
+          )}
+        >
+          {issue.title ?? "Generating title…"}
+        </span>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+            issueTypeStyles[issue.type]
+          )}
+        >
+          <TypeIcon className="size-3" />
+          {issueTypeLabels[issue.type]}
+        </span>
+        {isBlocked ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+            <IconLock className="size-3" />
+            Blocked
+          </span>
+        ) : null}
+      </div>
+      <div className="min-w-0 text-sm text-muted-foreground">
+        <span className="block truncate">
+          {issue.projects?.name ?? "Unknown project"}
+        </span>
+        {issue.projects?.repo ? (
+          <span className="block truncate text-xs">{issue.projects.repo}</span>
+        ) : null}
+      </div>
+      <div className="text-sm text-muted-foreground md:text-right">
+        {formatDate(issue.created_at)}
+      </div>
+    </Link>
+  )
+}
 
 export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const { data } = useQuery({
@@ -32,39 +114,52 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     () => new Set(data.blockedIssueIds),
     [data.blockedIssueIds]
   )
-  const columns = useMemo(
-    () => getIssuesColumns(blockedIssueIds),
-    [blockedIssueIds]
-  )
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "status", desc: false },
-  ])
   const [globalFilter, setGlobalFilter] = useState("")
+  const [pageIndex, setPageIndex] = useState(0)
+  const filteredIssues = useMemo(
+    () =>
+      data.issues
+        .filter((issue) => matchesIssue(issue, globalFilter))
+        .toSorted(compareIssues),
+    [data.issues, globalFilter]
+  )
+  const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
+  const safePageIndex = Math.min(pageIndex, pageCount - 1)
+  const pagedIssues = filteredIssues.slice(
+    safePageIndex * pageSize,
+    safePageIndex * pageSize + pageSize
+  )
+  const statusCounts = useMemo(() => {
+    const counts = new Map<HomeIssue["status"], number>()
 
-  const table = useReactTable({
-    data: data.issues,
-    columns,
-    state: { sorting, globalFilter },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: (row, _columnId, filterValue) => {
-      const issue = row.original
-      const haystack = [
-        issue.title,
-        issue.projects?.name,
-        issue.projects?.repo,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-      return haystack.includes(String(filterValue).toLowerCase())
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 20 } },
-  })
+    for (const issue of filteredIssues) {
+      counts.set(issue.status, (counts.get(issue.status) ?? 0) + 1)
+    }
+
+    return counts
+  }, [filteredIssues])
+  const groupedIssues = useMemo(() => {
+    const groups = new Map<HomeIssue["status"], HomeIssue[]>()
+
+    for (const issue of pagedIssues) {
+      const group = groups.get(issue.status)
+
+      if (group) {
+        group.push(issue)
+      } else {
+        groups.set(issue.status, [issue])
+      }
+    }
+
+    return Array.from(groups.entries()).sort(
+      ([statusA], [statusB]) => statusOrder[statusA] - statusOrder[statusB]
+    )
+  }, [pagedIssues])
+
+  function updateGlobalFilter(value: string) {
+    setGlobalFilter(value)
+    setPageIndex(0)
+  }
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -111,33 +206,67 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={globalFilter}
-                onChange={(event) => setGlobalFilter(event.target.value)}
+                onChange={(event) => updateGlobalFilter(event.target.value)}
                 placeholder="Search issues…"
                 className="pl-9"
               />
             </div>
-            <div className="overflow-hidden rounded-4xl border bg-card shadow-sm">
-              <DataTable table={table} columns={columns} />
-            </div>
+            {pagedIssues.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                No results.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                {groupedIssues.map(([status, issues]) => {
+                  const StatusIcon = statusIcons[status]
+
+                  return (
+                    <section key={status} className="border-b last:border-b-0">
+                      <div className="flex items-center gap-3 bg-muted/55 px-4 py-3">
+                        <IconChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                        <StatusIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold">
+                          {statusLabels[status]}
+                        </h2>
+                        <span className="text-sm text-muted-foreground">
+                          {statusCounts.get(status) ?? issues.length}
+                        </span>
+                      </div>
+                      <div className="divide-y">
+                        {issues.map((issue) => (
+                          <IssueRow
+                            key={issue.id}
+                            issue={issue}
+                            isBlocked={blockedIssueIds.has(issue.id)}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                {table.getFilteredRowModel().rows.length} issue
-                {table.getFilteredRowModel().rows.length === 1 ? "" : "s"}
+                {filteredIssues.length} issue
+                {filteredIssues.length === 1 ? "" : "s"}
               </span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
+                  onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
+                  disabled={safePageIndex === 0}
                 >
                   Previous
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
+                  onClick={() =>
+                    setPageIndex(Math.min(pageCount - 1, safePageIndex + 1))
+                  }
+                  disabled={safePageIndex >= pageCount - 1}
                 >
                   Next
                 </Button>
