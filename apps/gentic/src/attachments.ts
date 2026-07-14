@@ -27,6 +27,29 @@ function sanitizeFileName(name: string, index: number): string {
   return cleaned || `file-${index}`
 }
 
+function uniqueFileName(
+  name: string,
+  index: number,
+  usedNames: Set<string>
+): string {
+  const sanitized = sanitizeFileName(name, index)
+  if (!usedNames.has(sanitized)) {
+    usedNames.add(sanitized)
+    return sanitized
+  }
+
+  const dot = sanitized.lastIndexOf(".")
+  const stem = dot > 0 ? sanitized.slice(0, dot) : sanitized
+  const ext = dot > 0 ? sanitized.slice(dot) : ""
+  for (let suffix = 1; ; suffix += 1) {
+    const candidate = `${stem}-${suffix}${ext}`
+    if (!usedNames.has(candidate)) {
+      usedNames.add(candidate)
+      return candidate
+    }
+  }
+}
+
 async function downloadBytes(url: string, fileName: string): Promise<Uint8Array> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -36,7 +59,7 @@ async function downloadBytes(url: string, fileName: string): Promise<Uint8Array>
 }
 
 /**
- * Turns an issue's uploaded attachments into ACP content blocks for the next
+ * Turns one user message's uploaded attachments into ACP content blocks for the
  * prompt turn. Images and text files are embedded directly (base64 `image`
  * blocks and inline `resource` text — no disk access needed by Claude Code).
  * The ACP agent we spawn ignores embedded binary resources and treats
@@ -48,9 +71,10 @@ async function downloadBytes(url: string, fileName: string): Promise<Uint8Array>
 export async function buildAttachmentBlocks(
   api: AgentApi,
   issueId: string,
+  messageId: string,
   attachmentsDir: string
 ): Promise<ContentBlock[]> {
-  const attachments = await api.fetchAttachments(issueId)
+  const attachments = await api.fetchAttachments(issueId, messageId)
   if (attachments.length === 0) {
     return []
   }
@@ -60,8 +84,11 @@ export async function buildAttachmentBlocks(
 
   const blocks: ContentBlock[] = []
   let dirCreated = false
+  const usedNames = new Set<string>()
 
   for (const [index, attachment] of attachments.entries()) {
+    const fileName = uniqueFileName(attachment.fileName, index, usedNames)
+
     if (isImage(attachment)) {
       const bytes = await downloadBytes(attachment.url, attachment.fileName)
       blocks.push({
@@ -77,7 +104,7 @@ export async function buildAttachmentBlocks(
       blocks.push({
         type: "resource",
         resource: {
-          uri: `attachment:///${sanitizeFileName(attachment.fileName, index)}`,
+          uri: `attachment:///${fileName}`,
           text: Buffer.from(bytes).toString("utf-8"),
           mimeType: attachment.contentType ?? undefined,
         },
@@ -89,7 +116,7 @@ export async function buildAttachmentBlocks(
       await mkdir(attachmentsDir, { recursive: true })
       dirCreated = true
     }
-    const path = join(attachmentsDir, sanitizeFileName(attachment.fileName, index))
+    const path = join(attachmentsDir, fileName)
     const bytes = await downloadBytes(attachment.url, attachment.fileName)
     await writeFile(path, bytes)
     blocks.push({

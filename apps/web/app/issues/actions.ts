@@ -19,6 +19,10 @@ import {
   type IssueStatus,
 } from "@gentic/validators/issues"
 
+import {
+  rollbackMessageAttachmentUpload,
+  validateAttachmentBatch,
+} from "@gentic/services/attachments"
 import * as issuesService from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 
@@ -28,7 +32,6 @@ import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
 
 const ATTACHMENTS_BUCKET = "attachments"
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 const createIssueFormSchema = createIssueSchema
   .omit({ title: true, status: true, type: true })
@@ -61,10 +64,43 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     createIssueSchema.parse({ ...fields, status: "draft" })
   )
 
-  await uploadIssueAttachments(supabase, created.id, getAttachmentFiles(formData))
+  let message: { id: string; created_at: string } | null = null
 
-  if (status === "todo") {
-    await issuesService.updateIssueStatus(supabase, userId, created.id, "todo")
+  try {
+    message = await issuesService.createIssueUserMessage(
+      supabase,
+      created.id,
+      fields.prompt
+    )
+
+    await uploadIssueAttachments(
+      supabase,
+      created.id,
+      message.id,
+      getAttachmentFiles(formData)
+    )
+
+    if (status === "todo") {
+      await issuesService.updateIssueStatus(supabase, userId, created.id, "todo")
+    }
+  } catch (error) {
+    if (message) {
+      const messageId = message.id
+      await cleanupFailedMessage(supabase, created.id, messageId).catch(
+        (cleanupError) => {
+          console.error(
+            `Failed to clean up initial message ${messageId}:`,
+            cleanupError
+          )
+        }
+      )
+    }
+    await issuesService.deleteIssue(supabase, userId, created.id).catch(
+      (cleanupError) => {
+        console.error(`Failed to clean up issue ${created.id}:`, cleanupError)
+      }
+    )
+    throw error
   }
 
   after(async () => {
@@ -233,25 +269,70 @@ export async function sendIssueMessage(formData: FormData) {
   })
 
   await issuesService.ensureIssueOwned(supabase, userId, issue_id)
-  await uploadIssueAttachments(supabase, issue_id, getAttachmentFiles(formData))
-
-  const message = await issuesService.sendIssueMessage(
+  const files = getAttachmentFiles(formData)
+  validateAttachmentFiles(files)
+  const message = await issuesService.createIssueUserMessage(
     supabase,
-    userId,
     issue_id,
     content
   )
 
-  revalidatePath(`/issues/${issue_id}`)
+  try {
+    const attachments = await uploadIssueAttachments(
+      supabase,
+      issue_id,
+      message.id,
+      files
+    )
+    await issuesService.requeueIssueForUserMessage(supabase, issue_id)
 
-  return message
+    revalidatePath(`/issues/${issue_id}`)
+
+    return { ...message, attachments }
+  } catch (error) {
+    await cleanupFailedMessage(supabase, issue_id, message.id).catch(
+      (cleanupError) => {
+        console.error(
+          `Failed to clean up message ${message.id} after send failure:`,
+          cleanupError
+        )
+      }
+    )
+    throw error
+  }
 }
 
 export async function uploadAttachments(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
-  await uploadIssueAttachments(supabase, issueId, getAttachmentFiles(formData))
+  const files = getAttachmentFiles(formData)
+  validateAttachmentFiles(files)
+
+  if (files.length === 0) {
+    return
+  }
+
+  const message = await issuesService.createIssueUserMessage(
+    supabase,
+    issueId,
+    "Attached files."
+  )
+
+  try {
+    await uploadIssueAttachments(supabase, issueId, message.id, files)
+    await issuesService.requeueIssueForUserMessage(supabase, issueId)
+  } catch (error) {
+    await cleanupFailedMessage(supabase, issueId, message.id).catch(
+      (cleanupError) => {
+        console.error(
+          `Failed to clean up message ${message.id} after upload failure:`,
+          cleanupError
+        )
+      }
+    )
+    throw error
+  }
 
   revalidatePath(`/issues/${issueId}`)
 }
@@ -262,16 +343,36 @@ function getAttachmentFiles(formData: FormData) {
     .filter((value): value is File => value instanceof File && value.size > 0)
 }
 
+function validateAttachmentFiles(files: File[]) {
+  validateAttachmentBatch(files)
+}
+
 async function uploadIssueAttachments(
   supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
   issueId: string,
+  messageId: string,
   files: File[]
-) {
-  for (const file of files) {
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error(`"${file.name}" is larger than 25MB`)
-    }
+): Promise<
+  Array<{
+    id: string
+    fileName: string
+    sizeBytes: number | null
+    url: null
+    thumbnailUrl: null
+  }>
+> {
+  validateAttachmentFiles(files)
+  const uploadedPaths: string[] = []
+  const attachmentIds: string[] = []
+  const attachments: Array<{
+    id: string
+    fileName: string
+    sizeBytes: number | null
+    url: null
+    thumbnailUrl: null
+  }> = []
 
+  for (const file of files) {
     const storagePath = `${issueId}/${randomUUID()}-${sanitizeFileName(file.name)}`
 
     const { error: uploadError } = await supabase.storage
@@ -281,22 +382,115 @@ async function uploadIssueAttachments(
       })
 
     if (uploadError) {
+      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
       throw new Error(uploadError.message)
     }
+    uploadedPaths.push(storagePath)
 
-    const { error: insertError } = await supabase.from("attachments").insert({
-      issue_id: issueId,
-      file_name: file.name,
-      content_type: file.type || null,
-      size_bytes: file.size,
-      storage_path: storagePath,
-    })
+    const { data, error: insertError } = await supabase
+      .from("attachments")
+      .insert({
+        issue_id: issueId,
+        message_id: messageId,
+        file_name: file.name,
+        content_type: file.type || null,
+        size_bytes: file.size,
+        storage_path: storagePath,
+      })
+      .select("id")
+      .single<{ id: string }>()
 
     if (insertError) {
-      await supabase.storage.from(ATTACHMENTS_BUCKET).remove([storagePath])
+      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
       throw new Error(insertError.message)
     }
+
+    attachmentIds.push(data.id)
+    attachments.push({
+      id: data.id,
+      fileName: file.name,
+      sizeBytes: file.size,
+      url: null,
+      thumbnailUrl: null,
+    })
   }
+
+  return attachments
+}
+
+async function cleanupUploadedAttachments(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  storagePaths: string[],
+  attachmentIds: string[]
+) {
+  let storageDeletedAt: string | null = null
+  if (storagePaths.length > 0) {
+    const { error } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .remove(storagePaths)
+
+    if (!error) {
+      storageDeletedAt = new Date().toISOString()
+    }
+  }
+
+  if (attachmentIds.length > 0) {
+    await supabase
+      .from("attachments")
+      .update({
+        deleted_at: new Date().toISOString(),
+        storage_deleted_at: storageDeletedAt,
+      })
+      .in("id", attachmentIds)
+  }
+}
+
+async function cleanupFailedMessage(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  issueId: string,
+  messageId: string
+) {
+  await rollbackMessageAttachmentUpload(
+    {
+      async listAttachments(issueId, messageId) {
+        const { data } = await supabase
+          .from("attachments")
+          .select("id,storage_path")
+          .eq("issue_id", issueId)
+          .eq("message_id", messageId)
+          .returns<Array<{ id: string; storage_path: string }>>()
+
+        return data ?? []
+      },
+      async removeStorageObjects(storagePaths) {
+        const { error } = await supabase.storage
+          .from(ATTACHMENTS_BUCKET)
+          .remove(storagePaths)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
+      async markAttachmentsDeleted(attachmentIds, storageDeletedAt) {
+        const { error } = await supabase
+          .from("attachments")
+          .update({
+            deleted_at: new Date().toISOString(),
+            storage_deleted_at: storageDeletedAt,
+          })
+          .in("id", attachmentIds)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
+      async deleteMessage(issueId, messageId) {
+        await issuesService.deleteIssueMessage(supabase, issueId, messageId)
+      },
+    },
+    issueId,
+    messageId
+  )
 }
 
 const deleteAttachmentSchema = z.object({
@@ -313,25 +507,37 @@ export async function deleteAttachment(formData: FormData) {
 
   const { data: attachment, error: fetchError } = await supabase
     .from("attachments")
-    .select("storage_path")
+    .select("storage_path,deleted_at,storage_deleted_at")
     .eq("id", id)
-    .single<{ storage_path: string }>()
+    .eq("issue_id", issue_id)
+    .single<{
+      storage_path: string
+      deleted_at: string | null
+      storage_deleted_at: string | null
+    }>()
 
   if (fetchError) {
     throw new Error(fetchError.message)
   }
 
-  const { error: removeError } = await supabase.storage
-    .from(ATTACHMENTS_BUCKET)
-    .remove([attachment.storage_path])
+  let storageDeletedAt: string | null = null
+  if (!attachment.deleted_at) {
+    const { error: removeError } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .remove([attachment.storage_path])
 
-  if (removeError) {
-    throw new Error(removeError.message)
+    if (removeError) {
+      throw new Error(removeError.message)
+    }
+    storageDeletedAt = new Date().toISOString()
   }
 
   const { error } = await supabase
     .from("attachments")
-    .delete()
+    .update({
+      deleted_at: attachment.deleted_at ?? new Date().toISOString(),
+      storage_deleted_at: attachment.storage_deleted_at ?? storageDeletedAt,
+    })
     .eq("id", id)
     .eq("issue_id", issue_id)
 

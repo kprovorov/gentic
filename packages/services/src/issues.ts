@@ -244,16 +244,6 @@ export async function createIssue(
 
   const issue = unwrap(result)
 
-  if (input.status === "todo") {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: issue.id,
-        role: "user",
-        content: kickoffMessageContent(input.prompt ?? null),
-      })
-    )
-  }
-
   return issue
 }
 
@@ -501,13 +491,25 @@ export async function updateIssueStatus(
   const data = unwrap(result)
 
   if (startsRun) {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: id,
-        role: "user",
-        content: kickoffMessageContent(current.prompt),
-      })
-    )
+    const { count, error: countError } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("issue_id", id)
+      .eq("role", "user")
+
+    if (countError) {
+      throw new ServiceError("internal", countError.message)
+    }
+
+    if ((count ?? 0) === 0) {
+      unwrap(
+        await supabase.from("messages").insert({
+          issue_id: id,
+          role: "user",
+          content: kickoffMessageContent(current.prompt),
+        })
+      )
+    }
   }
 
   return data
@@ -616,6 +618,17 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
+  const message = await createIssueUserMessage(supabase, issueId, content)
+  await requeueIssueForUserMessage(supabase, issueId)
+
+  return message
+}
+
+export async function createIssueUserMessage(
+  supabase: Supabase,
+  issueId: string,
+  content: string
+) {
   const message = unwrap(
     await supabase
       .from("messages")
@@ -628,6 +641,27 @@ export async function sendIssueMessage(
       .single<{ id: string; created_at: string }>()
   )
 
+  return message
+}
+
+export async function deleteIssueMessage(
+  supabase: Supabase,
+  issueId: string,
+  messageId: string
+) {
+  unwrap(
+    await supabase
+      .from("messages")
+      .delete()
+      .eq("issue_id", issueId)
+      .eq("id", messageId)
+  )
+}
+
+export async function requeueIssueForUserMessage(
+  supabase: Supabase,
+  issueId: string
+) {
   // A finished run has no worker polling for it anymore. Re-queue so the
   // `@gentic/gentic` agent picks this follow-up up and resumes the session,
   // unless the issue never ran (draft) or a run is already todo/queued/in
@@ -643,8 +677,6 @@ export async function sendIssueMessage(
       .eq("id", issueId)
       .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
-
-  return message
 }
 
 export type ChangesRequestedReviewComment = {

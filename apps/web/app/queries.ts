@@ -205,14 +205,30 @@ export async function getIssueDetailData(
   ] = await Promise.all([
     supabase
       .from("messages")
-      .select("id,role,kind,content,status,created_at")
+      .select(
+        "id,role,kind,content,status,created_at,attachments(id,file_name,content_type,size_bytes,storage_path,deleted_at)"
+      )
       .eq("issue_id", id)
       .order("created_at", { ascending: true })
-      .returns<ChatMessage[]>(),
+      .returns<
+        Array<
+          Omit<ChatMessage, "attachments"> & {
+            attachments: Array<{
+              id: string
+              file_name: string
+              content_type: string | null
+              size_bytes: number | null
+              storage_path: string
+              deleted_at: string | null
+            }>
+          }
+        >
+      >(),
     supabase
       .from("attachments")
-      .select("id,file_name,content_type,size_bytes,storage_path")
+      .select("id,file_name,content_type,size_bytes,storage_path,deleted_at")
       .eq("issue_id", id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true })
       .returns<
         Array<{
@@ -221,6 +237,7 @@ export async function getIssueDetailData(
           content_type: string | null
           size_bytes: number | null
           storage_path: string
+          deleted_at: string | null
         }>
       >(),
     issuesService.listIssuePullRequests(supabase, userId, id),
@@ -235,46 +252,79 @@ export async function getIssueDetailData(
     throw new Error(attachmentsError.message)
   }
 
-  const attachments: Attachment[] = await Promise.all(
-    (attachmentRows ?? []).map(async (attachment) => {
-      const isImage = attachment.content_type?.startsWith("image/") ?? false
-      const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
-      const [{ data: signed }, { data: thumbnail }] = await Promise.all([
-        storage.createSignedUrl(
-          attachment.storage_path,
-          ATTACHMENT_SIGNED_URL_TTL_SECONDS
-        ),
-        isImage
-          ? storage.createSignedUrl(
-              attachment.storage_path,
-              ATTACHMENT_SIGNED_URL_TTL_SECONDS,
-              {
-                transform: {
-                  width: ATTACHMENT_THUMBNAIL_SIZE,
-                  height: ATTACHMENT_THUMBNAIL_SIZE,
-                  resize: "cover",
-                },
-              }
-            )
-          : Promise.resolve({ data: null }),
-      ])
+  const messagesWithAttachments: ChatMessage[] = await Promise.all(
+    (messages ?? []).map(async (message) => ({
+      ...message,
+      attachments: await Promise.all(
+        (message.attachments ?? []).map((attachment) =>
+          signAttachment(supabase, attachment)
+        )
+      ),
+    }))
+  )
 
-      return {
-        id: attachment.id,
-        fileName: attachment.file_name,
-        sizeBytes: attachment.size_bytes,
-        url: signed?.signedUrl ?? null,
-        thumbnailUrl: thumbnail?.signedUrl ?? null,
-      }
-    })
+  const attachments: Attachment[] = await Promise.all(
+    (attachmentRows ?? []).map((attachment) => signAttachment(supabase, attachment))
   )
 
   return {
     issue,
-    messages: messages ?? [],
+    messages: messagesWithAttachments,
     attachments,
     pullRequests,
     relations,
     relationCandidates,
+  }
+}
+
+async function signAttachment(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  attachment: {
+    id: string
+    file_name: string
+    content_type: string | null
+    size_bytes: number | null
+    storage_path: string
+    deleted_at: string | null
+  }
+): Promise<Attachment> {
+  if (attachment.deleted_at) {
+    return {
+      id: attachment.id,
+      fileName: attachment.file_name,
+      sizeBytes: attachment.size_bytes,
+      url: null,
+      thumbnailUrl: null,
+    }
+  }
+
+  const isImage = attachment.content_type?.startsWith("image/") ?? false
+  const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
+  const [{ data: signed }, { data: thumbnail }] = await Promise.all([
+    storage.createSignedUrl(
+      attachment.storage_path,
+      ATTACHMENT_SIGNED_URL_TTL_SECONDS
+    ),
+    isImage
+      ? storage.createSignedUrl(
+          attachment.storage_path,
+          ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+          {
+            transform: {
+              width: ATTACHMENT_THUMBNAIL_SIZE,
+              height: ATTACHMENT_THUMBNAIL_SIZE,
+              resize: "cover",
+            },
+          }
+        )
+      : Promise.resolve({ data: null }),
+  ])
+
+  return {
+    id: attachment.id,
+    fileName: attachment.file_name,
+    sizeBytes: attachment.size_bytes,
+    url: signed?.signedUrl ?? null,
+    thumbnailUrl: thumbnail?.signedUrl ?? null,
   }
 }

@@ -219,6 +219,7 @@ async function processIssue(
           const attachmentBlocks = await buildAttachmentBlocks(
             api,
             issue.id,
+            next.id,
             attachmentsDir
           )
           if (attachmentBlocks.length > 0) {

@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
+  IconDownload,
   IconExternalLink,
   IconGitPullRequest,
   IconLoader2,
+  IconPaperclip,
   IconSend,
 } from "@tabler/icons-react"
 import { Streamdown } from "streamdown"
@@ -39,6 +41,7 @@ import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
+import type { Attachment } from "./attachments"
 import { AttachmentPromptField } from "../attachment-prompt-field"
 import {
   ISSUE_RETRY_RESET_EVENT,
@@ -132,6 +135,7 @@ export type ChatMessage = {
   content: string | null
   status: "streaming" | "complete" | "error"
   created_at: string
+  attachments?: Attachment[]
 }
 
 function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
@@ -146,6 +150,7 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
   next[index] = {
     ...incoming,
     clientKey: existing.clientKey ?? incoming.clientKey,
+    attachments: incoming.attachments ?? existing.attachments,
   }
   return next
 }
@@ -239,6 +244,17 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: new Date().toISOString(),
+          attachments: Array.from(formData.getAll("files"))
+            .filter(
+              (value): value is File => value instanceof File && value.size > 0
+            )
+            .map((file) => ({
+              id: `optimistic-${crypto.randomUUID()}`,
+              fileName: file.name,
+              sizeBytes: file.size,
+              url: null,
+              thumbnailUrl: null,
+            })),
         })
       )
 
@@ -258,6 +274,7 @@ export function IssueChat({
             content,
             status: "complete",
             created_at: message.created_at,
+            attachments: message.attachments,
           }
         )
       )
@@ -470,6 +487,7 @@ export function IssueChat({
                 content: event.data.content,
                 status: event.data.status,
                 created_at: event.data.ts,
+                attachments: undefined,
               })
             )
           }
@@ -841,9 +859,52 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
             {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
+            <MessageAttachments attachments={message.attachments} />
           </BubbleContent>
         </Bubble>
       </MessageContent>
     </Message>
+  )
+}
+
+function MessageAttachments({ attachments }: { attachments?: Attachment[] }) {
+  if (!attachments || attachments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 grid gap-1.5">
+      {attachments.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex max-w-full items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
+        >
+          {attachment.thumbnailUrl ? (
+            // Supabase signs this URL with Image Transformation options.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={attachment.thumbnailUrl}
+              alt=""
+              className="size-7 shrink-0 rounded border object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <IconPaperclip className="size-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
+          {attachment.url ? (
+            <a
+              href={attachment.url}
+              target="_blank"
+              rel="noreferrer"
+              download={attachment.fileName}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <IconDownload className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
+      ))}
+    </div>
   )
 }
