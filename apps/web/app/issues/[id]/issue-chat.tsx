@@ -39,6 +39,8 @@ import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
+import { AttachmentPromptField } from "../attachment-prompt-field"
+
 export type ChatMessage = {
   id: string
   // Stable React key that survives the optimistic-id -> server-id swap in
@@ -127,6 +129,7 @@ export function IssueChat({
   const [pullRequests, setPullRequests] =
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
+  const [draftFiles, setDraftFiles] = useState<File[]>([])
   // Bumped on every submit to trigger a forced scroll-to-bottom, since the
   // scroller's own follow-bottom heuristic only kicks in if the viewport was
   // already at the bottom before the new message landed.
@@ -373,7 +376,11 @@ export function IssueChat({
     const formData = new FormData()
     formData.set("issue_id", issueId)
     formData.set("content", content)
+    for (const file of draftFiles) {
+      formData.append("files", file)
+    }
     setDraft("")
+    setDraftFiles([])
     setSendTick((tick) => tick + 1)
     mutation.mutate(formData)
   }
@@ -462,9 +469,11 @@ export function IssueChat({
       </MessageScrollerProvider>
 
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        <textarea
+        <AttachmentPromptField
+          key={sendTick}
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={setDraft}
+          onFilesChange={setDraftFiles}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault()
@@ -473,7 +482,9 @@ export function IssueChat({
           }}
           rows={2}
           placeholder="Message the agent…"
-          className="min-h-9 w-full resize-none rounded-3xl border border-transparent bg-input/50 px-4 py-2 text-base transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
+          disabled={mutation.isPending}
+          className="min-w-0 flex-1"
+          textareaClassName="min-h-18 resize-none"
         />
         <Button
           type="submit"

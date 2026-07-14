@@ -180,15 +180,6 @@ async function processIssue(
 
     await setRunState(api, channel, issue.id, { status: "in-progress" })
 
-    // Built fresh each run: images and text files are embedded directly,
-    // everything else downloaded into `attachmentsDir` and referenced by
-    // path. Attached to the first prompt only.
-    const attachmentBlocks = await buildAttachmentBlocks(
-      api,
-      issue.id,
-      attachmentsDir
-    )
-
     // Seed the queue with follow-ups sent before the channel connected
     // (including the issue's initial prompt). When resuming a session that
     // already consumed messages, start the cursor at that run's end so they
@@ -219,18 +210,19 @@ async function processIssue(
     // the agent is working are picked up after the current turn; once the
     // transcript is quiet for one poll interval the session ends.
     let idleChecked = false
-    let firstPrompt = true
     const nextPrompt = async (): Promise<PromptTurn | null> => {
       for (;;) {
         const next = queue.shift()
         if (next) {
           idleChecked = false
           const content = next.content
-          if (firstPrompt) {
-            firstPrompt = false
-            if (attachmentBlocks.length > 0) {
-              return [{ type: "text", text: content }, ...attachmentBlocks]
-            }
+          const attachmentBlocks = await buildAttachmentBlocks(
+            api,
+            issue.id,
+            attachmentsDir
+          )
+          if (attachmentBlocks.length > 0) {
+            return [{ type: "text", text: content }, ...attachmentBlocks]
           }
           return content
         }
