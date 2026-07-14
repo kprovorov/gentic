@@ -11,6 +11,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@gentic/ui/sidebar"
 
 import { Logo } from "./logo"
@@ -26,6 +27,8 @@ const navMain = [
 export function AppSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const { setOpenMobile } = useSidebar()
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -35,7 +38,7 @@ export function AppSidebar({
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <Link href="/home">
+              <Link href="/home" onClick={() => setOpenMobile(false)}>
                 <Logo className="size-5" />
                 <span className="font-heading text-base font-semibold">
                   Gentic
