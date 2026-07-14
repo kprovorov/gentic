@@ -37,7 +37,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     [blockedIssueIds]
   )
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "created_at", desc: true },
+    { id: "status", desc: false },
   ])
   const [globalFilter, setGlobalFilter] = useState("")
 
