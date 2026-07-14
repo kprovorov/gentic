@@ -191,7 +191,10 @@ function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
           <StatusIcon className={cn("size-4", statusIconStyles[issue.status])} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60 rounded-lg">
+      <DropdownMenuContent
+        align="start"
+        className="w-60 rounded-lg bg-popover before:hidden"
+      >
         {statusOptions.map((option) => {
           const OptionIcon = statusIcons[option.value]
           const isSelected = option.value === issue.status
