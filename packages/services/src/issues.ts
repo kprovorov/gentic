@@ -6,34 +6,32 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
+import type { Tables } from "@gentic/supabase/types"
 
 import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
 const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
 
-export type IssueRelationIssue = {
-  id: string
-  title: string | null
-  status: string
-}
+type IssueRow = Tables<"issues">
+type IssueRelationRow = Tables<"issue_relations">
+type IssuePullRequestRow = Tables<"issue_pull_requests">
 
-export type IssueRelation = {
-  id: string
-  source_issue_id: string
-  target_issue_id: string
+export type IssueRelationIssue = Pick<IssueRow, "id" | "title" | "status">
+
+export type IssueRelation = Pick<
+  IssueRelationRow,
+  "id" | "source_issue_id" | "target_issue_id" | "created_at"
+> & {
   type: "blocks"
-  created_at: string
   source_issue: IssueRelationIssue
   target_issue: IssueRelationIssue
 }
 
-export type IssuePullRequest = {
-  id: string
-  issue_id: string
-  url: string
-  created_at: string
-}
+export type IssuePullRequest = Pick<
+  IssuePullRequestRow,
+  "id" | "issue_id" | "url" | "created_at"
+>
 
 async function ensureProjectOwned(
   supabase: Supabase,
@@ -149,7 +147,6 @@ export async function listIssueRelationCandidates(
       .eq("projects.user_id", userId)
       .neq("id", issueId)
       .order("created_at", { ascending: false })
-      .returns<IssueRelationIssue[]>()
   )
 }
 
@@ -157,10 +154,10 @@ export async function listIssueRelations(
   supabase: Supabase,
   userId: string,
   issueId: string
-) {
+): Promise<IssueRelation[]> {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  return unwrap(
+  const relations = unwrap(
     await supabase
       .from("issue_relations")
       .select(
@@ -168,8 +165,12 @@ export async function listIssueRelations(
       )
       .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
       .order("created_at", { ascending: false })
-      .returns<IssueRelation[]>()
   )
+
+  return relations.map((relation) => ({
+    ...relation,
+    type: "blocks",
+  }))
 }
 
 export async function listIssuePullRequests(
@@ -185,7 +186,6 @@ export async function listIssuePullRequests(
       .select("id,issue_id,url,created_at")
       .eq("issue_id", issueId)
       .order("created_at", { ascending: false })
-      .returns<IssuePullRequest[]>()
   )
 }
 
@@ -204,9 +204,6 @@ export async function listBlockedIssueIds(
         "target_issue_id, source_issue:issues!issue_relations_source_issue_id_fkey(status)"
       )
       .in("target_issue_id", issueIds)
-      .returns<
-        { target_issue_id: string; source_issue: { status: string } }[]
-      >()
   )
 
   const blockedIssueIds = new Set<string>()
@@ -308,7 +305,7 @@ export async function updateIssue(
     .select("agent_provider, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ agent_provider: string }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -357,10 +354,7 @@ export async function resetIssueAgent(
     .select("prompt,agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      prompt: string | null
-      agent_provider: AgentProvider
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -442,11 +436,7 @@ export async function deleteIssueRelation(
     .select("id,source_issue_id,target_issue_id")
     .eq("id", relationId)
     .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
-    .maybeSingle<{
-      id: string
-      source_issue_id: string
-      target_issue_id: string
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -474,10 +464,7 @@ export async function updateIssueStatus(
     .select("status,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      status: string
-      prompt: string | null
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -524,7 +511,7 @@ export async function updateIssueAgentProvider(
     .select("run_started_at,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ run_started_at: string | null }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -566,7 +553,7 @@ export async function updateIssueStatusByPrUrl(
     .from("issue_pull_requests")
     .select("issue_id")
     .eq("url", prUrl)
-    .maybeSingle<{ issue_id: string }>()
+    .maybeSingle()
 
   if (pullRequestError) {
     throw new ServiceError("internal", pullRequestError.message)
@@ -702,10 +689,7 @@ export async function applyChangesRequestedReview(
     .from("issues")
     .select("id, projects!inner(auto_respond_to_reviews)")
     .eq("pr_url", prUrl)
-    .maybeSingle<{
-      id: string
-      projects: { auto_respond_to_reviews: boolean }
-    }>()
+    .maybeSingle()
 
   if (error) {
     throw new ServiceError("internal", error.message)

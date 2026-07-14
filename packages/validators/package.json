@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./agent": "./src/agent.ts",
     "./issues": "./src/issues.ts",
     "./projects": "./src/projects.ts",
     "./realtime": "./src/realtime.ts"

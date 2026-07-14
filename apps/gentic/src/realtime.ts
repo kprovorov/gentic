@@ -3,46 +3,24 @@ import {
   type RealtimeChannel,
   type SupabaseClient,
 } from "@supabase/supabase-js"
+import {
+  issueRealtimeTopic,
+  REALTIME_MESSAGE_EVENT,
+  REALTIME_RUN_STATE_EVENT,
+  REALTIME_USER_MESSAGE_EVENT,
+  userMessageEventSchema,
+  type MessageEvent as RealtimeMessageEvent,
+  type RunStateEvent as RealtimeRunStateEvent,
+  type UserMessageEvent as RealtimeUserMessageEvent,
+} from "@gentic/validators/realtime"
 
 import type { AgentApi } from "./api.js"
 
-// Mirrors the event contract documented in docs/realtime-transport.md and
-// implemented in @gentic/validators/realtime. Kept as plain types (not the
-// zod schemas) so the compiled worker never needs a runtime dependency on
-// monorepo TypeScript source — it ships as a standalone binary with no
-// node_modules on the target machine.
-export type RealtimeMessageEvent = {
-  id: string
-  seq: number
-  role: "assistant" | "system"
-  kind: "text" | "thinking" | "tool"
-  content: string
-  status: "streaming" | "complete" | "error"
-  ts: string
-}
-
-export type RealtimeRunStateEvent = {
-  status:
-    | "in-progress"
-    | "held"
-    | "run-failed"
-    | "ready-for-review"
-    | "waiting-for-input"
-  pr_url: string | null
-  usage_limit_reset_at: string | null
-  run_error: string | null
-  ts: string
-}
-
-export type RealtimeUserMessageEvent = {
-  id: string
-  content: string
-  created_at: string
-}
-
-const MESSAGE_EVENT = "message"
-const RUN_STATE_EVENT = "run_state"
-const USER_MESSAGE_EVENT = "user_message"
+export type {
+  MessageEvent as RealtimeMessageEvent,
+  RunStateEvent as RealtimeRunStateEvent,
+  UserMessageEvent as RealtimeUserMessageEvent,
+} from "@gentic/validators/realtime"
 
 // Refresh a bit before the token actually expires so a slow-running turn
 // never races the worker off an expired websocket auth.
@@ -69,23 +47,14 @@ export async function connectIssueChannel(
   const client = createClient(token.url, token.apiKey)
   await client.realtime.setAuth(token.token)
 
-  const channel = client.channel(`issue:${issueId}`, {
+  const channel = client.channel(issueRealtimeTopic(issueId), {
     config: { private: true },
   })
 
-  channel.on("broadcast", { event: USER_MESSAGE_EVENT }, ({ payload }) => {
-    const event = payload as Partial<RealtimeUserMessageEvent> | null
-    if (
-      event &&
-      typeof event.id === "string" &&
-      typeof event.content === "string" &&
-      typeof event.created_at === "string"
-    ) {
-      onUserMessage({
-        id: event.id,
-        content: event.content,
-        created_at: event.created_at,
-      })
+  channel.on("broadcast", { event: REALTIME_USER_MESSAGE_EVENT }, ({ payload }) => {
+    const event = userMessageEventSchema.safeParse(payload)
+    if (event.success) {
+      onUserMessage(event.data)
     }
   })
 
@@ -121,7 +90,7 @@ class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
   async publishMessage(event: Omit<RealtimeMessageEvent, "ts">): Promise<void> {
     await this.channel.send({
       type: "broadcast",
-      event: MESSAGE_EVENT,
+      event: REALTIME_MESSAGE_EVENT,
       payload: { ...event, ts: new Date().toISOString() } satisfies RealtimeMessageEvent,
     })
   }
@@ -131,7 +100,7 @@ class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
   ): Promise<void> {
     await this.channel.send({
       type: "broadcast",
-      event: RUN_STATE_EVENT,
+      event: REALTIME_RUN_STATE_EVENT,
       payload: {
         ...event,
         ts: new Date().toISOString(),

@@ -11,7 +11,9 @@
     "start": "turbo start",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:types": "bash scripts/generate-supabase-types.sh",
+    "db:types:check": "bash scripts/check-supabase-types.sh"
   },
   "devDependencies": {
     "turbo": "^2.10.2"

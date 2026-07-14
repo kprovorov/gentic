@@ -28,11 +28,17 @@ import { cn } from "@gentic/ui/utils"
 import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import {
   issueRealtimeTopic,
+  issuePullRequestSchema,
+  issueRunStateRowSchema,
+  chatMessageSchema,
   messageEventSchema,
   REALTIME_MESSAGE_EVENT,
   REALTIME_RUN_STATE_EVENT,
   REALTIME_USER_MESSAGE_EVENT,
+  deletedRowSchema,
   runStateEventSchema,
+  type ChatMessageContract,
+  type UserMessageEvent,
 } from "@gentic/validators/realtime"
 
 import { sendIssueMessage } from "@/app/issues/actions"
@@ -118,8 +124,7 @@ function filterSlashCommands(
     .slice(0, 8)
 }
 
-export type ChatMessage = {
-  id: string
+export type ChatMessage = ChatMessageContract & {
   // Stable React key that survives the optimistic-id -> server-id swap in
   // the send mutation's onSuccess. Without it, that swap changes the list
   // item's `key` (id), so React unmounts/remounts its DOM node — which
@@ -127,11 +132,6 @@ export type ChatMessage = {
   // the viewport to the first unhandled anchor message (the top of the
   // conversation) instead of staying put.
   clientKey?: string
-  role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
-  content: string | null
-  status: "streaming" | "complete" | "error"
-  created_at: string
 }
 
 function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
@@ -270,7 +270,7 @@ export function IssueChat({
             id: message.id,
             content,
             created_at: message.created_at,
-          },
+          } satisfies UserMessageEvent,
         })
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
@@ -375,14 +375,21 @@ export function IssueChat({
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            const removed = payload.old as { id: string }
+            const removed = deletedRowSchema.safeParse(payload.old)
+            if (!removed.success) {
+              return
+            }
             setMessages((current) =>
-              current.filter((message) => message.id !== removed.id)
+              current.filter((message) => message.id !== removed.data.id)
             )
             return
           }
+          const message = chatMessageSchema.safeParse(payload.new)
+          if (!message.success) {
+            return
+          }
           setMessages((current) =>
-            mergeMessage(current, payload.new as ChatMessage)
+            mergeMessage(current, message.data)
           )
         }
       )
@@ -395,14 +402,13 @@ export function IssueChat({
           filter: `id=eq.${issueId}`,
         },
         (payload) => {
-          const next = payload.new as {
-            status: IssueStatus
-            usage_limit_reset_at: string | null
-            pr_url: string | null
+          const next = issueRunStateRowSchema.safeParse(payload.new)
+          if (!next.success) {
+            return
           }
-          setStatus(next.status)
-          setUsageLimitResetAt(next.usage_limit_reset_at)
-          setPrUrl(next.pr_url)
+          setStatus(next.data.status)
+          setUsageLimitResetAt(next.data.usage_limit_reset_at)
+          setPrUrl(next.data.pr_url)
         }
       )
       .on(
@@ -415,14 +421,21 @@ export function IssueChat({
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            const removed = payload.old as { id: string }
+            const removed = deletedRowSchema.safeParse(payload.old)
+            if (!removed.success) {
+              return
+            }
             setPullRequests((current) =>
-              current.filter((pullRequest) => pullRequest.id !== removed.id)
+              current.filter((pullRequest) => pullRequest.id !== removed.data.id)
             )
             return
           }
+          const pullRequest = issuePullRequestSchema.safeParse(payload.new)
+          if (!pullRequest.success) {
+            return
+          }
           setPullRequests((current) =>
-            mergePullRequest(current, payload.new as IssuePullRequest)
+            mergePullRequest(current, pullRequest.data)
           )
         }
       )

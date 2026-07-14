@@ -36,7 +36,6 @@ import {
 import {
   getIssueDetailData,
   type IssueDetailData,
-  type IssueStatus,
 } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
@@ -49,6 +48,7 @@ import {
   CardTitle,
 } from "@gentic/ui/card"
 import { cn } from "@gentic/ui/utils"
+import type { IssueStatus } from "@gentic/validators/issues"
 
 import { Attachments } from "./attachments"
 import { IssueAgentSelect } from "./issue-agent-select"

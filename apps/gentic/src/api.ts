@@ -1,57 +1,27 @@
-export interface ClaimedIssue {
-  id: string
-  agentProvider: "claude_code" | "codex"
-  repo: string
-  setupScript: string | null
-  sessionId: string | null
-  runFinishedAt: string | null
-  prUrl: string | null
-}
+import {
+  attachmentsResponseSchema,
+  claimIssueResponseSchema,
+  insertMessageResponseSchema,
+  okResponseSchema,
+  realtimeTokenResponseSchema,
+  userMessagesResponseSchema,
+  type Attachment,
+  type ClaimedIssue,
+  type InsertMessageInput,
+  type RealtimeTokenResponse,
+  type RunStateFields,
+  type UserMessage,
+} from "@gentic/validators/agent"
+import type { z } from "zod"
 
-export interface RunStateFields {
-  status?:
-    | "in-progress"
-    | "held"
-    | "run-failed"
-    | "ready-for-review"
-    | "waiting-for-input"
-  session_id?: string | null
-  run_error?: string | null
-  run_started_at?: string | null
-  run_finished_at?: string | null
-  usage_limit_reset_at?: string | null
-  pr_url?: string | null
-}
-
-export interface UserMessage {
-  id: string
-  content: string | null
-  created_at: string
-}
-
-export interface RealtimeTokenResponse {
-  url: string
-  apiKey: string
-  token: string
-  expiresAt: string
-}
-
-export interface InsertMessageInput {
-  id: string
-  role: "assistant" | "system"
-  kind?: "text" | "tool" | "thinking"
-  content: string
-  status?: "complete" | "error"
-}
-
-export interface Attachment {
-  id: string
-  fileName: string
-  contentType: string | null
-  sizeBytes: number | null
-  /** Short-lived signed URL the file can be downloaded from. */
-  url: string
-}
+export type {
+  Attachment,
+  ClaimedIssue,
+  InsertMessageInput,
+  RealtimeTokenResponse,
+  RunStateFields,
+  UserMessage,
+} from "@gentic/validators/agent"
 
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
@@ -70,6 +40,7 @@ export function createAgentApi(input: {
 
   async function request<T>(
     path: string,
+    schema: z.ZodType<T>,
     options: { method?: string; body?: unknown } = {}
   ): Promise<T> {
     const headers: Record<string, string> = {
@@ -88,7 +59,7 @@ export function createAgentApi(input: {
       },
       body,
     })
-    const payload = (await response.json().catch(() => null)) as unknown
+    const payload = await response.json().catch(() => null)
 
     if (!response.ok) {
       const message =
@@ -101,26 +72,32 @@ export function createAgentApi(input: {
       throw new Error(message)
     }
 
-    return payload as T
+    return schema.parse(payload)
   }
 
   return {
     async claimNextQueuedIssue() {
-      const data = await request<{ issue: ClaimedIssue | null }>(
+      const data = await request(
         "/agent/issues/claim",
+        claimIssueResponseSchema,
         { method: "POST" }
       )
       return data.issue
     },
     async setRunState(issueId, fields) {
-      await request(`/agent/issues/${encodeURIComponent(issueId)}/run-state`, {
-        method: "PATCH",
-        body: fields,
-      })
+      await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/run-state`,
+        okResponseSchema,
+        {
+          method: "PATCH",
+          body: fields,
+        }
+      )
     },
     async insertMessage(issueId, message) {
-      const data = await request<{ id: string }>(
+      const data = await request(
         `/agent/issues/${encodeURIComponent(issueId)}/messages`,
+        insertMessageResponseSchema,
         {
           method: "POST",
           body: message,
@@ -130,19 +107,21 @@ export function createAgentApi(input: {
     },
     async fetchUserMessagesAfter(issueId, cursor) {
       const params = new URLSearchParams({ after: cursor })
-      const data = await request<{ messages: UserMessage[] }>(
-        `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`
+      const data = await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`,
+        userMessagesResponseSchema
       )
       return data.messages
     },
     async fetchAttachments(issueId) {
-      const data = await request<{ attachments: Attachment[] }>(
-        `/agent/issues/${encodeURIComponent(issueId)}/attachments`
+      const data = await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/attachments`,
+        attachmentsResponseSchema
       )
       return data.attachments
     },
     async fetchRealtimeToken() {
-      return request<RealtimeTokenResponse>("/agent/realtime/token", {
+      return request("/agent/realtime/token", realtimeTokenResponseSchema, {
         method: "POST",
       })
     },

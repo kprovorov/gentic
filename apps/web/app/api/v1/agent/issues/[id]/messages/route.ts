@@ -66,7 +66,7 @@ export async function POST(
         { onConflict: "id", ignoreDuplicates: true }
       )
       .select("id")
-      .maybeSingle<{ id: string }>()
+      .maybeSingle()
 
     if (error) {
       throw new Error(error.message)
