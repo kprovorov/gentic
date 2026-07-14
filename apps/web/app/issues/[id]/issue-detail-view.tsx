@@ -361,7 +361,10 @@ export function IssueDetailView({
                     issue when it moves to Queued.
                   </CardDescription>
                 </div>
-                <IssueRetryAgentButton issueId={issue.id} />
+                <IssueRetryAgentButton
+                  issueId={issue.id}
+                  issuePrompt={issue.prompt}
+                />
               </CardHeader>
               <CardContent>
                 <IssueChat

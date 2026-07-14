@@ -40,6 +40,10 @@ import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
 import { AttachmentPromptField } from "../attachment-prompt-field"
+import {
+  ISSUE_RETRY_RESET_EVENT,
+  type IssueRetryResetEventDetail,
+} from "./issue-retry-events"
 
 export type ChatMessage = {
   id: string
@@ -206,14 +210,43 @@ export function IssueChat({
   })
 
   const supabase = useSupabaseClient()
-  const displayedMessages = useMemo(
-    () => mergeMessages(messages, initialMessages),
-    [messages, initialMessages]
+  const isOptimisticRetryReset = initialMessages.some((message) =>
+    message.id.startsWith("optimistic-retry-")
   )
+  const displayedMessages = useMemo(() => {
+    if (isOptimisticRetryReset) {
+      return initialMessages
+    }
+
+    return mergeMessages(
+      messages.filter((message) => !message.id.startsWith("optimistic-retry-")),
+      initialMessages
+    )
+  }, [messages, initialMessages, isOptimisticRetryReset])
   const displayedPullRequests = useMemo(
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
   )
+
+  useEffect(() => {
+    function handleRetryReset(event: Event) {
+      const { detail } = event as CustomEvent<IssueRetryResetEventDetail>
+      if (detail.issueId !== issueId) {
+        return
+      }
+
+      setMessages([detail.message])
+      setStatus(detail.status)
+      setUsageLimitResetAt(detail.usageLimitResetAt)
+      setPrUrl(detail.prUrl)
+      setPullRequests(detail.pullRequests)
+    }
+
+    window.addEventListener(ISSUE_RETRY_RESET_EVENT, handleRetryReset)
+    return () => {
+      window.removeEventListener(ISSUE_RETRY_RESET_EVENT, handleRetryReset)
+    }
+  }, [issueId])
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
   // session all happen first with no message to attach a spinner to. Show a
