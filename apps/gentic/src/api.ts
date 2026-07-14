@@ -39,9 +39,29 @@ export interface RealtimeTokenResponse {
 export interface InsertMessageInput {
   id: string
   role: "assistant" | "system"
-  kind?: "text" | "tool" | "thinking"
+  kind?: "text" | "tool" | "thinking" | "plan" | "mode" | "commands"
   content: string
-  status?: "complete" | "error"
+  status?: "streaming" | "complete" | "error"
+  event_id?: string | null
+  run_id?: string | null
+  event_type?:
+    | "text"
+    | "thought"
+    | "tool_call"
+    | "plan"
+    | "mode"
+    | "available_commands"
+    | null
+  event_status?:
+    | "pending"
+    | "in_progress"
+    | "completed"
+    | "failed"
+    | "removed"
+    | null
+  event_seq?: number | null
+  tool_call_id?: string | null
+  payload?: Record<string, unknown> | null
 }
 
 export interface Attachment {

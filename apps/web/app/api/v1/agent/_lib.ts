@@ -40,9 +40,31 @@ export const runStateSchema = z
 export const insertMessageSchema = z.object({
   id: z.string().uuid().optional(),
   role: z.enum(["assistant", "system"]),
-  kind: z.enum(["text", "tool", "thinking"]).optional(),
+  kind: z
+    .enum(["text", "tool", "thinking", "plan", "mode", "commands"])
+    .optional(),
   content: z.string(),
-  status: z.enum(["complete", "error"]).optional(),
+  status: z.enum(["streaming", "complete", "error"]).optional(),
+  event_id: z.string().nullable().optional(),
+  run_id: z.string().nullable().optional(),
+  event_type: z
+    .enum([
+      "text",
+      "thought",
+      "tool_call",
+      "plan",
+      "mode",
+      "available_commands",
+    ])
+    .nullable()
+    .optional(),
+  event_status: z
+    .enum(["pending", "in_progress", "completed", "failed", "removed"])
+    .nullable()
+    .optional(),
+  event_seq: z.number().int().positive().nullable().optional(),
+  tool_call_id: z.string().nullable().optional(),
+  payload: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against

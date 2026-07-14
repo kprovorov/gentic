@@ -14,12 +14,19 @@ import {
   type NewSessionResponse,
   type NewSessionRequest,
   type PermissionOption,
+  type SessionUpdate,
+  type ToolCallContent,
+  type ToolCallStatus,
   type RequestPermissionOutcome,
   type ResumeSessionResponse,
 } from "@agentclientprotocol/sdk"
 
 import type { AgentApi } from "./api.js"
-import { StreamingAssistantMessage, publishMessage } from "./messages.js"
+import {
+  StreamingAssistantMessage,
+  publishStructuredMessage,
+  stableMessageId,
+} from "./messages.js"
 import type { IssueRealtimeChannel } from "./realtime.js"
 
 export type AgentProvider = "claude_code" | "codex"
@@ -279,20 +286,54 @@ export async function runTurn(
   prompt: PromptTurn
 ): Promise<void> {
   const promptDone = session.prompt(prompt)
+  const runId = session.sessionId
 
   let current: StreamingAssistantMessage | null = null
   let currentKind: "text" | "thinking" | null = null
+  let currentMessageId: string | null = null
+  const eventSeq = new Map<string, number>()
+  const toolCalls = new Map<
+    string,
+    {
+      title: string
+      kind?: string
+      status?: ToolCallStatus
+      content?: ToolCallContent[]
+      rawInput?: unknown
+      rawOutput?: unknown
+    }
+  >()
 
   const streamInto = async (
-    kind: "text" | "thinking"
+    kind: "text" | "thinking",
+    messageId?: string | null
   ): Promise<StreamingAssistantMessage> => {
-    if (current && currentKind !== kind) {
+    const stableId = messageId
+      ? stableMessageId([issueId, runId, kind, messageId])
+      : null
+    const eventId = messageId ?? stableId
+    if (
+      current &&
+      (currentKind !== kind ||
+        (messageId && currentMessageId && currentMessageId !== messageId))
+    ) {
       await current.finalize()
       current = null
     }
     if (!current) {
-      current = new StreamingAssistantMessage(api, issueId, channel, kind)
+      current = new StreamingAssistantMessage(
+        api,
+        issueId,
+        channel,
+        kind,
+        150,
+        {},
+        stableId ?? undefined,
+        runId,
+        eventId
+      )
       currentKind = kind
+      currentMessageId = messageId ?? null
     }
     return current
   }
@@ -302,7 +343,14 @@ export async function runTurn(
       await current.finalize()
       current = null
       currentKind = null
+      currentMessageId = null
     }
+  }
+
+  const nextSeq = (eventId: string): number => {
+    const seq = (eventSeq.get(eventId) ?? 0) + 1
+    eventSeq.set(eventId, seq)
+    return seq
   }
 
   try {
@@ -316,20 +364,58 @@ export async function runTurn(
       if (update.sessionUpdate === "agent_message_chunk") {
         const text = textOf(update.content)
         if (text) {
-          await (await streamInto("text")).append(text)
+          await (await streamInto("text", update.messageId)).append(text)
         }
       } else if (update.sessionUpdate === "agent_thought_chunk") {
         const text = textOf(update.content)
         if (text) {
-          await (await streamInto("thinking")).append(text)
+          await (await streamInto("thinking", update.messageId)).append(text)
         }
       } else if (update.sessionUpdate === "tool_call") {
-        // Flush any streaming text first so the transcript keeps its ordering.
         await finalizeCurrent()
-        await publishMessage(api, issueId, channel, {
-          kind: "tool",
-          content: update.title,
-        })
+        const tool = {
+          title: update.title,
+          kind: update.kind,
+          status: update.status ?? "pending",
+          content: update.content,
+          rawInput: update.rawInput,
+          rawOutput: update.rawOutput,
+        }
+        toolCalls.set(update.toolCallId, tool)
+        await publishToolCall(api, issueId, channel, runId, update.toolCallId, tool, nextSeq)
+      } else if (update.sessionUpdate === "tool_call_update") {
+        await finalizeCurrent()
+        const previous = toolCalls.get(update.toolCallId) ?? {
+          title: update.title ?? "Tool call",
+        }
+        const tool = {
+          ...previous,
+          ...(update.title !== undefined && update.title !== null
+            ? { title: update.title }
+            : {}),
+          ...(update.kind !== undefined && update.kind !== null
+            ? { kind: update.kind }
+            : {}),
+          ...(update.status !== undefined && update.status !== null
+            ? { status: update.status }
+            : {}),
+          ...(update.content !== undefined && update.content !== null
+            ? { content: update.content }
+            : {}),
+          ...(update.rawInput !== undefined ? { rawInput: update.rawInput } : {}),
+          ...(update.rawOutput !== undefined ? { rawOutput: update.rawOutput } : {}),
+        }
+        toolCalls.set(update.toolCallId, tool)
+        await publishToolCall(api, issueId, channel, runId, update.toolCallId, tool, nextSeq)
+      } else if (
+        update.sessionUpdate === "plan" ||
+        update.sessionUpdate === "plan_update" ||
+        update.sessionUpdate === "plan_removed" ||
+        update.sessionUpdate === "current_mode_update" ||
+        update.sessionUpdate === "available_commands_update"
+      ) {
+        await finalizeCurrent()
+        await publishSessionEvent(api, issueId, channel, runId, update, nextSeq)
       }
     }
 
@@ -347,6 +433,304 @@ export async function runTurn(
 
 function textOf(content: ContentBlock): string {
   return content.type === "text" ? content.text : ""
+}
+
+async function publishToolCall(
+  api: AgentApi,
+  issueId: string,
+  channel: IssueRealtimeChannel,
+  runId: string,
+  toolCallId: string,
+  tool: {
+    title: string
+    kind?: string
+    status?: ToolCallStatus
+    content?: ToolCallContent[]
+    rawInput?: unknown
+    rawOutput?: unknown
+  },
+  nextSeq: (eventId: string) => number
+): Promise<void> {
+  const status = tool.status ?? "pending"
+  const eventId = `tool:${toolCallId}`
+  await publishStructuredMessage(api, issueId, channel, {
+    id: stableMessageId([issueId, runId, eventId]),
+    role: "assistant",
+    kind: "tool",
+    content: formatToolCall(tool.title, status, tool.content, tool.rawOutput),
+    status:
+      status === "failed"
+        ? "error"
+        : status === "completed"
+          ? "complete"
+          : "streaming",
+    event_id: eventId,
+    run_id: runId,
+    event_type: "tool_call",
+    event_status:
+      status === "completed"
+        ? "completed"
+        : status === "failed"
+          ? "failed"
+          : status === "in_progress"
+            ? "in_progress"
+            : "pending",
+    event_seq: nextSeq(eventId),
+    tool_call_id: toolCallId,
+    payload: {
+      toolCallId,
+      title: tool.title,
+      kind: tool.kind ?? null,
+      status,
+      content: tool.content ?? [],
+      rawInput: tool.rawInput ?? null,
+      rawOutput: tool.rawOutput ?? null,
+    },
+  })
+}
+
+async function publishSessionEvent(
+  api: AgentApi,
+  issueId: string,
+  channel: IssueRealtimeChannel,
+  runId: string,
+  update: Extract<
+    SessionUpdate,
+    {
+      sessionUpdate:
+        | "plan"
+        | "plan_update"
+        | "plan_removed"
+        | "current_mode_update"
+        | "available_commands_update"
+    }
+  >,
+  nextSeq: (eventId: string) => number
+): Promise<void> {
+  const event = renderSessionEvent(update)
+  await publishStructuredMessage(api, issueId, channel, {
+    id: stableMessageId([issueId, runId, event.eventId]),
+    role: "system",
+    kind: event.kind,
+    content: event.content,
+    status: event.messageStatus,
+    event_id: event.eventId,
+    run_id: runId,
+    event_type: event.eventType,
+    event_status: event.eventStatus,
+    event_seq: nextSeq(event.eventId),
+    payload: event.payload,
+  })
+}
+
+function renderSessionEvent(
+  update: Extract<
+    SessionUpdate,
+    {
+      sessionUpdate:
+        | "plan"
+        | "plan_update"
+        | "plan_removed"
+        | "current_mode_update"
+        | "available_commands_update"
+    }
+  >
+): {
+  eventId: string
+  kind: "plan" | "mode" | "commands"
+  eventType: "plan" | "mode" | "available_commands"
+  eventStatus: "pending" | "in_progress" | "completed" | "removed"
+  messageStatus: "streaming" | "complete"
+  content: string
+  payload: Record<string, unknown>
+} {
+  if (update.sessionUpdate === "plan") {
+    const status = planStatus(update.entries)
+    return {
+      eventId: "plan:default",
+      kind: "plan",
+      eventType: "plan",
+      eventStatus: status,
+      messageStatus: status === "completed" ? "complete" : "streaming",
+      content: formatPlanEntries(update.entries),
+      payload: { entries: update.entries },
+    }
+  }
+
+  if (update.sessionUpdate === "plan_update") {
+    const plan = update.plan
+    if (plan.type === "items") {
+      const status = planStatus(plan.entries)
+      return {
+        eventId: `plan:${plan.id}`,
+        kind: "plan",
+        eventType: "plan",
+        eventStatus: status,
+        messageStatus: status === "completed" ? "complete" : "streaming",
+        content: formatPlanEntries(plan.entries),
+        payload: { plan },
+      }
+    }
+    if (plan.type === "markdown") {
+      return {
+        eventId: `plan:${plan.id}`,
+        kind: "plan",
+        eventType: "plan",
+        eventStatus: "in_progress",
+        messageStatus: "streaming",
+        content: plan.content,
+        payload: { plan },
+      }
+    }
+    return {
+      eventId: `plan:${plan.id}`,
+      kind: "plan",
+      eventType: "plan",
+      eventStatus: "in_progress",
+      messageStatus: "streaming",
+      content: `Plan: ${plan.uri}`,
+      payload: { plan },
+    }
+  }
+
+  if (update.sessionUpdate === "plan_removed") {
+    return {
+      eventId: `plan:${update.id}`,
+      kind: "plan",
+      eventType: "plan",
+      eventStatus: "removed",
+      messageStatus: "complete",
+      content: "Plan removed",
+      payload: { id: update.id },
+    }
+  }
+
+  if (update.sessionUpdate === "current_mode_update") {
+    return {
+      eventId: "mode:current",
+      kind: "mode",
+      eventType: "mode",
+      eventStatus: "completed",
+      messageStatus: "complete",
+      content: `Mode: ${update.currentModeId}`,
+      payload: { currentModeId: update.currentModeId },
+    }
+  }
+
+  return {
+    eventId: "commands:available",
+    kind: "commands",
+    eventType: "available_commands",
+    eventStatus: "completed",
+    messageStatus: "complete",
+    content: formatAvailableCommands(update.availableCommands),
+    payload: { availableCommands: update.availableCommands },
+  }
+}
+
+function planStatus(
+  entries: Array<{ status: "pending" | "in_progress" | "completed" }>
+): "pending" | "in_progress" | "completed" {
+  if (entries.length > 0 && entries.every((entry) => entry.status === "completed")) {
+    return "completed"
+  }
+  if (entries.some((entry) => entry.status === "in_progress")) {
+    return "in_progress"
+  }
+  return "pending"
+}
+
+function formatPlanEntries(
+  entries: Array<{
+    content: string
+    priority: "high" | "medium" | "low"
+    status: "pending" | "in_progress" | "completed"
+  }>
+): string {
+  if (entries.length === 0) {
+    return "Plan is empty"
+  }
+  return entries
+    .map((entry) => {
+      const mark =
+        entry.status === "completed"
+          ? "[x]"
+          : entry.status === "in_progress"
+            ? "[>]"
+            : "[ ]"
+      return `${mark} ${entry.content}`
+    })
+    .join("\n")
+}
+
+function formatAvailableCommands(
+  commands: Array<{ name: string; description: string }>
+): string {
+  if (commands.length === 0) {
+    return "No slash commands available"
+  }
+  return `Available commands updated:\n${commands
+    .map(
+      (command) =>
+        `/${command.name.replace(/^\/+/, "")} - ${command.description}`
+    )
+    .join("\n")}`
+}
+
+function formatToolCall(
+  title: string,
+  status: ToolCallStatus,
+  content?: ToolCallContent[],
+  rawOutput?: unknown
+): string {
+  const lines = [`${statusLabel(status)} ${title}`]
+  const text = (content ?? [])
+    .map((item) => toolContentText(item))
+    .filter(Boolean)
+    .join("\n")
+  if (text) {
+    lines.push(text)
+  } else if (rawOutput !== undefined) {
+    lines.push(formatUnknown(rawOutput))
+  }
+  return lines.join("\n")
+}
+
+function statusLabel(status: ToolCallStatus): string {
+  switch (status) {
+    case "completed":
+      return "Completed:"
+    case "failed":
+      return "Failed:"
+    case "in_progress":
+      return "Running:"
+    case "pending":
+      return "Pending:"
+  }
+}
+
+function toolContentText(content: ToolCallContent): string {
+  if (content.type === "content") {
+    return textOf(content.content)
+  }
+  if (content.type === "diff") {
+    return content.path ? `Diff: ${content.path}` : "Diff updated"
+  }
+  if (content.type === "terminal") {
+    return `Terminal: ${content.terminalId}`
+  }
+  return ""
+}
+
+function formatUnknown(value: unknown): string {
+  if (typeof value === "string") {
+    return value
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
 }
 
 /** Auto-approves tool calls, preferring the broadest allow option. */

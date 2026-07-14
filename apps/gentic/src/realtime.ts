@@ -15,9 +15,29 @@ export type RealtimeMessageEvent = {
   id: string
   seq: number
   role: "assistant" | "system"
-  kind: "text" | "thinking" | "tool"
+  kind: "text" | "thinking" | "tool" | "plan" | "mode" | "commands"
   content: string
   status: "streaming" | "complete" | "error"
+  event_id?: string | null
+  run_id?: string | null
+  event_type?:
+    | "text"
+    | "thought"
+    | "tool_call"
+    | "plan"
+    | "mode"
+    | "available_commands"
+    | null
+  event_status?:
+    | "pending"
+    | "in_progress"
+    | "completed"
+    | "failed"
+    | "removed"
+    | null
+  event_seq?: number | null
+  tool_call_id?: string | null
+  payload?: Record<string, unknown> | null
   ts: string
 }
 

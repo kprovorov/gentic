@@ -34,6 +34,12 @@ import {
   REALTIME_USER_MESSAGE_EVENT,
   runStateEventSchema,
 } from "@gentic/validators/realtime"
+import type {
+  ChatEventStatus,
+  ChatEventType,
+  ChatMessageKind,
+} from "@gentic/validators/chat-events"
+import { availableCommandSchema } from "@gentic/validators/chat-events"
 
 import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
@@ -48,6 +54,7 @@ import {
 type SlashCommand = {
   name: string
   description: string
+  input?: { hint: string } | null
 }
 
 const CLAUDE_CODE_SLASH_COMMANDS: SlashCommand[] = [
@@ -128,10 +135,17 @@ export type ChatMessage = {
   // conversation) instead of staying put.
   clientKey?: string
   role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
+  kind: ChatMessageKind
   content: string | null
   status: "streaming" | "complete" | "error"
   created_at: string
+  event_id?: string | null
+  run_id?: string | null
+  event_type?: ChatEventType | null
+  event_status?: ChatEventStatus | null
+  event_seq?: number | null
+  tool_call_id?: string | null
+  payload?: Record<string, unknown> | null
 }
 
 function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
@@ -152,6 +166,46 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
 
 function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
   return incoming.reduce(mergeMessage, list)
+}
+
+function slashCommandsFromMessages(messages: ChatMessage[]): SlashCommand[] | null {
+  const commandEvent = messages
+    .filter((message) => message.event_type === "available_commands")
+    .sort((a, b) => {
+      const time = a.created_at.localeCompare(b.created_at)
+      if (time !== 0) {
+        return time
+      }
+      return (a.event_seq ?? 0) - (b.event_seq ?? 0)
+    })
+    .at(-1)
+
+  const commands = commandEvent?.payload?.availableCommands
+  if (!Array.isArray(commands)) {
+    return null
+  }
+
+  const parsed = commands
+    .map((command) => availableCommandSchema.safeParse(command))
+    .filter((result) => result.success)
+    .map((result) => ({
+      ...result.data,
+      name: slashName(result.data.name),
+    }))
+
+  return parsed
+}
+
+function slashName(name: string): string {
+  return name.startsWith("/") ? name : `/${name}`
+}
+
+function slashCommandName(value: string): string | null {
+  const query = slashCommandQuery(value)
+  if (query === null || query === "/") {
+    return null
+  }
+  return query
 }
 
 function mergePullRequest(
@@ -304,10 +358,23 @@ export function IssueChat({
     [pullRequests, initialPullRequests]
   )
   const slashCommands = useMemo(
-    () => slashCommandsForProvider(agentProvider),
-    [agentProvider]
+    () =>
+      slashCommandsFromMessages(displayedMessages) ??
+      slashCommandsForProvider(agentProvider),
+    [displayedMessages, agentProvider]
+  )
+  const hasAcpSlashCommands = useMemo(
+    () => slashCommandsFromMessages(displayedMessages) !== null,
+    [displayedMessages]
   )
   const slashQuery = slashCommandQuery(draft)
+  const slashNameInDraft = slashCommandName(draft)
+  const invalidSlashCommand =
+    hasAcpSlashCommands &&
+    slashNameInDraft !== null &&
+    !slashCommands.some(
+      (command) => command.name.toLowerCase() === slashNameInDraft
+    )
   const matchingSlashCommands = useMemo(
     () =>
       slashQuery === null
@@ -470,6 +537,13 @@ export function IssueChat({
                 content: event.data.content,
                 status: event.data.status,
                 created_at: event.data.ts,
+                event_id: event.data.event_id ?? null,
+                run_id: event.data.run_id ?? null,
+                event_type: event.data.event_type ?? null,
+                event_status: event.data.event_status ?? null,
+                event_seq: event.data.event_seq ?? null,
+                tool_call_id: event.data.tool_call_id ?? null,
+                payload: event.data.payload ?? null,
               })
             )
           }
@@ -509,7 +583,7 @@ export function IssueChat({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = draft.trim()
-    if (!content || mutation.isPending) {
+    if (!content || mutation.isPending || invalidSlashCommand) {
       return
     }
 
@@ -681,7 +755,7 @@ export function IssueChat({
         <Button
           type="submit"
           size="icon"
-          disabled={mutation.isPending || !draft.trim()}
+          disabled={mutation.isPending || !draft.trim() || invalidSlashCommand}
         >
           <IconSend />
         </Button>

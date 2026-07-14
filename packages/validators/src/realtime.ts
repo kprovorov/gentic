@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+import {
+  chatEventPayloadSchema,
+  chatEventStatusSchema,
+  chatEventTypeSchema,
+  chatMessageKindSchema,
+  chatMessageStatusSchema,
+} from "./chat-events"
 import { issueStatusSchema } from "./issues"
 
 // Event names for the private `issue:{id}` Realtime Broadcast channel. See
@@ -13,12 +20,8 @@ export function issueRealtimeTopic(issueId: string): string {
 }
 
 export const realtimeMessageRoleSchema = z.enum(["assistant", "system"])
-export const realtimeMessageKindSchema = z.enum(["text", "thinking", "tool"])
-export const realtimeMessageStatusSchema = z.enum([
-  "streaming",
-  "complete",
-  "error",
-])
+export const realtimeMessageKindSchema = chatMessageKindSchema
+export const realtimeMessageStatusSchema = chatMessageStatusSchema
 
 // Worker -> browser: full-snapshot upsert of one transcript message.
 export const messageEventSchema = z.object({
@@ -28,6 +31,13 @@ export const messageEventSchema = z.object({
   kind: realtimeMessageKindSchema,
   content: z.string(),
   status: realtimeMessageStatusSchema,
+  event_id: z.string().min(1).nullable().optional(),
+  run_id: z.string().min(1).nullable().optional(),
+  event_type: chatEventTypeSchema.nullable().optional(),
+  event_status: chatEventStatusSchema.nullable().optional(),
+  event_seq: z.number().int().positive().nullable().optional(),
+  tool_call_id: z.string().min(1).nullable().optional(),
+  payload: chatEventPayloadSchema.nullable().optional(),
   ts: z.string(),
 })
 
