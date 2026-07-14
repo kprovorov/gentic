@@ -14,6 +14,7 @@ import {
   deleteIssueRelationSchema,
   issueStatusSchema,
   sendIssueMessageSchema,
+  updateIssueAgentProviderSchema,
   updateIssueSchema,
   type IssueStatus,
 } from "@gentic/validators/issues"
@@ -163,6 +164,25 @@ export async function updateIssueStatus(formData: FormData) {
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.updateIssueStatus(supabase, userId, id, status)
+
+  revalidatePath("/home")
+  revalidatePath("/issues")
+  revalidatePath(`/issues/${id}`)
+}
+
+export async function updateIssueAgentProvider(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, agent_provider } = updateIssueAgentProviderSchema.parse({
+    id: getString(formData, "id"),
+    agent_provider: getString(formData, "agent_provider"),
+  })
+
+  await issuesService.updateIssueAgentProvider(
+    supabase,
+    userId,
+    id,
+    agent_provider
+  )
 
   revalidatePath("/home")
   revalidatePath("/issues")

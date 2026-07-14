@@ -74,6 +74,15 @@ export const updateIssueStatusSchema = z.object({
 
 export type UpdateIssueStatusValues = z.infer<typeof updateIssueStatusSchema>
 
+export const updateIssueAgentProviderSchema = z.object({
+  id: z.string().uuid(),
+  agent_provider: agentProviderSchema,
+})
+
+export type UpdateIssueAgentProviderValues = z.infer<
+  typeof updateIssueAgentProviderSchema
+>
+
 export const sendIssueMessageSchema = z.object({
   issue_id: z.string().uuid(),
   content: z.string().trim().min(1).max(10_000),

@@ -51,6 +51,7 @@ import {
 import { cn } from "@gentic/ui/utils"
 
 import { Attachments } from "./attachments"
+import { IssueAgentSelect } from "./issue-agent-select"
 import { IssueChat } from "./issue-chat"
 import { IssueDeleteButton } from "./issue-delete-button"
 import { IssueRelations } from "./issue-relations"
@@ -389,16 +390,16 @@ export function IssueDetailView({
               </CardHeader>
               <CardContent className="grid gap-5">
                 <IssueStatusSelect issueId={issue.id} status={issue.status} />
+                <IssueAgentSelect
+                  issueId={issue.id}
+                  agentProvider={issue.agent_provider}
+                  disabled={Boolean(issue.run_started_at)}
+                />
                 <div className="grid gap-3 border-t pt-5">
                   <DetailRow
                     icon={TypeIcon}
                     label="Type"
                     value={issueTypeLabels[issue.type]}
-                  />
-                  <DetailRow
-                    icon={IconRobot}
-                    label="Agent"
-                    value={agentProviderLabels[issue.agent_provider]}
                   />
                   <DetailRow
                     icon={IconCalendar}

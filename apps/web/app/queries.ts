@@ -68,6 +68,7 @@ export type IssueDetail = {
   type: IssueType
   status: IssueStatus
   usage_limit_reset_at: string | null
+  run_started_at: string | null
   pr_url: string | null
   created_at: string
   updated_at: string
@@ -181,7 +182,7 @@ export async function getIssueDetailData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,agent_provider,type,status,usage_limit_reset_at,pr_url,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,agent_provider,type,status,usage_limit_reset_at,run_started_at,pr_url,created_at,updated_at,projects(id,name,repo)"
     )
     .eq("id", id)
     .maybeSingle()
