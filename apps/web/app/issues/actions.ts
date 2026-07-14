@@ -75,7 +75,16 @@ async function createIssue(status: IssueStatus, formData: FormData) {
 
     await Promise.all([
       issuesService.setIssueTitle(serviceClient, created.id, title),
-      type ? issuesService.setIssueType(serviceClient, created.id, type) : null,
+      type
+        ? issuesService
+            .setIssueType(serviceClient, created.id, type)
+            .catch((error) => {
+              console.error(
+                `Failed to persist type for issue ${created.id}:`,
+                error
+              )
+            })
+        : null,
     ])
   })
 
