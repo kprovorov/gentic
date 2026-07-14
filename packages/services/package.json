@@ -12,6 +12,7 @@
   },
   "scripts": {
     "lint": "eslint .",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@gentic/typescript-config": "workspace:*",
     "@types/node": "^20",
     "eslint": "^9",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
