@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   IconArrowLeft,
@@ -44,6 +44,8 @@ export function NewIssueView({
   })
   const { projects } = data
   const [prompt, setPrompt] = useState("")
+  const formRef = useRef<HTMLFormElement>(null)
+  const codexSubmitRef = useRef<HTMLButtonElement>(null)
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -80,6 +82,7 @@ export function NewIssueView({
               </div>
             ) : (
               <form
+                ref={formRef}
                 action={saveIssueDraft}
                 encType="multipart/form-data"
                 className="grid gap-5"
@@ -123,6 +126,16 @@ export function NewIssueView({
                     <IconDeviceFloppy />
                     Save draft
                   </Button>
+                  <button
+                    ref={codexSubmitRef}
+                    type="submit"
+                    formAction={runIssue}
+                    name="agent_provider"
+                    value="codex"
+                    className="hidden"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
                   <div className="flex items-center">
                     <Button
                       type="submit"
@@ -143,17 +156,14 @@ export function NewIssueView({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-48">
-                        <DropdownMenuItem asChild>
-                          <button
-                            type="submit"
-                            form="new-issue-form"
-                            formAction={runIssue}
-                            name="agent_provider"
-                            value="codex"
-                            className="w-full"
-                          >
-                            Run with Codex
-                          </button>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            formRef.current?.requestSubmit(
+                              codexSubmitRef.current ?? undefined
+                            )
+                          }}
+                        >
+                          Run with Codex
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
