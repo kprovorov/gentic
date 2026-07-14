@@ -45,7 +45,13 @@ export function NewIssueView({
   const { projects } = data
   const [prompt, setPrompt] = useState("")
   const formRef = useRef<HTMLFormElement>(null)
+  const agentProviderRef = useRef<HTMLInputElement>(null)
   const codexSubmitRef = useRef<HTMLButtonElement>(null)
+  const setAgentProvider = (agentProvider: "claude_code" | "codex") => {
+    if (agentProviderRef.current) {
+      agentProviderRef.current.value = agentProvider
+    }
+  }
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -88,6 +94,13 @@ export function NewIssueView({
                 className="grid gap-5"
                 id="new-issue-form"
               >
+                <input
+                  ref={agentProviderRef}
+                  type="hidden"
+                  name="agent_provider"
+                  defaultValue="claude_code"
+                />
+
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
                   <NativeSelect
@@ -122,7 +135,13 @@ export function NewIssueView({
                   <Button asChild variant="outline">
                     <Link href="/issues">Cancel</Link>
                   </Button>
-                  <Button type="submit" variant="secondary">
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    onClick={() => {
+                      setAgentProvider("claude_code")
+                    }}
+                  >
                     <IconDeviceFloppy />
                     Save draft
                   </Button>
@@ -130,8 +149,6 @@ export function NewIssueView({
                     ref={codexSubmitRef}
                     type="submit"
                     formAction={runIssue}
-                    name="agent_provider"
-                    value="codex"
                     className="hidden"
                     tabIndex={-1}
                     aria-hidden="true"
@@ -141,6 +158,9 @@ export function NewIssueView({
                       type="submit"
                       formAction={runIssue}
                       className="rounded-r-none border-r-primary-foreground/70"
+                      onClick={() => {
+                        setAgentProvider("claude_code")
+                      }}
                     >
                       <IconPlayerPlay />
                       Run with Claude Code
@@ -158,6 +178,7 @@ export function NewIssueView({
                       <DropdownMenuContent align="end" className="min-w-48">
                         <DropdownMenuItem
                           onSelect={() => {
+                            setAgentProvider("codex")
                             formRef.current?.requestSubmit(
                               codexSubmitRef.current ?? undefined
                             )
