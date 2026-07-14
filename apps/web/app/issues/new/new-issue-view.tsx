@@ -127,7 +127,7 @@ export function NewIssueView({
                     <Button
                       type="submit"
                       formAction={runIssue}
-                      className="rounded-r-none border-r-primary-foreground/25"
+                      className="rounded-r-none border-r-primary-foreground/70"
                     >
                       <IconPlayerPlay />
                       Run with Claude Code
@@ -137,7 +137,7 @@ export function NewIssueView({
                         <Button
                           type="button"
                           aria-label="Choose agent"
-                          className="rounded-l-none border-l-primary-foreground/25 px-2"
+                          className="rounded-l-none border-l-primary-foreground/70 px-2"
                         >
                           <IconChevronDown />
                         </Button>
