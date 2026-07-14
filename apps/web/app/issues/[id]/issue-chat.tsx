@@ -25,7 +25,7 @@ import {
   useMessageScroller,
 } from "@gentic/ui/message-scroller"
 import { cn } from "@gentic/ui/utils"
-import type { IssueStatus } from "@gentic/validators/issues"
+import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import {
   issueRealtimeTopic,
   messageEventSchema,
@@ -40,6 +40,79 @@ import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
 import { AttachmentPromptField } from "../attachment-prompt-field"
+
+type SlashCommand = {
+  name: string
+  description: string
+}
+
+const CLAUDE_CODE_SLASH_COMMANDS: SlashCommand[] = [
+  { name: "/init", description: "Generate or update project memory" },
+  { name: "/memory", description: "Edit Claude memory files" },
+  { name: "/mcp", description: "Manage MCP servers" },
+  { name: "/permissions", description: "Change tool approval rules" },
+  { name: "/plan", description: "Switch to planning mode" },
+  { name: "/model", description: "Change the active model" },
+  { name: "/effort", description: "Adjust reasoning effort" },
+  { name: "/context", description: "Inspect context usage" },
+  { name: "/compact", description: "Compact conversation history" },
+  { name: "/clear", description: "Clear conversation context" },
+  { name: "/diff", description: "Show current changes" },
+  { name: "/review", description: "Review a pull request" },
+  { name: "/code-review", description: "Review code changes" },
+  { name: "/security-review", description: "Review security risk" },
+  { name: "/tasks", description: "List background tasks" },
+  { name: "/help", description: "Show available commands" },
+]
+
+const CODEX_SLASH_COMMANDS: SlashCommand[] = [
+  { name: "/permissions", description: "Change approval rules" },
+  { name: "/model", description: "Change the active model" },
+  { name: "/reasoning", description: "Adjust reasoning effort" },
+  { name: "/status", description: "Show task and context status" },
+  { name: "/plan", description: "Toggle plan mode" },
+  { name: "/compact", description: "Compact task context" },
+  { name: "/review", description: "Start code review mode" },
+  { name: "/init", description: "Generate AGENTS.md guidance" },
+  { name: "/mcp", description: "Open MCP status" },
+  { name: "/goal", description: "Set a persistent goal" },
+  { name: "/agent", description: "Switch agent thread" },
+  { name: "/subagents", description: "Switch agent thread" },
+  { name: "/side", description: "Start a side conversation" },
+  { name: "/ide", description: "Include IDE context" },
+  { name: "/ide-context", description: "Toggle IDE context" },
+  { name: "/fast", description: "Toggle fast service tier" },
+  { name: "/feedback", description: "Send product feedback" },
+  { name: "/local", description: "Run locally" },
+  { name: "/cloud", description: "Run in the cloud" },
+  { name: "/help", description: "Show available commands" },
+]
+
+function slashCommandsForProvider(provider: AgentProvider): SlashCommand[] {
+  return provider === "codex"
+    ? CODEX_SLASH_COMMANDS
+    : CLAUDE_CODE_SLASH_COMMANDS
+}
+
+function slashCommandQuery(value: string): string | null {
+  if (!value.startsWith("/")) {
+    return null
+  }
+  const firstLine = value.split("\n", 1)[0] ?? ""
+  if (firstLine.includes(" ")) {
+    return null
+  }
+  return firstLine.toLowerCase()
+}
+
+function filterSlashCommands(
+  commands: SlashCommand[],
+  query: string
+): SlashCommand[] {
+  return commands
+    .filter((command) => command.name.toLowerCase().startsWith(query))
+    .slice(0, 8)
+}
 
 export type ChatMessage = {
   id: string
@@ -107,6 +180,7 @@ function formatPullRequestLabel(url: string) {
 
 export function IssueChat({
   issueId,
+  agentProvider,
   initialMessages,
   initialStatus,
   initialUsageLimitResetAt,
@@ -114,6 +188,7 @@ export function IssueChat({
   initialPullRequests,
 }: {
   issueId: string
+  agentProvider: AgentProvider
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
@@ -130,6 +205,7 @@ export function IssueChat({
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
   const [draftFiles, setDraftFiles] = useState<File[]>([])
+  const [selectedSlashCommandIndex, setSelectedSlashCommandIndex] = useState(0)
   // Bumped on every submit to trigger a forced scroll-to-bottom, since the
   // scroller's own follow-bottom heuristic only kicks in if the viewport was
   // already at the bottom before the new message landed.
@@ -214,6 +290,24 @@ export function IssueChat({
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
   )
+  const slashCommands = useMemo(
+    () => slashCommandsForProvider(agentProvider),
+    [agentProvider]
+  )
+  const slashQuery = slashCommandQuery(draft)
+  const matchingSlashCommands = useMemo(
+    () =>
+      slashQuery === null
+        ? []
+        : filterSlashCommands(slashCommands, slashQuery),
+    [slashCommands, slashQuery]
+  )
+  const showSlashCommands =
+    slashQuery !== null && matchingSlashCommands.length > 0
+  const boundedSlashCommandIndex =
+    matchingSlashCommands.length === 0
+      ? 0
+      : Math.min(selectedSlashCommandIndex, matchingSlashCommands.length - 1)
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
   // session all happen first with no message to attach a spinner to. Show a
@@ -385,6 +479,51 @@ export function IssueChat({
     mutation.mutate(formData)
   }
 
+  function selectSlashCommand(command: SlashCommand) {
+    setDraft(`${command.name} `)
+    setSelectedSlashCommandIndex(0)
+  }
+
+  function handlePromptKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showSlashCommands) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault()
+        setSelectedSlashCommandIndex(
+          (index) => (index + 1) % matchingSlashCommands.length
+        )
+        return
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault()
+        setSelectedSlashCommandIndex(
+          (index) =>
+            (index - 1 + matchingSlashCommands.length) %
+            matchingSlashCommands.length
+        )
+        return
+      }
+
+      if (event.key === "Tab") {
+        event.preventDefault()
+        selectSlashCommand(matchingSlashCommands[boundedSlashCommandIndex])
+        return
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setDraft("")
+        setSelectedSlashCommandIndex(0)
+        return
+      }
+    }
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      event.currentTarget.form?.requestSubmit()
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {(usageLimitResetAt && status === "held") ||
@@ -469,23 +608,30 @@ export function IssueChat({
       </MessageScrollerProvider>
 
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        <AttachmentPromptField
-          key={sendTick}
-          value={draft}
-          onChange={setDraft}
-          onFilesChange={setDraftFiles}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault()
-              event.currentTarget.form?.requestSubmit()
-            }
-          }}
-          rows={2}
-          placeholder="Message the agent…"
-          disabled={mutation.isPending}
-          className="min-w-0 flex-1"
-          textareaClassName="min-h-18 resize-none"
-        />
+        <div className="relative min-w-0 flex-1">
+          {showSlashCommands ? (
+            <SlashCommandMenu
+              commands={matchingSlashCommands}
+              selectedIndex={boundedSlashCommandIndex}
+              onSelect={selectSlashCommand}
+            />
+          ) : null}
+          <AttachmentPromptField
+            key={sendTick}
+            value={draft}
+            onChange={(value) => {
+              setDraft(value)
+              setSelectedSlashCommandIndex(0)
+            }}
+            onFilesChange={setDraftFiles}
+            onKeyDown={handlePromptKeyDown}
+            rows={2}
+            placeholder="Message the agent…"
+            disabled={mutation.isPending}
+            className="min-w-0"
+            textareaClassName="min-h-18 resize-none"
+          />
+        </div>
         <Button
           type="submit"
           size="icon"
@@ -494,6 +640,44 @@ export function IssueChat({
           <IconSend />
         </Button>
       </form>
+    </div>
+  )
+}
+
+function SlashCommandMenu({
+  commands,
+  selectedIndex,
+  onSelect,
+}: {
+  commands: SlashCommand[]
+  selectedIndex: number
+  onSelect: (command: SlashCommand) => void
+}) {
+  return (
+    <div className="absolute right-0 bottom-full left-0 z-20 mb-2 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
+      <div className="max-h-72 overflow-y-auto p-1">
+        {commands.map((command, index) => (
+          <button
+            key={command.name}
+            type="button"
+            className={cn(
+              "grid w-full grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-2 text-left text-sm",
+              index === selectedIndex
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent hover:text-accent-foreground"
+            )}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              onSelect(command)
+            }}
+          >
+            <span className="font-mono font-medium">{command.name}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {command.description}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
