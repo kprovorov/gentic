@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@gentic/ui/sidebar"
 
 export function NavMain({
@@ -18,6 +19,7 @@ export function NavMain({
   items: { title: string; href: string; icon: Icon }[]
 }) {
   const pathname = usePathname()
+  const { setOpenMobile } = useSidebar()
 
   return (
     <SidebarGroup>
@@ -29,7 +31,7 @@ export function NavMain({
               tooltip="New issue"
               className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
-              <Link href="/issues/new">
+              <Link href="/issues/new" onClick={() => setOpenMobile(false)}>
                 <IconCirclePlusFilled />
                 <span>New issue</span>
               </Link>
@@ -48,7 +50,7 @@ export function NavMain({
                   tooltip={item.title}
                   isActive={isActive}
                 >
-                  <Link href={item.href}>
+                  <Link href={item.href} onClick={() => setOpenMobile(false)}>
                     <item.icon />
                     <span>{item.title}</span>
                   </Link>
