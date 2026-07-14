@@ -73,6 +73,27 @@ export const statusStyles: Record<IssueStatus, string> = {
   cancelled: "bg-muted text-muted-foreground",
 }
 
+export const statusIconStyles: Record<IssueStatus, string> = {
+  draft: "text-muted-foreground",
+  todo: "text-muted-foreground",
+  queued: "text-primary",
+  held: "text-amber-600 dark:text-amber-300",
+  "in-progress": "text-primary",
+  "waiting-for-input": "text-amber-600 dark:text-amber-300",
+  testing: "text-sky-600 dark:text-sky-300",
+  "tests-failed": "text-red-600 dark:text-red-300",
+  "ready-for-review": "text-violet-600 dark:text-violet-300",
+  "changes-requested": "text-orange-600 dark:text-orange-300",
+  approved: "text-teal-600 dark:text-teal-300",
+  merged: "text-indigo-600 dark:text-indigo-300",
+  deploying: "text-blue-600 dark:text-blue-300",
+  "deploy-failed": "text-rose-600 dark:text-rose-300",
+  validating: "text-cyan-600 dark:text-cyan-300",
+  "run-failed": "text-destructive",
+  completed: "text-emerald-600 dark:text-emerald-300",
+  cancelled: "text-muted-foreground",
+}
+
 export const statusIcons = {
   draft: IconPencil,
   todo: IconCircleDashed,
@@ -114,6 +135,27 @@ export const statusOrder: Record<IssueStatus, number> = {
   completed: 16,
   cancelled: 17,
 }
+
+export const statusOptions: { value: IssueStatus; label: string }[] = [
+  { value: "draft", label: statusLabels.draft },
+  { value: "todo", label: statusLabels.todo },
+  { value: "queued", label: statusLabels.queued },
+  { value: "held", label: statusLabels.held },
+  { value: "in-progress", label: statusLabels["in-progress"] },
+  { value: "waiting-for-input", label: statusLabels["waiting-for-input"] },
+  { value: "testing", label: statusLabels.testing },
+  { value: "tests-failed", label: statusLabels["tests-failed"] },
+  { value: "ready-for-review", label: statusLabels["ready-for-review"] },
+  { value: "changes-requested", label: statusLabels["changes-requested"] },
+  { value: "approved", label: statusLabels.approved },
+  { value: "merged", label: statusLabels.merged },
+  { value: "deploying", label: statusLabels.deploying },
+  { value: "deploy-failed", label: statusLabels["deploy-failed"] },
+  { value: "validating", label: statusLabels.validating },
+  { value: "run-failed", label: statusLabels["run-failed"] },
+  { value: "completed", label: statusLabels.completed },
+  { value: "cancelled", label: statusLabels.cancelled },
+]
 
 export const issueTypeLabels: Record<IssueType, string> = {
   issue: "Issue",
