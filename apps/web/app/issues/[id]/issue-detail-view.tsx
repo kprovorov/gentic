@@ -54,7 +54,7 @@ import { Attachments } from "./attachments"
 import { IssueChat } from "./issue-chat"
 import { IssueDeleteButton } from "./issue-delete-button"
 import { IssueRelations } from "./issue-relations"
-import { IssueResetAgentButton } from "./issue-reset-agent-button"
+import { IssueRetryAgentButton } from "./issue-retry-agent-button"
 import { IssueStatusSelect } from "./issue-status-select"
 
 const statusLabels: Record<IssueStatus, string> = {
@@ -361,7 +361,7 @@ export function IssueDetailView({
                     issue when it moves to Queued.
                   </CardDescription>
                 </div>
-                <IssueResetAgentButton issueId={issue.id} />
+                <IssueRetryAgentButton issueId={issue.id} />
               </CardHeader>
               <CardContent>
                 <IssueChat
