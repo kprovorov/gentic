@@ -249,10 +249,7 @@ export async function createIssue(
       await supabase.from("messages").insert({
         issue_id: issue.id,
         role: "user",
-        content: kickoffMessageContent(
-          input.title ?? null,
-          input.prompt ?? null
-        ),
+        content: kickoffMessageContent(input.prompt ?? null),
       })
     )
   }
@@ -260,17 +257,8 @@ export async function createIssue(
   return issue
 }
 
-// The title may still be null here: the web app generates it in the
-// background after the issue is saved (see apps/web/app/issues/actions.ts),
-// so an issue can reach `todo` status before its title exists.
-function kickoffMessageContent(
-  title: string | null,
-  prompt: string | null
-): string {
-  if (!title) {
-    return prompt ?? ""
-  }
-  return prompt ? `${title}\n\n${prompt}` : title
+function kickoffMessageContent(prompt: string | null): string {
+  return prompt ?? ""
 }
 
 // Called from the background title-generation step after an issue is saved
@@ -366,11 +354,10 @@ export async function resetIssueAgent(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("title,prompt,agent_provider,projects!inner(user_id)")
+    .select("prompt,agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle<{
-      title: string | null
       prompt: string | null
       agent_provider: AgentProvider
     }>()
@@ -407,7 +394,7 @@ export async function resetIssueAgent(
     await supabase.from("messages").insert({
       issue_id: id,
       role: "user",
-      content: kickoffMessageContent(current.title, current.prompt),
+      content: kickoffMessageContent(current.prompt),
     })
   )
 }
@@ -484,12 +471,11 @@ export async function updateIssueStatus(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("status,title,prompt,projects!inner(user_id)")
+    .select("status,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle<{
       status: string
-      title: string | null
       prompt: string | null
     }>()
 
@@ -519,7 +505,7 @@ export async function updateIssueStatus(
       await supabase.from("messages").insert({
         issue_id: id,
         role: "user",
-        content: kickoffMessageContent(current.title, current.prompt),
+        content: kickoffMessageContent(current.prompt),
       })
     )
   }
