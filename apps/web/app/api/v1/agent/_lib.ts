@@ -31,6 +31,7 @@ export const runStateSchema = z
     run_error: z.string().nullable().optional(),
     run_started_at: z.string().datetime().nullable().optional(),
     run_finished_at: z.string().datetime().nullable().optional(),
+    message_cursor_seq: z.number().int().nonnegative().optional(),
     usage_limit_reset_at: z.string().datetime().nullable().optional(),
     pr_url: z.string().url().nullable().optional(),
   })
@@ -39,10 +40,11 @@ export const runStateSchema = z
 
 export const insertMessageSchema = z.object({
   id: z.string().uuid().optional(),
+  run_id: z.string().uuid().nullable().optional(),
   role: z.enum(["assistant", "system"]),
   kind: z.enum(["text", "tool", "thinking"]).optional(),
   content: z.string(),
-  status: z.enum(["complete", "error"]).optional(),
+  status: z.enum(["streaming", "complete", "error"]).optional(),
 })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against

@@ -1,10 +1,11 @@
 export interface ClaimedIssue {
   id: string
+  runId: string
   agentProvider: "claude_code" | "codex"
   repo: string
   setupScript: string | null
   sessionId: string | null
-  runFinishedAt: string | null
+  messageCursorSeq: number
   prUrl: string | null
 }
 
@@ -19,6 +20,7 @@ export interface RunStateFields {
   run_error?: string | null
   run_started_at?: string | null
   run_finished_at?: string | null
+  message_cursor_seq?: number
   usage_limit_reset_at?: string | null
   pr_url?: string | null
 }
@@ -26,6 +28,13 @@ export interface RunStateFields {
 export interface UserMessage {
   id: string
   content: string | null
+  created_at: string
+  seq: number
+}
+
+export interface PersistedMessage {
+  id: string
+  seq: number
   created_at: string
 }
 
@@ -38,10 +47,11 @@ export interface RealtimeTokenResponse {
 
 export interface InsertMessageInput {
   id: string
+  run_id?: string
   role: "assistant" | "system"
   kind?: "text" | "tool" | "thinking"
   content: string
-  status?: "complete" | "error"
+  status?: "streaming" | "complete" | "error"
 }
 
 export interface Attachment {
@@ -56,8 +66,11 @@ export interface Attachment {
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
-  insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
-  fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
+  insertMessage(
+    issueId: string,
+    message: InsertMessageInput
+  ): Promise<PersistedMessage>
+  fetchUserMessagesAfter(issueId: string, cursor: number): Promise<UserMessage[]>
   fetchAttachments(issueId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
 }
@@ -119,17 +132,16 @@ export function createAgentApi(input: {
       })
     },
     async insertMessage(issueId, message) {
-      const data = await request<{ id: string }>(
+      return request<PersistedMessage>(
         `/agent/issues/${encodeURIComponent(issueId)}/messages`,
         {
           method: "POST",
           body: message,
         }
       )
-      return data.id
     },
     async fetchUserMessagesAfter(issueId, cursor) {
-      const params = new URLSearchParams({ after: cursor })
+      const params = new URLSearchParams({ after: String(cursor) })
       const data = await request<{ messages: UserMessage[] }>(
         `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`
       )

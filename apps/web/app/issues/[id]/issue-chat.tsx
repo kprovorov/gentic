@@ -132,14 +132,27 @@ export type ChatMessage = {
   content: string | null
   status: "streaming" | "complete" | "error"
   created_at: string
+  seq: number | null
+}
+
+function compareMessages(a: ChatMessage, b: ChatMessage) {
+  if (a.seq !== null && b.seq !== null && a.seq !== b.seq) {
+    return a.seq - b.seq
+  }
+  if (a.seq !== null && b.seq === null) {
+    return -1
+  }
+  if (a.seq === null && b.seq !== null) {
+    return 1
+  }
+  const time = a.created_at.localeCompare(b.created_at)
+  return time === 0 ? a.id.localeCompare(b.id) : time
 }
 
 function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
   const index = list.findIndex((message) => message.id === incoming.id)
   if (index === -1) {
-    return [...list, incoming].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at)
-    )
+    return [...list, incoming].sort(compareMessages)
   }
   const next = [...list]
   const existing = next[index]
@@ -147,7 +160,7 @@ function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
     ...incoming,
     clientKey: existing.clientKey ?? incoming.clientKey,
   }
-  return next
+  return next.sort(compareMessages)
 }
 
 function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
@@ -239,6 +252,7 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: new Date().toISOString(),
+          seq: null,
         })
       )
 
@@ -258,6 +272,7 @@ export function IssueChat({
             content,
             status: "complete",
             created_at: message.created_at,
+            seq: message.seq,
           }
         )
       )
@@ -270,6 +285,7 @@ export function IssueChat({
             id: message.id,
             content,
             created_at: message.created_at,
+            seq: message.seq,
           },
         })
       }
@@ -470,6 +486,7 @@ export function IssueChat({
                 content: event.data.content,
                 status: event.data.status,
                 created_at: event.data.ts,
+                seq: event.data.message_seq,
               })
             )
           }

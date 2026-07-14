@@ -8,13 +8,13 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, agent_provider, session_id, run_finished_at, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, agent_provider, session_id, message_cursor_seq, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 type ClaimCandidateRow = {
   id: string
   agent_provider: "claude_code" | "codex"
   session_id: string | null
-  run_finished_at: string | null
+  message_cursor_seq: number
   pr_url: string | null
   projects: {
     repo: string
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
 
 async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const now = new Date().toISOString()
+  const runId = crypto.randomUUID()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
@@ -62,6 +63,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     .from("issues")
     .update({
       status: "queued",
+      run_id: runId,
       run_started_at: now,
       run_error: null,
       run_finished_at: null,
@@ -87,10 +89,11 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   return {
     id,
     agentProvider: candidate.agent_provider,
+    runId,
     repo: candidate.projects.repo,
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
-    runFinishedAt: candidate.run_finished_at,
+    messageCursorSeq: candidate.message_cursor_seq,
     prUrl: candidate.pr_url,
   }
 }

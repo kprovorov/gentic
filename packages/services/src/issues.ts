@@ -624,8 +624,8 @@ export async function sendIssueMessage(
         role: "user",
         content,
       })
-      .select("id, created_at")
-      .single<{ id: string; created_at: string }>()
+      .select("id, created_at, seq")
+      .single<{ id: string; created_at: string; seq: number }>()
   )
 
   // A finished run has no worker polling for it anymore. Re-queue so the

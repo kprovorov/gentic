@@ -14,6 +14,7 @@ import type { AgentApi } from "./api.js"
 export type RealtimeMessageEvent = {
   id: string
   seq: number
+  message_seq: number | null
   role: "assistant" | "system"
   kind: "text" | "thinking" | "tool"
   content: string
@@ -38,6 +39,7 @@ export type RealtimeUserMessageEvent = {
   id: string
   content: string
   created_at: string
+  seq: number
 }
 
 const MESSAGE_EVENT = "message"
@@ -79,12 +81,14 @@ export async function connectIssueChannel(
       event &&
       typeof event.id === "string" &&
       typeof event.content === "string" &&
-      typeof event.created_at === "string"
+      typeof event.created_at === "string" &&
+      typeof event.seq === "number"
     ) {
       onUserMessage({
         id: event.id,
         content: event.content,
         created_at: event.created_at,
+        seq: event.seq,
       })
     }
   })

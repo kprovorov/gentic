@@ -55,6 +55,7 @@ export function IssueRetryAgentButton({
         content: issuePrompt ?? "",
         status: "complete",
         created_at: now,
+        seq: null,
       } satisfies IssueDetailData["messages"][number]
 
       queryClient.setQueryData<IssueDetailData>(issueKey, (current) => {

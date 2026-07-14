@@ -24,6 +24,7 @@ export const realtimeMessageStatusSchema = z.enum([
 export const messageEventSchema = z.object({
   id: z.string().uuid(),
   seq: z.number().int().positive(),
+  message_seq: z.number().int().positive().nullable(),
   role: realtimeMessageRoleSchema,
   kind: realtimeMessageKindSchema,
   content: z.string(),
@@ -58,6 +59,7 @@ export const userMessageEventSchema = z.object({
   id: z.string().uuid(),
   content: z.string(),
   created_at: z.string(),
+  seq: z.number().int().positive(),
 })
 
 export type UserMessageEvent = z.infer<typeof userMessageEventSchema>

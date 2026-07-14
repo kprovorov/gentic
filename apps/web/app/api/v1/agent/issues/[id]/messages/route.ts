@@ -14,10 +14,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const cursor = new URL(request.url).searchParams.get("after")
+    const cursorParam = new URL(request.url).searchParams.get("after")
+    const cursor = Number(cursorParam)
     const { supabase, userId } = await getAgentContext(request)
 
-    if (!cursor) {
+    if (cursorParam === null || !Number.isSafeInteger(cursor) || cursor < 0) {
       return json({ error: "Missing after cursor" }, { status: 400 })
     }
 
@@ -25,11 +26,11 @@ export async function GET(
 
     const { data, error } = await supabase
       .from("messages")
-      .select("id, content, created_at")
+      .select("id, content, created_at, seq")
       .eq("issue_id", id)
       .eq("role", "user")
-      .gt("created_at", cursor)
-      .order("created_at", { ascending: true })
+      .gt("seq", cursor)
+      .order("seq", { ascending: true })
 
     if (error) {
       throw new Error(error.message)
@@ -57,27 +58,28 @@ export async function POST(
       .upsert(
         {
           ...(fields.id ? { id: fields.id } : {}),
+          ...(fields.run_id !== undefined ? { run_id: fields.run_id } : {}),
           issue_id: id,
           role: fields.role,
           kind: fields.kind ?? "text",
           content: fields.content,
           status: fields.status ?? "complete",
+          updated_at: new Date().toISOString(),
         },
-        { onConflict: "id", ignoreDuplicates: true }
+        { onConflict: "id" }
       )
-      .select("id")
-      .maybeSingle<{ id: string }>()
+      .select("id, seq, created_at")
+      .maybeSingle<{ id: string; seq: number; created_at: string }>()
 
     if (error) {
       throw new Error(error.message)
     }
 
-    const messageId = data?.id ?? fields.id
-    if (!messageId) {
+    if (!data) {
       throw new Error("Message insert did not return an id")
     }
 
-    return json({ id: messageId })
+    return json(data)
   } catch (error) {
     return handleAgentError(error)
   }

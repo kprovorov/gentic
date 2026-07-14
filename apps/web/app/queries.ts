@@ -205,9 +205,9 @@ export async function getIssueDetailData(
   ] = await Promise.all([
     supabase
       .from("messages")
-      .select("id,role,kind,content,status,created_at")
+      .select("id,role,kind,content,status,created_at,seq")
       .eq("issue_id", id)
-      .order("created_at", { ascending: true })
+      .order("seq", { ascending: true })
       .returns<ChatMessage[]>(),
     supabase
       .from("attachments")

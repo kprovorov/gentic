@@ -7,22 +7,34 @@ import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
 import { issueRunInstructions, runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
+const RUN_ID = "22222222-2222-4222-8222-222222222222"
 
-test("finalize inserts exactly once with the broadcast id", async () => {
+test("finalize reserves then completes the same broadcast id", async () => {
   const api = fakeApi()
   const channel = fakeChannel()
-  const message = new StreamingAssistantMessage(api, ISSUE_ID, channel, "text")
+  const message = new StreamingAssistantMessage(
+    api,
+    ISSUE_ID,
+    RUN_ID,
+    channel,
+    "text"
+  )
 
   await message.append("hello")
   await message.finalize()
   await message.finalize()
 
-  assert.equal(api.inserted.length, 1)
+  assert.equal(api.inserted.length, 2)
   assert.equal(channel.messages.length, 2)
   assert.equal(api.inserted[0]?.issueId, ISSUE_ID)
   assert.equal(api.inserted[0]?.message.id, channel.messages[1]?.id)
   assert.equal(api.inserted[0]?.message.content, "hello")
-  assert.equal(api.inserted[0]?.message.status, "complete")
+  assert.equal(api.inserted[0]?.message.status, "streaming")
+  assert.equal(api.inserted[1]?.message.id, channel.messages[1]?.id)
+  assert.equal(api.inserted[1]?.message.content, "hello")
+  assert.equal(api.inserted[1]?.message.status, "complete")
+  assert.equal(channel.messages[0]?.message_seq, 1)
+  assert.equal(channel.messages[1]?.message_seq, 1)
 })
 
 test("finalize retries transient API failure", async () => {
@@ -33,6 +45,7 @@ test("finalize retries transient API failure", async () => {
   const message = new StreamingAssistantMessage(
     api,
     ISSUE_ID,
+    RUN_ID,
     channel,
     "thinking",
     150,
@@ -42,20 +55,24 @@ test("finalize retries transient API failure", async () => {
   await message.append("thinking")
   await message.finalize()
 
-  assert.equal(api.insertAttempts, 2)
-  assert.equal(api.inserted.length, 1)
-  assert.equal(api.inserted[0]?.message.id, channel.messages[1]?.id)
-  assert.equal(api.inserted[0]?.message.kind, "thinking")
+  assert.equal(api.insertAttempts, 3)
+  assert.equal(api.inserted.length, 2)
+  assert.equal(api.inserted[1]?.message.id, channel.messages[1]?.id)
+  assert.equal(api.inserted[1]?.message.kind, "thinking")
 })
 
 test("terminal persist failure does not reject finalize", async () => {
   const api = fakeApi({
-    failInsertAttempts: [new Error("permanent failure")],
+    failInsertAttempts: [
+      new Error("permanent failure"),
+      new Error("permanent failure"),
+    ],
   })
   const channel = fakeChannel()
   const message = new StreamingAssistantMessage(
     api,
     ISSUE_ID,
+    RUN_ID,
     channel,
     "text",
     150,
@@ -65,7 +82,7 @@ test("terminal persist failure does not reject finalize", async () => {
   await message.append("delivered over broadcast")
   await assert.doesNotReject(() => message.finalize())
 
-  assert.equal(api.insertAttempts, 1)
+  assert.equal(api.insertAttempts, 2)
   assert.equal(api.inserted.length, 0)
   assert.equal(channel.messages.at(-1)?.status, "complete")
 })
@@ -74,7 +91,7 @@ test("tool messages insert at emit time with the broadcast id", async () => {
   const api = fakeApi()
   const channel = fakeChannel()
 
-  await publishMessage(api, ISSUE_ID, channel, {
+  await publishMessage(api, ISSUE_ID, RUN_ID, channel, {
     kind: "tool",
     content: "Read file",
   })
@@ -106,14 +123,14 @@ test("run error path best-effort persists the current partial", async () => {
   }
 
   await assert.rejects(
-    () => runTurn(session as never, api, ISSUE_ID, channel, "prompt"),
+    () => runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt"),
     /agent crashed/
   )
 
-  assert.equal(api.inserted.length, 1)
-  assert.equal(api.inserted[0]?.message.id, channel.messages.at(-1)?.id)
-  assert.equal(api.inserted[0]?.message.content, "partial output")
-  assert.equal(api.inserted[0]?.message.status, "error")
+  assert.equal(api.inserted.length, 2)
+  assert.equal(api.inserted[1]?.message.id, channel.messages.at(-1)?.id)
+  assert.equal(api.inserted[1]?.message.content, "partial output")
+  assert.equal(api.inserted[1]?.message.status, "error")
   assert.equal(channel.messages.at(-1)?.status, "error")
 })
 
@@ -144,6 +161,7 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
   insertAttempts: number
 } {
   const inserted: { issueId: string; message: InsertMessageInput }[] = []
+  const messageSeqs = new Map<string, number>()
   const api: AgentApi & {
     inserted: { issueId: string; message: InsertMessageInput }[]
     insertAttempts: number
@@ -161,7 +179,13 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
         throw failure
       }
       inserted.push({ issueId, message })
-      return message.id
+      const seq = messageSeqs.get(message.id) ?? messageSeqs.size + 1
+      messageSeqs.set(message.id, seq)
+      return {
+        id: message.id,
+        seq,
+        created_at: new Date().toISOString(),
+      }
     },
     async fetchUserMessagesAfter() {
       return []

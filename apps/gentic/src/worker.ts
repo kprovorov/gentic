@@ -89,7 +89,41 @@ export async function runWorker(): Promise<void> {
 }
 
 /** One pending user follow-up, queued for the next prompt turn. */
-type QueuedMessage = { id: string; content: string; created_at: string }
+export type QueuedMessage = {
+  id: string
+  content: string
+  created_at: string
+  seq: number
+}
+
+export function enqueueUserMessage(
+  queue: QueuedMessage[],
+  seenMessageIds: Set<string>,
+  message: {
+    id: string
+    content: string | null
+    created_at: string
+    seq: number
+  }
+): boolean {
+  if (seenMessageIds.has(message.id)) {
+    return false
+  }
+  seenMessageIds.add(message.id)
+  const entry: QueuedMessage = {
+    id: message.id,
+    content: message.content ?? "",
+    created_at: message.created_at,
+    seq: message.seq,
+  }
+  const index = queue.findIndex((existing) => existing.seq > entry.seq)
+  if (index === -1) {
+    queue.push(entry)
+  } else {
+    queue.splice(index, 0, entry)
+  }
+  return true
+}
 
 async function processIssue(
   api: AgentApi,
@@ -102,9 +136,10 @@ async function processIssue(
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   let channel: IssueRealtimeChannel | null = null
+  let messageCursorSeq = issue.messageCursorSeq
 
   try {
-    // Push queue for user follow-ups, ordered by `created_at`. Fed by two
+    // Push queue for user follow-ups, ordered by database `seq`. Fed by two
     // sources deduped by message id: a one-shot REST backlog fetch below,
     // and live `user_message` broadcast events for the rest of the run.
     const seenMessageIds = new Set<string>()
@@ -115,25 +150,9 @@ async function processIssue(
       id: string
       content: string | null
       created_at: string
+      seq: number
     }): void => {
-      if (seenMessageIds.has(message.id)) {
-        return
-      }
-      seenMessageIds.add(message.id)
-      const entry: QueuedMessage = {
-        id: message.id,
-        content: message.content ?? "",
-        created_at: message.created_at,
-      }
-      const index = queue.findIndex(
-        (existing) => existing.created_at > entry.created_at
-      )
-      if (index === -1) {
-        queue.push(entry)
-      } else {
-        queue.splice(index, 0, entry)
-      }
-      if (queueWaiter) {
+      if (enqueueUserMessage(queue, seenMessageIds, message) && queueWaiter) {
         const resolve = queueWaiter
         queueWaiter = null
         resolve()
@@ -182,14 +201,10 @@ async function processIssue(
 
     // Seed the queue with follow-ups sent before the channel connected
     // (including the issue's initial prompt). When resuming a session that
-    // already consumed messages, start the cursor at that run's end so they
-    // aren't replayed. A session-less retry (e.g. clone failed before the
-    // agent started) has consumed nothing, so it replays from the beginning.
-    const seedCursor =
-      issue.sessionId && issue.runFinishedAt
-        ? issue.runFinishedAt
-        : new Date(0).toISOString()
-    const backlog = await api.fetchUserMessagesAfter(issue.id, seedCursor)
+    // already consumed messages, start after the highest user-message sequence
+    // fed to the agent. Clone/setup failures occur before any prompt is
+    // consumed, so their cursor remains 0 and they replay from the beginning.
+    const backlog = await api.fetchUserMessagesAfter(issue.id, messageCursorSeq)
     for (const message of backlog) {
       enqueue(message)
     }
@@ -216,6 +231,10 @@ async function processIssue(
         if (next) {
           idleChecked = false
           const content = next.content
+          messageCursorSeq = Math.max(messageCursorSeq, next.seq)
+          await setRunState(api, channel, issue.id, {
+            message_cursor_seq: messageCursorSeq,
+          })
           const attachmentBlocks = await buildAttachmentBlocks(
             api,
             issue.id,
@@ -237,6 +256,7 @@ async function processIssue(
     await runAgentSession({
       api,
       issueId: issue.id,
+      runId: issue.runId,
       channel,
       agentProvider: issue.agentProvider,
       cwd: dir,
@@ -251,6 +271,7 @@ async function processIssue(
     await setRunState(api, channel, issue.id, {
       status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
+      message_cursor_seq: messageCursorSeq,
       ...(prUrl ? { pr_url: prUrl } : {}),
     })
     logInfo(`issue ${issue.id} completed`)
@@ -265,6 +286,7 @@ async function processIssue(
         status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
+        message_cursor_seq: messageCursorSeq,
         usage_limit_reset_at: usageLimitResetAt,
       }).catch((updateError) => {
         logError("failed to record usage-limit hold:", describe(updateError))
@@ -277,6 +299,7 @@ async function processIssue(
       status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
+      message_cursor_seq: messageCursorSeq,
       usage_limit_reset_at: null,
     }).catch((updateError) => {
       logError("failed to record run failure:", describe(updateError))
