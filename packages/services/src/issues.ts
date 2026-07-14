@@ -235,7 +235,7 @@ export async function createIssue(
       project_id: input.project_id,
       title: input.title ?? null,
       prompt: input.prompt ?? null,
-      status: input.status,
+      status: input.status === "todo" ? "draft" : input.status,
       agent_provider: input.agent_provider,
       type: input.type,
     })
@@ -244,21 +244,21 @@ export async function createIssue(
 
   const issue = unwrap(result)
 
-  if (input.status === "todo") {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: issue.id,
-        role: "user",
-        content: kickoffMessageContent(input.prompt ?? null),
-      })
-    )
+  if (input.status !== "todo") {
+    return issue
   }
 
-  return issue
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: issue.id }))
+  return getIssue(supabase, userId, issue.id)
 }
 
-function kickoffMessageContent(prompt: string | null): string {
-  return prompt ?? ""
+export async function startIssueFromDraft(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
+  await ensureIssueOwned(supabase, userId, id)
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
 }
 
 // Called from the background title-generation step after an issue is saved
@@ -354,11 +354,10 @@ export async function resetIssueAgent(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("prompt,agent_provider,projects!inner(user_id)")
+    .select("agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle<{
-      prompt: string | null
       agent_provider: AgentProvider
     }>()
 
@@ -369,32 +368,10 @@ export async function resetIssueAgent(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  unwrap(await supabase.from("messages").delete().eq("issue_id", id))
-  unwrap(await supabase.from("issue_pull_requests").delete().eq("issue_id", id))
-
-  const now = new Date().toISOString()
   unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        agent_provider: agentProvider,
-        session_id: null,
-        run_error: null,
-        run_started_at: null,
-        run_finished_at: null,
-        usage_limit_reset_at: null,
-        pr_url: null,
-        updated_at: now,
-      })
-      .eq("id", id)
-  )
-
-  unwrap(
-    await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: kickoffMessageContent(current.prompt),
+    await supabase.rpc("reset_issue_run", {
+      p_issue_id: id,
+      p_agent_provider: agentProvider,
     })
   )
 }
@@ -491,26 +468,13 @@ export async function updateIssueStatus(
   // and drives the issue's selected coding agent against a fresh clone.
   const startsRun = current.status === "draft" && status === "todo"
 
-  const result = await supabase
-    .from("issues")
-    .update(startsRun ? { status, usage_limit_reset_at: null } : { status })
-    .eq("id", id)
-    .select(ISSUE_WITH_PROJECT_SELECT)
-    .single()
-
-  const data = unwrap(result)
-
   if (startsRun) {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: id,
-        role: "user",
-        content: kickoffMessageContent(current.prompt),
-      })
-    )
+    unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
+  } else {
+    unwrap(await supabase.from("issues").update({ status }).eq("id", id))
   }
 
-  return data
+  return getIssue(supabase, userId, id)
 }
 
 export async function updateIssueAgentProvider(
@@ -616,35 +580,14 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const message = unwrap(
+  return unwrap(
     await supabase
-      .from("messages")
-      .insert({
-        issue_id: issueId,
-        role: "user",
-        content,
+      .rpc("send_issue_user_message", {
+        p_issue_id: issueId,
+        p_content: content,
       })
-      .select("id, created_at")
       .single<{ id: string; created_at: string }>()
   )
-
-  // A finished run has no worker polling for it anymore. Re-queue so the
-  // `@gentic/gentic` agent picks this follow-up up and resumes the session,
-  // unless the issue never ran (draft) or a run is already todo/queued/in
-  // flight.
-  unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        usage_limit_reset_at: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", issueId)
-      .not("status", "in", "(draft,todo,queued,held,in-progress)")
-  )
-
-  return message
 }
 
 export type ChangesRequestedReviewComment = {
