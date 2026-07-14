@@ -2,7 +2,7 @@ import "server-only"
 
 import { gateway, generateText } from "ai"
 
-import { issueTypeSchema, type IssueType } from "@gentic/validators/issues"
+import type { IssueType } from "@gentic/validators/issues"
 
 const ISSUE_TYPE_MODEL = process.env.ISSUE_TYPE_MODEL ?? "openai/gpt-4.1-mini"
 
@@ -17,11 +17,16 @@ export async function generateIssueType(prompt: string): Promise<IssueType> {
     temperature: 0,
   })
 
-  const type = issueTypeSchema.safeParse(text.trim().toLowerCase())
+  // Models don't reliably stick to "return only the type" — strip anything
+  // but letters and match the first known type mentioned anywhere in the
+  // response, the same tolerant approach `generateIssueTitle` uses for
+  // stray quotes/punctuation.
+  const normalized = text.trim().toLowerCase().replace(/[^a-z]/g, "")
+  const type = ISSUE_TYPES.find((candidate) => normalized.includes(candidate))
 
-  if (!type.success || type.data === "issue") {
+  if (!type) {
     throw new Error(`AI Gateway returned an invalid issue type: "${text}"`)
   }
 
-  return type.data
+  return type
 }
