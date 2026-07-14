@@ -1,96 +1,53 @@
-import {
-  getAgentContext,
-  handleAgentError,
-  json,
-  type Supabase,
-} from "../../_lib"
+import { getAgentContext, handleAgentError, json } from "../../_lib"
 
 export const runtime = "nodejs"
-
-const CLAIM_ISSUE_SELECT =
-  "id, agent_provider, session_id, run_finished_at, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
-
-type ClaimCandidateRow = {
-  id: string
-  agent_provider: "claude_code" | "codex"
-  session_id: string | null
-  run_finished_at: string | null
-  pr_url: string | null
-  projects: {
-    repo: string
-    setup_script: string | null
-  }
-}
 
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
-    return json({ issue: await claimNextQueuedIssue(supabase, userId) })
+    const { data, error } = await supabase
+      .rpc("claim_issue_run", {
+        p_user_id: userId,
+      })
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const rows = data as ClaimedRunRow[] | null
+    const claimed = rows?.[0]
+    if (!claimed) {
+      return json({ issue: null })
+    }
+
+    if (!claimed.repo) {
+      throw new Error("Issue has no associated project repo")
+    }
+
+    return json({
+      issue: {
+        id: claimed.id,
+        runId: claimed.run_id,
+        agentProvider: claimed.agent_provider,
+        repo: claimed.repo,
+        setupScript: claimed.setup_script,
+        sessionId: claimed.session_id,
+        runFinishedAt: claimed.run_finished_at,
+        prUrl: claimed.pr_url,
+      },
+    })
   } catch (error) {
     return handleAgentError(error)
   }
 }
 
-async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
-  const now = new Date().toISOString()
-  const { data: candidate, error: candidateError } = await supabase
-    .from("issues")
-    .select(CLAIM_ISSUE_SELECT)
-    .or(`status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`)
-    .eq("projects.user_id", userId)
-    .eq("unfinished_blockers.type", "blocks")
-    .not(
-      "unfinished_blockers.source_issue.status",
-      "in",
-      "(completed,cancelled)"
-    )
-    .is("unfinished_blockers", null)
-    .order("updated_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-    .returns<ClaimCandidateRow | null>()
-
-  if (candidateError) {
-    throw new Error(candidateError.message)
-  }
-  if (!candidate) {
-    return null
-  }
-
-  const { id } = candidate
-  const { data: claimed, error: claimError } = await supabase
-    .from("issues")
-    .update({
-      status: "queued",
-      run_started_at: now,
-      run_error: null,
-      run_finished_at: null,
-      usage_limit_reset_at: null,
-      updated_at: now,
-    })
-    .eq("id", id)
-    .in("status", ["todo", "held"])
-    .select("id")
-    .maybeSingle()
-
-  if (claimError) {
-    throw new Error(claimError.message)
-  }
-  if (!claimed) {
-    return null
-  }
-
-  if (!candidate.projects.repo) {
-    throw new Error("Issue has no associated project repo")
-  }
-
-  return {
-    id,
-    agentProvider: candidate.agent_provider,
-    repo: candidate.projects.repo,
-    setupScript: candidate.projects.setup_script,
-    sessionId: candidate.session_id,
-    runFinishedAt: candidate.run_finished_at,
-    prUrl: candidate.pr_url,
-  }
+type ClaimedRunRow = {
+  id: string
+  run_id: string
+  agent_provider: "claude_code" | "codex"
+  session_id: string | null
+  run_finished_at: string | null
+  pr_url: string | null
+  repo: string
+  setup_script: string | null
 }

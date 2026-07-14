@@ -30,6 +30,7 @@ export class StreamingAssistantMessage {
   constructor(
     private readonly api: AgentApi,
     private readonly issueId: string,
+    private readonly runId: string,
     private readonly channel: IssueRealtimeChannel,
     private readonly kind: "text" | "thinking" = "text",
     private readonly flushIntervalMs = 150,
@@ -83,6 +84,7 @@ export class StreamingAssistantMessage {
     await persistMessageWithRetry(
       this.api,
       this.issueId,
+      this.runId,
       {
         id: this.id,
         role: "assistant",
@@ -109,6 +111,7 @@ export class StreamingAssistantMessage {
     await persistMessageWithRetry(
       this.api,
       this.issueId,
+      this.runId,
       {
         id: this.id,
         role: "assistant",
@@ -126,6 +129,7 @@ export class StreamingAssistantMessage {
     this.seq += 1
     await this.channel.publishMessage({
       id: this.id,
+      run_id: this.runId,
       seq: this.seq,
       role: "assistant",
       kind: this.kind,
@@ -139,6 +143,7 @@ export class StreamingAssistantMessage {
 export async function publishMessage(
   api: AgentApi,
   issueId: string,
+  runId: string,
   channel: IssueRealtimeChannel,
   fields: {
     kind?: "text" | "tool" | "thinking"
@@ -151,6 +156,7 @@ export async function publishMessage(
   const status = fields.status ?? "complete"
   await channel.publishMessage({
     id,
+    run_id: runId,
     seq: 1,
     role: "assistant",
     kind: fields.kind ?? "text",
@@ -160,6 +166,7 @@ export async function publishMessage(
   await persistMessageWithRetry(
     api,
     issueId,
+    runId,
     {
       id,
       role: "assistant",
@@ -180,12 +187,14 @@ export async function setRunState(
   api: AgentApi,
   channel: IssueRealtimeChannel | null,
   issueId: string,
+  runId: string,
   fields: RunStateFields
 ): Promise<void> {
-  await api.setRunState(issueId, fields)
+  await api.setRunState(issueId, runId, fields)
 
   if (channel && fields.status) {
     await channel.publishRunState({
+      run_id: runId,
       status: fields.status,
       pr_url: fields.pr_url ?? null,
       usage_limit_reset_at: fields.usage_limit_reset_at ?? null,
@@ -197,6 +206,7 @@ export async function setRunState(
 async function persistMessageWithRetry(
   api: AgentApi,
   issueId: string,
+  runId: string,
   message: {
     id: string
     role: "assistant" | "system"
@@ -212,7 +222,7 @@ async function persistMessageWithRetry(
 
   for (;;) {
     try {
-      await api.insertMessage(issueId, message)
+      await api.insertMessage(issueId, runId, message)
       return
     } catch (error) {
       const delay = retryDelaysMs[attempt]

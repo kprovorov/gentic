@@ -22,6 +22,8 @@ import {
 import { runAgentSession, type PromptTurn } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 
+const HEARTBEAT_INTERVAL_MS = 30_000
+
 export async function runWorker(): Promise<void> {
   const config = loadConfig()
   const api = createAgentApi({
@@ -76,7 +78,7 @@ export async function runWorker(): Promise<void> {
       })
     activeRuns.add(run)
     logInfo(
-      `issue ${issue.id} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      `issue ${issue.id} run ${issue.runId} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
     )
   }
 
@@ -102,6 +104,7 @@ async function processIssue(
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   let channel: IssueRealtimeChannel | null = null
+  const heartbeat = startHeartbeat(api, issue)
 
   try {
     // Push queue for user follow-ups, ordered by `created_at`. Fed by two
@@ -178,7 +181,9 @@ async function processIssue(
       await runSetupScript({ script: issue.setupScript, dir })
     }
 
-    await setRunState(api, channel, issue.id, { status: "in-progress" })
+    await setRunState(api, channel, issue.id, issue.runId, {
+      status: "in-progress",
+    })
 
     // Seed the queue with follow-ups sent before the channel connected
     // (including the issue's initial prompt). When resuming a session that
@@ -237,18 +242,21 @@ async function processIssue(
     await runAgentSession({
       api,
       issueId: issue.id,
+      runId: issue.runId,
       channel,
       agentProvider: issue.agentProvider,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,
       onSessionId: (sessionId) =>
-        setRunState(api, channel, issue.id, { session_id: sessionId }),
+        setRunState(api, channel, issue.id, issue.runId, {
+          session_id: sessionId,
+        }),
       nextPrompt,
     })
 
     const prUrl = await getPullRequestUrl(dir)
-    await setRunState(api, channel, issue.id, {
+    await setRunState(api, channel, issue.id, issue.runId, {
       status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
@@ -261,7 +269,7 @@ async function processIssue(
       logInfo(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
-      await setRunState(api, channel, issue.id, {
+      await setRunState(api, channel, issue.id, issue.runId, {
         status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
@@ -273,7 +281,7 @@ async function processIssue(
     }
 
     logError(`issue ${issue.id} failed:`, message)
-    await setRunState(api, channel, issue.id, {
+    await setRunState(api, channel, issue.id, issue.runId, {
       status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
@@ -282,11 +290,46 @@ async function processIssue(
       logError("failed to record run failure:", describe(updateError))
     })
   } finally {
+    heartbeat.stop()
     if (channel) {
       await channel.close().catch((closeError) => {
         logError("failed to close realtime channel:", describe(closeError))
       })
     }
+  }
+}
+
+function startHeartbeat(api: AgentApi, issue: ClaimedIssue): { stop(): void } {
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const beat = async (): Promise<void> => {
+    if (stopped) {
+      return
+    }
+    try {
+      await api.heartbeatRun(issue.id, issue.runId)
+    } catch (error) {
+      logError(
+        `issue ${issue.id} run ${issue.runId} heartbeat failed:`,
+        describe(error)
+      )
+    }
+    if (!stopped) {
+      timer = setTimeout(() => void beat(), HEARTBEAT_INTERVAL_MS)
+    }
+  }
+
+  timer = setTimeout(() => void beat(), HEARTBEAT_INTERVAL_MS)
+
+  return {
+    stop() {
+      stopped = true
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    },
   }
 }
 

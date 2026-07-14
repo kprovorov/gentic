@@ -354,12 +354,11 @@ export async function resetIssueAgent(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("prompt,agent_provider,projects!inner(user_id)")
+    .select("prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle<{
       prompt: string | null
-      agent_provider: AgentProvider
     }>()
 
   if (fetchError) {
@@ -369,34 +368,19 @@ export async function resetIssueAgent(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  unwrap(await supabase.from("messages").delete().eq("issue_id", id))
-  unwrap(await supabase.from("issue_pull_requests").delete().eq("issue_id", id))
+  const { data: ok, error } = await supabase.rpc("reset_issue_agent_run", {
+    p_issue_id: id,
+    p_user_id: userId,
+    p_agent_provider: agentProvider,
+    p_kickoff_content: kickoffMessageContent(current.prompt),
+  })
 
-  const now = new Date().toISOString()
-  unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        agent_provider: agentProvider,
-        session_id: null,
-        run_error: null,
-        run_started_at: null,
-        run_finished_at: null,
-        usage_limit_reset_at: null,
-        pr_url: null,
-        updated_at: now,
-      })
-      .eq("id", id)
-  )
-
-  unwrap(
-    await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: kickoffMessageContent(current.prompt),
-    })
-  )
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!ok) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
 }
 
 export async function addIssueRelation(

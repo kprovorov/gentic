@@ -23,6 +23,7 @@ export const realtimeMessageStatusSchema = z.enum([
 // Worker -> browser: full-snapshot upsert of one transcript message.
 export const messageEventSchema = z.object({
   id: z.string().uuid(),
+  run_id: z.string().uuid(),
   seq: z.number().int().positive(),
   role: realtimeMessageRoleSchema,
   kind: realtimeMessageKindSchema,
@@ -43,6 +44,7 @@ export const realtimeRunStateStatusSchema = issueStatusSchema.extract([
 
 // Worker -> browser: mirror of the run-state PATCH, for instant UI updates.
 export const runStateEventSchema = z.object({
+  run_id: z.string().uuid(),
   status: realtimeRunStateStatusSchema,
   pr_url: z.string().url().nullable(),
   usage_limit_reset_at: z.string().nullable(),

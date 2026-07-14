@@ -1,4 +1,5 @@
 import {
+  ApiError,
   ensureIssueOwned,
   getAgentContext,
   handleAgentError,
@@ -52,27 +53,26 @@ export async function POST(
 
     await ensureIssueOwned(supabase, userId, id)
 
-    const { data, error } = await supabase
-      .from("messages")
-      .upsert(
-        {
-          ...(fields.id ? { id: fields.id } : {}),
-          issue_id: id,
-          role: fields.role,
-          kind: fields.kind ?? "text",
-          content: fields.content,
-          status: fields.status ?? "complete",
-        },
-        { onConflict: "id", ignoreDuplicates: true }
-      )
-      .select("id")
-      .maybeSingle<{ id: string }>()
+    const { data: messageId, error } = await supabase.rpc(
+      "insert_run_message",
+      {
+        p_issue_id: id,
+        p_run_id: fields.run_id,
+        p_message_id: fields.id ?? null,
+        p_role: fields.role,
+        p_kind: fields.kind ?? "text",
+        p_content: fields.content,
+        p_status: fields.status ?? "complete",
+      }
+    )
 
     if (error) {
+      if (error.code === "P0001") {
+        throw new ApiError(409, "Run is no longer active")
+      }
       throw new Error(error.message)
     }
 
-    const messageId = data?.id ?? fields.id
     if (!messageId) {
       throw new Error("Message insert did not return an id")
     }

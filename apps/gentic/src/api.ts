@@ -1,5 +1,6 @@
 export interface ClaimedIssue {
   id: string
+  runId: string
   agentProvider: "claude_code" | "codex"
   repo: string
   setupScript: string | null
@@ -55,8 +56,17 @@ export interface Attachment {
 
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
-  setRunState(issueId: string, fields: RunStateFields): Promise<void>
-  insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
+  heartbeatRun(issueId: string, runId: string): Promise<void>
+  setRunState(
+    issueId: string,
+    runId: string,
+    fields: RunStateFields
+  ): Promise<void>
+  insertMessage(
+    issueId: string,
+    runId: string,
+    message: InsertMessageInput
+  ): Promise<string>
   fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
   fetchAttachments(issueId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
@@ -112,18 +122,24 @@ export function createAgentApi(input: {
       )
       return data.issue
     },
-    async setRunState(issueId, fields) {
+    async heartbeatRun(issueId, runId) {
       await request(`/agent/issues/${encodeURIComponent(issueId)}/run-state`, {
         method: "PATCH",
-        body: fields,
+        body: { run_id: runId },
       })
     },
-    async insertMessage(issueId, message) {
+    async setRunState(issueId, runId, fields) {
+      await request(`/agent/issues/${encodeURIComponent(issueId)}/run-state`, {
+        method: "PATCH",
+        body: { ...fields, run_id: runId },
+      })
+    },
+    async insertMessage(issueId, runId, message) {
       const data = await request<{ id: string }>(
         `/agent/issues/${encodeURIComponent(issueId)}/messages`,
         {
           method: "POST",
-          body: message,
+          body: { ...message, run_id: runId },
         }
       )
       return data.id

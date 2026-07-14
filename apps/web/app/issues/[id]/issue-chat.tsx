@@ -187,6 +187,7 @@ export function IssueChat({
   agentProvider,
   initialMessages,
   initialStatus,
+  initialActiveRunId,
   initialUsageLimitResetAt,
   initialPrUrl,
   initialPullRequests,
@@ -195,12 +196,16 @@ export function IssueChat({
   agentProvider: AgentProvider
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
+  initialActiveRunId: string | null
   initialUsageLimitResetAt: string | null
   initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [status, setStatus] = useState<IssueStatus>(initialStatus)
+  const [activeRunId, setActiveRunId] = useState<string | null>(
+    initialActiveRunId
+  )
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
   )
@@ -331,6 +336,7 @@ export function IssueChat({
 
       setMessages([detail.message])
       setStatus(detail.status)
+      setActiveRunId(detail.activeRunId)
       setUsageLimitResetAt(detail.usageLimitResetAt)
       setPrUrl(detail.prUrl)
       setPullRequests(detail.pullRequests)
@@ -397,10 +403,12 @@ export function IssueChat({
         (payload) => {
           const next = payload.new as {
             status: IssueStatus
+            active_run_id: string | null
             usage_limit_reset_at: string | null
             pr_url: string | null
           }
           setStatus(next.status)
+          setActiveRunId(next.active_run_id)
           setUsageLimitResetAt(next.usage_limit_reset_at)
           setPrUrl(next.pr_url)
         }
@@ -457,6 +465,9 @@ export function IssueChat({
             if (!event.success) {
               return
             }
+            if (event.data.run_id !== activeRunId) {
+              return
+            }
             const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
             if (event.data.seq <= lastSeq) {
               return
@@ -482,6 +493,9 @@ export function IssueChat({
             if (!event.success) {
               return
             }
+            if (event.data.run_id !== activeRunId) {
+              return
+            }
             setStatus(event.data.status)
             setUsageLimitResetAt(event.data.usage_limit_reset_at)
             setPrUrl(event.data.pr_url)
@@ -504,7 +518,7 @@ export function IssueChat({
         void supabase.removeChannel(channel)
       }
     }
-  }, [supabase, issueId])
+  }, [supabase, issueId, activeRunId])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()

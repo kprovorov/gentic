@@ -7,11 +7,18 @@ import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
 import { issueRunInstructions, runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
+const RUN_ID = "22222222-2222-4222-8222-222222222222"
 
 test("finalize inserts exactly once with the broadcast id", async () => {
   const api = fakeApi()
   const channel = fakeChannel()
-  const message = new StreamingAssistantMessage(api, ISSUE_ID, channel, "text")
+  const message = new StreamingAssistantMessage(
+    api,
+    ISSUE_ID,
+    RUN_ID,
+    channel,
+    "text"
+  )
 
   await message.append("hello")
   await message.finalize()
@@ -33,6 +40,7 @@ test("finalize retries transient API failure", async () => {
   const message = new StreamingAssistantMessage(
     api,
     ISSUE_ID,
+    RUN_ID,
     channel,
     "thinking",
     150,
@@ -56,6 +64,7 @@ test("terminal persist failure does not reject finalize", async () => {
   const message = new StreamingAssistantMessage(
     api,
     ISSUE_ID,
+    RUN_ID,
     channel,
     "text",
     150,
@@ -74,7 +83,7 @@ test("tool messages insert at emit time with the broadcast id", async () => {
   const api = fakeApi()
   const channel = fakeChannel()
 
-  await publishMessage(api, ISSUE_ID, channel, {
+  await publishMessage(api, ISSUE_ID, RUN_ID, channel, {
     kind: "tool",
     content: "Read file",
   })
@@ -106,7 +115,7 @@ test("run error path best-effort persists the current partial", async () => {
   }
 
   await assert.rejects(
-    () => runTurn(session as never, api, ISSUE_ID, channel, "prompt"),
+    () => runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt"),
     /agent crashed/
   )
 
@@ -153,9 +162,11 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     async claimNextQueuedIssue() {
       return null
     },
+    async heartbeatRun() {},
     async setRunState() {},
-    async insertMessage(issueId, message) {
+    async insertMessage(issueId, runId, message) {
       api.insertAttempts += 1
+      assert.equal(runId, RUN_ID)
       const failure = options.failInsertAttempts?.shift()
       if (failure) {
         throw failure

@@ -373,6 +373,7 @@ export function IssueDetailView({
                   agentProvider={issue.agent_provider}
                   initialMessages={messages}
                   initialStatus={issue.status}
+                  initialActiveRunId={issue.active_run_id}
                   initialUsageLimitResetAt={issue.usage_limit_reset_at}
                   initialPrUrl={issue.pr_url}
                   initialPullRequests={pullRequests}

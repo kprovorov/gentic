@@ -26,6 +26,7 @@ export const runStateStatusSchema = issueStatusSchema.extract([
 
 export const runStateSchema = z
   .object({
+    run_id: z.string().uuid(),
     status: runStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
     run_error: z.string().nullable().optional(),
@@ -38,6 +39,7 @@ export const runStateSchema = z
   .refine((value) => Object.keys(value).length > 0)
 
 export const insertMessageSchema = z.object({
+  run_id: z.string().uuid(),
   id: z.string().uuid().optional(),
   role: z.enum(["assistant", "system"]),
   kind: z.enum(["text", "tool", "thinking"]).optional(),

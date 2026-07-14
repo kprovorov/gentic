@@ -85,6 +85,7 @@ export type PromptTurn = string | ContentBlock[]
 export interface RunSessionInput {
   api: AgentApi
   issueId: string
+  runId: string
   channel: IssueRealtimeChannel
   agentProvider: AgentProvider
   /** Absolute path to the cloned repo the agent works in. */
@@ -151,7 +152,14 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           prompt = prependInstructions(prompt, input.existingPrUrl)
           shouldPrependInstructions = false
         }
-        await runTurn(session, input.api, input.issueId, input.channel, prompt)
+        await runTurn(
+          session,
+          input.api,
+          input.issueId,
+          input.runId,
+          input.channel,
+          prompt
+        )
       }
     })
   } finally {
@@ -275,6 +283,7 @@ export async function runTurn(
   session: ActiveSession,
   api: AgentApi,
   issueId: string,
+  runId: string,
   channel: IssueRealtimeChannel,
   prompt: PromptTurn
 ): Promise<void> {
@@ -291,7 +300,7 @@ export async function runTurn(
       current = null
     }
     if (!current) {
-      current = new StreamingAssistantMessage(api, issueId, channel, kind)
+      current = new StreamingAssistantMessage(api, issueId, runId, channel, kind)
       currentKind = kind
     }
     return current
@@ -326,7 +335,7 @@ export async function runTurn(
       } else if (update.sessionUpdate === "tool_call") {
         // Flush any streaming text first so the transcript keeps its ordering.
         await finalizeCurrent()
-        await publishMessage(api, issueId, channel, {
+        await publishMessage(api, issueId, runId, channel, {
           kind: "tool",
           content: update.title,
         })

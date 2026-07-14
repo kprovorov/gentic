@@ -13,6 +13,7 @@ import type { AgentApi } from "./api.js"
 // node_modules on the target machine.
 export type RealtimeMessageEvent = {
   id: string
+  run_id: string
   seq: number
   role: "assistant" | "system"
   kind: "text" | "thinking" | "tool"
@@ -22,6 +23,7 @@ export type RealtimeMessageEvent = {
 }
 
 export type RealtimeRunStateEvent = {
+  run_id: string
   status:
     | "in-progress"
     | "held"
