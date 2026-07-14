@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
   IconArrowLeft,
+  IconChevronDown,
   IconDeviceFloppy,
   IconPlayerPlay,
 } from "@tabler/icons-react"
@@ -19,6 +20,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@gentic/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@gentic/ui/dropdown-menu"
 import { Label } from "@gentic/ui/label"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
@@ -68,7 +75,11 @@ export function NewIssueView({
                 </Button>
               </div>
             ) : (
-              <form action={saveIssueDraft} className="grid gap-5">
+              <form
+                action={saveIssueDraft}
+                className="grid gap-5"
+                id="new-issue-form"
+              >
                 <div className="grid gap-2">
                   <Label htmlFor="issue-project">Project</Label>
                   <NativeSelect
@@ -83,22 +94,6 @@ export function NewIssueView({
                         {project.name} ({project.repo})
                       </NativeSelectOption>
                     ))}
-                  </NativeSelect>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="issue-agent-provider">Agent</Label>
-                  <NativeSelect
-                    name="agent_provider"
-                    required
-                    defaultValue="claude_code"
-                    id="issue-agent-provider"
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="claude_code">
-                      Claude Code
-                    </NativeSelectOption>
-                    <NativeSelectOption value="codex">Codex</NativeSelectOption>
                   </NativeSelect>
                 </div>
 
@@ -122,10 +117,41 @@ export function NewIssueView({
                     <IconDeviceFloppy />
                     Save draft
                   </Button>
-                  <Button type="submit" formAction={runIssue}>
-                    <IconPlayerPlay />
-                    Run
-                  </Button>
+                  <div className="flex items-center">
+                    <Button
+                      type="submit"
+                      formAction={runIssue}
+                      className="rounded-r-none border-r-primary-foreground/25"
+                    >
+                      <IconPlayerPlay />
+                      Run with Claude Code
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          aria-label="Choose agent"
+                          className="rounded-l-none border-l-primary-foreground/25 px-2"
+                        >
+                          <IconChevronDown />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-48">
+                        <DropdownMenuItem asChild>
+                          <button
+                            type="submit"
+                            form="new-issue-form"
+                            formAction={runIssue}
+                            name="agent_provider"
+                            value="codex"
+                            className="w-full"
+                          >
+                            Run with Codex
+                          </button>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </form>
             )}
