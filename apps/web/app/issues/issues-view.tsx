@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  IconCheck,
   IconChevronDown,
   IconLock,
   IconPlus,
@@ -14,16 +15,25 @@ import { getIssuesData, type HomeIssue, type IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@gentic/ui/dropdown-menu"
 import { Input } from "@gentic/ui/input"
 import { cn } from "@gentic/ui/utils"
 
+import { updateIssueStatus } from "./actions"
 import {
   formatDate,
   issueTypeIcons,
   issueTypeLabels,
   issueTypeStyles,
+  statusIconStyles,
   statusIcons,
   statusLabels,
+  statusOptions,
   statusOrder,
 } from "./issues-columns"
 
@@ -60,19 +70,18 @@ function IssueRow({
   const TypeIcon = issueTypeIcons[issue.type]
 
   return (
-    <Link
-      href={`/issues/${issue.id}`}
-      className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]"
-    >
+    <div className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span
+        <IssueStatusMenu issue={issue} />
+        <Link
+          href={`/issues/${issue.id}`}
           className={cn(
-            "min-w-0 truncate font-medium hover:text-primary",
+            "min-w-0 truncate font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             !issue.title && "text-muted-foreground italic"
           )}
         >
-          {issue.title ?? "Generating title…"}
-        </span>
+          {issue.title ?? "Generating title..."}
+        </Link>
         <span
           className={cn(
             "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
@@ -100,7 +109,110 @@ function IssueRow({
       <div className="text-sm text-muted-foreground md:text-right">
         {formatDate(issue.created_at)}
       </div>
-    </Link>
+    </div>
+  )
+}
+
+function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
+  const queryClient = useQueryClient()
+  const StatusIcon = statusIcons[issue.status]
+  const mutation = useMutation({
+    mutationFn: updateIssueStatus,
+    onMutate: async (formData) => {
+      const nextStatus = formData.get("status")
+
+      if (typeof nextStatus !== "string") {
+        return
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+      ])
+
+      const previousIssues = queryClient.getQueryData<IssuesData>(
+        queryKeys.issues
+      )
+      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+      const updateData = (current: IssuesData | undefined) =>
+        current
+          ? {
+              ...current,
+              issues: current.issues.map((currentIssue) =>
+                currentIssue.id === issue.id
+                  ? { ...currentIssue, status: nextStatus as HomeIssue["status"] }
+                  : currentIssue
+              ),
+            }
+          : current
+
+      queryClient.setQueryData(queryKeys.issues, updateData)
+      queryClient.setQueryData(queryKeys.home, updateData)
+
+      return { previousHome, previousIssues }
+    },
+    onError: (_error, _formData, context) => {
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+  })
+
+  function selectStatus(nextStatus: HomeIssue["status"]) {
+    if (nextStatus === issue.status || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issue.id)
+    formData.set("status", nextStatus)
+    mutation.mutate(formData)
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          aria-label={`Change status from ${statusLabels[issue.status]}`}
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-muted"
+        >
+          <StatusIcon className={cn("size-4", statusIconStyles[issue.status])} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-60 rounded-lg">
+        {statusOptions.map((option) => {
+          const OptionIcon = statusIcons[option.value]
+          const isSelected = option.value === issue.status
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              disabled={mutation.isPending}
+              onSelect={() => selectStatus(option.value)}
+              className="gap-3"
+            >
+              <OptionIcon
+                className={cn("size-4", statusIconStyles[option.value])}
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {isSelected ? <IconCheck className="size-4" /> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
