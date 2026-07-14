@@ -369,6 +369,7 @@ export function IssueDetailView({
               <CardContent>
                 <IssueChat
                   issueId={issue.id}
+                  agentProvider={issue.agent_provider}
                   initialMessages={messages}
                   initialStatus={issue.status}
                   initialUsageLimitResetAt={issue.usage_limit_reset_at}
