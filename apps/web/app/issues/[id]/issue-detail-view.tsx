@@ -33,12 +33,12 @@ import {
   IconThumbUp,
 } from "@tabler/icons-react"
 
+import { fetchIssueDetailData } from "@/app/client-queries"
 import {
-  getIssueDetailData,
   type IssueDetailData,
   type IssueStatus,
 } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -207,8 +207,9 @@ export function IssueDetailView({
 }) {
   const { data } = useQuery({
     queryKey: queryKeys.issue(issueId),
-    queryFn: () => getIssueDetailData(issueId),
+    queryFn: () => fetchIssueDetailData(issueId),
     initialData,
+    staleTime: queryStaleTimes.realtime,
   })
   const {
     issue,

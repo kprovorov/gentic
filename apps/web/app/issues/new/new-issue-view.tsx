@@ -11,8 +11,9 @@ import {
 } from "@tabler/icons-react"
 
 import { runIssue, saveIssueDraft } from "@/app/issues/actions"
-import { getNewIssueData, type ProjectOption } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { fetchNewIssueData } from "@/app/client-queries"
+import type { ProjectOption } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -39,8 +40,9 @@ export function NewIssueView({
 }) {
   const { data } = useQuery({
     queryKey: queryKeys.newIssue,
-    queryFn: getNewIssueData,
+    queryFn: fetchNewIssueData,
     initialData,
+    staleTime: queryStaleTimes.formOptions,
   })
   const { projects } = data
   const [prompt, setPrompt] = useState("")
