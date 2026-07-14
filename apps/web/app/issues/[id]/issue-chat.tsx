@@ -206,6 +206,13 @@ export function IssueChat({
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
   )
+  // The worker only starts streaming a message once the model produces its
+  // first token — cloning, running the setup script, and booting the ACP
+  // session all happen first with no message to attach a spinner to. Show a
+  // standalone marker for that gap so "agent is working" isn't silent.
+  const isAgentWorkingWithoutMessage =
+    (status === "queued" || status === "in-progress") &&
+    !displayedMessages.some((message) => message.status === "streaming")
 
   useEffect(() => {
     const channel = supabase
@@ -428,6 +435,20 @@ export function IssueChat({
                   </MessageScrollerItem>
                 ))
               )}
+              {isAgentWorkingWithoutMessage ? (
+                <MessageScrollerItem messageId="agent-working">
+                  <Message>
+                    <MessageContent>
+                      <Marker role="status">
+                        <MarkerIcon>
+                          <IconLoader2 className="animate-spin" />
+                        </MarkerIcon>
+                        <MarkerContent>Agent is working…</MarkerContent>
+                      </Marker>
+                    </MessageContent>
+                  </Message>
+                </MessageScrollerItem>
+              ) : null}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
