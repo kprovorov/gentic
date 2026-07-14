@@ -1,4 +1,5 @@
 import type {
+  AgentProvider,
   CreateIssueValues,
   IssueRelationDirection,
   IssueStatus,
@@ -360,14 +361,19 @@ export async function deleteIssue(
 export async function resetIssueAgent(
   supabase: Supabase,
   userId: string,
-  id: string
+  id: string,
+  agentProvider: AgentProvider
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("title,prompt,projects!inner(user_id)")
+    .select("title,prompt,agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ title: string | null; prompt: string | null }>()
+    .maybeSingle<{
+      title: string | null
+      prompt: string | null
+      agent_provider: AgentProvider
+    }>()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -385,6 +391,7 @@ export async function resetIssueAgent(
       .from("issues")
       .update({
         status: "todo",
+        agent_provider: agentProvider,
         session_id: null,
         run_error: null,
         run_started_at: null,

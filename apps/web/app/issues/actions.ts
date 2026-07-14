@@ -9,6 +9,7 @@ import { z } from "zod"
 
 import {
   addIssueRelationSchema,
+  agentProviderSchema,
   createIssueSchema,
   deleteIssueRelationSchema,
   issueStatusSchema,
@@ -145,8 +146,11 @@ export async function deleteIssue(formData: FormData) {
 export async function resetIssueAgent(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const id = z.string().uuid().parse(getString(formData, "id"))
+  const agentProvider = agentProviderSchema.parse(
+    getString(formData, "agent_provider") || "claude_code"
+  )
 
-  await issuesService.resetIssueAgent(supabase, userId, id)
+  await issuesService.resetIssueAgent(supabase, userId, id, agentProvider)
 
   revalidatePath("/home")
   revalidatePath("/issues")
