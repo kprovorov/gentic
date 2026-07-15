@@ -1,0 +1,97 @@
+---
+title: "Create, Assign, and Manage AI Coding Issues in Gentic"
+sidebarTitle: "Issues"
+description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, and the agent writes code and opens a pull request on your behalf."
+---
+
+An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the agent clones your repository, follows the instructions in your prompt, commits changes, and opens a pull request. Every issue tracks its own status, agent conversation, and pull requests in one place.
+
+## Create an Issue
+
+<Steps>
+  <Step title="Open the new issue form">
+    From **Home**, click **New issue** in the top-right corner.
+  </Step>
+  <Step title="Select a project">
+    Choose the project (GitHub repository) the agent should work in. If you have no projects yet, [create one in Settings](/web/projects) first.
+  </Step>
+  <Step title="Fill in the issue fields">
+    Complete the **Title**, **Type**, **Agent**, **Prompt**, and **Status** fields (see [Field reference](#field-reference) below).
+  </Step>
+  <Step title="Submit">
+    Click **Create issue**. If you set the status to **Todo**, the agent run is queued immediately.
+  </Step>
+</Steps>
+
+<Tip>
+  Write a detailed prompt with explicit acceptance criteria — for example, "Add a `/health` endpoint that returns `{ status: 'ok' }` with HTTP 200. Include a Jest test." The more context you give the agent, the fewer revision cycles you need.
+</Tip>
+
+## Field Reference
+
+<ParamField body="project" type="string" required>
+  The project whose GitHub repository the agent will clone and work in. You cannot change the project after the issue is created.
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  A short description of the work to be done, shown on the Home issues list and on the GitHub pull request. Maximum 160 characters.
+</ParamField>
+
+<ParamField body="type" type="feature | bug | feedback | idea">
+  Categorises the issue so you can filter and visually distinguish different kinds of work at a glance.
+
+  | Value | When to use |
+  |---|---|
+  | `feature` | New functionality or enhancements |
+  | `bug` | Defects and regressions to fix |
+  | `feedback` | Changes driven by user or team feedback |
+  | `idea` | Exploratory or speculative work |
+</ParamField>
+
+<ParamField body="agent" type="Claude Code | Codex">
+  The AI agent that will execute the issue. Choose **Claude Code** (Anthropic) or **Codex** (OpenAI) depending on your preference or the nature of the task. You can change the agent when editing an issue.
+</ParamField>
+
+<ParamField body="prompt" type="text">
+  Detailed instructions for the agent. Include background context, step-by-step requirements, acceptance criteria, links to relevant files, and any constraints. The prompt is passed directly to the agent at the start of each run.
+</ParamField>
+
+<ParamField body="status" type="enum">
+  The workflow status of the issue. Setting the initial status to **Todo** queues the agent immediately on creation. See the [Issue Statuses reference](/web/issue-statuses) for the full list and what each status means.
+</ParamField>
+
+## Issue Workflow
+
+### Triggering an Agent Run
+
+Moving an issue's status from **Draft** to **Todo** is the action that queues the agent run. You can do this at creation time by setting the initial status to **Todo**, or later by updating the status on the issue detail page.
+
+### Sending Messages While the Agent Runs
+
+While an agent run is active (status: **In progress** or **Waiting for input**), a chat interface is available on the issue detail page. Type a message and send it to communicate with the agent mid-run — for example, to clarify a requirement or unblock a decision.
+
+### Re-queuing a Completed or Cancelled Issue
+
+If an issue has reached **Completed** or **Cancelled** status and you want the agent to do more work, send a new message from the chat interface. Gentic re-queues the agent run and the agent resumes with the full prior conversation context intact.
+
+### Tracking Pull Requests
+
+Every pull request the agent opens for an issue is attached to it and shown on the issue detail page. Each PR appears as its own button labelled `owner/repo#number` — click one to review those changes on GitHub.
+
+An issue can accumulate multiple pull requests over its lifetime. When you [re-queue a completed or cancelled issue](#re-queuing-a-completed-or-cancelled-issue) or the agent needs a follow-up run, any new PR the agent opens is added to the list alongside the earlier ones. Older PRs stay visible so you can trace every change the agent has shipped for that issue in one place.
+
+## Edit an Issue
+
+Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, and **Type** fields. The **Project** field cannot be changed after creation.
+
+## Reset the Agent
+
+Resetting an agent clears the current agent session and re-queues the issue as if it were starting fresh. Use this when a run is stuck or you want the agent to restart without any prior conversation history. To reset, open the issue and click **Reset agent**.
+
+<Warning>
+  Resetting the agent is irreversible — the existing session and conversation history for that run are permanently cleared.
+</Warning>
+
+## Delete an Issue
+
+To permanently remove an issue, open the issue detail page, click **Delete**, and confirm. Deletion redirects you back to the Home issues list.

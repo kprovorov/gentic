@@ -1,0 +1,61 @@
+---
+title: "Gentic Agent Worker: Background AI Coding Runner"
+sidebarTitle: "Overview"
+description: "The Gentic agent worker is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and opens pull requests automatically."
+---
+
+The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims one at a time, clones the associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. When the agent finishes, it commits its changes and opens a pull request against your repository automatically. You never need to manually invoke an AI tool for individual issues; the worker handles the full cycle from poll to PR.
+
+## How it works
+
+When you move an issue from **Draft** to **Todo** in the Gentic web app, the API adds it to the unclaimed `todo` pool. On its next poll cycle, the agent worker claims that issue (flipping it to `queued`), creates a fresh clone of its configured repository, and runs the issue's assigned agent provider through the Agent Client Protocol. The worker streams assistant output back into the issue transcript in real time; once the agent goes quiet, the run resolves directly to `ready-for-review` (if a pull request was opened) or `waiting-for-input`. If you send a follow-up message to an issue whose run has already ended, the API returns it to `todo` and the worker resumes the same ACP session — preserving the full conversation context.
+
+## Deployment options
+
+You can deploy the agent worker in two ways. Choose the option that fits your server environment best.
+
+<CardGroup cols={2}>
+  <Card title="Standalone Binary" icon="box">
+    Download a prebuilt, self-contained binary from GitHub Releases. No Node.js, pnpm, or `node_modules` required on the target machine. Recommended for production servers.
+  </Card>
+  <Card title="From Source (Node.js)" icon="code">
+    Clone the repository, install dependencies with pnpm, and run the worker with `pnpm --filter @gentic/gentic start`. Best for development or environments where you already manage a Node.js toolchain.
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+Review these requirements before installing the agent worker. Which prerequisites apply to you depends on your chosen deployment method.
+
+<CardGroup cols={2}>
+  <Card title="Node.js 20+ & pnpm 11.9.0+" icon="node-js">
+    Required only when running from source. Not needed when using the standalone binary.
+  </Card>
+  <Card title="Bun (build-time only)" icon="circle-bolt">
+    Required only if you want to compile the standalone binary yourself from source. Not needed on the target machine that runs the binary.
+  </Card>
+  <Card title="Git & SSH access" icon="key">
+    The worker clones repos over SSH by default. Add an SSH deploy key or machine user key to every repository Gentic will access.
+  </Card>
+  <Card title="AI agent credentials" icon="robot">
+    Claude Code credentials must be present in the worker environment. Codex must be installed and authenticated separately; set `CODEX_PATH` if it is not on `PATH`.
+  </Card>
+</CardGroup>
+
+## Security note
+
+Run the agent worker on a **private** server or VM. It is a background polling process — not a web server. Do not expose it as a public HTTP endpoint. Keep your `GENTIC_API_KEY` and SSH credentials secret and limit access to the machine accordingly.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/agent/installation">
+    Install the standalone binary or run from source, and set up Git authentication.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/agent/configuration">
+    Configure your API key, API URL, and other environment variables.
+  </Card>
+  <Card title="Service Management" icon="server" href="/agent/service-management">
+    Start, stop, and restart the worker as a managed system service.
+  </Card>
+</CardGroup>

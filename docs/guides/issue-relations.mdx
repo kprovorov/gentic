@@ -1,0 +1,76 @@
+---
+title: "Sequence and Block Issues with Gentic Issue Relations"
+sidebarTitle: "Issue Relations"
+description: "Use issue relations in Gentic to declare dependencies between tasks. A blocked issue is skipped by the worker until its blocker completes or cancels."
+---
+
+Issue relations let you describe dependencies between coding tasks so the agent worker executes them in the right order. When one issue blocks another, Gentic automatically holds the blocked issue in the queue until its dependency is completed or cancelled — no manual coordination required.
+
+## What issue relations are
+
+A relation connects two issues with a directional dependency: issue A **blocks** issue B. The agent worker respects this constraint at the moment it polls for work. If issue B is in the `Todo` queue but it is blocked by issue A, the worker skips issue B and moves on. Once issue A reaches a `completed` or `cancelled` state, issue B becomes eligible and the worker picks it up on the next poll cycle.
+
+This is useful any time one piece of work must land before another can safely begin — for example, a database migration that must run before the API layer that depends on the new schema, or a shared utility module that must exist before the features that import it.
+
+<Tip>
+  Break large features into multiple focused issues and use blocking relations to sequence them. Smaller issues give the agent a tighter scope, produce cleaner pull requests, and are easier to review. A chain of three well-scoped issues almost always produces better results than one monolithic issue.
+</Tip>
+
+## How blocking works
+
+The enforcement happens at the worker level, not the UI level. The Gentic API filters out issues that have unresolved blockers when it responds to the worker's poll. This means:
+
+- You can move a blocked issue to `Todo` at any time — it simply will not be executed until the blocker clears.
+- The home screen shows a **Blocked** badge on any issue that has an unresolved blocker, so you can see the dependency state at a glance.
+- A blocker is considered resolved when its status is `completed` or `cancelled`.
+
+## How to add a relation
+
+<Steps>
+
+### Open the issue you want to block
+
+Navigate to the issue that should wait for another issue to finish first. This is the *downstream* issue — the one that is blocked.
+
+### Find the Relations section
+
+Scroll down the issue detail page to the **Relations** section.
+
+### Select the related issue and direction
+
+Click **Add relation**. A picker appears where you choose:
+
+- **Related issue** — search by title or issue ID to find the upstream issue that must complete first.
+- **Direction** — choose **blocks** to mark that the issue you are currently viewing is blocked by the selected issue, or choose the inverse to mark that the current issue blocks the selected one.
+
+### Save the relation
+
+Click **Add** to save. The relation appears in the Relations section immediately, and the home screen badge updates on the next page load.
+
+</Steps>
+
+## Relation directions at a glance
+
+| Direction | Meaning | Effect |
+|-----------|---------|--------|
+| **This issue is blocked by** issue A | Issue A must complete before this issue runs | Worker skips this issue until A is `completed` or `cancelled` |
+| **This issue blocks** issue B | This issue must complete before issue B runs | Worker skips issue B until this issue is `completed` or `cancelled` |
+
+## How to remove a relation
+
+Open either issue in the relation and scroll to the **Relations** section. Click the remove (×) icon next to the relation you want to delete. The relation is removed immediately and the blocked issue becomes eligible for the worker on its next poll.
+
+## Example: sequencing a multi-step feature
+
+Imagine you are building a new notifications system. You might create the following issues and link them in sequence:
+
+1. **Add `notifications` table migration** — no blockers, runs first.
+2. **Implement `NotificationsService`** — blocked by issue 1. Runs after the migration lands.
+3. **Add notifications API endpoints** — blocked by issue 2. Runs after the service exists.
+4. **Build notifications UI panel** — blocked by issue 3. Runs last, once the API is available.
+
+Each issue has a tight, well-defined scope. The agent works through them in order, and each pull request builds cleanly on the previous one.
+
+<Note>
+  Issue relations only affect the **agent worker's** execution order. You can still manually change an issue's status or reset the agent at any time regardless of its blocked state. Use the **Blocked** badge on the home screen as a reminder, not a hard lock on your own actions.
+</Note>

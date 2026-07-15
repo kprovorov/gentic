@@ -1,0 +1,79 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Gentic",
+  "theme": "luma",
+  "colors": {
+    "primary": "#9bfa04",
+    "light": "#5ca40c"
+  },
+  "logo": {
+    "light": "/images/gentic.full.light.png",
+    "dark": "/images/gentic.full.dark.png"
+  },
+  "favicon": "https://media.brand.dev/2e783573-20b9-4094-9709-7754ed23643c.svg",
+  "fonts": {
+    "heading": {
+      "family": "Outfit"
+    },
+    "body": {
+      "family": "Inter"
+    }
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/kprovorov/gentic"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "how-it-works"
+            ]
+          },
+          {
+            "group": "Web App",
+            "pages": [
+              "web/projects",
+              "web/issues",
+              "web/github-integration",
+              "web/issue-statuses"
+            ]
+          },
+          {
+            "group": "Agent Worker",
+            "pages": [
+              "agent/overview",
+              "agent/installation",
+              "agent/configuration",
+              "agent/service-management"
+            ]
+          },
+          {
+            "group": "MCP Integration",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/first-issue",
+              "guides/attachments",
+              "guides/issue-relations",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

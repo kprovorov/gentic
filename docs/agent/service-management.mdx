@@ -1,0 +1,177 @@
+---
+title: "Run the Gentic Worker as a Background Service"
+sidebarTitle: "Service Management"
+description: "Use gentic start, stop, restart, status, and logs to manage the agent worker as a system service on Linux (systemd) or macOS (launchd) with automatic restarts."
+---
+
+The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. When you need to update the worker or change its configuration, `gentic restart` applies the change without touching your service unit file.
+
+<Tip>
+  Always use `gentic start` in production instead of running `gentic run` directly in a terminal session. The managed service handles automatic restarts on crash and survives reboots; a foreground process in a terminal does not.
+</Tip>
+
+## Platform behavior
+
+The service backend is selected automatically based on the host operating system.
+
+| Platform | Backend | Service file location |
+|---|---|---|
+| Linux (user scope) | systemd user unit | `~/.config/systemd/user/gentic.service` |
+| Linux (system scope) | systemd system unit | `/etc/systemd/system/gentic.service` |
+| macOS | launchd agent | `~/Library/LaunchAgents/dev.gentic.agent.plist` |
+| Other | Detached process + pidfile | N/A |
+
+<Warning>
+  On platforms without a native service manager (anything other than Linux with systemd or macOS), `gentic start` falls back to launching a detached background process tracked by a pidfile. The worker will **not** restart on crash and **will not** survive a reboot. Use a dedicated process manager on those platforms.
+</Warning>
+
+---
+
+## Commands
+
+### Start the service
+
+Install the service unit (if it does not already exist) and start the worker:
+
+```bash
+gentic start
+```
+
+Start the service now but **do not** register it to launch automatically after a reboot or login:
+
+```bash
+gentic start --no-boot
+```
+
+Install and start a **system-wide** service unit instead of a per-user one. Requires root or `sudo`. Linux and systemd only:
+
+```bash
+gentic start --system
+```
+
+### Stop the service
+
+```bash
+gentic stop
+```
+
+Stop the **system-wide** service instead of the per-user one (Linux/systemd only):
+
+```bash
+gentic stop --system
+```
+
+### Restart the service
+
+```bash
+gentic restart
+```
+
+Restart the **system-wide** service instead of the per-user one (Linux/systemd only):
+
+```bash
+gentic restart --system
+```
+
+### Check service status
+
+Display a human-readable summary of authentication state, service state, uptime, and boot configuration:
+
+```bash
+gentic status
+```
+
+Output a machine-readable JSON object — useful for monitoring scripts or deployment health checks:
+
+```bash
+gentic status --json
+```
+
+Check the **system-wide** service rather than the per-user one (Linux/systemd only):
+
+```bash
+gentic status --system
+```
+
+### View service logs
+
+Stream the worker service's logs. On Linux with systemd this delegates to `journalctl` for the `gentic` unit; on other platforms it tails the log file that the fallback backend writes to:
+
+```bash
+gentic logs
+```
+
+Follow the log output as it is written (equivalent to `tail -f` or `journalctl -f`):
+
+```bash
+gentic logs --follow
+# or
+gentic logs -f
+```
+
+Show logs for the **system-wide** service instead of the per-user one (Linux/systemd only):
+
+```bash
+gentic logs --system
+```
+
+### Run in the foreground
+
+Run the worker directly in the current terminal session. Use this during local development or when debugging an issue — not in production:
+
+```bash
+gentic run
+```
+
+---
+
+## Understanding `gentic status` output
+
+`gentic status` displays a summary panel with the following fields.
+
+| Field | Description |
+|---|---|
+| **Auth** | Whether credentials are configured, with the API key masked (first 3 and last 4 characters shown) and the API URL displayed in full. |
+| **Service** | The service state (`running`, `stopped`, or `not-installed`), the backend name (e.g. `systemd`, `launchd`, or `fallback`), the process PID if running, and the uptime since the process started. |
+| **Boot** | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`). |
+| **Last run** | The timestamp of the most recently completed issue run. |
+| **Tools** | Install and authentication state of the external CLIs each issue run shells out to: `GitHub CLI` (`gh`), `Claude` (`claude`), and `Codex` (`codex`). Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
+
+### Why the tools check matters
+
+Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the agent provider configured for the project. If any of these CLIs is missing or not authenticated on the worker host, runs will fail even though the worker service itself is healthy. Checking `gentic status` after installing the worker — and any time you rotate credentials — surfaces those problems before you queue a real issue.
+
+The `--json` flag returns the same information as a JSON object with the following top-level keys: `auth`, `apiUrl`, `maskedApiKey`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
+
+---
+
+## The `--no-boot` flag
+
+Pass `--no-boot` to `gentic start` when you want the service to run right now but not register itself to start automatically after a system reboot. This is useful for short-lived worker environments — such as CI-backed VMs or spot instances — where you control the lifecycle externally.
+
+```bash
+gentic start --no-boot
+```
+
+When `--no-boot` is set, `gentic status` reports `Boot: disabled`. You can re-enable boot registration at any time by running `gentic start` again without the flag.
+
+---
+
+## Typical production setup
+
+The following example builds the standalone binary, copies it to a production server, authenticates, and starts the managed service.
+
+```bash
+# On your build machine
+cd apps/gentic
+./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+scp -r dist/linux-x64 deploy@prod-server:/opt/gentic
+
+# On the production server
+cd /opt/gentic
+./gentic auth login --api-url https://gentic.chat/api/v1 --api-key <your-key>
+./gentic start
+
+# Verify it is running
+./gentic status
+```

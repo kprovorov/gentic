@@ -1,0 +1,323 @@
+---
+title: "Gentic MCP Tools Reference: All 12 Tools Explained"
+sidebarTitle: "Tools"
+description: "Reference for all 12 Gentic MCP tools: create and manage projects, issues, and trigger AI coding agent runs from any MCP-compatible client."
+---
+
+Gentic's MCP server exposes 12 tools that your AI assistant can call once you have connected and authorized via OAuth 2.0. The tools are grouped into three categories — Account, Projects, and Issues — and cover every operation available in the Gentic dashboard. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
+
+---
+
+## Account
+
+### `whoami`
+
+Returns the Gentic account ID associated with the current MCP connection. Use this to confirm which account your client has authorized and to retrieve the user ID for reference.
+
+<Expandable title="Output fields">
+  <ResponseField name="userId" type="string">
+    The unique Gentic account ID for the authorized session.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Projects
+
+### `list_projects`
+
+Lists all Gentic projects owned by the authenticated account. Use the returned project IDs as `project_id` when creating or filtering issues.
+
+<Expandable title="Output fields">
+  <ResponseField name="projects" type="array">
+    An array of project objects owned by the authenticated account.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `get_project`
+
+Returns full details for a single project. Use the project ID from `list_projects`.
+
+<ParamField body="id" type="string (uuid)" required>
+  The project ID, from `list_projects` or `get_project`.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="project" type="object">
+    The matching project object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `create_project`
+
+Creates a new Gentic project linked to a GitHub repository.
+
+<ParamField body="name" type="string" required>
+  Human-readable project name shown in Gentic. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="repo" type="string" required>
+  GitHub repository in `owner/name` format, for example `vercel/next.js`.
+</ParamField>
+
+<ParamField body="setup_script" type="string">
+  Optional shell script run by the background agent after cloning the repository. Maximum 10,000 characters. Pass `null` to leave it unset.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="project" type="object">
+    The newly created project object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `update_project`
+
+Updates the name, repository, or setup script for an existing project. You must supply all three editable fields — any field you do not want to change should be passed with its current value.
+
+<ParamField body="id" type="string (uuid)" required>
+  The project ID, from `list_projects` or `get_project`.
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Updated human-readable project name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="repo" type="string" required>
+  Updated GitHub repository in `owner/name` format.
+</ParamField>
+
+<ParamField body="setup_script" type="string | null" required>
+  Updated shell setup script. Pass `null` to remove the existing script.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="project" type="object">
+    The updated project object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `delete_project`
+
+Permanently deletes a project and all of its issues. All issues belonging to the project are removed at the same time.
+
+<Warning>
+  Deleting a project is irreversible. All issues within the project are also deleted immediately.
+</Warning>
+
+<ParamField body="id" type="string (uuid)" required>
+  The project ID to delete.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="id" type="string (uuid)">
+    The ID of the deleted project.
+  </ResponseField>
+  <ResponseField name="deleted" type="boolean">
+    Always `true` when the deletion completed successfully.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Issues
+
+### `list_issues`
+
+Lists issues owned by the authenticated account. Filter by project to narrow results.
+
+<ParamField body="project_id" type="string (uuid)">
+  Optional. When provided, returns only issues belonging to this project. Omit to list issues across all projects.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issues" type="array">
+    An array of issue objects matching the filter.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `get_issue`
+
+Returns full details for a single issue, including its current status, prompt, and agent configuration.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID, from `list_issues` or `create_issue`.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue" type="object">
+    The matching issue object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `create_issue`
+
+Creates a new issue inside a project. Issues are created in `draft` status by default, giving you the chance to refine the title and agent prompt before queuing a run.
+
+<ParamField body="project_id" type="string (uuid)" required>
+  The ID of the project to create this issue in. Obtain it from `list_projects`.
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  Short issue title shown in the Gentic dashboard. Maximum 160 characters.
+</ParamField>
+
+<ParamField body="prompt" type="string">
+  Detailed instructions for the background coding agent. Explain the problem, expected behavior, and any relevant context. The agent uses this prompt as its primary directive when the issue is queued.
+</ParamField>
+
+<ParamField body="status" type="enum">
+  Initial workflow status for the issue. Defaults to `draft`.
+
+  Accepted values: `draft`, `todo`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `completed`, `cancelled`
+</ParamField>
+
+<ParamField body="agent_provider" type="enum">
+  The AI coding agent to assign to this issue. Defaults to `claude_code`.
+
+  Accepted values: `claude_code`, `codex`
+</ParamField>
+
+<ParamField body="type" type="enum">
+  Categorizes the nature of the issue. Defaults to `feature`.
+
+  Accepted values: `feature`, `bug`, `feedback`, `idea`
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue" type="object">
+    The newly created issue object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `update_issue`
+
+Updates the title, prompt, agent provider, and type for an existing issue. Use this to refine the agent's instructions before queuing a run. `title`, `agent_provider`, and `type` are required; `prompt` is optional.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID to update.
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  Updated short issue title. Maximum 160 characters.
+</ParamField>
+
+<ParamField body="prompt" type="string">
+  Updated detailed instructions for the background coding agent. Optional — omit to leave the prompt unchanged.
+</ParamField>
+
+<ParamField body="agent_provider" type="enum" required>
+  Coding agent to assign to this issue.
+
+  Accepted values: `claude_code`, `codex`
+</ParamField>
+
+<ParamField body="type" type="enum" required>
+  Updated issue type.
+
+  Accepted values: `feature`, `bug`, `feedback`, `idea`
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue" type="object">
+    The updated issue object.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `delete_issue`
+
+Permanently deletes an issue. This action cannot be undone.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID to delete.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="id" type="string (uuid)">
+    The ID of the deleted issue.
+  </ResponseField>
+  <ResponseField name="deleted" type="boolean">
+    Always `true` when the deletion completed successfully.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `update_issue_status`
+
+Moves an issue to a new workflow status. This is the primary tool for driving an issue through the Gentic pipeline after it has been created and refined.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID to update.
+</ParamField>
+
+<ParamField body="status" type="enum" required>
+  New workflow status for the issue.
+
+  Accepted values: `draft`, `todo`, `queued`, `held`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `run-failed`, `completed`, `cancelled`
+
+  See [Issue Statuses](/web/issue-statuses) for what each value means and the transitions the worker drives automatically.
+</ParamField>
+
+<Note>
+  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue's title and prompt, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+</Note>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue" type="object">
+    The updated issue object, reflecting the new status.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Practical example: create and queue an issue
+
+The most common pattern is to create an issue in `draft` state, optionally review or update it, then transition it to `todo` to start the agent run. You can instruct your assistant with a single natural-language request:
+
+> "Create a bug issue for project `abc-123` titled 'Fix null pointer in auth' with prompt 'The login endpoint throws NPE when email is missing. Add input validation.' then move it to todo."
+
+Your assistant will execute two tool calls in sequence:
+
+**Step 1 — `create_issue`**
+
+```json
+{
+  "project_id": "abc-123",
+  "title": "Fix null pointer in auth",
+  "prompt": "The login endpoint throws NPE when email is missing. Add input validation.",
+  "type": "bug",
+  "status": "draft",
+  "agent_provider": "claude_code"
+}
+```
+
+**Step 2 — `update_issue_status`**
+
+```json
+{
+  "id": "<id returned from create_issue>",
+  "status": "todo"
+}
+```
+
+The `draft → todo` transition queues the background agent run. From this point, Gentic takes over: the agent clones the repository, applies the fix described in the prompt, and advances the issue status as it progresses.
+
+<Tip>
+  If you want to review or edit the prompt before the agent starts, tell your assistant to create the issue in `draft` and stop. Come back later and ask it to move the issue to `todo` when you are ready.
+</Tip>

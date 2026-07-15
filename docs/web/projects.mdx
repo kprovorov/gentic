@@ -1,0 +1,65 @@
+---
+title: "Set Up and Manage Projects in Your Gentic Workspace"
+sidebarTitle: "Projects"
+description: "Projects link your GitHub repositories to Gentic so AI coding agents know which codebase to clone and work in when processing your issues."
+---
+
+A project maps a GitHub repository to your Gentic workspace. When you assign an issue to a project, the AI agent clones that repository, runs your setup script, and begins coding — so every project you create becomes a codebase your agents can work in. You manage projects from the **Settings → Workspace** page.
+
+## Add a Project
+
+<Steps>
+  <Step title="Open Settings">
+    Navigate to **Settings** in the sidebar, then select **Workspace**.
+  </Step>
+  <Step title="Fill in the project form">
+    In the **Add project** card on the left, complete the **Name**, **Repo**, and optional **Setup script** fields (see [Field reference](#field-reference) below).
+  </Step>
+  <Step title="Submit">
+    Click **Add project**. The new project appears immediately in the project list on the right.
+  </Step>
+</Steps>
+
+## Field Reference
+
+<ParamField body="name" type="string" required>
+  A human-readable display name for the project, shown throughout the Gentic UI and when selecting a project for a new issue. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="repo" type="string" required>
+  The GitHub repository the agent will clone, in `owner/repo` format — for example, `kprovorov/gentic`. The value must match the exact owner and repository name as they appear on GitHub.
+</ParamField>
+
+<ParamField body="setup_script" type="string">
+  An optional shell script that runs inside the cloned repository **before** the agent starts writing code. Use this field to install dependencies or perform any other environment setup the agent needs. For example:
+
+  ```bash
+  npm install
+  ```
+
+  You can include multiple commands separated by newlines.
+</ParamField>
+
+<ParamField body="auto_respond_to_reviews" type="boolean" default="true">
+  Controls whether Gentic automatically feeds **Request changes** reviews on the project's pull requests back to the agent that opened them. When enabled (the default), a `changes_requested` review — including its body and inline comments — is appended to the issue's transcript and the run is re-queued, so the agent pushes fixes to the same PR branch without a human relaying the feedback.
+
+  Uncheck **Auto-respond to review feedback** on the project card to keep the older behavior: the issue still moves to `changes-requested`, but no run is queued and you decide when to respond.
+
+  See [GitHub Integration](/web/github-integration#auto-respond-to-review-feedback) for the webhook and credential setup required to make this work.
+</ParamField>
+
+<Tip>
+  Always include a setup script that installs your project's dependencies. Agents start coding immediately after the script finishes, so a missing `npm install` or `pip install -r requirements.txt` will cause the agent to fail on import errors.
+</Tip>
+
+## Edit a Project
+
+Each project card in the project list is an editable form. Update the **Name**, **Repo**, or **Setup script** fields directly in the card, then click **Save** to apply your changes.
+
+## Delete a Project
+
+To remove a project, click the **trash icon** (delete button) inside the project card. The project is deleted immediately.
+
+<Note>
+  Deleting a project does not delete any GitHub issues or pull requests associated with it. Your GitHub repository and its history remain completely untouched — only the Gentic project record is removed.
+</Note>
