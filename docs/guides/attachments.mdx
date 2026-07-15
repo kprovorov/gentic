@@ -4,7 +4,7 @@ sidebarTitle: "Attachments"
 description: "Upload images, text files, and documents to Gentic issues to give the AI coding agent additional context like screenshots, logs, or spec files."
 ---
 
-Attachments let you hand the AI agent more than words. When you upload a file to an issue, Gentic embeds it directly in the agent's prompt so the agent sees exactly the same information you do — a screenshot of the broken UI, the stack trace from your logs, a design mockup, or a specification document — without you having to paste it all into the prompt text field.
+Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded to the worker and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the prompt.
 
 ## What attachments do
 
@@ -30,7 +30,7 @@ Gentic handles different file types differently to give the agent the most usefu
 </CardGroup>
 
 <Note>
-  Attachments are fetched fresh at the start of every agent run and included in the first message of that run. If you add, replace, or remove attachments and want the agent to see the updated set, use **Reset Agent** on the issue detail page to start a new run.
+  Attachments are fetched when a worker prepares the prompt. Files added to a follow-up message are delivered on the next prompt turn. To rebuild an issue from its original prompt and current attachments, use **Retry with...** on the issue detail page.
 </Note>
 
 ## How to upload attachments
@@ -39,25 +39,25 @@ Gentic handles different file types differently to give the agent the most usefu
 
 ### Open the issue
 
-Navigate to the issue you want to attach files to from the home screen or the Issues list.
+Navigate to the issue you want to attach files to from the **Issues** list.
 
-### Find the Attachments section
+### Use a prompt composer
 
-Scroll down the issue detail page to the **Attachments** section below the prompt.
+Use the composer on the **New issue** page or the message composer under **Agent activity** on an existing issue.
 
 ### Upload your files
 
-Drag and drop files onto the upload area, or click it to open a file picker. You can select multiple files at once. Each file is uploaded immediately and appears in the attachments list when the upload completes.
+Drag files onto the composer or click the paperclip button. You can select multiple files. The files upload when you save, run, or send the accompanying prompt text.
 
 ### Confirm the files are listed
 
-Check that each uploaded file appears in the attachments list with the correct file name and size. The list refreshes automatically after each upload.
+After submission, confirm that each file appears in the issue's **Attachments** card with the correct name and size.
 
 </Steps>
 
 ## How to delete an attachment
 
-Open the issue and find the file in the **Attachments** section. Click the delete (trash) icon next to the file name. Gentic removes the file from storage and from the issue immediately. If the agent has not yet run, it will not receive the deleted file. If the agent has already run and you want to remove a file from a future re-run, delete it and then reset the agent.
+Open the issue and find the file in the **Attachments** card. Click the delete button next to the file name and confirm. Gentic removes the file from storage and from the issue. Deleting it does not remove content already delivered to an agent session; use **Retry with...** if you need a fresh session built from the remaining files.
 
 ## Good use cases for attachments
 
@@ -76,7 +76,7 @@ Open the issue and find the file in the **Attachments** section. Click the delet
 <Accordion title="Design mockups">
   Attach a design mockup when asking the agent to implement a new UI component. Give the agent both the image and a prompt like "implement the card component shown in the attachment using Tailwind CSS."
 
-  **Supported formats:** PNG, JPG, SVG (as image), Figma exports
+  **Supported formats:** formats uploaded with an `image/*` MIME type. SVG files are often uploaded as `image/svg+xml`, but handling depends on the selected agent client.
 </Accordion>
 
 <Accordion title="Specification documents">

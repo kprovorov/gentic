@@ -10,11 +10,11 @@ This guide takes you from a blank account to a merged pull request. You will sig
 
 ### Sign up at gentic.chat
 
-Open [gentic.chat](https://gentic.chat) in your browser and create a free account. After email confirmation, you land on the main dashboard where your projects and issues live.
+Open [gentic.chat](https://gentic.chat) in your browser and create an account. After you sign in, open **Issues** or **Settings** from the sidebar.
 
 ### Add a project
 
-Navigate to **Settings** in the top navigation, then find the **Projects** section. Click **Add project** and enter your repository in `owner/repo` format — for example, `acme-corp/backend`. Gentic stores this slug and the agent worker uses it to construct the full Git remote URL when it clones your code.
+Open **Settings** from the sidebar. In **Add project**, enter a display name and your repository in `owner/repo` format — for example, `acme-corp/backend`. Optionally add a setup script that installs dependencies before an agent session starts, then click **Add project**.
 
 <Tip>
   You can add as many projects as you need. Each issue is scoped to a single project, so the worker always knows which repository to clone.
@@ -22,7 +22,7 @@ Navigate to **Settings** in the top navigation, then find the **Projects** secti
 
 ### Connect GitHub
 
-Still in **Settings**, open the **GitHub integration** section and follow the OAuth flow to authorize Gentic. This grants the platform permission to open pull requests and manage branches on your behalf. Make sure you grant access to the repository you added in the previous step.
+Still in **Settings**, click **Connect GitHub** and install the configured GitHub App on the repositories you want Gentic to track. The integration sends pull-request status and review events back to Gentic. It does not replace the worker's own Git and GitHub CLI credentials, which are used to clone, push, and open pull requests.
 
 ### Install and configure the agent worker
 
@@ -57,29 +57,21 @@ Then install and start the worker as a managed OS service so it restarts automat
 gentic start
 ```
 
-Verify the worker is authenticated and running:
+Verify the worker configuration, service, and required external tools:
 
 ```bash
-gentic auth status
+gentic status
 ```
 
 <Note>
-  The agent worker must be running before you move an issue to Todo. If no worker is polling, queued issues stay queued indefinitely. See the [Agent Worker installation guide](/agent/overview) for full details on service management, SSH deploy keys, and per-agent prerequisites.
+  The agent worker must be running before you move an issue to Todo. If no worker is polling, issues remain in Todo. See the [Agent Worker installation guide](/agent/installation) for service management, SSH deploy keys, and agent prerequisites.
 </Note>
 
 ### Create your first issue
 
-Back in the Gentic web app, open your project and click **New issue**. Fill in the fields:
+Back in the Gentic web app, open **Issues** and click **New issue**. Choose a project, then write a detailed prompt. You can attach supporting files in the same composer.
 
-| Field | Value |
-|---|---|
-| **Title** | A short, descriptive name for the task |
-| **Type** | `Feature` (or `Bug`, `Chore`, etc.) |
-| **Agent** | `Claude Code` or `Codex` |
-| **Prompt** | A detailed description of exactly what the agent should implement |
-| **Status** | `Draft` |
-
-Save the issue. Draft issues are never picked up by the worker, so you can take your time refining the prompt and attaching any supporting files before you commit to running it.
+Click **Save draft** to review the issue before it runs. Gentic generates the title and type in the background. Draft issues are never picked up by the worker, so you can refine the generated fields, prompt, and attachments before running it.
 
 <Tip>
   Write prompts the same way you would write a detailed ticket for a junior engineer: describe the goal, the acceptance criteria, any relevant file paths, and the coding style you expect. The more context you give, the better the output.
@@ -87,7 +79,7 @@ Save the issue. Draft issues are never picked up by the worker, so you can take 
 
 ### Move the issue to Todo
 
-When your issue is ready, change its **Status** from `Draft` to `Todo`. This single action drops the issue into the unclaimed pool for agent workers and records your prompt as the first message in the issue's conversation thread.
+When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the prompt as the first message and makes the issue eligible for a worker.
 
 On the worker's next poll (within a few seconds), it claims the issue, clones the repository into a fresh working directory, and starts the AI agent.
 

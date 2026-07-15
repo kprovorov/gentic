@@ -134,7 +134,7 @@ gentic run
 | **Auth** | Whether credentials are configured, with the API key masked (first 3 and last 4 characters shown) and the API URL displayed in full. |
 | **Service** | The service state (`running`, `stopped`, or `not-installed`), the backend name (e.g. `systemd`, `launchd`, or `fallback`), the process PID if running, and the uptime since the process started. |
 | **Boot** | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`). |
-| **Last run** | The timestamp of the most recently completed issue run. |
+| **Last run** | Currently reports `unknown (no API support yet)`. The CLI does not yet receive a last-run timestamp from the API. |
 | **Tools** | Install and authentication state of the external CLIs each issue run shells out to: `GitHub CLI` (`gh`), `Claude` (`claude`), and `Codex` (`codex`). Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
 
 ### Why the tools check matters

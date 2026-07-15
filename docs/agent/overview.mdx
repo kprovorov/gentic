@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "The Gentic agent worker is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and opens pull requests automatically."
 ---
 
-The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims one at a time, clones the associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. When the agent finishes, it commits its changes and opens a pull request against your repository automatically. You never need to manually invoke an AI tool for individual issues; the worker handles the full cycle from poll to PR.
+The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims work up to its configured concurrency limit, clones each associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. When the agent finishes, it commits its changes and opens a pull request against your repository automatically. The default concurrency limit is one issue.
 
 ## How it works
 

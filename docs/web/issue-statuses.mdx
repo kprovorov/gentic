@@ -21,7 +21,7 @@ draft → todo → queued → in-progress → ready-for-review
                                      ↘ changes-requested → approved → merged
 ```
 
-Not every issue visits every status — for example, a project without automated tests skips `testing` and `tests-failed`, and an issue you cancel before the agent picks it up moves straight from `todo` (or `draft`) to `cancelled`.
+Not every issue visits every status. The worker drives the agent-run states, while several review and deployment states are available for manual or external workflow updates.
 
 ## Pre-work
 
@@ -49,8 +49,8 @@ These statuses cover the period between the agent opening a pull request and the
 
 | Status | Description |
 |---|---|
-| `testing` | Automated tests are running against the agent's changes. |
-| `tests-failed` | One or more automated tests failed. Send the agent a follow-up message to fix the failures, or push changes manually. |
+| `testing` | Reserved for a workflow that is running automated tests against the changes. Gentic's worker does not set this automatically. |
+| `tests-failed` | Reserved for a workflow reporting failed tests. Gentic's worker does not set this automatically. |
 | `ready-for-review` | The agent has opened a pull request and it is ready for human review on GitHub. |
 | `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. Send the agent a message describing what to fix, or push changes yourself. |
 | `approved` | A reviewer submitted an **Approve** review on GitHub. The pull request is ready to merge. |
@@ -60,9 +60,9 @@ These statuses cover the period between the agent opening a pull request and the
 | Status | Description |
 |---|---|
 | `merged` | The pull request has been merged into the target branch. Set automatically when GitHub sends a `pull_request.closed` webhook with `merged: true`. |
-| `deploying` | A deployment pipeline is running the merged changes to a target environment. |
-| `deploy-failed` | The deployment failed. Check your CI/CD logs for details. |
-| `validating` | The deployed changes are being validated — for example, by smoke tests or a health check. |
+| `deploying` | Reserved for an external deployment workflow that is running the merged changes. |
+| `deploy-failed` | Reserved for an external workflow reporting a deployment failure. |
+| `validating` | Reserved for an external workflow validating deployed changes. |
 
 ## Terminal
 
@@ -70,7 +70,7 @@ Issues in these statuses are no longer active. You can re-open a conversation by
 
 | Status | Description |
 |---|---|
-| `run-failed` | The agent run ended with an unrecoverable error before opening a pull request. Check the transcript for the error output. Use **Reset Agent** to retry after fixing the underlying cause. |
+| `run-failed` | The agent run ended with an unrecoverable error before opening a pull request. Check agent activity for the error output. Use **Retry with...** after fixing the underlying cause. |
 | `completed` | The issue has been resolved and all work is done. |
 | `cancelled` | The issue was cancelled before completion, either manually or because the pull request was closed on GitHub without being merged. |
 
@@ -86,7 +86,7 @@ If you have configured the [GitHub integration](/web/github-integration) with a 
 | `pull_request_review.submitted` | `review.state: approved` | `approved` |
 | `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
 
-Gentic matches the event to an issue by the pull request's `html_url`, so only PRs opened by the agent (or manually attached to an issue) are affected. Comment-only reviews and other event types are ignored.
+Gentic matches the event to a stored pull-request URL on the issue. Comment-only reviews and other event types are ignored.
 
 To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests** and **Pull request reviews** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
 

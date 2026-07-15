@@ -7,7 +7,7 @@ description: "Solutions for common problems with the Gentic agent worker, GitHub
 Most problems with Gentic fall into one of three categories: the worker is not running or not authenticated, the agent encountered an error during a run, or GitHub access is not set up correctly. Work through the relevant accordion below for step-by-step fixes.
 
 <Note>
-  Run `gentic status --json` for machine-readable diagnostics you can pipe into other tools or include in a support request. The JSON output includes worker state, API connectivity, last poll timestamp, and the active configuration (with the API key masked).
+  Run `gentic status --json` for machine-readable diagnostics you can pipe into other tools or include in a support request. The JSON output includes configured auth details, service state, backend, PID and uptime when available, boot state, and external tool checks. It does not currently test API connectivity or report the last poll.
 </Note>
 
 <Accordion title="Issue stuck on 'todo' — agent never starts">
@@ -55,15 +55,15 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   **Step 1 — Check the transcript:**
 
-  Open the issue and scroll to the **Transcript** panel. If you see recent output, the agent is still active. Complex tasks can take 5–15 minutes — give it time before intervening.
+  Open the issue and scroll to **Agent activity**. If you see recent output, the agent is still active. Complex tasks can take 5–15 minutes — give it time before intervening.
 
   **Step 2 — Look for a "waiting for input" state:**
 
   If the issue status has moved to `Waiting for input`, the agent has paused and is expecting a message from you. Send a reply in the transcript to continue.
 
-  **Step 3 — Reset the agent if it is genuinely stuck:**
+  **Step 3 — Retry the agent if it is genuinely stuck:**
 
-  If the transcript has been idle for more than 15 minutes and no error appears, use **Reset Agent** on the issue detail page. This cancels the current run and returns the issue to `todo` so the worker picks it up fresh on the next poll.
+  If agent activity has been idle for more than 15 minutes and no error appears, use **Retry with Claude Code** or the adjacent agent dropdown. This clears the stored run state and conversation, then returns the issue to `todo` for a fresh session.
 </Accordion>
 
 <Accordion title="Issue status shows 'run-failed'">
@@ -71,7 +71,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   **Step 1 — Read the transcript for an error message:**
 
-  Open the issue and scroll to the bottom of the **Transcript** panel. The agent usually prints the error that caused it to stop — a git authentication failure, a missing dependency, or a tool error.
+  Open the issue and scroll to the bottom of **Agent activity**. The agent usually prints the error that caused it to stop — a git authentication failure, a missing dependency, or a tool error.
 
   **Step 2 — Fix the underlying cause:**
 
@@ -84,9 +84,9 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   | Repository not found (404) | Confirm the project `owner/repo` in Settings is correct and the worker's SSH key has access. |
   | Out of disk space | Free up disk on the worker machine; the work directory defaults to `~/.local/share/gentic/workspaces`. |
 
-  **Step 3 — Reset the agent to retry:**
+  **Step 3 — Retry the agent:**
 
-  After fixing the underlying issue, click **Reset Agent** on the issue detail page. The issue moves back to `todo` and the worker attempts the run again on its next poll.
+  After fixing the underlying issue, click **Retry with Claude Code** or choose another agent from its dropdown. The issue moves back to `todo` and the worker attempts a fresh run on its next poll.
 </Accordion>
 
 <Accordion title="Issue stuck on 'held' — waiting for a usage limit reset">
@@ -100,7 +100,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   In most cases, waiting is correct. The worker automatically re-claims the issue on the first poll after the reset time and resumes the same agent session, so the transcript context is preserved.
 
-  If you cannot wait — for example, you want to run the issue on a different agent provider that is not rate-limited — change the **Agent** on the issue and then use **Reset Agent** to send it back to `todo`.
+  If you cannot wait, use the retry dropdown to start a fresh run with a different provider. Retrying clears the stored conversation and pull-request links for the issue.
 
   **Step 3 — If the reset time looks wrong:**
 

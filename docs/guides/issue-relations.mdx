@@ -21,7 +21,7 @@ This is useful any time one piece of work must land before another can safely be
 The enforcement happens at the worker level, not the UI level. The Gentic API filters out issues that have unresolved blockers when it responds to the worker's poll. This means:
 
 - You can move a blocked issue to `Todo` at any time — it simply will not be executed until the blocker clears.
-- The home screen shows a **Blocked** badge on any issue that has an unresolved blocker, so you can see the dependency state at a glance.
+- The issue detail page shows a **Blocked** badge when an issue has an unresolved blocker.
 - A blocker is considered resolved when its status is `completed` or `cancelled`.
 
 ## How to add a relation
@@ -45,7 +45,7 @@ Click **Add relation**. A picker appears where you choose:
 
 ### Save the relation
 
-Click **Add** to save. The relation appears in the Relations section immediately, and the home screen badge updates on the next page load.
+Click **Add** to save. The relation appears in the **Relations** card immediately, and the issue's **Blocked** badge updates after the data refreshes.
 
 </Steps>
 
@@ -72,5 +72,5 @@ Imagine you are building a new notifications system. You might create the follow
 Each issue has a tight, well-defined scope. The agent works through them in order, and each pull request builds cleanly on the previous one.
 
 <Note>
-  Issue relations only affect the **agent worker's** execution order. You can still manually change an issue's status or reset the agent at any time regardless of its blocked state. Use the **Blocked** badge on the home screen as a reminder, not a hard lock on your own actions.
+  Issue relations only affect the **agent worker's** execution order. You can still manually change an issue's status or retry the agent regardless of its blocked state. The **Blocked** badge is a reminder, not a hard lock on your own actions.
 </Note>
