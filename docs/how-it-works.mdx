@@ -12,7 +12,7 @@ Gentic connects two things: a web app where your team writes and manages work, a
 
 ### You create an issue in the web app
 
-Open your project in [gentic.chat](https://gentic.chat) and create a new issue. Every issue has a **title**, a **prompt** (the detailed instructions the agent will follow), and an **agent** selection — either `Claude Code` or `Codex`. You can also attach files: images, text files, and other documents are embedded directly into the agent's first prompt so it has the full context it needs before writing a single line of code.
+Create a new issue in [gentic.chat](https://gentic.chat), choose a project, and write the prompt the agent will follow. Choose **Save draft**, **Run with Claude Code**, or **Run with Codex**. Gentic generates a title and issue type in the background. You can also attach files in the prompt composer.
 
 New issues start in **Draft** status. A draft is never picked up by the worker, giving you time to iterate on the prompt, add attachments, and set any blocking dependencies before the agent begins.
 
@@ -32,7 +32,7 @@ Your deployed agent worker runs as a background process on a server you control.
 
 When the worker finds a `todo` issue, it claims it (moving the status to `queued`) and clones the project's GitHub repository into a fresh, isolated working directory. The clone target is constructed by prepending `GIT_REMOTE_BASE` (default: `git@github.com:`) to the `owner/repo` slug stored in the project — so a project configured as `acme-corp/backend` is cloned from `git@github.com:acme-corp/backend`.
 
-Once the clone finishes and the agent session starts, the status flips to `in-progress`. Each issue gets its own working directory, so concurrent runs never interfere with one another.
+Once the clone finishes and the agent session starts, the status flips to `in-progress`. Each issue gets its own working directory. A worker processes one issue at a time by default; set `MAX_CONCURRENT_ISSUES` to allow more isolated runs on the same worker.
 
 ### The agent writes code and opens a pull request
 

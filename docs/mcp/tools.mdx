@@ -4,7 +4,7 @@ sidebarTitle: "Tools"
 description: "Reference for all 12 Gentic MCP tools: create and manage projects, issues, and trigger AI coding agent runs from any MCP-compatible client."
 ---
 
-Gentic's MCP server exposes 12 tools that your AI assistant can call once you have connected and authorized via OAuth 2.0. The tools are grouped into three categories — Account, Projects, and Issues — and cover every operation available in the Gentic dashboard. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
+Gentic's MCP server exposes 12 tools that your AI assistant can call once you have connected and authorized via OAuth 2.0. The tools are grouped into three categories — Account, Projects, and Issues — and cover core project and issue management. Attachments, messages, relations, retries, and GitHub integration settings remain web-app workflows. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
 
 ---
 
@@ -180,7 +180,7 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
 <ParamField body="status" type="enum">
   Initial workflow status for the issue. Defaults to `draft`.
 
-  Accepted values: `draft`, `todo`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `completed`, `cancelled`
+  Accepted values: `draft`, `todo`, `queued`, `held`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `run-failed`, `completed`, `cancelled`
 </ParamField>
 
 <ParamField body="agent_provider" type="enum">
@@ -275,7 +275,7 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 </ParamField>
 
 <Note>
-  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue's title and prompt, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue prompt, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
 </Note>
 
 <Expandable title="Output fields">

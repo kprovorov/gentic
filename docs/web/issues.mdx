@@ -16,10 +16,10 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
     Choose the project (GitHub repository) the agent should work in. If you have no projects yet, [create one in Settings](/web/projects) first.
   </Step>
   <Step title="Fill in the issue fields">
-    Complete the **Title**, **Type**, **Agent**, **Prompt**, and **Status** fields (see [Field reference](#field-reference) below).
+    Choose a **Project**, write the **Prompt**, and optionally attach files. Gentic generates a title and issue type after submission.
   </Step>
   <Step title="Submit">
-    Click **Create issue**. If you set the status to **Todo**, the agent run is queued immediately.
+    Click **Save draft** to review the issue first, or choose **Run with Claude Code** or **Run with Codex** to queue it immediately.
   </Step>
 </Steps>
 
@@ -33,12 +33,12 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   The project whose GitHub repository the agent will clone and work in. You cannot change the project after the issue is created.
 </ParamField>
 
-<ParamField body="title" type="string" required>
-  A short description of the work to be done, shown on the Home issues list and on the GitHub pull request. Maximum 160 characters.
+<ParamField body="title" type="string">
+  Gentic generates a short title in the background after creating the issue. You can edit it later. Edited titles accept up to 160 characters.
 </ParamField>
 
 <ParamField body="type" type="feature | bug | feedback | idea">
-  Categorises the issue so you can filter and visually distinguish different kinds of work at a glance.
+  Gentic classifies the issue in the background after creation. You can change the result on the edit page.
 
   | Value | When to use |
   |---|---|
@@ -49,7 +49,7 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
 </ParamField>
 
 <ParamField body="agent" type="Claude Code | Codex">
-  The AI agent that will execute the issue. Choose **Claude Code** (Anthropic) or **Codex** (OpenAI) depending on your preference or the nature of the task. You can change the agent when editing an issue.
+  The AI agent that will execute the issue. The primary run button uses Claude Code; use its dropdown to run with Codex. You can change the agent before the first run from the issue detail page.
 </ParamField>
 
 <ParamField body="prompt" type="text">
@@ -57,39 +57,39 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
 </ParamField>
 
 <ParamField body="status" type="enum">
-  The workflow status of the issue. Setting the initial status to **Todo** queues the agent immediately on creation. See the [Issue Statuses reference](/web/issue-statuses) for the full list and what each status means.
+  **Save draft** creates the issue as `draft`. A **Run with...** action creates it as a draft and immediately transitions it to `todo`, which queues the agent. See the [Issue Statuses reference](/web/issue-statuses).
 </ParamField>
 
 ## Issue Workflow
 
 ### Triggering an Agent Run
 
-Moving an issue's status from **Draft** to **Todo** is the action that queues the agent run. You can do this at creation time by setting the initial status to **Todo**, or later by updating the status on the issue detail page.
+Moving an issue's status from **Draft** to **Todo** queues the agent run. The **Run with...** actions perform that transition during creation; **Save draft** lets you do it later from the issue detail page.
 
 ### Sending Messages While the Agent Runs
 
-While an agent run is active (status: **In progress** or **Waiting for input**), a chat interface is available on the issue detail page. Type a message and send it to communicate with the agent mid-run — for example, to clarify a requirement or unblock a decision.
+The chat composer is available on the issue detail page. During an active run, new messages are delivered to the current session. Sending a message after a run has ended re-queues the issue and resumes its stored session.
 
-### Re-queuing a Completed or Cancelled Issue
+### Re-queuing an Ended Run
 
-If an issue has reached **Completed** or **Cancelled** status and you want the agent to do more work, send a new message from the chat interface. Gentic re-queues the agent run and the agent resumes with the full prior conversation context intact.
+If an agent run has ended and you want more work, send a new message from the chat interface. Gentic re-queues the issue and resumes the stored agent session with the prior conversation context intact.
 
 ### Tracking Pull Requests
 
 Every pull request the agent opens for an issue is attached to it and shown on the issue detail page. Each PR appears as its own button labelled `owner/repo#number` — click one to review those changes on GitHub.
 
-An issue can accumulate multiple pull requests over its lifetime. When you [re-queue a completed or cancelled issue](#re-queuing-a-completed-or-cancelled-issue) or the agent needs a follow-up run, any new PR the agent opens is added to the list alongside the earlier ones. Older PRs stay visible so you can trace every change the agent has shipped for that issue in one place.
+An issue can accumulate multiple pull requests over its lifetime. When you [re-queue an ended run](#re-queuing-an-ended-run), any new PR the agent opens is added to the list alongside the earlier ones. Older PRs stay visible so you can trace every change the agent has shipped for that issue in one place.
 
 ## Edit an Issue
 
 Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, and **Type** fields. The **Project** field cannot be changed after creation.
 
-## Reset the Agent
+## Retry an Agent
 
-Resetting an agent clears the current agent session and re-queues the issue as if it were starting fresh. Use this when a run is stuck or you want the agent to restart without any prior conversation history. To reset, open the issue and click **Reset agent**.
+Retrying an agent clears the current agent session and re-queues the issue as if it were starting fresh. Open the issue and click **Retry with Claude Code**, or use the adjacent dropdown to retry with Codex.
 
 <Warning>
-  Resetting the agent is irreversible — the existing session and conversation history for that run are permanently cleared.
+  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message from the current prompt. It does not delete pull requests from GitHub.
 </Warning>
 
 ## Delete an Issue

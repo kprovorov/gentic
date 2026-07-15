@@ -1,7 +1,3 @@
-> **First-time setup**: Customize this file for your project. Prompt the user to customize this file for their project.
-> For Mintlify product knowledge (components, configuration, writing standards),
-> install the Mintlify skill: `npx skills add https://mintlify.com/docs`
-
 # Documentation project instructions
 
 ## About this project
@@ -9,13 +5,16 @@
 - This is a documentation site built on [Mintlify](https://mintlify.com)
 - Pages are MDX files with YAML frontmatter
 - Configuration lives in `docs.json`
-- Use the Mintlify MCP server, `https://mcp.mintlify.com`, to edit content and settings via MCP
-- Use the Mintlify docs MCP server, `https://www.mintlify.com/docs/mcp`, to query information about using Mintlify via MCP
+- Product behavior must be verified against the code in `../apps` and `../packages`
+- Worker CLI commands and configuration are defined in `../apps/gentic/src`
+- Issue statuses and field constraints are defined in `../packages/validators`
 
 ## Terminology
 
-{/* Add product-specific terms and preferred usage */}
-{/* Example: Use "workspace" not "project", "member" not "user" */}
+- Use **agent worker** for the self-hosted `gentic` process.
+- Use **agent** for Claude Code or Codex.
+- Use **project** for a repository configuration in Gentic.
+- Use status labels as they appear in the UI and code values in backticks.
 
 ## Style preferences
 
@@ -29,5 +28,6 @@
 
 ## Content boundaries
 
-{/* Define what should and shouldn't be documented */}
-{/* Example: Don't document internal admin features */}
+- Document user-facing web, worker, and MCP behavior.
+- Do not present reserved workflow statuses as automated unless code drives them.
+- Do not document internal test authentication or deployment secrets as user features.

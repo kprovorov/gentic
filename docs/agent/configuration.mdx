@@ -1,7 +1,7 @@
 ---
 title: "Configure the Gentic Agent Worker"
 sidebarTitle: "Configuration"
-description: "Configure the Gentic agent worker with gentic auth login (recommended) or environment variables. Covers API key, API URL, Git remote, and poll settings."
+description: "Configure the Gentic agent worker with gentic auth login or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
 ---
 
 The primary way to configure the agent worker is with `gentic auth login`, which saves your API key and API URL to a persistent config file on disk. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
@@ -11,7 +11,7 @@ The primary way to configure the agent worker is with `gentic auth login`, which
 The recommended way to configure credentials is with the `gentic auth` commands. These commands read and write an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
 
 <Note>
-  `GENTIC_API_KEY` is your **Gentic API key**. Retrieve it from your account settings at [gentic.chat](https://gentic.chat). The worker only receives issues belonging to your account.
+  `GENTIC_API_KEY` must be a user-scoped API key accepted by the Gentic deployment. The worker only receives issues belonging to that user. Ask the deployment administrator how user API keys are issued; the current Gentic web settings page does not create them.
 </Note>
 
 ### Log in
@@ -76,7 +76,7 @@ The full list of supported variables is below.
 </ParamField>
 
 <ParamField body="GENTIC_API_KEY" type="string" required>
-  Your Gentic API key from your account settings at [gentic.chat](https://gentic.chat). The hosted API verifies this key and only returns issues that belong to your account.
+  A user-scoped API key accepted by the Gentic deployment. The hosted API verifies the key and only returns issues that belong to its user.
 
   ```bash
   GENTIC_API_KEY=your_api_key_here
@@ -92,6 +92,14 @@ The full list of supported variables is below.
 
   ```bash
   GIT_REMOTE_BASE=git@github.mycompany.com:
+  ```
+</ParamField>
+
+<ParamField body="MAX_CONCURRENT_ISSUES" type="number" default="1">
+  The maximum number of issues this worker processes at the same time. Each active issue uses its own repository clone and realtime channel. Increase this only when the host has enough CPU, memory, disk, and agent-provider capacity.
+
+  ```bash
+  MAX_CONCURRENT_ISSUES=3
   ```
 </ParamField>
 

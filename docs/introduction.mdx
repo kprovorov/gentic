@@ -23,16 +23,16 @@ Gentic has two parts that work together: the **web app** you use every day, and 
 
 <CardGroup cols={2}>
   <Card title="Issue Management" icon="list-check" href="/web/issues">
-    Create issues with a title, detailed prompt, agent choice, and file attachments. Move them through Draft → Todo → In Progress → Done.
+    Create issues from a detailed prompt and attachments, then move them through Draft → Todo → In progress → Ready for review.
   </Card>
   <Card title="Claude Code & Codex" icon="robot" href="/agent/overview">
     Assign each issue to Claude Code or OpenAI Codex. The worker selects the right agent automatically based on the issue setting.
   </Card>
-  <Card title="GitHub Integration" icon="github" href="/web/projects">
-    Connect your GitHub repositories so the agent worker can clone them, create branches, commit changes, and open pull requests on your behalf.
+  <Card title="GitHub Integration" icon="github" href="/web/github-integration">
+    Connect a GitHub App so pull-request and review events update the matching Gentic issue. The worker keeps separate Git credentials for cloning and pushing.
   </Card>
   <Card title="File Attachments" icon="paperclip" href="/web/issues">
-    Attach images, text files, and other documents to an issue. The agent receives them as part of its first prompt, giving it real context to work from.
+    Attach images, text files, and other documents to the initial prompt or a follow-up message.
   </Card>
   <Card title="Issue Dependencies" icon="link" href="/web/issues">
     Block one issue on another to sequence work. Dependent issues won't be picked up by the worker until their blockers are resolved.
@@ -44,7 +44,7 @@ Gentic has two parts that work together: the **web app** you use every day, and 
 
 ## Supported AI agents
 
-Gentic currently supports two AI coding agents. You choose the agent when you create an issue, and you can switch it at any time before the issue moves to Todo.
+Gentic currently supports two AI coding agents. Choose one when you run an issue. You can switch it from the issue detail page until the first run starts.
 
 | Agent | Provider | Notes |
 |---|---|---|

@@ -18,7 +18,7 @@ Open a terminal on the machine where you deployed the worker and run:
 gentic status
 ```
 
-The output shows whether the worker is running, which API endpoint it is connected to, and the time of its last successful poll. If the worker is stopped, start it with:
+The output shows configured authentication, service state, boot configuration, and whether the required external tools are installed and authenticated. It does not currently test the API connection or report the last poll. If the worker is stopped, start it with:
 
 ```bash
 gentic start
@@ -34,22 +34,19 @@ You will be prompted for your `GENTIC_API_URL` (for example `https://gentic.chat
 
 ### Add a project in Settings
 
-Gentic needs to know which GitHub repository to clone when it runs an agent. If you have not added a project yet, navigate to **Settings → Projects** and click **Add project**.
+Gentic needs to know which GitHub repository to clone when it runs an agent. If you have not added a project yet, open **Settings** and use the **Add project** card.
 
-Enter the repository in `owner/repo` format — for example `acme-corp/api-server`. Gentic prepends the configured `GIT_REMOTE_BASE` (default: `git@github.com:`) to build the clone URL, so your worker must have SSH access to that repository. Save the project before moving on.
+Enter a project name and the repository in `owner/repo` format — for example `acme-corp/api-server`. Optionally add a setup script. Gentic prepends the configured `GIT_REMOTE_BASE` (default: `git@github.com:`) to build the clone URL, so your worker must have SSH access to that repository. Save the project before moving on.
 
 ### Create a new issue
 
-Navigate to **Issues → New Issue** in the sidebar. Fill in the form fields:
+Open **Issues**, click **New issue**, and complete the form:
 
 - **Project** — select the repository you just added.
-- **Title** — a short, human-readable summary of the task (up to 160 characters).
-- **Type** — choose `Feature`, `Bug`, `Feedback`, or `Idea` to categorise the work.
-- **Agent** — select `Claude Code` (default) or `Codex` depending on which agent your worker environment has credentials for.
 - **Prompt** — the detailed instructions the agent will receive. See the next step for advice on writing an effective prompt.
-- **Status** — leave this as `Draft` for now so the agent does not start before you are ready.
+- **Attachments** — optionally add screenshots, logs, or specifications with the paperclip button or drag and drop.
 
-Click **Create issue** to save it.
+Click **Save draft**. Gentic generates a title and type in the background. If you do not need to review a draft, use **Run with Claude Code** or its dropdown option, **Run with Codex**, instead.
 
 ### Write a great prompt
 
@@ -60,7 +57,7 @@ The prompt is the single most important input you give the agent. A vague prompt
 
   - **Be specific about location.** Instead of "fix the login bug", write "In `src/auth/login.ts`, the `validateEmail` function does not reject addresses missing an `@` symbol."
   - **State acceptance criteria.** "The endpoint should return `400` with `{ "error": "email is required" }` when the `email` field is absent."
-  - **Mention the tech stack.** "This is a Next.js 14 app using Zod for schema validation and Prisma for database access."
+  - **Mention the tech stack.** "This is a Next.js app using Zod for schema validation and Prisma for database access."
   - **Include file paths when you know them.** "Update the schema in `prisma/schema.prisma` and regenerate the client."
   - **List constraints.** "Do not change the public API surface of `UserService`. All new logic should be in a private helper method."
 </Tip>
@@ -77,11 +74,11 @@ Open the issue you just created and review the prompt in the detail panel. Edit 
 
 When you are satisfied with the prompt, change the issue status to **Todo**. This is the trigger: Gentic moves the issue into the unclaimed pool (status `todo`) and inserts the opening user message. On its next poll cycle (every three seconds by default), an agent worker claims the issue — flipping it to `queued` while it clones the repository, then to `in-progress` once the agent session starts.
 
-You can change the status from the issue detail page using the **Status** dropdown, or from the home screen using the status badge on the issue card.
+You can change the status from the issue detail page using the **Status** dropdown, or from the **Issues** list using the status menu.
 
 ### Watch the agent work
 
-After the status moves to **Todo**, the issue transitions to **Queued** as soon as a worker claims it and then to **In Progress** once the agent session starts. The **Transcript** panel on the issue detail page streams the agent's output in real time — you can watch it read files, reason about the change, and write code.
+After the status moves to **Todo**, the issue transitions to **Queued** as soon as a worker claims it and then to **In progress** once the agent session starts. The **Agent activity** panel streams the agent's output in real time.
 
 <Note>
   If the issue stays on **Todo** for more than a minute, check that the worker is still running (`gentic status`) and that it can reach the Gentic API. See the [Troubleshooting guide](/guides/troubleshooting) for common causes.
