@@ -1,6 +1,6 @@
 begin;
 
-select plan(19);
+select plan(21);
 
 insert into public.projects (id, user_id, name, repo)
 values
@@ -264,6 +264,30 @@ select set_config(
   'request.jwt.claims',
   '{"role":"service_role"}',
   true
+);
+
+select throws_like(
+  $$
+    select public.reset_issue_run_audited(
+      '00000000-0000-0000-0000-0000000000a2',
+      'codex',
+      'user_b',
+      'test wrong actor reset',
+      'sql_test'
+    )
+  $$,
+  '%Issue not found%',
+  'audited reset requires the actor to own the issue'
+);
+
+select is(
+  (
+    select count(*)
+    from public.messages
+    where issue_id = '00000000-0000-0000-0000-0000000000a2'
+  ),
+  2::bigint,
+  'failed wrong-actor reset does not delete transcript rows'
 );
 
 select lives_ok(

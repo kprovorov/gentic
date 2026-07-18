@@ -279,10 +279,12 @@ begin
       using errcode = '22023';
   end if;
 
-  select prompt, agent_provider, status
+  select issues.prompt, issues.agent_provider, issues.status
   into v_prompt, v_previous_agent_provider, v_previous_status
   from public.issues
-  where id = p_issue_id;
+  join public.projects on projects.id = issues.project_id
+  where issues.id = p_issue_id
+    and projects.user_id = p_actor_user_id;
 
   if not found then
     raise exception 'Issue not found'
