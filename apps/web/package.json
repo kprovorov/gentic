@@ -8,7 +8,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/**/*.test.mjs",
     "lint": "eslint",
     "test": "node --import tsx --test \"app/**/*.test.ts\"",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

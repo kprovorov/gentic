@@ -1,14 +1,14 @@
+import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { test } from "node:test"
-import assert from "node:assert/strict"
 
 test("agent API authentication has no temporary API-key bypass", async () => {
   const authHelper = await readFile(
-    new URL("../app/api/v1/agent/_lib.ts", import.meta.url),
+    new URL("./_lib.ts", import.meta.url),
     "utf8"
   )
   const envExample = await readFile(
-    new URL("../.env.example", import.meta.url),
+    new URL("../../../../.env.example", import.meta.url),
     "utf8"
   )
 
