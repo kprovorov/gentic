@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(19);
 
 insert into public.projects (id, user_id, name, repo)
 values
@@ -72,20 +72,35 @@ select is(
 
 select lives_ok(
   $$
+    select public.send_issue_user_message(
+      '00000000-0000-0000-0000-0000000000a2',
+      'allowed follow-up'
+    )
+  $$,
+  'authenticated issue owners can append user messages through the authorized RPC'
+);
+
+select throws_like(
+  $$
     insert into public.messages (
       id,
       issue_id,
       role,
-      content
+      content,
+      consumed_by_run_id,
+      consumed_at
     )
     values (
       '00000000-0000-0000-0000-0000000000a4',
       '00000000-0000-0000-0000-0000000000a2',
       'user',
-      'allowed follow-up'
+      'allowed follow-up',
+      '00000000-0000-0000-0000-0000000000aa',
+      now()
     )
   $$,
-  'authenticated issue owners can append user messages'
+  '%permission denied%',
+  'authenticated users cannot forge message run-consumption identity'
 );
 
 select throws_like(
@@ -103,26 +118,18 @@ select throws_like(
       'forged assistant row'
     )
   $$,
-  '%row-level security%',
+  '%permission denied%',
   'authenticated users cannot forge assistant authorship'
 );
 
 select throws_like(
   $$
-    insert into public.messages (
-      id,
-      issue_id,
-      role,
-      content
-    )
-    values (
-      '00000000-0000-0000-0000-0000000000b4',
+    select public.send_issue_user_message(
       '00000000-0000-0000-0000-0000000000b2',
-      'user',
       'cross-user insert'
     )
   $$,
-  '%row-level security%',
+  '%Issue not found%',
   'authenticated users cannot append messages to another user issue'
 );
 

@@ -7,7 +7,7 @@ drop policy if exists "Users can update messages for their own issues"
 drop policy if exists "Users can delete messages for their own issues"
   on public.messages;
 
-revoke update, delete on public.messages from authenticated;
+revoke insert, update, delete on public.messages from authenticated;
 
 -- Keep direct client issue edits away from run identity/state fields. Trusted
 -- agent/webhook/reset paths use the service role after doing explicit

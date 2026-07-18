@@ -2,7 +2,8 @@
 
 Issue transcripts are append-only for normal authenticated clients:
 
-- Browser clients may insert `role = 'user'` messages for issues they own.
+- Browser clients may append user messages for issues they own through the
+  ownership-checked `send_issue_user_message` RPC.
 - Browser clients may not insert `assistant` or `system` messages.
 - Browser clients may not update or delete rows in `public.messages`.
 - Browser clients may not update protected issue run fields such as
