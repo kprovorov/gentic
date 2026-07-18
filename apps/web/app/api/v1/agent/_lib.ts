@@ -131,12 +131,22 @@ export class ApiError extends Error {
   }
 }
 
+const SPECIAL_TEST_API_KEY_ENABLED =
+  process.env.SPECIAL_TEST_API_KEY_ENABLED === "true"
+const SPECIAL_TEST_API_KEY = process.env.SPECIAL_TEST_API_KEY
+const SPECIAL_TEST_USER_ID = process.env.SPECIAL_TEST_USER_ID
+
 async function authenticateApiKey(request: Request): Promise<string> {
   const authorization = request.headers.get("authorization")
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   if (!token) {
     throw new ApiError(401, "Missing bearer token")
+  }
+
+  const specialTestUserId = authenticateSpecialTestApiKey(token)
+  if (specialTestUserId) {
+    return specialTestUserId
   }
 
   const key = authCacheKey(token)
@@ -157,6 +167,30 @@ async function authenticateApiKey(request: Request): Promise<string> {
   rememberLocally(key, subject)
   await redisSet(redis, key, subject)
   return subject
+}
+
+function authenticateSpecialTestApiKey(token: string): string | null {
+  if (
+    !SPECIAL_TEST_API_KEY_ENABLED ||
+    !SPECIAL_TEST_API_KEY ||
+    !SPECIAL_TEST_USER_ID ||
+    token !== SPECIAL_TEST_API_KEY
+  ) {
+    return null
+  }
+
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production"
+  ) {
+    throw new ApiError(403, "Temporary API key bypass is disabled in production")
+  }
+
+  if (!SPECIAL_TEST_USER_ID.startsWith("user_")) {
+    throw new ApiError(403, "Temporary API key user must be user-scoped")
+  }
+
+  return SPECIAL_TEST_USER_ID
 }
 
 async function verifyApiKeyWithClerk(token: string): Promise<string> {
