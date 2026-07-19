@@ -131,8 +131,6 @@ export class ApiError extends Error {
   }
 }
 
-const SPECIAL_TEST_API_KEY_ENABLED =
-  process.env.SPECIAL_TEST_API_KEY_ENABLED === "true"
 const SPECIAL_TEST_API_KEY = process.env.SPECIAL_TEST_API_KEY
 const SPECIAL_TEST_USER_ID = process.env.SPECIAL_TEST_USER_ID
 
@@ -171,7 +169,6 @@ async function authenticateApiKey(request: Request): Promise<string> {
 
 function authenticateSpecialTestApiKey(token: string): string | null {
   if (
-    !SPECIAL_TEST_API_KEY_ENABLED ||
     !SPECIAL_TEST_API_KEY ||
     !SPECIAL_TEST_USER_ID ||
     token !== SPECIAL_TEST_API_KEY
