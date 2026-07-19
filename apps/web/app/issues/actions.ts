@@ -315,16 +315,19 @@ const deleteAttachmentSchema = z.object({
 })
 
 export async function deleteAttachment(formData: FormData) {
-  const { supabase } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedContext()
   const { id, issue_id } = deleteAttachmentSchema.parse({
     id: getString(formData, "id"),
     issue_id: getString(formData, "issue_id"),
   })
 
+  await issuesService.ensureIssueOwned(supabase, userId, issue_id)
+
   const { data: attachment, error: fetchError } = await supabase
     .from("attachments")
     .select("storage_path")
     .eq("id", id)
+    .eq("issue_id", issue_id)
     .single<{ storage_path: string }>()
 
   if (fetchError) {
