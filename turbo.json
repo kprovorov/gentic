@@ -20,6 +20,9 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "test": {
+      "dependsOn": ["^test"]
+    },
     "format": {
       "cache": false
     }
