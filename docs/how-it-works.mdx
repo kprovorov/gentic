@@ -53,6 +53,8 @@ When the agent finishes its run, the worker resolves the issue directly to `read
 
 The issue transcript is a live conversation. While the issue is `in-progress`, you can type a follow-up message in the web app — for example, to clarify a requirement or redirect the agent. The worker picks up any new messages sent during an active session and delivers them to the agent in the same ACP session without restarting.
 
+Typing `/` in the composer opens a picker of the agent's built-in slash commands (like `/model`, `/plan`, or `/compact`), filtered to whichever agent — Claude Code or Codex — the issue is configured to use. The command is forwarded verbatim to the underlying agent, which handles it natively. See [Sending Messages While the Agent Runs](/web/issues#sending-messages-while-the-agent-runs) for details.
+
 The worker keeps the session open for one full poll interval after the agent goes quiet, so messages sent just as the agent is finishing are still handled in the same run.
 
 ### Follow-up messages re-queue finished issues
