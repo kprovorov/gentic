@@ -33,6 +33,7 @@ export interface StructuredMessageFields {
   run_id?: string | null
   event_type?: EventType | null
   event_status?: EventStatus | null
+  event_ts?: string | null
   event_seq?: number | null
   tool_call_id?: string | null
   payload?: Record<string, unknown> | null
@@ -57,6 +58,7 @@ export class StreamingAssistantMessage {
   private timer: ReturnType<typeof setTimeout> | null = null
   private started = false
   private finalized = false
+  private lastEventTs: string | null = null
 
   constructor(
     private readonly api: AgentApi,
@@ -129,6 +131,7 @@ export class StreamingAssistantMessage {
         run_id: this.runId ?? null,
         event_type: this.kind === "thinking" ? "thought" : "text",
         event_status: "completed",
+        event_ts: this.lastEventTs,
         event_seq: this.seq,
         payload: { content: this.content },
       },
@@ -161,6 +164,7 @@ export class StreamingAssistantMessage {
         run_id: this.runId ?? null,
         event_type: this.kind === "thinking" ? "thought" : "text",
         event_status: "failed",
+        event_ts: this.lastEventTs,
         event_seq: this.seq,
         payload: { content: this.content },
       },
@@ -172,6 +176,8 @@ export class StreamingAssistantMessage {
     status: "streaming" | "complete" | "error"
   ): Promise<void> {
     this.seq += 1
+    const eventTs = new Date().toISOString()
+    this.lastEventTs = eventTs
     await this.channel.publishMessage({
       id: this.id,
       seq: this.seq,
@@ -188,6 +194,7 @@ export class StreamingAssistantMessage {
           : status === "error"
             ? "failed"
             : "completed",
+      event_ts: eventTs,
       event_seq: this.seq,
       payload: { content: this.content },
     })
@@ -250,22 +257,25 @@ export async function publishStructuredMessage(
   fields: StructuredMessageFields,
   persistOptions?: PersistOptions
 ): Promise<void> {
+  const eventTs = fields.event_ts ?? new Date().toISOString()
+  const message = { ...fields, event_ts: eventTs }
   await channel.publishMessage({
-    id: fields.id,
-    seq: fields.event_seq ?? 1,
-    role: fields.role,
-    kind: fields.kind,
-    content: fields.content,
-    status: fields.status,
-    event_id: fields.event_id ?? null,
-    run_id: fields.run_id ?? null,
-    event_type: fields.event_type ?? null,
-    event_status: fields.event_status ?? null,
-    event_seq: fields.event_seq ?? null,
-    tool_call_id: fields.tool_call_id ?? null,
-    payload: fields.payload ?? null,
+    id: message.id,
+    seq: message.event_seq ?? 1,
+    role: message.role,
+    kind: message.kind,
+    content: message.content,
+    status: message.status,
+    event_id: message.event_id ?? null,
+    run_id: message.run_id ?? null,
+    event_type: message.event_type ?? null,
+    event_status: message.event_status ?? null,
+    event_ts: message.event_ts,
+    event_seq: message.event_seq ?? null,
+    tool_call_id: message.tool_call_id ?? null,
+    payload: message.payload ?? null,
   })
-  await persistMessageWithRetry(api, issueId, fields, persistOptions)
+  await persistMessageWithRetry(api, issueId, message, persistOptions)
 }
 
 /**
@@ -304,6 +314,7 @@ async function persistMessageWithRetry(
     run_id?: string | null
     event_type?: EventType | null
     event_status?: EventStatus | null
+    event_ts?: string | null
     event_seq?: number | null
     tool_call_id?: string | null
     payload?: Record<string, unknown> | null

@@ -7,6 +7,7 @@ import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
 import { issueRunInstructions, runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T/
 
 test("finalize inserts exactly once with the broadcast id", async () => {
   const api = fakeApi()
@@ -108,6 +109,7 @@ test("runTurn maps text and thought chunks to structured stable events", async (
   assert.equal(api.inserted[0]?.message.event_type, "text")
   assert.equal(api.inserted[0]?.message.event_id, "m1")
   assert.equal(api.inserted[0]?.message.run_id, "session-1")
+  assert.match(api.inserted[0]?.message.event_ts ?? "", ISO_DATE)
   assert.equal(api.inserted[1]?.message.event_type, "thought")
   assert.equal(api.inserted[1]?.message.event_id, "t1")
   assert.match(api.inserted[0]?.message.id ?? "", /^[0-9a-f-]{36}$/)
@@ -155,6 +157,7 @@ test("runTurn updates tool calls through real statuses with one stable id", asyn
   )
   assert.equal(new Set(api.inserted.map((entry) => entry.message.id)).size, 1)
   assert.equal(channel.messages.at(-1)?.tool_call_id, "tool-1")
+  assert.match(channel.messages.at(-1)?.event_ts ?? "", ISO_DATE)
   assert.match(channel.messages.at(-1)?.content ?? "", /package contents/)
 })
 
@@ -198,6 +201,7 @@ test("runTurn renders plan lifecycle events incrementally", async () => {
     ["in_progress", "completed", "removed"]
   )
   assert.match(api.inserted[0]?.message.content ?? "", /\[>\] Inspect/)
+  assert.match(api.inserted[0]?.message.event_ts ?? "", ISO_DATE)
   assert.match(api.inserted[1]?.message.content ?? "", /\[x\] Patch/)
 })
 

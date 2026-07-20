@@ -35,6 +35,7 @@ export type RealtimeMessageEvent = {
     | "failed"
     | "removed"
     | null
+  event_ts?: string | null
   event_seq?: number | null
   tool_call_id?: string | null
   payload?: Record<string, unknown> | null

@@ -62,6 +62,7 @@ export const insertMessageSchema = z.object({
     .enum(["pending", "in_progress", "completed", "failed", "removed"])
     .nullable()
     .optional(),
+  event_ts: z.string().datetime().nullable().optional(),
   event_seq: z.number().int().positive().nullable().optional(),
   tool_call_id: z.string().nullable().optional(),
   payload: z.record(z.string(), z.unknown()).nullable().optional(),

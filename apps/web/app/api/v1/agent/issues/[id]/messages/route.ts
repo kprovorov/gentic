@@ -66,6 +66,7 @@ export async function POST(
           run_id: fields.run_id ?? null,
           event_type: fields.event_type ?? null,
           event_status: fields.event_status ?? null,
+          event_ts: fields.event_ts ?? null,
           event_seq: fields.event_seq ?? null,
           tool_call_id: fields.tool_call_id ?? null,
           payload: fields.payload ?? null,

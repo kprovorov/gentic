@@ -3,6 +3,7 @@ alter table public.messages
   add column run_id text,
   add column event_type text,
   add column event_status text,
+  add column event_ts timestamptz,
   add column event_seq integer,
   add column tool_call_id text,
   add column payload jsonb;
@@ -64,6 +65,7 @@ set
     when status = 'error' then 'failed'
     else 'completed'
   end,
+  event_ts = created_at,
   event_seq = 1,
   payload = jsonb_build_object(
     'legacy', true,

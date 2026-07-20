@@ -35,6 +35,7 @@ export const messageEventSchema = z.object({
   run_id: z.string().min(1).nullable().optional(),
   event_type: chatEventTypeSchema.nullable().optional(),
   event_status: chatEventStatusSchema.nullable().optional(),
+  event_ts: z.string().datetime().nullable().optional(),
   event_seq: z.number().int().positive().nullable().optional(),
   tool_call_id: z.string().min(1).nullable().optional(),
   payload: chatEventPayloadSchema.nullable().optional(),

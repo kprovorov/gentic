@@ -143,6 +143,7 @@ export type ChatMessage = {
   run_id?: string | null
   event_type?: ChatEventType | null
   event_status?: ChatEventStatus | null
+  event_ts?: string | null
   event_seq?: number | null
   tool_call_id?: string | null
   payload?: Record<string, unknown> | null
@@ -541,6 +542,7 @@ export function IssueChat({
                 run_id: event.data.run_id ?? null,
                 event_type: event.data.event_type ?? null,
                 event_status: event.data.event_status ?? null,
+                event_ts: event.data.event_ts ?? null,
                 event_seq: event.data.event_seq ?? null,
                 tool_call_id: event.data.tool_call_id ?? null,
                 payload: event.data.payload ?? null,
