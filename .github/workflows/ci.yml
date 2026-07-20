@@ -4,7 +4,14 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
@@ -24,10 +31,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Disable placeholder local Clerk auth
-        run: >-
-          perl -0pi -e
-          's/\[auth\.third_party\.clerk\]\nenabled = true/[auth.third_party.clerk]\nenabled = false/'
-          supabase/config.toml
+        run: |
+          perl -0pi -e 's/(\[auth\.third_party\.clerk\]\nenabled = )true/${1}false/' supabase/config.toml
 
       - name: Start Supabase
         run: pnpm dlx supabase@2.109.1 start
@@ -35,14 +40,24 @@ jobs:
       - name: Verify generated Supabase types
         run: pnpm db:types:check
 
+      - name: Lint local database
+        run: pnpm dlx supabase@2.109.1 db lint --local
+
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Build
-        run: pnpm build
+      - name: Root tests
+        env:
+          TZ: UTC
+        run: pnpm test
 
-      - name: Test
+      - name: Agent tests in non-UTC timezone
+        env:
+          TZ: America/Los_Angeles
         run: pnpm --filter @gentic/gentic test
+
+      - name: Production build
+        run: pnpm build

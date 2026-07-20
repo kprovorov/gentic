@@ -22,6 +22,30 @@ import {
 import { runAgentSession } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 
+export interface ProcessIssueDeps {
+  connectIssueChannel: typeof connectIssueChannel
+  cloneRepo: typeof cloneRepo
+  checkoutPullRequest: typeof checkoutPullRequest
+  hasLocalCheckout: typeof hasLocalCheckout
+  runSetupScript: typeof runSetupScript
+  setRunState: typeof setRunState
+  buildAttachmentBlocks: typeof buildAttachmentBlocks
+  runAgentSession: typeof runAgentSession
+  getPullRequestUrl: typeof getPullRequestUrl
+}
+
+const defaultProcessIssueDeps: ProcessIssueDeps = {
+  connectIssueChannel,
+  cloneRepo,
+  checkoutPullRequest,
+  hasLocalCheckout,
+  runSetupScript,
+  setRunState,
+  buildAttachmentBlocks,
+  runAgentSession,
+  getPullRequestUrl,
+}
+
 export async function runWorker(): Promise<void> {
   const config = loadConfig()
   const api = createAgentApi({
@@ -88,10 +112,11 @@ export async function runWorker(): Promise<void> {
   logInfo("worker stopped")
 }
 
-async function processIssue(
+export async function processIssue(
   api: AgentApi,
   config: Config,
-  issue: ClaimedIssue
+  issue: ClaimedIssue,
+  deps: ProcessIssueDeps = defaultProcessIssueDeps
 ): Promise<void> {
   const dir = join(config.WORKDIR, issue.id)
   // Sibling of the repo clone, not inside it, so downloaded attachments can
@@ -108,7 +133,7 @@ async function processIssue(
       runId: issue.activeRunId,
       pollIntervalMs: config.POLL_INTERVAL_MS,
       buildPrompt: async (content) => {
-        const attachmentBlocks = await buildAttachmentBlocks(
+        const attachmentBlocks = await deps.buildAttachmentBlocks(
           api,
           issue.id,
           attachmentsDir
@@ -126,7 +151,7 @@ async function processIssue(
       },
     })
 
-    channel = await connectIssueChannel(
+    channel = await deps.connectIssueChannel(
       api,
       issue.id,
       promptSource.wake
@@ -149,26 +174,26 @@ async function processIssue(
     // new run (no session yet) or when no local checkout survived (e.g. a
     // different worker machine claimed this follow-up).
     const resumingLocalCheckout =
-      Boolean(issue.sessionId) && hasLocalCheckout(dir)
+      Boolean(issue.sessionId) && deps.hasLocalCheckout(dir)
     if (!resumingLocalCheckout) {
-      await cloneRepo({
+      await deps.cloneRepo({
         remoteBase: config.GIT_REMOTE_BASE,
         repo: issue.repo,
         dir,
       })
 
       if (issue.prUrl) {
-        await checkoutPullRequest({ prUrl: issue.prUrl, dir })
+        await deps.checkoutPullRequest({ prUrl: issue.prUrl, dir })
       }
     }
 
     if (issue.setupScript) {
-      await runSetupScript({ script: issue.setupScript, dir })
+      await deps.runSetupScript({ script: issue.setupScript, dir })
     }
 
-    await setRunState(api, channel, issue.id, { status: "in-progress" })
+    await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
 
-    await runAgentSession({
+    await deps.runAgentSession({
       api,
       issueId: issue.id,
       channel,
@@ -178,7 +203,7 @@ async function processIssue(
       existingPrUrl: issue.prUrl,
       onSessionId: (sessionId) => {
         currentSessionId = sessionId
-        return setRunState(api, channel, issue.id, {
+        return deps.setRunState(api, channel, issue.id, {
           session_id: sessionId,
         })
       },
@@ -186,7 +211,7 @@ async function processIssue(
       nextPrompt: promptSource.nextPrompt,
     })
 
-    const prUrl = await getPullRequestUrl(dir)
+    const prUrl = await deps.getPullRequestUrl(dir)
     const finished = await api.finishRun(issue.id, {
       active_run_id: issue.activeRunId,
       status: prUrl ? "ready-for-review" : "waiting-for-input",
@@ -197,12 +222,17 @@ async function processIssue(
       logInfo(
         `issue ${issue.id} received more prompts before finish; re-queueing`
       )
-      await setRunState(api, channel, issue.id, { status: "in-progress" })
-      await processIssue(api, config, {
-        ...issue,
-        sessionId: currentSessionId,
-        prUrl,
-      })
+      await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
+      await processIssue(
+        api,
+        config,
+        {
+          ...issue,
+          sessionId: currentSessionId,
+          prUrl,
+        },
+        deps
+      )
       return
     }
     if (channel) {
@@ -221,7 +251,7 @@ async function processIssue(
       logInfo(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
-      await setRunState(api, channel, issue.id, {
+      await deps.setRunState(api, channel, issue.id, {
         status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
@@ -233,7 +263,7 @@ async function processIssue(
     }
 
     logError(`issue ${issue.id} failed:`, message)
-    await setRunState(api, channel, issue.id, {
+    await deps.setRunState(api, channel, issue.id, {
       status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),

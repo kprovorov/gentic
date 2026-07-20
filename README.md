@@ -38,7 +38,30 @@ Run checks before shipping changes:
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
+```
+
+The agent test suite includes race/reconnect coverage for prompt replay,
+overlapping runs, final-message durability, ordering, and attachment scoping.
+Run it under both UTC and a non-UTC timezone before changing chat or worker
+behavior:
+
+```bash
+TZ=UTC pnpm --filter @gentic/gentic test
+TZ=America/Los_Angeles pnpm --filter @gentic/gentic test
+```
+
+Pull request CI runs install, Supabase startup, generated database type checks,
+database linting, lint, typecheck, root tests, agent tests in a non-UTC
+timezone, and the production build. The Supabase checks use the local Docker
+stack and do not require project secrets. To run them locally, install Docker,
+then run:
+
+```bash
+pnpm dlx supabase@2.109.1 start
+pnpm db:types:check
+pnpm dlx supabase@2.109.1 db lint --local
 ```
 
 Run the agent worker tests separately:
