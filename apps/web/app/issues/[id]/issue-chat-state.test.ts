@@ -203,6 +203,9 @@ test("failed optimistic sends remain visible with failed pending state", () => {
   state = issueChatReducer(state, {
     type: "failure",
     optimisticId: "optimistic-2",
+    error: "Network dropped",
+    content: "try me",
+    files: [],
   })
 
   assert.deepEqual(selectIssueChatMessages(state), [
@@ -214,7 +217,10 @@ test("failed optimistic sends remain visible with failed pending state", () => {
         content: "try me",
         status: "error",
       }),
+      deliveryError: "Network dropped",
       pending: "failed",
+      retryContent: "try me",
+      retryFiles: [],
     },
   ])
 })

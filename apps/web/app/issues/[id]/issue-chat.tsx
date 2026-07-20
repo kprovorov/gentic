@@ -6,6 +6,7 @@ import {
   IconExternalLink,
   IconGitPullRequest,
   IconLoader2,
+  IconRefresh,
   IconSend,
 } from "@tabler/icons-react"
 import { Streamdown } from "streamdown"
@@ -119,6 +120,12 @@ function filterSlashCommands(
     .slice(0, 8)
 }
 
+type RealtimeConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "offline"
+
 function mergePullRequest(
   list: IssuePullRequest[],
   incoming: IssuePullRequest
@@ -180,6 +187,9 @@ export function IssueChat({
   // scroller's own follow-bottom heuristic only kicks in if the viewport was
   // already at the bottom before the new message landed.
   const [sendTick, setSendTick] = useState(0)
+  const [liveMessage, setLiveMessage] = useState("")
+  const [connectionStatus, setConnectionStatus] =
+    useState<RealtimeConnectionStatus>("connecting")
   const queryClient = useQueryClient()
   // The private broadcast channel from the effect below, kept in a ref so
   // `handleSubmit` can send on it without re-subscribing on every render.
@@ -187,11 +197,32 @@ export function IssueChat({
     ReturnType<typeof useSupabaseClient>["channel"]
   > | null>(null)
   const broadcastSubscribedRef = useRef(false)
+  const announcedAssistantMessageRef = useRef<string | null>(null)
+  const connectionStatusRef =
+    useRef<RealtimeConnectionStatus>(connectionStatus)
+
+  function setRealtimeConnectionStatus(
+    nextStatus: RealtimeConnectionStatus,
+    announcement?: string
+  ) {
+    connectionStatusRef.current = nextStatus
+    setConnectionStatus(nextStatus)
+    if (announcement) {
+      setLiveMessage(announcement)
+    }
+  }
+
   const mutation = useMutation({
     mutationFn: sendIssueMessage,
     onMutate: (formData) => {
       const content = String(formData.get("content") ?? "")
-      const optimisticId = `optimistic-${crypto.randomUUID()}`
+      const retryId = String(formData.get("client_message_id") ?? "")
+      const optimisticId = retryId.startsWith("optimistic-")
+        ? retryId
+        : `optimistic-${crypto.randomUUID()}`
+      const files = formData
+        .getAll("files")
+        .filter((value): value is File => value instanceof File)
 
       dispatch({
         type: "optimistic_send",
@@ -203,8 +234,11 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: new Date().toISOString(),
+          retryContent: content,
+          retryFiles: files,
         },
       })
+      setLiveMessage("Sending message.")
 
       return { optimisticId }
     },
@@ -224,6 +258,7 @@ export function IssueChat({
           created_at: message.created_at,
         },
       })
+      setLiveMessage("Message delivered. Agent will process it shortly.")
 
       if (broadcastSubscribedRef.current && broadcastChannelRef.current) {
         void broadcastChannelRef.current.send({
@@ -239,10 +274,23 @@ export function IssueChat({
       await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
     },
     onError: (_error, formData, context) => {
+      const content = String(formData.get("content") ?? "")
+      const files = formData
+        .getAll("files")
+        .filter((value): value is File => value instanceof File)
+      const error = getSendErrorMessage(_error)
       if (context) {
-        dispatch({ type: "failure", optimisticId: context.optimisticId })
+        dispatch({
+          type: "failure",
+          optimisticId: context.optimisticId,
+          error,
+          content,
+          files,
+        })
       }
-      setDraft((current) => current || String(formData.get("content") ?? ""))
+      setDraft((current) => current || content)
+      setDraftFiles((current) => (current.length > 0 ? current : files))
+      setLiveMessage(`Message failed to send. ${error}`)
     },
   })
 
@@ -309,6 +357,50 @@ export function IssueChat({
     (status === "queued" || status === "in-progress") &&
     !hasStreamingMessage &&
     !lastMessageCompletedAssistantTurn
+  const connectionMessage = getConnectionMessage(connectionStatus)
+
+  useEffect(() => {
+    const lastAssistant = displayedMessages.findLast(
+      (message) =>
+        message.role === "assistant" &&
+        message.kind === "text" &&
+        message.status === "complete"
+    )
+    if (!lastAssistant) {
+      return
+    }
+    if (announcedAssistantMessageRef.current === lastAssistant.id) {
+      return
+    }
+    announcedAssistantMessageRef.current = lastAssistant.id
+    setLiveMessage("Agent response complete.")
+  }, [displayedMessages])
+
+  useEffect(() => {
+    function updateOnlineStatus() {
+      if (!navigator.onLine) {
+        setRealtimeConnectionStatus(
+          "offline",
+          "You are offline. You can keep composing."
+        )
+        return
+      }
+      if (connectionStatusRef.current === "offline") {
+        setRealtimeConnectionStatus(
+          "reconnecting",
+          "Realtime connection lost. Reconnecting."
+        )
+      }
+    }
+
+    updateOnlineStatus()
+    window.addEventListener("online", updateOnlineStatus)
+    window.addEventListener("offline", updateOnlineStatus)
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus)
+      window.removeEventListener("offline", updateOnlineStatus)
+    }
+  }, [])
 
   useEffect(() => {
     const channel = supabase
@@ -413,6 +505,39 @@ export function IssueChat({
         )
         .subscribe((subscribeStatus) => {
           broadcastSubscribedRef.current = subscribeStatus === "SUBSCRIBED"
+          if (typeof navigator !== "undefined" && !navigator.onLine) {
+            setRealtimeConnectionStatus(
+              "offline",
+              "You are offline. You can keep composing."
+            )
+            return
+          }
+          if (subscribeStatus === "SUBSCRIBED") {
+            setRealtimeConnectionStatus(
+              "connected",
+              connectionStatusRef.current === "connected"
+                ? undefined
+                : "Realtime connection restored."
+            )
+            return
+          }
+          if (subscribeStatus === "TIMED_OUT" || subscribeStatus === "CLOSED") {
+            setRealtimeConnectionStatus(
+              "reconnecting",
+              "Realtime connection lost. Reconnecting."
+            )
+            return
+          }
+          if (subscribeStatus === "CHANNEL_ERROR") {
+            if (connectionStatusRef.current === "connected") {
+              setRealtimeConnectionStatus(
+                "reconnecting",
+                "Realtime connection lost. Reconnecting."
+              )
+              return
+            }
+            setRealtimeConnectionStatus("connecting")
+          }
         })
 
       broadcastChannelRef.current = channel
@@ -441,6 +566,25 @@ export function IssueChat({
     formData.set("issue_id", issueId)
     formData.set("content", content)
     for (const file of draftFiles) {
+      formData.append("files", file)
+    }
+    setDraft("")
+    setDraftFiles([])
+    setSendTick((tick) => tick + 1)
+    mutation.mutate(formData)
+  }
+
+  function retryFailedMessage(message: ChatMessage) {
+    if (mutation.isPending) {
+      return
+    }
+
+    const content = message.retryContent ?? message.content ?? ""
+    const formData = new FormData()
+    formData.set("issue_id", issueId)
+    formData.set("content", content)
+    formData.set("client_message_id", message.id)
+    for (const file of message.retryFiles ?? []) {
       formData.append("files", file)
     }
     setDraft("")
@@ -496,6 +640,9 @@ export function IssueChat({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {liveMessage}
+      </div>
       {(usageLimitResetAt && status === "held") ||
       prUrl ||
       displayedPullRequests.length > 0 ? (
@@ -553,7 +700,13 @@ export function IssueChat({
                     key={message.clientKey ?? message.id}
                     messageId={message.id}
                   >
-                    <ChatMessageRow message={message} />
+                    <ChatMessageRow
+                      message={message}
+                      isLatestUserMessage={message.id === lastDisplayedMessage?.id}
+                      issueStatus={status}
+                      onRetry={retryFailedMessage}
+                      retryDisabled={mutation.isPending}
+                    />
                   </MessageScrollerItem>
                 ))
               )}
@@ -577,6 +730,21 @@ export function IssueChat({
         </MessageScroller>
       </MessageScrollerProvider>
 
+      {connectionMessage ? (
+        <div
+          className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            connectionStatus === "connected"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+          )}
+          role={connectionStatus === "connected" ? "status" : "alert"}
+          aria-live="polite"
+        >
+          {connectionMessage}
+        </div>
+      ) : null}
+
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <div className="relative min-w-0 flex-1">
           {showSlashCommands ? (
@@ -587,12 +755,12 @@ export function IssueChat({
             />
           ) : null}
           <AttachmentPromptField
-            key={sendTick}
             value={draft}
             onChange={(value) => {
               setDraft(value)
               setSelectedSlashCommandIndex(0)
             }}
+            files={draftFiles}
             onFilesChange={setDraftFiles}
             onKeyDown={handlePromptKeyDown}
             rows={2}
@@ -605,6 +773,9 @@ export function IssueChat({
         <Button
           type="submit"
           size="icon"
+          aria-label={
+            mutation.isPending ? "Sending message" : "Send message to agent"
+          }
           disabled={mutation.isPending || !draft.trim()}
         >
           <IconSend />
@@ -674,12 +845,28 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
-function ChatMessageRow({ message }: { message: ChatMessage }) {
+function ChatMessageRow({
+  message,
+  isLatestUserMessage = false,
+  issueStatus,
+  onRetry,
+  retryDisabled = false,
+}: {
+  message: ChatMessage
+  isLatestUserMessage?: boolean
+  issueStatus?: IssueStatus
+  onRetry?: (message: ChatMessage) => void
+  retryDisabled?: boolean
+}) {
   const isUser = message.role === "user"
   const isTool = message.kind === "tool"
   const isMarker = message.role === "system" || message.kind === "thinking"
   const content = message.content ?? ""
   const isStreaming = message.status === "streaming"
+  const deliveryLabel = getDeliveryLabel(message, {
+    isLatestUserMessage,
+    issueStatus,
+  })
 
   if (isMarker) {
     return (
@@ -767,7 +954,76 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
             ) : null}
           </BubbleContent>
         </Bubble>
+        {deliveryLabel || message.pending === "failed" ? (
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2 px-3.5 text-xs text-muted-foreground">
+            {deliveryLabel ? <span>{deliveryLabel}</span> : null}
+            {message.pending === "failed" ? (
+              <>
+                {message.deliveryError ? (
+                  <span className="text-destructive">
+                    {message.deliveryError}
+                  </span>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => onRetry?.(message)}
+                  disabled={retryDisabled}
+                >
+                  <IconRefresh />
+                  Retry
+                </Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </MessageContent>
     </Message>
   )
+}
+
+function getDeliveryLabel(
+  message: ChatMessage,
+  {
+    isLatestUserMessage,
+    issueStatus,
+  }: { isLatestUserMessage: boolean; issueStatus?: IssueStatus }
+) {
+  if (message.role !== "user") {
+    return null
+  }
+  if (message.pending === "sending") {
+    return "Sending..."
+  }
+  if (message.pending === "failed") {
+    return "Failed to send"
+  }
+  if (
+    isLatestUserMessage &&
+    (issueStatus === "queued" || issueStatus === "in-progress")
+  ) {
+    return "Delivered. Agent received it and is processing."
+  }
+  return "Delivered"
+}
+
+function getSendErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Your message was not delivered."
+}
+
+function getConnectionMessage(status: RealtimeConnectionStatus) {
+  if (status === "offline") {
+    return "Offline. You can keep composing, but sends may fail until the connection returns."
+  }
+  if (status === "reconnecting") {
+    return "Reconnecting to live updates. You can keep composing while we recover."
+  }
+  if (status === "connecting") {
+    return "Connecting to live updates..."
+  }
+  return null
 }

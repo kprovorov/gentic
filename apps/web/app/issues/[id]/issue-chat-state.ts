@@ -13,11 +13,13 @@ export type ChatMessage = {
   content: string | null
   status: "streaming" | "complete" | "error"
   created_at: string
+  pending?: "sending" | "failed"
+  deliveryError?: string
+  retryContent?: string
+  retryFiles?: File[]
 }
 
-type TranscriptEntity = ChatMessage & {
-  pending?: "sending" | "failed"
-}
+type TranscriptEntity = ChatMessage
 
 export type IssueChatState = {
   entities: Record<string, TranscriptEntity>
@@ -35,7 +37,13 @@ export type IssueChatAction =
     }
   | { type: "stream_delta"; event: MessageEvent }
   | { type: "finalization"; event: MessageEvent }
-  | { type: "failure"; optimisticId: string }
+  | {
+      type: "failure"
+      optimisticId: string
+      error: string
+      content: string
+      files: File[]
+    }
   | { type: "reconnect_reconciliation"; messages: ChatMessage[] }
   | { type: "reset"; messages: ChatMessage[] }
 
@@ -74,7 +82,7 @@ export function issueChatReducer(
     case "finalization":
       return upsertSequencedEvent(state, action.event, action.event.status)
     case "failure":
-      return markOptimisticFailed(state, action.optimisticId)
+      return markOptimisticFailed(state, action)
     case "reconnect_reconciliation":
       return mergeBatch(state, action.messages)
     case "reset":
@@ -167,15 +175,19 @@ function upsertSequencedEvent(
 
 function markOptimisticFailed(
   state: IssueChatState,
-  optimisticId: string
+  action: Extract<IssueChatAction, { type: "failure" }>
 ): IssueChatState {
-  const existing = state.entities[optimisticId]
+  const existing = state.entities[action.optimisticId]
   if (!existing) {
     return state
   }
 
   return upsertMessage(state, {
     ...existing,
+    content: action.content,
+    deliveryError: action.error,
+    retryContent: action.content,
+    retryFiles: action.files,
     status: "error",
     pending: "failed",
   })
@@ -235,12 +247,18 @@ function mergeEntity(
     ...existing,
     ...incoming,
     clientKey: existing.clientKey ?? incoming.clientKey,
+    deliveryError: incoming.deliveryError ?? existing.deliveryError,
+    retryContent: incoming.retryContent ?? existing.retryContent,
+    retryFiles: incoming.retryFiles ?? existing.retryFiles,
     pending: incoming.pending,
     status: dominantStatus(existing.status, incoming.status),
   }
 
   if (incoming.pending === undefined) {
     delete merged.pending
+    delete merged.deliveryError
+    delete merged.retryContent
+    delete merged.retryFiles
   }
 
   return merged
