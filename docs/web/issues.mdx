@@ -70,6 +70,12 @@ Moving an issue's status from **Draft** to **Todo** queues the agent run. The **
 
 The chat composer is available on the issue detail page. During an active run, new messages are delivered to the current session. Sending a message after a run has ended re-queues the issue and resumes its stored session.
 
+#### Slash Commands
+
+Type `/` at the start of the composer to open a picker of the underlying agent's built-in slash commands — for example `/model`, `/plan`, `/compact`, `/review`. The list is filtered as you type and scoped to the issue's selected agent, so a Claude Code issue shows Claude Code commands and a Codex issue shows Codex commands.
+
+Use the arrow keys to move through suggestions, `Tab` to insert the highlighted command, `Esc` to dismiss the picker, and `Enter` to send. The command text is delivered verbatim to Claude Code or Codex, which handles it natively — Gentic does not translate or intercept it. Add any arguments the underlying command expects after the command name before sending.
+
 ### Re-queuing an Ended Run
 
 If an agent run has ended and you want more work, send a new message from the chat interface. Gentic re-queues the issue and resumes the stored agent session with the prior conversation context intact.
