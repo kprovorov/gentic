@@ -88,6 +88,10 @@ export function issueRunInstructions(existingPrUrl?: string | null): string {
 
 /** One prompt turn: plain text, or text plus attachment content blocks. */
 export type PromptTurn = string | ContentBlock[]
+export interface PromptDelivery {
+  prompt: PromptTurn
+  messageIds: string[]
+}
 
 export interface RunSessionInput {
   api: AgentApi
@@ -109,7 +113,8 @@ export interface RunSessionInput {
    * Supplies the next user prompt for the session. Resolve with `null` when
    * there is no more work, which ends the session.
    */
-  nextPrompt: () => Promise<PromptTurn | null>
+  nextPrompt: () => Promise<PromptTurn | PromptDelivery | null>
+  onPromptProcessed?: (messageIds: string[]) => Promise<void>
 }
 
 /**
@@ -150,20 +155,34 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
 
       let shouldPrependInstructions = agent.provider === "codex"
       for (;;) {
-        let prompt = await input.nextPrompt()
-        if (prompt === null) {
+        const next = await input.nextPrompt()
+        if (next === null) {
           break
         }
+        const delivery = normalizePromptDelivery(next)
+        let prompt = delivery.prompt
         if (shouldPrependInstructions) {
           prompt = prependInstructions(prompt, input.existingPrUrl)
           shouldPrependInstructions = false
         }
         await runTurn(session, input.api, input.issueId, input.channel, prompt)
+        if (delivery.messageIds.length > 0) {
+          await input.onPromptProcessed?.(delivery.messageIds)
+        }
       }
     })
   } finally {
     child.kill()
   }
+}
+
+function normalizePromptDelivery(
+  next: PromptTurn | PromptDelivery
+): PromptDelivery {
+  if (typeof next === "object" && !Array.isArray(next) && "prompt" in next) {
+    return next
+  }
+  return { prompt: next, messageIds: [] }
 }
 
 interface AgentProviderConfig {

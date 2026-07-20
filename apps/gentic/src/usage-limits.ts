@@ -11,7 +11,8 @@ const RESET_MARKERS = ["reset", "retry", "try again", "available", "until"]
 
 export function getUsageLimitResetAt(
   error: unknown,
-  now = new Date()
+  now = new Date(),
+  options: { defaultTimeZone?: "local" | "utc" } = {}
 ): string | null {
   const message = describe(error)
   const lower = message.toLowerCase()
@@ -25,7 +26,7 @@ export function getUsageLimitResetAt(
   const resetAt =
     parseRelativeReset(message, now) ??
     parseAbsoluteReset(message, now) ??
-    parseTimeOnlyReset(message, now)
+    parseTimeOnlyReset(message, now, options.defaultTimeZone ?? "local")
 
   return resetAt && resetAt.getTime() > now.getTime()
     ? resetAt.toISOString()
@@ -68,7 +69,11 @@ function parseAbsoluteReset(message: string, now: Date): Date | null {
   return Number.isNaN(parsed.getTime()) || parsed <= now ? null : parsed
 }
 
-function parseTimeOnlyReset(message: string, now: Date): Date | null {
+function parseTimeOnlyReset(
+  message: string,
+  now: Date,
+  defaultTimeZone: "local" | "utc"
+): Date | null {
   const match = message.match(
     /(?:reset(?:s)?|retry|try again|available)(?:\s+\w+){0,3}\s+(?:at|after|by)?\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)?(?:\s*\((UTC)\))?/i
   )
@@ -89,8 +94,9 @@ function parseTimeOnlyReset(message: string, now: Date): Date | null {
     hours = 0
   }
 
+  const useUtc = match[4]?.toLowerCase() === "utc" || defaultTimeZone === "utc"
   const resetAt =
-    match[4]?.toLowerCase() === "utc"
+    useUtc
       ? new Date(
           Date.UTC(
             now.getUTCFullYear(),
@@ -104,11 +110,11 @@ function parseTimeOnlyReset(message: string, now: Date): Date | null {
         )
       : new Date(now)
 
-  if (!match[4]) {
+  if (!useUtc) {
     resetAt.setHours(hours, minutes, 0, 0)
   }
   if (resetAt <= now) {
-    if (match[4]?.toLowerCase() === "utc") {
+    if (useUtc) {
       resetAt.setUTCDate(resetAt.getUTCDate() + 1)
     } else {
       resetAt.setDate(resetAt.getDate() + 1)

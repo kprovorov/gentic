@@ -1,0 +1,103 @@
+---
+title: "Create, Assign, and Manage AI Coding Issues in Gentic"
+sidebarTitle: "Issues"
+description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, and the agent writes code and opens a pull request on your behalf."
+---
+
+An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the agent clones your repository, follows the instructions in your prompt, commits changes, and opens a pull request. Every issue tracks its own status, agent conversation, and pull requests in one place.
+
+## Create an Issue
+
+<Steps>
+  <Step title="Open the new issue form">
+    From **Home**, click **New issue** in the top-right corner.
+  </Step>
+  <Step title="Select a project">
+    Choose the project (GitHub repository) the agent should work in. If you have no projects yet, [create one in Settings](/web/projects) first.
+  </Step>
+  <Step title="Fill in the issue fields">
+    Choose a **Project**, write the **Prompt**, and optionally attach files. Gentic generates a title and issue type after submission.
+  </Step>
+  <Step title="Submit">
+    Click **Save draft** to review the issue first, or choose **Run with Claude Code** or **Run with Codex** to queue it immediately.
+  </Step>
+</Steps>
+
+<Tip>
+  Write a detailed prompt with explicit acceptance criteria — for example, "Add a `/health` endpoint that returns `{ status: 'ok' }` with HTTP 200. Include a Jest test." The more context you give the agent, the fewer revision cycles you need.
+</Tip>
+
+## Field Reference
+
+<ParamField body="project" type="string" required>
+  The project whose GitHub repository the agent will clone and work in. You cannot change the project after the issue is created.
+</ParamField>
+
+<ParamField body="title" type="string">
+  Gentic generates a short title in the background after creating the issue. You can edit it later. Edited titles accept up to 160 characters.
+</ParamField>
+
+<ParamField body="type" type="feature | bug | feedback | idea">
+  Gentic classifies the issue in the background after creation. You can change the result on the edit page.
+
+  | Value | When to use |
+  |---|---|
+  | `feature` | New functionality or enhancements |
+  | `bug` | Defects and regressions to fix |
+  | `feedback` | Changes driven by user or team feedback |
+  | `idea` | Exploratory or speculative work |
+</ParamField>
+
+<ParamField body="agent" type="Claude Code | Codex">
+  The AI agent that will execute the issue. The primary run button uses Claude Code; use its dropdown to run with Codex. You can change the agent before the first run from the issue detail page.
+</ParamField>
+
+<ParamField body="prompt" type="text">
+  Detailed instructions for the agent. Include background context, step-by-step requirements, acceptance criteria, links to relevant files, and any constraints. The prompt is passed directly to the agent at the start of each run.
+</ParamField>
+
+<ParamField body="status" type="enum">
+  **Save draft** creates the issue as `draft`. A **Run with...** action creates it as a draft and immediately transitions it to `todo`, which queues the agent. See the [Issue Statuses reference](/web/issue-statuses).
+</ParamField>
+
+## Issue Workflow
+
+### Triggering an Agent Run
+
+Moving an issue's status from **Draft** to **Todo** queues the agent run. The **Run with...** actions perform that transition during creation; **Save draft** lets you do it later from the issue detail page.
+
+### Sending Messages While the Agent Runs
+
+The chat composer is available on the issue detail page. During an active run, new messages are delivered to the current session. Sending a message after a run has ended re-queues the issue and resumes its stored session.
+
+#### Slash Commands
+
+Type `/` at the start of the composer to open a picker of the underlying agent's built-in slash commands — for example `/model`, `/plan`, `/compact`, `/review`. The list is filtered as you type and scoped to the issue's selected agent, so a Claude Code issue shows Claude Code commands and a Codex issue shows Codex commands.
+
+Use the arrow keys to move through suggestions, `Tab` to insert the highlighted command, `Esc` to dismiss the picker, and `Enter` to send. The command text is delivered verbatim to Claude Code or Codex, which handles it natively — Gentic does not translate or intercept it. Add any arguments the underlying command expects after the command name before sending.
+
+### Re-queuing an Ended Run
+
+If an agent run has ended and you want more work, send a new message from the chat interface. Gentic re-queues the issue and resumes the stored agent session with the prior conversation context intact.
+
+### Tracking Pull Requests
+
+Every pull request the agent opens for an issue is attached to it and shown on the issue detail page. Each PR appears as its own button labelled `owner/repo#number` — click one to review those changes on GitHub.
+
+An issue can accumulate multiple pull requests over its lifetime. When you [re-queue an ended run](#re-queuing-an-ended-run), any new PR the agent opens is added to the list alongside the earlier ones. Older PRs stay visible so you can trace every change the agent has shipped for that issue in one place.
+
+## Edit an Issue
+
+Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, and **Type** fields. The **Project** field cannot be changed after creation.
+
+## Retry an Agent
+
+Retrying an agent clears the current agent session and re-queues the issue as if it were starting fresh. Open the issue and click **Retry with Claude Code**, or use the adjacent dropdown to retry with Codex.
+
+<Warning>
+  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message from the current prompt. It does not delete pull requests from GitHub.
+</Warning>
+
+## Delete an Issue
+
+To permanently remove an issue, open the issue detail page, click **Delete**, and confirm. Deletion redirects you back to the Home issues list.

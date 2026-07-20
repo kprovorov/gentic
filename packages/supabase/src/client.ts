@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { useSession } from "@clerk/nextjs"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
+import type { Database } from "./types"
+
 /**
  * Supabase client for use in Client Components. Authenticates against
  * Supabase's Data API using the Clerk session token (Clerk is registered as a
@@ -14,7 +16,7 @@ export function useSupabaseClient() {
 
   return useMemo(
     () =>
-      createSupabaseClient(
+      createSupabaseClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         {

@@ -6,34 +6,32 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
+import type { Tables } from "@gentic/supabase/types"
 
 import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
 const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
 
-export type IssueRelationIssue = {
-  id: string
-  title: string | null
-  status: string
-}
+type IssueRow = Tables<"issues">
+type IssueRelationRow = Tables<"issue_relations">
+type IssuePullRequestRow = Tables<"issue_pull_requests">
 
-export type IssueRelation = {
-  id: string
-  source_issue_id: string
-  target_issue_id: string
+export type IssueRelationIssue = Pick<IssueRow, "id" | "title" | "status">
+
+export type IssueRelation = Pick<
+  IssueRelationRow,
+  "id" | "source_issue_id" | "target_issue_id" | "created_at"
+> & {
   type: "blocks"
-  created_at: string
   source_issue: IssueRelationIssue
   target_issue: IssueRelationIssue
 }
 
-export type IssuePullRequest = {
-  id: string
-  issue_id: string
-  url: string
-  created_at: string
-}
+export type IssuePullRequest = Pick<
+  IssuePullRequestRow,
+  "id" | "issue_id" | "url" | "created_at"
+>
 
 async function ensureProjectOwned(
   supabase: Supabase,
@@ -149,7 +147,6 @@ export async function listIssueRelationCandidates(
       .eq("projects.user_id", userId)
       .neq("id", issueId)
       .order("created_at", { ascending: false })
-      .returns<IssueRelationIssue[]>()
   )
 }
 
@@ -157,10 +154,10 @@ export async function listIssueRelations(
   supabase: Supabase,
   userId: string,
   issueId: string
-) {
+): Promise<IssueRelation[]> {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  return unwrap(
+  const relations = unwrap(
     await supabase
       .from("issue_relations")
       .select(
@@ -168,8 +165,12 @@ export async function listIssueRelations(
       )
       .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
       .order("created_at", { ascending: false })
-      .returns<IssueRelation[]>()
   )
+
+  return relations.map((relation) => ({
+    ...relation,
+    type: "blocks",
+  }))
 }
 
 export async function listIssuePullRequests(
@@ -185,7 +186,6 @@ export async function listIssuePullRequests(
       .select("id,issue_id,url,created_at")
       .eq("issue_id", issueId)
       .order("created_at", { ascending: false })
-      .returns<IssuePullRequest[]>()
   )
 }
 
@@ -204,9 +204,6 @@ export async function listBlockedIssueIds(
         "target_issue_id, source_issue:issues!issue_relations_source_issue_id_fkey(status)"
       )
       .in("target_issue_id", issueIds)
-      .returns<
-        { target_issue_id: string; source_issue: { status: string } }[]
-      >()
   )
 
   const blockedIssueIds = new Set<string>()
@@ -235,7 +232,7 @@ export async function createIssue(
       project_id: input.project_id,
       title: input.title ?? null,
       prompt: input.prompt ?? null,
-      status: input.status,
+      status: input.status === "todo" ? "draft" : input.status,
       agent_provider: input.agent_provider,
       type: input.type,
     })
@@ -244,21 +241,21 @@ export async function createIssue(
 
   const issue = unwrap(result)
 
-  if (input.status === "todo") {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: issue.id,
-        role: "user",
-        content: kickoffMessageContent(input.prompt ?? null),
-      })
-    )
+  if (input.status !== "todo") {
+    return issue
   }
 
-  return issue
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: issue.id }))
+  return getIssue(supabase, userId, issue.id)
 }
 
-function kickoffMessageContent(prompt: string | null): string {
-  return prompt ?? ""
+export async function startIssueFromDraft(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
+  await ensureIssueOwned(supabase, userId, id)
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
 }
 
 // Called from the background title-generation step after an issue is saved
@@ -308,7 +305,7 @@ export async function updateIssue(
     .select("agent_provider, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ agent_provider: string }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -354,13 +351,10 @@ export async function resetIssueAgent(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("prompt,agent_provider,projects!inner(user_id)")
+    .select("agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      prompt: string | null
-      agent_provider: AgentProvider
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -369,32 +363,10 @@ export async function resetIssueAgent(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  unwrap(await supabase.from("messages").delete().eq("issue_id", id))
-  unwrap(await supabase.from("issue_pull_requests").delete().eq("issue_id", id))
-
-  const now = new Date().toISOString()
   unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        agent_provider: agentProvider,
-        session_id: null,
-        run_error: null,
-        run_started_at: null,
-        run_finished_at: null,
-        usage_limit_reset_at: null,
-        pr_url: null,
-        updated_at: now,
-      })
-      .eq("id", id)
-  )
-
-  unwrap(
-    await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: kickoffMessageContent(current.prompt),
+    await supabase.rpc("reset_issue_run", {
+      p_issue_id: id,
+      p_agent_provider: agentProvider,
     })
   )
 }
@@ -442,11 +414,7 @@ export async function deleteIssueRelation(
     .select("id,source_issue_id,target_issue_id")
     .eq("id", relationId)
     .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
-    .maybeSingle<{
-      id: string
-      source_issue_id: string
-      target_issue_id: string
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -474,10 +442,7 @@ export async function updateIssueStatus(
     .select("status,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      status: string
-      prompt: string | null
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -491,26 +456,13 @@ export async function updateIssueStatus(
   // and drives the issue's selected coding agent against a fresh clone.
   const startsRun = current.status === "draft" && status === "todo"
 
-  const result = await supabase
-    .from("issues")
-    .update(startsRun ? { status, usage_limit_reset_at: null } : { status })
-    .eq("id", id)
-    .select(ISSUE_WITH_PROJECT_SELECT)
-    .single()
-
-  const data = unwrap(result)
-
   if (startsRun) {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: id,
-        role: "user",
-        content: kickoffMessageContent(current.prompt),
-      })
-    )
+    unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
+  } else {
+    unwrap(await supabase.from("issues").update({ status }).eq("id", id))
   }
 
-  return data
+  return getIssue(supabase, userId, id)
 }
 
 export async function updateIssueAgentProvider(
@@ -524,7 +476,7 @@ export async function updateIssueAgentProvider(
     .select("run_started_at,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ run_started_at: string | null }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -566,7 +518,7 @@ export async function updateIssueStatusByPrUrl(
     .from("issue_pull_requests")
     .select("issue_id")
     .eq("url", prUrl)
-    .maybeSingle<{ issue_id: string }>()
+    .maybeSingle()
 
   if (pullRequestError) {
     throw new ServiceError("internal", pullRequestError.message)
@@ -616,35 +568,14 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const message = unwrap(
+  return unwrap(
     await supabase
-      .from("messages")
-      .insert({
-        issue_id: issueId,
-        role: "user",
-        content,
+      .rpc("send_issue_user_message", {
+        p_issue_id: issueId,
+        p_content: content,
       })
-      .select("id, created_at")
       .single<{ id: string; created_at: string }>()
   )
-
-  // A finished run has no worker polling for it anymore. Re-queue so the
-  // `@gentic/gentic` agent picks this follow-up up and resumes the session,
-  // unless the issue never ran (draft) or a run is already todo/queued/in
-  // flight.
-  unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        usage_limit_reset_at: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", issueId)
-      .not("status", "in", "(draft,todo,queued,held,in-progress)")
-  )
-
-  return message
 }
 
 export type ChangesRequestedReviewComment = {
@@ -702,10 +633,7 @@ export async function applyChangesRequestedReview(
     .from("issues")
     .select("id, projects!inner(auto_respond_to_reviews)")
     .eq("pr_url", prUrl)
-    .maybeSingle<{
-      id: string
-      projects: { auto_respond_to_reviews: boolean }
-    }>()
+    .maybeSingle()
 
   if (error) {
     throw new ServiceError("internal", error.message)
