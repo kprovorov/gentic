@@ -1,0 +1,60 @@
+---
+title: "Gentic: AI Coding Agent Management Platform Overview"
+sidebarTitle: "Introduction"
+description: "Gentic lets your team create coding issues, assign them to Claude Code or Codex, and automatically receive pull requests from the AI agent's work."
+---
+
+Gentic is a platform for managing AI coding agents. Instead of context-switching into a terminal or IDE to prompt an AI tool, your whole team works from a shared web app where they write issues, track progress, and review pull requests — all in one place. You write the requirements; Gentic's agent worker picks them up, runs Claude Code or Codex against your real codebase, and delivers a pull request for you to review.
+
+## How Gentic is structured
+
+Gentic has two parts that work together: the **web app** you use every day, and the **agent worker** you deploy once on a server.
+
+<CardGroup cols={2}>
+  <Card title="Web App (gentic.chat)" icon="browser" href="https://gentic.chat">
+    Create and manage projects, write issues, choose an AI agent, upload attachments, and watch pull requests appear — all from your browser.
+  </Card>
+  <Card title="Agent Worker CLI" icon="server" href="/agent/overview">
+    A background process you deploy on any server or VM. It polls Gentic for queued issues, clones the right repo, runs the agent, and pushes a PR.
+  </Card>
+</CardGroup>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Issue Management" icon="list-check" href="/web/issues">
+    Create issues from a detailed prompt and attachments, then move them through Draft → Todo → In progress → Ready for review.
+  </Card>
+  <Card title="Claude Code & Codex" icon="robot" href="/agent/overview">
+    Assign each issue to Claude Code or OpenAI Codex. The worker selects the right agent automatically based on the issue setting.
+  </Card>
+  <Card title="GitHub Integration" icon="github" href="/web/github-integration">
+    Connect a GitHub App so pull-request and review events update the matching Gentic issue. The worker keeps separate Git credentials for cloning and pushing.
+  </Card>
+  <Card title="File Attachments" icon="paperclip" href="/web/issues">
+    Attach images, text files, and other documents to the initial prompt or a follow-up message.
+  </Card>
+  <Card title="Issue Dependencies" icon="link" href="/web/issues">
+    Block one issue on another to sequence work. Dependent issues won't be picked up by the worker until their blockers are resolved.
+  </Card>
+  <Card title="MCP Server" icon="plug" href="/mcp/overview">
+    Manage Gentic from Claude Desktop, Cursor, or any other MCP-compatible AI client without opening the web app.
+  </Card>
+</CardGroup>
+
+## Supported AI agents
+
+Gentic currently supports two AI coding agents. Choose one when you run an issue. You can switch it from the issue detail page until the first run starts.
+
+| Agent | Provider | Notes |
+|---|---|---|
+| **Claude Code** | Anthropic | Requires Claude credentials in the worker environment. |
+| **Codex** | OpenAI | Requires the Codex CLI installed and authenticated in the worker environment. |
+
+## Architecture overview
+
+When you move an issue from **Draft** to **Todo**, Gentic queues it for the worker. Your deployed agent worker polls the Gentic API every few seconds, claims the next queued issue, clones the project's GitHub repository into a fresh working directory, and runs the chosen agent through the Agent Client Protocol (ACP). The agent writes code and opens a pull request, and the issue status updates in real time in your web app. The worker never exposes a public endpoint — it is a private outbound polling process that you run in a trusted environment.
+
+<Note>
+  Because the agent worker runs in your own environment, it has access to your source code and Git credentials. Run it on a server or VM you control, and treat your `GENTIC_API_KEY` as a secret.
+</Note>

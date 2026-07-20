@@ -1,0 +1,100 @@
+{
+  "projectType": "saas",
+  "projectName": "Gentic",
+  "projectDescription": "Gentic is a platform for managing AI coding agents — create issues, assign them to Claude Code or Codex, and track the resulting pull requests.",
+  "theme": "luma",
+  "primaryColor": "#9bfa04",
+  "lightColor": "#5ca40c",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "how-it-works"
+            ]
+          },
+          {
+            "group": "Web App",
+            "pages": [
+              "web/projects",
+              "web/issues",
+              "web/github-integration",
+              "web/issue-statuses"
+            ]
+          },
+          {
+            "group": "Agent Worker",
+            "pages": [
+              "agent/overview",
+              "agent/installation",
+              "agent/configuration",
+              "agent/service-management"
+            ]
+          },
+          {
+            "group": "MCP Integration",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/first-issue",
+              "guides/attachments",
+              "guides/issue-relations",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Create and manage coding issues assigned to AI agents (Claude Code or Codex)",
+    "Background agent worker that polls for queued issues and autonomously writes code",
+    "Automated pull request creation after each agent run",
+    "Real-time issue status tracking through the full development lifecycle",
+    "GitHub App integration for repository and PR automation",
+    "File attachments on issues (images, text files) forwarded to the agent",
+    "Issue blocking/dependency relations",
+    "MCP server for managing issues and projects from any MCP-compatible AI client",
+    "Standalone binary deployment — no Node.js required on the target machine",
+    "OS-native service management (systemd on Linux, launchd on macOS)"
+  ],
+  "publicApiSurface": [
+    "gentic auth login [--api-url <url>] [--api-key <key>]",
+    "gentic auth logout [-y]",
+    "gentic auth status",
+    "gentic run",
+    "gentic start [--no-boot] [--system]",
+    "gentic stop [--system]",
+    "gentic restart [--system]",
+    "gentic status [--system] [--json]",
+    "MCP tool: whoami",
+    "MCP tool: list_projects",
+    "MCP tool: get_project",
+    "MCP tool: create_project",
+    "MCP tool: update_project",
+    "MCP tool: delete_project",
+    "MCP tool: list_issues",
+    "MCP tool: get_issue",
+    "MCP tool: create_issue",
+    "MCP tool: update_issue",
+    "MCP tool: delete_issue",
+    "MCP tool: update_issue_status",
+    "POST /api/v1/agent/issues/claim",
+    "PATCH /api/v1/agent/issues/{id}/run-state",
+    "GET /api/v1/agent/issues/{id}/messages",
+    "POST /api/v1/agent/issues/{id}/messages",
+    "PATCH /api/v1/agent/messages/{id}",
+    "GET /api/v1/agent/issues/{id}/attachments"
+  ]
+}

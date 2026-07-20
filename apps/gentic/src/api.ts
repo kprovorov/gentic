@@ -1,12 +1,15 @@
 import {
   attachmentsResponseSchema,
   claimIssueResponseSchema,
+  finishRunResponseSchema,
   insertMessageResponseSchema,
   okResponseSchema,
+  pendingUserMessagesResponseSchema,
   realtimeTokenResponseSchema,
-  userMessagesResponseSchema,
+  type AckMessagesInput,
   type Attachment,
   type ClaimedIssue,
+  type FinishRunFields,
   type InsertMessageInput,
   type RealtimeTokenResponse,
   type RunStateFields,
@@ -15,8 +18,10 @@ import {
 import type { z } from "zod"
 
 export type {
+  AckMessagesInput,
   Attachment,
   ClaimedIssue,
+  FinishRunFields,
   InsertMessageInput,
   RealtimeTokenResponse,
   RunStateFields,
@@ -26,8 +31,14 @@ export type {
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
+  finishRun(issueId: string, fields: FinishRunFields): Promise<boolean>
   insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
-  fetchUserMessagesAfter(issueId: string, cursor: string): Promise<UserMessage[]>
+  fetchPendingUserMessages(issueId: string): Promise<UserMessage[]>
+  ackUserMessages(
+    issueId: string,
+    runId: string,
+    messageIds: string[]
+  ): Promise<void>
   fetchAttachments(issueId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
 }
@@ -94,6 +105,17 @@ export function createAgentApi(input: {
         }
       )
     },
+    async finishRun(issueId, fields) {
+      const data = await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/run-state`,
+        finishRunResponseSchema,
+        {
+          method: "PATCH",
+          body: { ...fields, finish_if_no_pending: true },
+        }
+      )
+      return data.finished
+    },
     async insertMessage(issueId, message) {
       const data = await request(
         `/agent/issues/${encodeURIComponent(issueId)}/messages`,
@@ -105,13 +127,26 @@ export function createAgentApi(input: {
       )
       return data.id
     },
-    async fetchUserMessagesAfter(issueId, cursor) {
-      const params = new URLSearchParams({ after: cursor })
+    async fetchPendingUserMessages(issueId) {
       const data = await request(
-        `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`,
-        userMessagesResponseSchema
+        `/agent/issues/${encodeURIComponent(issueId)}/messages`,
+        pendingUserMessagesResponseSchema
       )
       return data.messages
+    },
+    async ackUserMessages(issueId, runId, messageIds) {
+      if (messageIds.length === 0) {
+        return
+      }
+      const body: AckMessagesInput = { run_id: runId, message_ids: messageIds }
+      await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/messages`,
+        okResponseSchema,
+        {
+          method: "PATCH",
+          body,
+        }
+      )
     },
     async fetchAttachments(issueId) {
       const data = await request(

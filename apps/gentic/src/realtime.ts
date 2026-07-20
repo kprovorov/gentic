@@ -11,7 +11,6 @@ import {
   userMessageEventSchema,
   type MessageEvent as RealtimeMessageEvent,
   type RunStateEvent as RealtimeRunStateEvent,
-  type UserMessageEvent as RealtimeUserMessageEvent,
 } from "@gentic/validators/realtime"
 
 import type { AgentApi } from "./api.js"
@@ -34,14 +33,13 @@ export interface IssueRealtimeChannel {
 
 /**
  * Joins the private `issue:{id}` Broadcast channel used to stream the live
- * agent conversation (see docs/realtime-transport.md). Rejects if the
- * channel can't be joined — callers should treat that like any other
- * startup failure; there is no REST fallback in this phase.
+ * agent conversation. User-message broadcasts are wake-up hints only; callers
+ * must fetch durable messages from the database.
  */
 export async function connectIssueChannel(
   api: AgentApi,
   issueId: string,
-  onUserMessage: (event: RealtimeUserMessageEvent) => void
+  onUserMessage: () => void
 ): Promise<IssueRealtimeChannel> {
   const token = await api.fetchRealtimeToken()
   const client = createClient(token.url, token.apiKey)
@@ -54,7 +52,7 @@ export async function connectIssueChannel(
   channel.on("broadcast", { event: REALTIME_USER_MESSAGE_EVENT }, ({ payload }) => {
     const event = userMessageEventSchema.safeParse(payload)
     if (event.success) {
-      onUserMessage(event.data)
+      onUserMessage()
     }
   })
 
@@ -91,7 +89,10 @@ class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
     await this.channel.send({
       type: "broadcast",
       event: REALTIME_MESSAGE_EVENT,
-      payload: { ...event, ts: new Date().toISOString() } satisfies RealtimeMessageEvent,
+      payload: {
+        ...event,
+        ts: new Date().toISOString(),
+      } satisfies RealtimeMessageEvent,
     })
   }
 

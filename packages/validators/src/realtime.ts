@@ -105,8 +105,9 @@ export const deletedRowSchema = z.object({
 
 export type DeletedRow = z.infer<typeof deletedRowSchema>
 
-// Browser -> worker: a follow-up message, keyed by the `messages` row id so
-// the worker can dedupe it against its REST-fetched backlog.
+// Browser -> worker: wake-up signal for a persisted follow-up message. Workers
+// fetch durable messages from the database and must not treat Broadcast as the
+// delivery source of truth.
 export const userMessageEventSchema = z.object({
   id: z.string().uuid(),
   content: z.string(),

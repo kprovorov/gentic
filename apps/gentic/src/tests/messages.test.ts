@@ -154,6 +154,9 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
       return null
     },
     async setRunState() {},
+    async finishRun() {
+      return true
+    },
     async insertMessage(issueId, message) {
       api.insertAttempts += 1
       const failure = options.failInsertAttempts?.shift()
@@ -163,9 +166,10 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
       inserted.push({ issueId, message })
       return message.id
     },
-    async fetchUserMessagesAfter() {
+    async fetchPendingUserMessages() {
       return []
     },
+    async ackUserMessages() {},
     async fetchAttachments() {
       return []
     },

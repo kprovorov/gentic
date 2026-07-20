@@ -1,0 +1,137 @@
+---
+title: "Configure the Gentic Agent Worker"
+sidebarTitle: "Configuration"
+description: "Configure the Gentic agent worker with gentic auth login or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
+---
+
+The primary way to configure the agent worker is with `gentic auth login`, which saves your API key and API URL to a persistent config file on disk. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
+
+## Authentication via CLI
+
+The recommended way to configure credentials is with the `gentic auth` commands. These commands read and write an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
+
+<Note>
+  `GENTIC_API_KEY` must be a user-scoped API key accepted by the Gentic deployment. The worker only receives issues belonging to that user. Ask the deployment administrator how user API keys are issued; the current Gentic web settings page does not create them.
+</Note>
+
+### Log in
+
+Run `gentic auth login` to start the interactive prompt. It asks for your API URL and API key, then saves them to the config file.
+
+```bash
+gentic auth login
+```
+
+For scripted or CI environments where you cannot interact with a prompt, pass both flags directly:
+
+```bash
+gentic auth login --api-url https://gentic.chat/api/v1 --api-key <your-key>
+```
+
+<Warning>
+  The Gentic API does not currently expose a read-only endpoint for credential validation. Your key is saved without a live check and will surface as an error on the worker's first poll if it is incorrect. Double-check your key before starting the service.
+</Warning>
+
+### Check authentication status
+
+Display the currently configured API URL and a masked version of your API key:
+
+```bash
+gentic auth status
+```
+
+### Log out
+
+Clear the stored credentials from the config file. Run with `--yes` (or `-y`) to skip the confirmation prompt:
+
+```bash
+gentic auth logout
+gentic auth logout --yes
+```
+
+Logging out removes only the `GENTIC_API_KEY` and `GENTIC_API_URL` entries. Other settings stored in the config file — such as `GIT_REMOTE_BASE`, `WORKDIR`, and `POLL_INTERVAL_MS` — are preserved.
+
+---
+
+## Environment variables (alternative)
+
+Environment variables give you fine-grained control over every configuration value and are an alternative to `gentic auth login` — useful for local development, containers, or CI systems where you manage secrets through the environment directly. Create a `.env` file in the directory where you run `gentic` and fill in the values for your environment:
+
+```bash
+# .env
+GENTIC_API_URL=https://gentic.chat/api/v1
+GENTIC_API_KEY=your_api_key_here
+```
+
+The full list of supported variables is below.
+
+### Required
+
+<ParamField body="GENTIC_API_URL" type="string" required>
+  The Gentic API endpoint. Use `https://gentic.chat/api/v1` for the hosted service, or `http://localhost:3000/api/v1` when developing against a local web app instance.
+
+  ```bash
+  GENTIC_API_URL=https://gentic.chat/api/v1
+  ```
+</ParamField>
+
+<ParamField body="GENTIC_API_KEY" type="string" required>
+  A user-scoped API key accepted by the Gentic deployment. The hosted API verifies the key and only returns issues that belong to its user.
+
+  ```bash
+  GENTIC_API_KEY=your_api_key_here
+  ```
+</ParamField>
+
+### Optional
+
+<ParamField body="GIT_REMOTE_BASE" type="string" default="git@github.com:">
+  The base URL prepended to each project's `owner/repo` path when the worker clones a repository. With the default value, a project stored as `acme/backend` is cloned from `git@github.com:acme/backend`.
+
+  Change this if your repositories are hosted on GitHub Enterprise, GitLab, or another Git provider:
+
+  ```bash
+  GIT_REMOTE_BASE=git@github.mycompany.com:
+  ```
+</ParamField>
+
+<ParamField body="MAX_CONCURRENT_ISSUES" type="number" default="1">
+  The maximum number of issues this worker processes at the same time. Each active issue uses its own repository clone and realtime channel. Increase this only when the host has enough CPU, memory, disk, and agent-provider capacity.
+
+  ```bash
+  MAX_CONCURRENT_ISSUES=3
+  ```
+</ParamField>
+
+<ParamField body="WORKDIR" type="string" default="~/.local/share/gentic/workspaces (Linux)">
+  The directory where the worker creates per-issue repository clones. Each issue gets its own subdirectory. If unset, the worker uses an OS-appropriate data directory determined by [`env-paths`](https://github.com/sindresorhus/env-paths):
+
+  - **Linux**: `~/.local/share/gentic/workspaces`
+  - **macOS**: `~/Library/Application Support/gentic/workspaces`
+
+  Override it to use a custom location, such as a dedicated volume with more disk space:
+
+  ```bash
+  WORKDIR=/mnt/data/gentic-workspaces
+  ```
+</ParamField>
+
+<ParamField body="POLL_INTERVAL_MS" type="number" default="3000">
+  How often (in milliseconds) the worker polls the Gentic API for issues with `status = 'todo'` (or `status = 'held'` past their usage-limit reset time). The default of `3000` ms (3 seconds) works well for most setups. Increase this value to reduce API traffic on low-priority workers.
+
+  ```bash
+  POLL_INTERVAL_MS=5000
+  ```
+</ParamField>
+
+---
+
+## Configuration precedence
+
+The worker merges all configuration sources in the following order, with later sources winning:
+
+1. **Config file** — written by `gentic auth login` (e.g. `~/.config/gentic/config.json`)
+2. **`.env` file** — loaded from the working directory at startup
+3. **Shell environment variables** — exported in the process environment at runtime
+
+This means you can set your API key once with `gentic auth login` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.

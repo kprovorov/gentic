@@ -172,6 +172,7 @@ export type Database = {
       }
       issues: {
         Row: {
+          active_run_id: string | null
           agent_provider: string
           created_at: string
           id: string
@@ -189,6 +190,7 @@ export type Database = {
           usage_limit_reset_at: string | null
         }
         Insert: {
+          active_run_id?: string | null
           agent_provider?: string
           created_at?: string
           id?: string
@@ -206,6 +208,7 @@ export type Database = {
           usage_limit_reset_at?: string | null
         }
         Update: {
+          active_run_id?: string | null
           agent_provider?: string
           created_at?: string
           id?: string
@@ -234,6 +237,8 @@ export type Database = {
       }
       messages: {
         Row: {
+          consumed_at: string | null
+          consumed_by_run_id: string | null
           content: string | null
           created_at: string
           github_review_id: number | null
@@ -241,10 +246,13 @@ export type Database = {
           issue_id: string
           kind: string
           role: string
+          seq: number
           status: string
           updated_at: string
         }
         Insert: {
+          consumed_at?: string | null
+          consumed_by_run_id?: string | null
           content?: string | null
           created_at?: string
           github_review_id?: number | null
@@ -252,10 +260,13 @@ export type Database = {
           issue_id: string
           kind?: string
           role: string
+          seq?: number
           status?: string
           updated_at?: string
         }
         Update: {
+          consumed_at?: string | null
+          consumed_by_run_id?: string | null
           content?: string | null
           created_at?: string
           github_review_id?: number | null
@@ -263,6 +274,7 @@ export type Database = {
           issue_id?: string
           kind?: string
           role?: string
+          seq?: number
           status?: string
           updated_at?: string
         }
@@ -314,7 +326,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      finish_issue_run_if_no_pending: {
+        Args: {
+          p_issue_id: string
+          p_run_id: string
+          p_status: string
+          p_run_finished_at: string
+          p_pr_url?: string | null
+        }
+        Returns: boolean
+      }
+      reset_issue_run: {
+        Args: {
+          p_issue_id: string
+          p_agent_provider: string
+        }
+        Returns: undefined
+      }
+      send_issue_user_message: {
+        Args: {
+          p_issue_id: string
+          p_content: string
+        }
+        Returns: {
+          id: string
+          created_at: string
+        }[]
+      }
+      start_issue_from_draft: {
+        Args: {
+          p_issue_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

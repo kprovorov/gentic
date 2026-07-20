@@ -5,11 +5,11 @@ import { realtimeRunStateStatusSchema } from "./realtime.js"
 
 export const claimedIssueSchema = z.object({
   id: z.string().uuid(),
+  activeRunId: z.string().uuid(),
   agentProvider: agentProviderSchema,
   repo: z.string(),
   setupScript: z.string().nullable(),
   sessionId: z.string().nullable(),
-  runFinishedAt: z.string().nullable(),
   prUrl: z.string().nullable(),
 })
 
@@ -19,7 +19,7 @@ export const claimIssueResponseSchema = z.object({
   issue: claimedIssueSchema.nullable(),
 })
 
-export const runStateFieldsSchema = z
+const runStateFieldsBaseSchema = z
   .object({
     status: realtimeRunStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
@@ -30,23 +30,50 @@ export const runStateFieldsSchema = z
     pr_url: z.string().url().nullable().optional(),
   })
   .strict()
+
+export const runStateFieldsSchema = runStateFieldsBaseSchema
   .refine((value) => Object.keys(value).length > 0)
 
 export type RunStateFields = z.infer<typeof runStateFieldsSchema>
+
+export const finishRunFieldsSchema = runStateFieldsBaseSchema
+  .extend({
+    active_run_id: z.string().uuid(),
+    status: realtimeRunStateStatusSchema.extract([
+      "ready-for-review",
+      "waiting-for-input",
+    ]),
+    run_finished_at: z.string().datetime(),
+  })
+  .strict()
+
+export type FinishRunFields = z.infer<typeof finishRunFieldsSchema>
 
 export const okResponseSchema = z.object({
   ok: z.literal(true),
 })
 
+export const finishRunResponseSchema = z.object({
+  finished: z.boolean(),
+})
+
+export const ackMessagesInputSchema = z.object({
+  run_id: z.string().uuid(),
+  message_ids: z.array(z.string().uuid()).min(1),
+})
+
+export type AckMessagesInput = z.infer<typeof ackMessagesInputSchema>
+
 export const userMessageSchema = z.object({
   id: z.string().uuid(),
   content: z.string().nullable(),
   created_at: z.string(),
+  seq: z.number(),
 })
 
 export type UserMessage = z.infer<typeof userMessageSchema>
 
-export const userMessagesResponseSchema = z.object({
+export const pendingUserMessagesResponseSchema = z.object({
   messages: z.array(userMessageSchema),
 })
 

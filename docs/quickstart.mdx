@@ -1,0 +1,101 @@
+---
+title: "Gentic Quickstart: From Sign-Up to First Pull Request"
+sidebarTitle: "Quickstart"
+description: "Create a Gentic project, deploy the agent worker, write your first issue, and receive an AI-generated pull request in a single sitting."
+---
+
+This guide takes you from a blank account to a merged pull request. You will sign up, connect a GitHub repository, deploy the agent worker on a server, create an issue, and watch the AI agent write code and open a PR — all in one sitting.
+
+<Steps>
+
+### Sign up at gentic.chat
+
+Open [gentic.chat](https://gentic.chat) in your browser and create an account. After you sign in, open **Issues** or **Settings** from the sidebar.
+
+### Add a project
+
+Open **Settings** from the sidebar. In **Add project**, enter a display name and your repository in `owner/repo` format — for example, `acme-corp/backend`. Optionally add a setup script that installs dependencies before an agent session starts, then click **Add project**.
+
+<Tip>
+  You can add as many projects as you need. Each issue is scoped to a single project, so the worker always knows which repository to clone.
+</Tip>
+
+### Connect GitHub
+
+Still in **Settings**, click **Connect GitHub** and install the configured GitHub App on the repositories you want Gentic to track. The integration sends pull-request status and review events back to Gentic. It does not replace the worker's own Git and GitHub CLI credentials, which are used to clone, push, and open pull requests.
+
+### Install and configure the agent worker
+
+The agent worker is a CLI you run on a server, VM, or any machine that can reach both the Gentic API and GitHub. Download the latest pre-built binary for your platform from the [GitHub Releases page](https://github.com/kprovorov/gentic/releases), or build from source.
+
+Once the binary is on your server, authenticate it with your Gentic API key:
+
+```bash
+gentic auth login
+```
+
+The interactive prompt asks for the API URL and your key. For non-interactive or scripted setup, pass both flags directly:
+
+```bash
+gentic auth login \
+  --api-url https://gentic.chat/api/v1 \
+  --api-key your-api-key-here
+```
+
+Alternatively, create a `.env` file next to the binary and set the variables there:
+
+```bash
+GENTIC_API_URL=https://gentic.chat/api/v1
+GENTIC_API_KEY=your-api-key-here
+GIT_REMOTE_BASE=git@github.com:
+POLL_INTERVAL_MS=3000
+```
+
+Then install and start the worker as a managed OS service so it restarts automatically:
+
+```bash
+gentic start
+```
+
+Verify the worker configuration, service, and required external tools:
+
+```bash
+gentic status
+```
+
+<Note>
+  The agent worker must be running before you move an issue to Todo. If no worker is polling, issues remain in Todo. See the [Agent Worker installation guide](/agent/installation) for service management, SSH deploy keys, and agent prerequisites.
+</Note>
+
+### Create your first issue
+
+Back in the Gentic web app, open **Issues** and click **New issue**. Choose a project, then write a detailed prompt. You can attach supporting files in the same composer.
+
+Click **Save draft** to review the issue before it runs. Gentic generates the title and type in the background. Draft issues are never picked up by the worker, so you can refine the generated fields, prompt, and attachments before running it.
+
+<Tip>
+  Write prompts the same way you would write a detailed ticket for a junior engineer: describe the goal, the acceptance criteria, any relevant file paths, and the coding style you expect. The more context you give, the better the output.
+</Tip>
+
+### Move the issue to Todo
+
+When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the prompt as the first message and makes the issue eligible for a worker.
+
+On the worker's next poll (within a few seconds), it claims the issue, clones the repository into a fresh working directory, and starts the AI agent.
+
+### Watch the pull request appear
+
+Switch to the **Issues** view and open your issue. You will see the status move through `todo → queued → in-progress` as the worker picks it up, and real-time agent output stream into the transcript panel. When the agent finishes, it commits its changes and opens a pull request on GitHub. The issue status updates to `ready-for-review` and a link to the PR appears in the issue.
+
+Open the pull request on GitHub, review the changes, and merge when you are satisfied.
+
+<CardGroup cols={2}>
+  <Card title="Agent Worker Setup" icon="server" href="/agent/overview">
+    Full installation guide: service management, SSH keys, Claude Code and Codex credentials.
+  </Card>
+  <Card title="How It Works" icon="circle-info" href="/how-it-works">
+    A deeper look at the end-to-end flow from issue creation to pull request.
+  </Card>
+</CardGroup>
+
+</Steps>

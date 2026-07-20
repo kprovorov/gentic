@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import {
   getAgentContext,
   handleAgentError,
@@ -8,7 +10,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, agent_provider, session_id, run_finished_at, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, agent_provider, session_id, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 export async function POST(request: Request) {
   try {
@@ -45,10 +47,12 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   }
 
   const { id } = candidate
+  const activeRunId = randomUUID()
   const { data: claimed, error: claimError } = await supabase
     .from("issues")
     .update({
       status: "queued",
+      active_run_id: activeRunId,
       run_started_at: now,
       run_error: null,
       run_finished_at: null,
@@ -73,11 +77,11 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
 
   return {
     id,
+    activeRunId,
     agentProvider: candidate.agent_provider,
     repo: candidate.projects.repo,
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
-    runFinishedAt: candidate.run_finished_at,
     prUrl: candidate.pr_url,
   }
 }

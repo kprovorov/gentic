@@ -5,9 +5,12 @@ import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 import {
+  ackMessagesInputSchema,
+  finishRunFieldsSchema,
   insertMessageInputSchema,
   runStateFieldsSchema,
 } from "@gentic/validators/agent"
+import { issueStatusSchema } from "@gentic/validators/issues"
 import { z } from "zod"
 
 import { getRedis } from "@/lib/redis"
@@ -20,6 +23,21 @@ export type Supabase = ReturnType<typeof createServiceClient>
 // Everything else (e.g. `merged`, `approved`) is set by the user or the
 // GitHub webhook, not the agent run itself.
 export const runStateSchema = runStateFieldsSchema
+export const runStateStatusSchema = issueStatusSchema.extract([
+  "in-progress",
+  "held",
+  "run-failed",
+  "ready-for-review",
+  "waiting-for-input",
+])
+
+export const finishRunSchema = finishRunFieldsSchema
+  .extend({
+    finish_if_no_pending: z.literal(true),
+  })
+  .strict()
+
+export const ackMessagesSchema = ackMessagesInputSchema
 export const insertMessageSchema = insertMessageInputSchema.partial({ id: true })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against
