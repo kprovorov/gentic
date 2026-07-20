@@ -1,6 +1,6 @@
 import type { IssueStatus } from "@gentic/validators/issues"
 
-import type { ChatMessage } from "./issue-chat"
+import type { ChatMessage } from "./issue-chat-state"
 
 export const ISSUE_RETRY_RESET_EVENT = "gentic:issue-retry-reset"
 

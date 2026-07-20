@@ -4,6 +4,12 @@ import { clerkClient } from "@clerk/nextjs/server"
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
+import {
+  ackMessagesInputSchema,
+  finishRunFieldsSchema,
+  insertMessageInputSchema,
+  runStateFieldsSchema,
+} from "@gentic/validators/agent"
 import { issueStatusSchema } from "@gentic/validators/issues"
 import { z } from "zod"
 
@@ -16,6 +22,7 @@ export type Supabase = ReturnType<typeof createServiceClient>
 // The statuses a worker run is allowed to move an issue into via `/run-state`.
 // Everything else (e.g. `merged`, `approved`) is set by the user or the
 // GitHub webhook, not the agent run itself.
+export const runStateSchema = runStateFieldsSchema
 export const runStateStatusSchema = issueStatusSchema.extract([
   "in-progress",
   "held",
@@ -24,26 +31,14 @@ export const runStateStatusSchema = issueStatusSchema.extract([
   "waiting-for-input",
 ])
 
-export const runStateSchema = z
-  .object({
-    status: runStateStatusSchema.optional(),
-    session_id: z.string().nullable().optional(),
-    run_error: z.string().nullable().optional(),
-    run_started_at: z.string().datetime().nullable().optional(),
-    run_finished_at: z.string().datetime().nullable().optional(),
-    usage_limit_reset_at: z.string().datetime().nullable().optional(),
-    pr_url: z.string().url().nullable().optional(),
+export const finishRunSchema = finishRunFieldsSchema
+  .extend({
+    finish_if_no_pending: z.literal(true),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0)
 
-export const insertMessageSchema = z.object({
-  id: z.string().uuid().optional(),
-  role: z.enum(["assistant", "system"]),
-  kind: z.enum(["text", "tool", "thinking"]).optional(),
-  content: z.string(),
-  status: z.enum(["complete", "error"]).optional(),
-})
+export const ackMessagesSchema = ackMessagesInputSchema
+export const insertMessageSchema = insertMessageInputSchema.partial({ id: true })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against
 // Clerk bills one API-key usage and the worker polls constantly, so caching is

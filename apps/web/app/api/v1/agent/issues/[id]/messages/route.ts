@@ -1,4 +1,5 @@
 import {
+  ackMessagesSchema,
   ensureIssueOwned,
   getAgentContext,
   handleAgentError,
@@ -14,28 +15,55 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const cursor = new URL(request.url).searchParams.get("after")
     const { supabase, userId } = await getAgentContext(request)
-
-    if (!cursor) {
-      return json({ error: "Missing after cursor" }, { status: 400 })
-    }
 
     await ensureIssueOwned(supabase, userId, id)
 
     const { data, error } = await supabase
       .from("messages")
-      .select("id, content, created_at")
+      .select("id, content, created_at, seq")
       .eq("issue_id", id)
       .eq("role", "user")
-      .gt("created_at", cursor)
-      .order("created_at", { ascending: true })
+      .is("consumed_by_run_id", null)
+      .order("seq", { ascending: true })
 
     if (error) {
       throw new Error(error.message)
     }
 
     return json({ messages: data ?? [] })
+  } catch (error) {
+    return handleAgentError(error)
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const fields = ackMessagesSchema.parse(await request.json())
+    const { supabase, userId } = await getAgentContext(request)
+
+    await ensureIssueOwned(supabase, userId, id)
+
+    const { error } = await supabase
+      .from("messages")
+      .update({
+        consumed_by_run_id: fields.run_id,
+        consumed_at: new Date().toISOString(),
+      })
+      .eq("issue_id", id)
+      .eq("role", "user")
+      .is("consumed_by_run_id", null)
+      .in("id", fields.message_ids)
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    return json({ ok: true })
   } catch (error) {
     return handleAgentError(error)
   }
@@ -66,7 +94,7 @@ export async function POST(
         { onConflict: "id", ignoreDuplicates: true }
       )
       .select("id")
-      .maybeSingle<{ id: string }>()
+      .maybeSingle()
 
     if (error) {
       throw new Error(error.message)

@@ -25,15 +25,6 @@ export async function GET(
       .select("id,file_name,content_type,size_bytes,storage_path")
       .eq("issue_id", id)
       .order("created_at", { ascending: true })
-      .returns<
-        Array<{
-          id: string
-          file_name: string
-          content_type: string | null
-          size_bytes: number | null
-          storage_path: string
-        }>
-      >()
 
     if (error) {
       throw new Error(error.message)

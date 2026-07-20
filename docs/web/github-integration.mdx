@@ -1,0 +1,99 @@
+---
+title: "Connect GitHub to Gentic via GitHub App Installation"
+sidebarTitle: "GitHub Integration"
+description: "Install the Gentic GitHub App to enable automatic pull request status updates and repository access for your AI coding agent runs."
+---
+
+The GitHub integration connects a GitHub App installation to your Gentic workspace. Once connected, GitHub automatically sends pull request events back to Gentic — so the issue status on your dashboard reflects the real state of the PR without you needing to update it manually, and reviewers requesting changes can send that feedback directly to the agent that opened the PR. You manage the integration from **Settings → Workspace**.
+
+## Connection States
+
+The GitHub integration card in Settings displays one of three states:
+
+<CardGroup cols={3}>
+  <Card title="Not connected" icon="plug">
+    No GitHub App installation is linked to your workspace. Agent runs can still open pull requests if the agent worker has direct Git access, but PR status events will not flow back into Gentic automatically.
+  </Card>
+  <Card title="Pending approval" icon="clock">
+    You have submitted an installation request, but an organization administrator has not yet approved the GitHub App. This state applies to organization-owned repositories only.
+  </Card>
+  <Card title="Connected" icon="circle-check">
+    The GitHub App installation is active. Pull request status updates from GitHub are delivered to Gentic automatically.
+  </Card>
+</CardGroup>
+
+<Note>
+  If you install the Gentic GitHub App on an organization-owned repository, the installation may require approval from an organization administrator before it becomes active. The integration status shows **Pending approval** until the admin grants access.
+</Note>
+
+## Connect GitHub
+
+<Steps>
+  <Step title="Open Settings">
+    Navigate to **Settings** in the sidebar and select **Workspace**.
+  </Step>
+  <Step title="Click Connect GitHub">
+    In the **GitHub integration** card, click the **Connect GitHub** button. This redirects you to GitHub to install the Gentic GitHub App.
+  </Step>
+  <Step title="Select repositories">
+    On the GitHub App installation page, choose whether to grant access to all repositories or specific ones, then click **Install**.
+  </Step>
+  <Step title="Confirm the connection">
+    After installation, GitHub redirects you back to Gentic. The integration card now shows **Connected** (or **Pending approval** for org installs awaiting admin sign-off).
+  </Step>
+</Steps>
+
+## Disconnect GitHub
+
+To remove the GitHub integration, open the **GitHub integration** card in Settings and click **Disconnect**. Gentic removes the stored installation record. The GitHub App itself remains installed on your GitHub account or organization — you must uninstall it separately from your GitHub App settings if you no longer want Gentic to have any access.
+
+## Auto-Respond to Review Feedback
+
+When a reviewer submits a **Request changes** review on a pull request Gentic opened, Gentic can feed that feedback straight back to the agent that wrote the code — no human relay needed. Gentic reads the review body and every inline comment attached to it, appends them to the issue's transcript, and re-queues the run so the same agent session pushes fixes to the existing PR branch.
+
+If Gentic cannot fetch inline comments (for example, because the App credentials described below are missing), it falls back to the review body alone rather than dropping the event.
+
+### When it Runs
+
+- The pull request was opened by a Gentic agent run (an issue is linked to it).
+- The GitHub review is a `changes_requested` review — approvals and plain comment reviews do not trigger a re-run.
+- The project's **Auto-respond to review feedback** setting is enabled. See [Projects](/web/projects#field-reference) for how to toggle it per project.
+
+Re-queueing is idempotent: if GitHub redelivers the same review webhook, Gentic will not re-queue the run a second time.
+
+### Enable Auto-Respond on a Self-Hosted Deployment
+
+Auto-respond needs two credentials **in addition to** the webhook secret used by the base integration, because the `pull_request_review` webhook payload only carries the review body — the inline comments have to be fetched from the GitHub API with an App installation token.
+
+<Steps>
+  <Step title="Set the GitHub App webhook secret">
+    In your GitHub App settings, generate a **webhook secret** and set the **Webhook URL** to `https://YOUR_GENTIC_DOMAIN/api/integrations/github/webhook`. Put the secret in the web app environment as `GITHUB_WEBHOOK_SECRET`. This is required for the base integration too.
+  </Step>
+  <Step title="Add the App ID and private key">
+    In the GitHub App's **General** settings, copy the **App ID** shown at the top of the page. Under **Private keys**, click **Generate a private key** to download a `.pem` file. Set both values in your web app environment:
+
+    ```bash
+    GITHUB_APP_ID=<app id>
+    # Paste the full .pem contents. If your host doesn't support real newlines
+    # in a single env var, use literal `\n` escapes for the line breaks.
+    GITHUB_APP_PRIVATE_KEY=<private key .pem contents>
+    ```
+
+    Gentic uses these to sign a short-lived App JWT and mint installation access tokens on demand — one per review event — to fetch the inline comments for that review.
+  </Step>
+  <Step title="Redeploy">
+    Restart the web app so the new environment variables take effect. No database migration or user action is required after the redeploy; auto-respond is on by default for every project.
+  </Step>
+</Steps>
+
+<Note>
+  Gentic Cloud users do not need to configure these variables — they are managed for you. The steps above apply only to self-hosted deployments.
+</Note>
+
+### Disable Auto-Respond for a Project
+
+Open **Settings → Workspace**, find the project card, uncheck **Auto-respond to review feedback**, and click **Save**. From that point on, `changes_requested` reviews on that project's PRs will still move the issue to the [`changes-requested`](/web/issue-statuses#review) workflow status, but Gentic will not queue a new run — you decide when and how to respond.
+
+## Agent Repository Access
+
+The GitHub App integration controls **PR status webhooks and review auto-response**. It is separate from the credentials the agent worker uses to clone and push to repositories. The agent worker requires its own direct Git or SSH access to your repositories — configure this in your self-hosted agent worker environment, not through the GitHub App settings in Gentic.

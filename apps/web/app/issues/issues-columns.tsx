@@ -27,9 +27,10 @@ import {
   IconThumbUp,
 } from "@tabler/icons-react"
 
-import type { HomeIssue, IssueStatus, IssueType } from "@/app/queries"
+import type { HomeIssue } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
+import type { IssueStatus, IssueType } from "@gentic/validators/issues"
 
 export const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",

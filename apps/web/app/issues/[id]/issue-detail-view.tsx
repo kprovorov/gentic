@@ -34,10 +34,7 @@ import {
 } from "@tabler/icons-react"
 
 import { fetchIssueDetailData } from "@/app/client-queries"
-import {
-  type IssueDetailData,
-  type IssueStatus,
-} from "@/app/queries"
+import type { IssueDetailData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
@@ -49,6 +46,7 @@ import {
   CardTitle,
 } from "@gentic/ui/card"
 import { cn } from "@gentic/ui/utils"
+import type { IssueStatus } from "@gentic/validators/issues"
 
 import { Attachments } from "./attachments"
 import { IssueAgentSelect } from "./issue-agent-select"
@@ -250,7 +248,6 @@ export function IssueDetailView({
           "issue_pull_requests",
           "issue_relations",
           "attachments",
-          "messages",
         ]}
         queryKey={queryKeys.issue(issue.id)}
       />

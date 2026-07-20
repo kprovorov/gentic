@@ -64,7 +64,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   await uploadIssueAttachments(supabase, created.id, getAttachmentFiles(formData))
 
   if (status === "todo") {
-    await issuesService.updateIssueStatus(supabase, userId, created.id, "todo")
+    await issuesService.startIssueFromDraft(supabase, userId, created.id)
   }
 
   after(async () => {

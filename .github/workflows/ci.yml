@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Disable placeholder local Clerk auth
+        run: |
+          perl -0pi -e 's/(\[auth\.third_party\.clerk\]\nenabled = )true/${1}false/' supabase/config.toml
+
+      - name: Start Supabase
+        run: pnpm dlx supabase@2.109.1 start
+
+      - name: Verify generated Supabase types
+        run: pnpm db:types:check
+
+      - name: Lint local database
+        run: pnpm dlx supabase@2.109.1 db lint --local
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Root tests
+        env:
+          TZ: UTC
+        run: pnpm test
+
+      - name: Agent tests in non-UTC timezone
+        env:
+          TZ: America/Los_Angeles
+        run: pnpm --filter @gentic/gentic test
+
+      - name: Production build
+        run: pnpm build
