@@ -24,7 +24,7 @@ export const runStateStatusSchema = issueStatusSchema.extract([
   "waiting-for-input",
 ])
 
-export const runStateSchema = z
+const runStateBaseSchema = z
   .object({
     status: runStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
@@ -35,7 +35,27 @@ export const runStateSchema = z
     pr_url: z.string().url().nullable().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0)
+
+export const runStateSchema = runStateBaseSchema.refine(
+  (value) => Object.keys(value).length > 0
+)
+
+export const finishRunSchema = runStateBaseSchema
+  .extend({
+    finish_if_no_pending: z.literal(true),
+    active_run_id: z.string().uuid(),
+    status: runStateStatusSchema.extract([
+      "ready-for-review",
+      "waiting-for-input",
+    ]),
+    run_finished_at: z.string().datetime(),
+  })
+  .strict()
+
+export const ackMessagesSchema = z.object({
+  run_id: z.string().uuid(),
+  message_ids: z.array(z.string().uuid()).min(1),
+})
 
 export const insertMessageSchema = z.object({
   id: z.string().uuid().optional(),

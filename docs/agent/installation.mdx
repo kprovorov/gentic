@@ -1,0 +1,249 @@
+---
+title: "Install the Gentic Agent Worker on Your Server"
+sidebarTitle: "Installation"
+description: "Deploy the Gentic agent worker using Homebrew, a Linux package, the prebuilt tarball, or from source with Node.js. Includes Git and credentials setup."
+---
+
+The agent worker ships as a standalone binary compiled with [Bun](https://bun.sh) — a single executable plus vendored agent sidecars, with no runtime dependencies on the target machine. Choose the install method that matches your environment:
+
+- **[Homebrew](#option-a-homebrew-macos-and-linux)** — recommended for macOS and Linuxbrew users.
+- **[Linux packages](#option-b-linux-packages-deb-rpm-apk)** — `.deb`, `.rpm`, and `.apk` built for Debian/Ubuntu, RHEL/Fedora, and Alpine.
+- **[Prebuilt tarball](#option-c-prebuilt-tarball)** — a portable `.tar.gz` you can drop onto any Linux or macOS server.
+- **[From source with Node.js](#option-d-from-source-with-nodejs)** — for development or when you need to build a target that is not published.
+
+All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) and [agent credentials](#agent-credentials-setup) setup below before starting the worker.
+
+**Supported platforms**
+
+| OS/arch | Homebrew | `.deb` / `.rpm` / `.apk` | Tarball |
+|---|---|---|---|
+| macOS, Apple Silicon (`darwin-arm64`) | ✅ | — | ✅ |
+| macOS, Intel (`darwin-x64`) | ✅ | — | ✅ |
+| Linux, x86-64 (`linux-x64`) | ✅ (Linuxbrew) | ✅ | ✅ |
+| Linux, ARM64 (`linux-arm64`) | ✅ (Linuxbrew) | ✅ | ✅ |
+
+## Option A: Homebrew (macOS and Linux)
+
+The Gentic Homebrew tap publishes a formula for every release, with per-platform bottles pointing at the official GitHub Release archives.
+
+<Steps>
+  <Step title="Install from the tap">
+    ```bash
+    brew install kprovorov/tap/gentic
+    ```
+
+    Or tap and install in two steps:
+
+    ```bash
+    brew tap kprovorov/tap
+    brew install gentic
+    ```
+  </Step>
+  <Step title="Upgrade later">
+    ```bash
+    brew update
+    brew upgrade gentic
+    ```
+  </Step>
+</Steps>
+
+Homebrew installs the `gentic` binary and its `vendor/` sidecars into the keg and symlinks `gentic` onto your `PATH`, so `gentic` works from any shell.
+
+## Option B: Linux packages (.deb, .rpm, .apk)
+
+Every release publishes native Linux packages for `x86-64` and `ARM64` alongside the tarballs, built from the same binary. Use these if you manage your fleet with `apt`, `dnf`/`yum`, or `apk`.
+
+The packages install the binary to `/usr/lib/gentic/gentic` with its `vendor/` sidecars next to it, and expose `gentic` on `PATH` via `/usr/bin/gentic`.
+
+<Tabs>
+  <Tab title="Debian / Ubuntu (.deb)">
+    ```bash
+    # Pick the URL for your architecture from the latest release
+    curl -LO https://github.com/kprovorov/gentic/releases/latest/download/gentic-<version>-linux-x64.deb
+    sudo dpkg -i gentic-<version>-linux-x64.deb
+    ```
+
+    Replace `<version>` with the release version (e.g. `0.4.2`) and `linux-x64` with `linux-arm64` on ARM64 hosts.
+  </Tab>
+  <Tab title="RHEL / Fedora (.rpm)">
+    ```bash
+    curl -LO https://github.com/kprovorov/gentic/releases/latest/download/gentic-<version>-linux-x64.rpm
+    sudo rpm -i gentic-<version>-linux-x64.rpm
+    # or: sudo dnf install ./gentic-<version>-linux-x64.rpm
+    ```
+  </Tab>
+  <Tab title="Alpine (.apk)">
+    ```bash
+    curl -LO https://github.com/kprovorov/gentic/releases/latest/download/gentic-<version>-linux-x64.apk
+    sudo apk add --allow-untrusted ./gentic-<version>-linux-x64.apk
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  The exact filenames — including the version — are listed on the [Releases page](https://github.com/kprovorov/gentic/releases). Checksums for every artifact are published in `checksums.txt` on the same release.
+</Tip>
+
+## Option C: Prebuilt tarball
+
+If you don't want a package manager to own the binary — for example, when deploying into a container image or a locked-down server — download the raw tarball and extract it yourself.
+
+<Note>
+  The archive contains the `gentic` binary **plus** vendor sidecars (`vendor/claude-agent-acp/` and `vendor/codex-acp/`) that are spawned as child processes at runtime. Always keep the entire extracted directory together — do not copy `gentic` on its own.
+</Note>
+
+Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0.4.2-linux-x64.tar.gz`.
+
+<Steps>
+  <Step title="Download the archive for your platform">
+    ```bash
+    # Example for Linux x86-64
+    curl -LO https://github.com/kprovorov/gentic/releases/latest/download/gentic-<version>-linux-x64.tar.gz
+    curl -LO https://github.com/kprovorov/gentic/releases/latest/download/checksums.txt
+    ```
+
+    Substitute `<version>` with the release version and `linux-x64` with your platform slug (`linux-arm64`, `darwin-x64`, or `darwin-arm64`).
+  </Step>
+  <Step title="Verify the checksum">
+    ```bash
+    sha256sum --check --ignore-missing checksums.txt
+    ```
+  </Step>
+  <Step title="Extract the archive">
+    ```bash
+    tar -xzf gentic-<version>-linux-x64.tar.gz
+    ```
+
+    You will see the `gentic` binary and the `vendor/` directory alongside it.
+  </Step>
+  <Step title="Run the worker">
+    Set your credentials in the environment and start the worker:
+
+    ```bash
+    GENTIC_API_URL=https://gentic.chat/api/v1 \
+    GENTIC_API_KEY=<your-api-key> \
+    ./gentic run
+    ```
+
+    For production use, run `gentic start` instead to install a managed system service. See [Service Management](/agent/service-management).
+  </Step>
+</Steps>
+
+<Warning>
+  macOS binaries are not code-signed or notarized. On first run, Gatekeeper will block execution with a security warning. To allow it, open **System Settings → Privacy & Security** and click **Allow Anyway**, or run `xattr -dr com.apple.quarantine ./gentic` from the terminal. The Homebrew formula handles this automatically.
+</Warning>
+
+## Option D: From source with Node.js
+
+Run from source when you need to build a platform that is not published, or when you are developing against the worker. Requires Node.js 20 or newer and pnpm 11.9.0 or newer on the machine.
+
+### Compile your own standalone binary
+
+If you just need a `gentic` binary for a target that is not in the release matrix, use the build script — you still get the same standalone output as Option C, without needing Node.js on the deployment server.
+
+<Steps>
+  <Step title="Install dependencies from the repository root">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  <Step title="Run the build script">
+    Pass the Bun compile target and the output directory as arguments:
+
+    ```bash
+    cd apps/gentic
+    ./scripts/build-binary.sh bun-linux-x64 dist/linux-x64
+    ```
+
+    Valid targets are `bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, and `bun-darwin-arm64`.
+  </Step>
+  <Step title="Copy the output directory to your server">
+    ```bash
+    scp -r dist/linux-x64 user@your-server:/opt/gentic
+    ```
+  </Step>
+</Steps>
+
+### Run directly from source
+
+<Steps>
+  <Step title="Clone or upload the repository to the server">
+    ```bash
+    git clone git@github.com:kprovorov/gentic.git
+    cd gentic
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  <Step title="Build the agent package">
+    ```bash
+    pnpm --filter @gentic/gentic build
+    ```
+  </Step>
+  <Step title="Start the worker">
+    ```bash
+    pnpm --filter @gentic/gentic start
+    ```
+
+    This runs `gentic run` in the foreground. For production, use `gentic start` to install a managed system service instead. See [Service Management](/agent/service-management).
+  </Step>
+</Steps>
+
+---
+
+## Git authentication setup
+
+The worker clones repositories using the `GIT_REMOTE_BASE` value (default: `git@github.com:`). For a project stored as `owner/repo`, the worker clones `git@github.com:owner/repo`. You must give the worker SSH access to every repository it will clone.
+
+<Steps>
+  <Step title="Generate a deploy key or use a machine user key">
+    ```bash
+    ssh-keygen -t ed25519 -C "gentic-worker" -f ~/.ssh/gentic_deploy
+    ```
+  </Step>
+  <Step title="Add the public key to each repository">
+    In GitHub, go to **Repository → Settings → Deploy keys** and add the contents of `~/.ssh/gentic_deploy.pub`. Enable **Allow write access** so the worker can push branches for pull requests.
+  </Step>
+  <Step title="Configure SSH to use the key">
+    Add the following to `~/.ssh/config` on the server:
+
+    ```text
+    Host github.com
+      IdentityFile ~/.ssh/gentic_deploy
+      IdentitiesOnly yes
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Agent credentials setup
+
+### Claude Code
+
+Claude Code credentials are managed entirely outside Gentic, the same way you would authenticate Claude Code for any other use. Ensure the credentials are present in the environment where the worker process runs. The worker picks them up automatically through the Agent Client Protocol sidecar.
+
+### Codex
+
+<Steps>
+  <Step title="Install the Codex CLI in the worker environment">
+    Follow the [Codex installation instructions](https://github.com/openai/codex) for your platform.
+  </Step>
+  <Step title="Authenticate Codex">
+    Run `codex` once interactively to complete authentication before starting the worker.
+  </Step>
+  <Step title="Set CODEX_PATH if Codex is not on PATH">
+    If the `codex` binary is not discoverable via `PATH` in the worker's environment, set the `CODEX_PATH` environment variable to its absolute path:
+
+    ```bash
+    export CODEX_PATH=/usr/local/bin/codex
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Codex runs default to `INITIAL_AGENT_MODE=agent-full-access`. You can override this by setting the variable in the worker's environment before starting the service.
+</Tip>

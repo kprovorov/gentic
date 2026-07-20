@@ -5,7 +5,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { IssueChat, type ChatMessage } from "./issue-chat"
+import { IssueChat } from "./issue-chat"
+import type { ChatMessage } from "./issue-chat-state"
 
 const sendIssueMessageMock = vi.fn()
 const invalidateQueriesMock = vi.fn()

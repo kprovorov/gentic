@@ -1,0 +1,92 @@
+---
+title: "How Gentic Works: Issues, Agents, and Pull Requests"
+sidebarTitle: "How It Works"
+description: "Understand Gentic's end-to-end workflow: from creating an issue in the web app to receiving an automated pull request from an AI coding agent."
+---
+
+Gentic connects two things: a web app where your team writes and manages work, and a background worker that turns that work into real code. Understanding how these two parts communicate helps you configure Gentic correctly and troubleshoot issues when something unexpected happens.
+
+## The end-to-end flow
+
+<Steps>
+
+### You create an issue in the web app
+
+Create a new issue in [gentic.chat](https://gentic.chat), choose a project, and write the prompt the agent will follow. Choose **Save draft**, **Run with Claude Code**, or **Run with Codex**. Gentic generates a title and issue type in the background. You can also attach files in the prompt composer.
+
+New issues start in **Draft** status. A draft is never picked up by the worker, giving you time to iterate on the prompt, add attachments, and set any blocking dependencies before the agent begins.
+
+### Moving to Todo queues the issue
+
+When you change an issue's status from **Draft** to **Todo**, Gentic records your prompt as the first message in the issue's conversation thread and puts the issue in the unclaimed pool. Every issue in Gentic has a single `status` field that covers both the workflow position (draft, waiting for review, merged, cancelled…) and the current agent lifecycle (queued, in-progress, held, run-failed). The full list is documented in [Issue Statuses](/web/issue-statuses).
+
+### The agent worker polls for queued issues
+
+Your deployed agent worker runs as a background process on a server you control. It polls the Gentic API on a fixed interval — **3,000 ms by default**, configurable via `POLL_INTERVAL_MS`. On each tick, it calls the API with your `GENTIC_API_KEY`, which the API uses to identify your account and return only issues that belong to your projects.
+
+<Note>
+  The worker is an outbound-only polling process. It never exposes a port or accepts inbound connections. Keep it running on a private server or VM with access to your GitHub repositories — do not expose it as a public web service.
+</Note>
+
+### The worker claims the issue and clones the repository
+
+When the worker finds a `todo` issue, it claims it (moving the status to `queued`) and clones the project's GitHub repository into a fresh, isolated working directory. The clone target is constructed by prepending `GIT_REMOTE_BASE` (default: `git@github.com:`) to the `owner/repo` slug stored in the project — so a project configured as `acme-corp/backend` is cloned from `git@github.com:acme-corp/backend`.
+
+Once the clone finishes and the agent session starts, the status flips to `in-progress`. Each issue gets its own working directory. A worker processes one issue at a time by default; set `MAX_CONCURRENT_ISSUES` to allow more isolated runs on the same worker.
+
+### The agent writes code and opens a pull request
+
+With the repository cloned, the worker spawns the chosen agent through the **Agent Client Protocol (ACP)**:
+
+- **Claude Code** issues run through `@agentclientprotocol/claude-agent-acp`, using Claude Code credentials already present in the worker environment.
+- **Codex** issues run through `@agentclientprotocol/codex-acp`, which shells out to the `codex` CLI already installed and authenticated in the worker environment.
+
+The agent receives the issue prompt (plus any attachment content) as its first user message. The worker appends an automatic instruction telling the agent to commit its changes and open a pull request before finishing — you do not need to include this in your prompt.
+
+As the agent works, its output streams back into the issue's transcript in real time so you can follow along in the web app.
+
+### The issue status updates automatically
+
+When the agent finishes its run, the worker resolves the issue directly to `ready-for-review` (if a pull request was opened) or `waiting-for-input` (if the agent stopped without opening one). If the agent encounters an unrecoverable error the status becomes `run-failed`, and if it hits a usage or session limit it moves to `held` with a parsed reset time — the worker will auto-retry once that time has passed.
+
+### You can send follow-up messages while the agent is running
+
+The issue transcript is a live conversation. While the issue is `in-progress`, you can type a follow-up message in the web app — for example, to clarify a requirement or redirect the agent. The worker picks up any new messages sent during an active session and delivers them to the agent in the same ACP session without restarting.
+
+The worker keeps the session open for one full poll interval after the agent goes quiet, so messages sent just as the agent is finishing are still handled in the same run.
+
+### Follow-up messages re-queue finished issues
+
+If you send a message to an issue whose run has already ended — anything outside `draft`, `todo`, `queued`, `held`, or `in-progress` — Gentic automatically returns it to `todo`. The worker claims it on the next poll and resumes the **same ACP session** using the stored `session_id`, so the agent picks up exactly where it left off with the full conversation history intact. You do not need to re-enter any context.
+
+</Steps>
+
+## Supported agents
+
+| Agent | Identifier | Notes |
+|---|---|---|
+| **Claude Code** | `claude_code` | Requires Claude credentials (API key or OAuth) present in the worker environment before the worker starts. |
+| **Codex** | `codex` | Requires the Codex CLI installed on the worker machine and authenticated. Set `CODEX_PATH` in the environment if the binary is not on `PATH`. Runs default in `agent-full-access` mode unless `INITIAL_AGENT_MODE` is overridden. |
+
+## Issue status reference
+
+Every issue carries a single `status` field. The most common values are summarised below; for the complete list — including review, deploy, and terminal statuses, plus how GitHub pull request events map back into Gentic — see [Issue Statuses](/web/issue-statuses).
+
+| `status` | Meaning |
+|---|---|
+| `draft` | Issue is being written; invisible to the worker. |
+| `todo` | Issue is ready in the unclaimed pool; waiting for a worker to pick it up. |
+| `queued` | A worker has claimed the issue and is cloning the repository. |
+| `held` | The agent hit a usage or session limit; the worker will retry after the parsed reset time. |
+| `in-progress` | The agent session is running against the cloned repository. |
+| `ready-for-review` | A pull request is open on GitHub and waiting for review. |
+| `run-failed` | The agent run ended with an error before opening a pull request. |
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Follow a step-by-step guide from signup to your first pull request.
+  </Card>
+  <Card title="Agent Worker Setup" icon="server" href="/agent/overview">
+    Deploy, configure, and manage the background worker process.
+  </Card>
+</CardGroup>

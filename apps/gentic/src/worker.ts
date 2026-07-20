@@ -14,12 +14,12 @@ import {
 } from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
+import { createPendingMessagePromptSource } from "./pending-messages.js"
 import {
   connectIssueChannel,
   type IssueRealtimeChannel,
-  type RealtimeUserMessageEvent,
 } from "./realtime.js"
-import { runAgentSession, type PromptTurn } from "./session.js"
+import { runAgentSession } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 
 export async function runWorker(): Promise<void> {
@@ -88,9 +88,6 @@ export async function runWorker(): Promise<void> {
   logInfo("worker stopped")
 }
 
-/** One pending user follow-up, queued for the next prompt turn. */
-type QueuedMessage = { id: string; content: string; created_at: string }
-
 async function processIssue(
   api: AgentApi,
   config: Config,
@@ -102,53 +99,44 @@ async function processIssue(
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   let channel: IssueRealtimeChannel | null = null
+  let currentSessionId = issue.sessionId
 
   try {
-    // Push queue for user follow-ups, ordered by `created_at`. Fed by two
-    // sources deduped by message id: a one-shot REST backlog fetch below,
-    // and live `user_message` broadcast events for the rest of the run.
-    const seenMessageIds = new Set<string>()
-    const queue: QueuedMessage[] = []
-    let queueWaiter: (() => void) | null = null
+    const promptSource = createPendingMessagePromptSource({
+      api,
+      issueId: issue.id,
+      runId: issue.activeRunId,
+      pollIntervalMs: config.POLL_INTERVAL_MS,
+      buildPrompt: async (content) => {
+        const attachmentBlocks = await buildAttachmentBlocks(
+          api,
+          issue.id,
+          attachmentsDir
+        )
+        if (attachmentBlocks.length > 0) {
+          return [{ type: "text", text: content }, ...attachmentBlocks]
+        }
+        return content
+      },
+      onFetchError: (error) => {
+        logError(
+          `failed to fetch pending messages for issue ${issue.id}:`,
+          describe(error)
+        )
+      },
+    })
 
-    const enqueue = (message: {
-      id: string
-      content: string | null
-      created_at: string
-    }): void => {
-      if (seenMessageIds.has(message.id)) {
-        return
-      }
-      seenMessageIds.add(message.id)
-      const entry: QueuedMessage = {
-        id: message.id,
-        content: message.content ?? "",
-        created_at: message.created_at,
-      }
-      const index = queue.findIndex(
-        (existing) => existing.created_at > entry.created_at
-      )
-      if (index === -1) {
-        queue.push(entry)
-      } else {
-        queue.splice(index, 0, entry)
-      }
-      if (queueWaiter) {
-        const resolve = queueWaiter
-        queueWaiter = null
-        resolve()
-      }
-    }
-
-    // Join the channel before doing anything else, so no follow-up sent
-    // from here on is missed between the seed fetch below and going live.
-    // A join failure fails the run like any other startup error — no
-    // silent REST fallback in this phase.
     channel = await connectIssueChannel(
       api,
       issue.id,
-      (event: RealtimeUserMessageEvent) => enqueue(event)
-    )
+      promptSource.wake
+    ).catch((error) => {
+      logError(
+        `issue ${issue.id} realtime unavailable; continuing with database polling:`,
+        describe(error)
+      )
+      return createNoopIssueChannel()
+    })
 
     await rm(attachmentsDir, { recursive: true, force: true })
 
@@ -180,60 +168,6 @@ async function processIssue(
 
     await setRunState(api, channel, issue.id, { status: "in-progress" })
 
-    // Seed the queue with follow-ups sent before the channel connected
-    // (including the issue's initial prompt). When resuming a session that
-    // already consumed messages, start the cursor at that run's end so they
-    // aren't replayed. A session-less retry (e.g. clone failed before the
-    // agent started) has consumed nothing, so it replays from the beginning.
-    const seedCursor =
-      issue.sessionId && issue.runFinishedAt
-        ? issue.runFinishedAt
-        : new Date(0).toISOString()
-    const backlog = await api.fetchUserMessagesAfter(issue.id, seedCursor)
-    for (const message of backlog) {
-      enqueue(message)
-    }
-
-    const waitForQueueOrTimeout = (ms: number): Promise<void> =>
-      new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          queueWaiter = null
-          resolve()
-        }, ms)
-        queueWaiter = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-      })
-
-    // Feed user messages to the session oldest-first. Follow-ups pushed while
-    // the agent is working are picked up after the current turn; once the
-    // transcript is quiet for one poll interval the session ends.
-    let idleChecked = false
-    const nextPrompt = async (): Promise<PromptTurn | null> => {
-      for (;;) {
-        const next = queue.shift()
-        if (next) {
-          idleChecked = false
-          const content = next.content
-          const attachmentBlocks = await buildAttachmentBlocks(
-            api,
-            issue.id,
-            attachmentsDir
-          )
-          if (attachmentBlocks.length > 0) {
-            return [{ type: "text", text: content }, ...attachmentBlocks]
-          }
-          return content
-        }
-        if (idleChecked) {
-          return null
-        }
-        idleChecked = true
-        await waitForQueueOrTimeout(config.POLL_INTERVAL_MS)
-      }
-    }
-
     await runAgentSession({
       api,
       issueId: issue.id,
@@ -242,17 +176,43 @@ async function processIssue(
       cwd: dir,
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,
-      onSessionId: (sessionId) =>
-        setRunState(api, channel, issue.id, { session_id: sessionId }),
-      nextPrompt,
+      onSessionId: (sessionId) => {
+        currentSessionId = sessionId
+        return setRunState(api, channel, issue.id, {
+          session_id: sessionId,
+        })
+      },
+      onPromptProcessed: promptSource.onPromptProcessed,
+      nextPrompt: promptSource.nextPrompt,
     })
 
     const prUrl = await getPullRequestUrl(dir)
-    await setRunState(api, channel, issue.id, {
+    const finished = await api.finishRun(issue.id, {
+      active_run_id: issue.activeRunId,
       status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
     })
+    if (!finished) {
+      logInfo(
+        `issue ${issue.id} received more prompts before finish; re-queueing`
+      )
+      await setRunState(api, channel, issue.id, { status: "in-progress" })
+      await processIssue(api, config, {
+        ...issue,
+        sessionId: currentSessionId,
+        prUrl,
+      })
+      return
+    }
+    if (channel) {
+      await channel.publishRunState({
+        status: prUrl ? "ready-for-review" : "waiting-for-input",
+        pr_url: prUrl ?? null,
+        usage_limit_reset_at: null,
+        run_error: null,
+      })
+    }
     logInfo(`issue ${issue.id} completed`)
   } catch (error) {
     const message = describe(error)
@@ -287,6 +247,14 @@ async function processIssue(
         logError("failed to close realtime channel:", describe(closeError))
       })
     }
+  }
+}
+
+function createNoopIssueChannel(): IssueRealtimeChannel {
+  return {
+    async publishMessage() {},
+    async publishRunState() {},
+    async close() {},
   }
 }
 

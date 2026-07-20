@@ -1,0 +1,98 @@
+---
+title: "Add File Attachments to Gentic Issues for Agent Context"
+sidebarTitle: "Attachments"
+description: "Upload images, text files, and documents to Gentic issues to give the AI coding agent additional context like screenshots, logs, or spec files."
+---
+
+Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded to the worker and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the prompt.
+
+## What attachments do
+
+Every file you attach to an issue is forwarded to the AI agent as part of its first run. The agent receives the attachments alongside your prompt text, giving it richer context before it touches a single line of code.
+
+## How attachments are delivered to the agent
+
+Gentic handles different file types differently to give the agent the most useful representation of each file:
+
+<CardGroup cols={2}>
+  <Card title="Images" icon="image">
+    PNG, JPG, GIF, WebP, and other image files are base64-encoded and embedded directly in the agent's prompt as image content blocks. The agent can see the full image.
+  </Card>
+  <Card title="Text files" icon="file-lines">
+    Plain text, Markdown, JSON, XML, YAML, and other text-based formats are read as UTF-8 and embedded inline as text resource blocks. No disk access required by the agent.
+  </Card>
+  <Card title="Other file types" icon="file">
+    PDFs, spreadsheets, binaries, and anything else are downloaded next to (not inside) the repository clone and referenced by their local file path. The agent can read them from disk during its run.
+  </Card>
+  <Card title="File size limit" icon="weight-scale">
+    Each individual file must be **25 MB or smaller**. Uploads that exceed this limit are rejected before they are stored.
+  </Card>
+</CardGroup>
+
+<Note>
+  Attachments are fetched when a worker prepares the prompt. Files added to a follow-up message are delivered on the next prompt turn. To rebuild an issue from its original prompt and current attachments, use **Retry with...** on the issue detail page.
+</Note>
+
+## How to upload attachments
+
+<Steps>
+
+### Open the issue
+
+Navigate to the issue you want to attach files to from the **Issues** list.
+
+### Use a prompt composer
+
+Use the composer on the **New issue** page or the message composer under **Agent activity** on an existing issue.
+
+### Upload your files
+
+Drag files onto the composer or click the paperclip button. You can select multiple files. The files upload when you save, run, or send the accompanying prompt text.
+
+### Confirm the files are listed
+
+After submission, confirm that each file appears in the issue's **Attachments** card with the correct name and size.
+
+</Steps>
+
+## How to delete an attachment
+
+Open the issue and find the file in the **Attachments** card. Click the delete button next to the file name and confirm. Gentic removes the file from storage and from the issue. Deleting it does not remove content already delivered to an agent session; use **Retry with...** if you need a fresh session built from the remaining files.
+
+## Good use cases for attachments
+
+<Accordion title="Screenshots of UI bugs">
+  Attach a screenshot directly to a bug issue instead of describing the visual problem in words. The agent can inspect the screenshot and target the exact element or layout that looks wrong.
+
+  **Supported formats:** PNG, JPG, GIF, WebP, BMP, TIFF
+</Accordion>
+
+<Accordion title="Log files showing errors">
+  Paste long stack traces or server logs as a `.txt` or `.log` file rather than cramming them into the prompt. The agent receives the full log as an inline text block.
+
+  **Supported formats:** `.txt`, `.log`, `.csv` (any `text/*` MIME type)
+</Accordion>
+
+<Accordion title="Design mockups">
+  Attach a design mockup when asking the agent to implement a new UI component. Give the agent both the image and a prompt like "implement the card component shown in the attachment using Tailwind CSS."
+
+  **Supported formats:** formats uploaded with an `image/*` MIME type. SVG files are often uploaded as `image/svg+xml`, but handling depends on the selected agent client.
+</Accordion>
+
+<Accordion title="Specification documents">
+  Upload a spec or RFC document to keep the prompt short while still giving the agent the full requirements. Markdown and plain text files are embedded inline; PDFs are downloaded alongside the repo and read from disk.
+
+  **Supported formats:** `.md`, `.txt`, `.pdf`
+</Accordion>
+
+<Accordion title="Data files for data-related tasks">
+  For tasks that involve parsing, transforming, or validating data, attach a representative sample. The agent can inspect the actual structure rather than inferring it from a description.
+
+  **Supported formats:** `.json`, `.csv`, `.yaml`, `.xml`, `.tsv`
+</Accordion>
+
+## Tips for effective attachments
+
+<Tip>
+  Name your files descriptively before uploading. `login-error-screenshot.png` is more helpful to the agent than `image001.png`. The file name is included in the agent's context alongside the file content.
+</Tip>

@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconExternalLink,
-  IconRefresh,
   IconGitPullRequest,
   IconLoader2,
+  IconRefresh,
   IconSend,
 } from "@tabler/icons-react"
 import { Streamdown } from "streamdown"
@@ -45,6 +45,7 @@ import {
   ISSUE_RETRY_RESET_EVENT,
   type IssueRetryResetEventDetail,
 } from "./issue-retry-events"
+import { type ChatMessage, useIssueChat } from "./issue-chat-state"
 
 type SlashCommand = {
   name: string
@@ -119,55 +120,11 @@ function filterSlashCommands(
     .slice(0, 8)
 }
 
-export type ChatMessage = {
-  id: string
-  // Stable React key that survives the optimistic-id -> server-id swap in
-  // the send mutation's onSuccess. Without it, that swap changes the list
-  // item's `key` (id), so React unmounts/remounts its DOM node — which
-  // resets @shadcn/react's message-scroller anchor tracking and can snap
-  // the viewport to the first unhandled anchor message (the top of the
-  // conversation) instead of staying put.
-  clientKey?: string
-  role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
-  content: string | null
-  status: "streaming" | "complete" | "error"
-  created_at: string
-  deliveryStatus?: "sending" | "persisted" | "failed"
-  deliveryError?: string
-  retryContent?: string
-  retryFiles?: File[]
-}
-
 type RealtimeConnectionStatus =
   | "connecting"
   | "connected"
   | "reconnecting"
   | "offline"
-
-function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
-  const index = list.findIndex((message) => message.id === incoming.id)
-  if (index === -1) {
-    return [...list, incoming].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at)
-    )
-  }
-  const next = [...list]
-  const existing = next[index]
-  next[index] = {
-    ...incoming,
-    clientKey: existing.clientKey ?? incoming.clientKey,
-    deliveryStatus: incoming.deliveryStatus ?? existing.deliveryStatus,
-    deliveryError: incoming.deliveryError ?? existing.deliveryError,
-    retryContent: incoming.retryContent ?? existing.retryContent,
-    retryFiles: incoming.retryFiles ?? existing.retryFiles,
-  }
-  return next
-}
-
-function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
-  return incoming.reduce(mergeMessage, list)
-}
 
 function mergePullRequest(
   list: IssuePullRequest[],
@@ -214,7 +171,8 @@ export function IssueChat({
   initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const { messages: displayedMessages, dispatch } =
+    useIssueChat(initialMessages)
   const [status, setStatus] = useState<IssueStatus>(initialStatus)
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
@@ -242,9 +200,6 @@ export function IssueChat({
   const announcedAssistantMessageRef = useRef<string | null>(null)
   const connectionStatusRef =
     useRef<RealtimeConnectionStatus>(connectionStatus)
-  // Last-seen `seq` per message id, so an out-of-order broadcast delivery
-  // can't regress a message back to older content.
-  const messageSeqRef = useRef(new Map<string, number>())
 
   function setRealtimeConnectionStatus(
     nextStatus: RealtimeConnectionStatus,
@@ -269,8 +224,9 @@ export function IssueChat({
         .getAll("files")
         .filter((value): value is File => value instanceof File)
 
-      setMessages((current) =>
-        mergeMessage(current, {
+      dispatch({
+        type: "optimistic_send",
+        message: {
           id: optimisticId,
           clientKey: optimisticId,
           role: "user",
@@ -278,11 +234,10 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: new Date().toISOString(),
-          deliveryStatus: "sending",
           retryContent: content,
           retryFiles: files,
-        })
-      )
+        },
+      })
       setLiveMessage("Sending message.")
 
       return { optimisticId }
@@ -290,21 +245,19 @@ export function IssueChat({
     onSuccess: async (message, formData, context) => {
       const content = String(formData.get("content") ?? "")
 
-      setMessages((current) =>
-        mergeMessage(
-          current.filter(({ id }) => id !== context.optimisticId),
-          {
-            id: message.id,
-            clientKey: context.optimisticId,
-            role: "user",
-            kind: "text",
-            content,
-            status: "complete",
-            created_at: message.created_at,
-            deliveryStatus: "persisted",
-          }
-        )
-      )
+      dispatch({
+        type: "persisted_insert_update",
+        optimisticId: context.optimisticId,
+        message: {
+          id: message.id,
+          clientKey: context.optimisticId,
+          role: "user",
+          kind: "text",
+          content,
+          status: "complete",
+          created_at: message.created_at,
+        },
+      })
       setLiveMessage("Message delivered. Agent will process it shortly.")
 
       if (broadcastSubscribedRef.current && broadcastChannelRef.current) {
@@ -325,43 +278,23 @@ export function IssueChat({
       const files = formData
         .getAll("files")
         .filter((value): value is File => value instanceof File)
+      const error = getSendErrorMessage(_error)
       if (context) {
-        setMessages((current) =>
-          mergeMessage(current, {
-            id: context.optimisticId,
-            clientKey: context.optimisticId,
-            role: "user",
-            kind: "text",
-            content,
-            status: "error",
-            created_at: new Date().toISOString(),
-            deliveryStatus: "failed",
-            deliveryError: getSendErrorMessage(_error),
-            retryContent: content,
-            retryFiles: files,
-          })
-        )
+        dispatch({
+          type: "failure",
+          optimisticId: context.optimisticId,
+          error,
+          content,
+          files,
+        })
       }
       setDraft((current) => current || content)
       setDraftFiles((current) => (current.length > 0 ? current : files))
-      setLiveMessage(`Message failed to send. ${getSendErrorMessage(_error)}`)
+      setLiveMessage(`Message failed to send. ${error}`)
     },
   })
 
   const supabase = useSupabaseClient()
-  const isOptimisticRetryReset = initialMessages.some((message) =>
-    message.id.startsWith("optimistic-retry-")
-  )
-  const displayedMessages = useMemo(() => {
-    if (isOptimisticRetryReset) {
-      return initialMessages
-    }
-
-    return mergeMessages(
-      messages.filter((message) => !message.id.startsWith("optimistic-retry-")),
-      initialMessages
-    )
-  }, [messages, initialMessages, isOptimisticRetryReset])
   const displayedPullRequests = useMemo(
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
@@ -392,7 +325,7 @@ export function IssueChat({
         return
       }
 
-      setMessages([detail.message])
+      dispatch({ type: "reset", messages: [detail.message] })
       setStatus(detail.status)
       setUsageLimitResetAt(detail.usageLimitResetAt)
       setPrUrl(detail.prUrl)
@@ -403,7 +336,7 @@ export function IssueChat({
     return () => {
       window.removeEventListener(ISSUE_RETRY_RESET_EVENT, handleRetryReset)
     }
-  }, [issueId])
+  }, [dispatch, issueId])
 
   // The worker only starts streaming a message once the model produces its
   // first token — cloning, running the setup script, and booting the ACP
@@ -433,13 +366,14 @@ export function IssueChat({
         message.kind === "text" &&
         message.status === "complete"
     )
-    if (lastAssistant) {
-      if (announcedAssistantMessageRef.current === lastAssistant.id) {
-        return
-      }
-      announcedAssistantMessageRef.current = lastAssistant.id
-      setLiveMessage("Agent response complete.")
+    if (!lastAssistant) {
+      return
     }
+    if (announcedAssistantMessageRef.current === lastAssistant.id) {
+      return
+    }
+    announcedAssistantMessageRef.current = lastAssistant.id
+    setLiveMessage("Agent response complete.")
   }, [displayedMessages])
 
   useEffect(() => {
@@ -471,27 +405,6 @@ export function IssueChat({
   useEffect(() => {
     const channel = supabase
       .channel(`issue-${issueId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `issue_id=eq.${issueId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            const removed = payload.old as { id: string }
-            setMessages((current) =>
-              current.filter((message) => message.id !== removed.id)
-            )
-            return
-          }
-          setMessages((current) =>
-            mergeMessage(current, payload.new as ChatMessage)
-          )
-        }
-      )
       .on(
         "postgres_changes",
         {
@@ -532,17 +445,22 @@ export function IssueChat({
           )
         }
       )
-      .subscribe()
+      .subscribe((subscribeStatus) => {
+        if (subscribeStatus === "SUBSCRIBED") {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.issue(issueId),
+          })
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [supabase, issueId])
+  }, [supabase, issueId, queryClient])
 
-  // Private Realtime Broadcast channel: the low-latency transport (see
-  // docs/realtime-transport.md). Subscribed in addition to the
-  // `postgres_changes` effect above during rollout — upsert-by-id makes
-  // double delivery of the same message harmless.
+  // Private Realtime Broadcast channel: the low-latency transcript transport
+  // (see docs/realtime-transport.md). Durable query hydration reconciles any
+  // missed persisted messages on initial load, navigation, and reconnect.
   useEffect(() => {
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -563,21 +481,13 @@ export function IssueChat({
             if (!event.success) {
               return
             }
-            const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
-            if (event.data.seq <= lastSeq) {
-              return
-            }
-            messageSeqRef.current.set(event.data.id, event.data.seq)
-            setMessages((current) =>
-              mergeMessage(current, {
-                id: event.data.id,
-                role: event.data.role,
-                kind: event.data.kind,
-                content: event.data.content,
-                status: event.data.status,
-                created_at: event.data.ts,
-              })
-            )
+            dispatch({
+              type:
+                event.data.status === "streaming"
+                  ? "stream_delta"
+                  : "finalization",
+              event: event.data,
+            })
           }
         )
         .on(
@@ -643,7 +553,7 @@ export function IssueChat({
         void supabase.removeChannel(channel)
       }
     }
-  }, [supabase, issueId])
+  }, [supabase, issueId, dispatch])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1044,10 +954,10 @@ function ChatMessageRow({
             ) : null}
           </BubbleContent>
         </Bubble>
-        {deliveryLabel || message.deliveryStatus === "failed" ? (
+        {deliveryLabel || message.pending === "failed" ? (
           <div className="flex max-w-full flex-wrap items-center justify-end gap-2 px-3.5 text-xs text-muted-foreground">
             {deliveryLabel ? <span>{deliveryLabel}</span> : null}
-            {message.deliveryStatus === "failed" ? (
+            {message.pending === "failed" ? (
               <>
                 {message.deliveryError ? (
                   <span className="text-destructive">
@@ -1083,10 +993,10 @@ function getDeliveryLabel(
   if (message.role !== "user") {
     return null
   }
-  if (message.deliveryStatus === "sending") {
+  if (message.pending === "sending") {
     return "Sending..."
   }
-  if (message.deliveryStatus === "failed") {
+  if (message.pending === "failed") {
     return "Failed to send"
   }
   if (

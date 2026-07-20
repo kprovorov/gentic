@@ -56,14 +56,14 @@ export interface IssueRealtimeChannel {
 
 /**
  * Joins the private `issue:{id}` Broadcast channel used to stream the live
- * agent conversation (see docs/realtime-transport.md). Rejects if the
- * channel can't be joined — callers should treat that like any other
- * startup failure; there is no REST fallback in this phase.
+ * agent conversation (see docs/realtime-transport.md). User-message
+ * broadcasts are wake-up hints only; callers must fetch durable messages from
+ * the database.
  */
 export async function connectIssueChannel(
   api: AgentApi,
   issueId: string,
-  onUserMessage: (event: RealtimeUserMessageEvent) => void
+  onUserMessage: () => void
 ): Promise<IssueRealtimeChannel> {
   const token = await api.fetchRealtimeToken()
   const client = createClient(token.url, token.apiKey)
@@ -81,11 +81,7 @@ export async function connectIssueChannel(
       typeof event.content === "string" &&
       typeof event.created_at === "string"
     ) {
-      onUserMessage({
-        id: event.id,
-        content: event.content,
-        created_at: event.created_at,
-      })
+      onUserMessage()
     }
   })
 
