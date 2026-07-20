@@ -4,9 +4,10 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { IconArrowLeft, IconDeviceFloppy } from "@tabler/icons-react"
 
+import { fetchIssueEditData } from "@/app/client-queries"
 import { updateIssue } from "@/app/issues/actions"
-import { getIssueEditData, type IssueEdit } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import type { IssueEdit } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -28,8 +29,9 @@ export function EditIssueView({
 }) {
   const { data: issue } = useQuery({
     queryKey: queryKeys.issueEdit(issueId),
-    queryFn: () => getIssueEditData(issueId),
+    queryFn: () => fetchIssueEditData(issueId),
     initialData,
+    staleTime: queryStaleTimes.formOptions,
   })
 
   return (

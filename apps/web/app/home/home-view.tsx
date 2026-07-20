@@ -4,8 +4,9 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { IconListDetails, IconPlus } from "@tabler/icons-react"
 
-import { getHomeData, type HomeData } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { fetchHomeData } from "@/app/client-queries"
+import type { HomeData } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -19,8 +20,9 @@ import {
 export function HomeView({ initialData }: { initialData: HomeData }) {
   const { data } = useQuery({
     queryKey: queryKeys.home,
-    queryFn: getHomeData,
+    queryFn: fetchHomeData,
     initialData,
+    staleTime: queryStaleTimes.realtime,
   })
   const activeIssueCount = data.issues.filter(
     (issue) =>

@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test \"app/**/*.test.ts\" && NODE_ENV=development pnpm exec vitest run \"app/issues/[id]/issue-chat.test.tsx\"",
+    "test": "node --import tsx --test \"app/**/*.test.ts\" \"tests/*.test.ts\" && NODE_ENV=development pnpm exec vitest run \"app/issues/[id]/issue-chat.test.tsx\"",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },

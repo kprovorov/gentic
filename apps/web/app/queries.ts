@@ -1,6 +1,4 @@
-"use server"
-
-import { notFound } from "next/navigation"
+import "server-only"
 
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
@@ -135,8 +133,23 @@ export type IssueDetailData = {
   relationCandidates: issuesService.IssueRelationIssue[]
 }
 
-export async function getHomeData(): Promise<HomeData> {
-  const { supabase } = await getAuthenticatedContext()
+type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
+
+export class QueryNotFoundError extends Error {
+  constructor(message = "Not found") {
+    super(message)
+    this.name = "QueryNotFoundError"
+  }
+}
+
+async function resolveContext(context?: AuthenticatedContext) {
+  return context ?? getAuthenticatedContext()
+}
+
+export async function getHomeData(
+  context?: AuthenticatedContext
+): Promise<HomeData> {
+  const { supabase } = await resolveContext(context)
   const { data: issues, error } = await supabase
     .from("issues")
     .select("id,title,status,type,created_at,projects(id,name,repo)")
@@ -158,12 +171,16 @@ export async function getHomeData(): Promise<HomeData> {
   }
 }
 
-export async function getIssuesData(): Promise<IssuesData> {
-  return getHomeData()
+export async function getIssuesData(
+  context?: AuthenticatedContext
+): Promise<IssuesData> {
+  return getHomeData(context)
 }
 
-export async function getSettingsData(): Promise<SettingsData> {
-  const { supabase, userId } = await getAuthenticatedContext()
+export async function getSettingsData(
+  context?: AuthenticatedContext
+): Promise<SettingsData> {
+  const { supabase, userId } = await resolveContext(context)
   const [projects, githubIntegration] = await Promise.all([
     projectsService.listProjects(supabase, userId),
     githubIntegrationsService.getGithubIntegration(supabase, userId),
@@ -182,8 +199,10 @@ export async function getSettingsData(): Promise<SettingsData> {
   }
 }
 
-export async function getNewIssueData(): Promise<{ projects: ProjectOption[] }> {
-  const { supabase, userId } = await getAuthenticatedContext()
+export async function getNewIssueData(
+  context?: AuthenticatedContext
+): Promise<{ projects: ProjectOption[] }> {
+  const { supabase, userId } = await resolveContext(context)
   const projects = await projectsService.listProjects(supabase, userId)
 
   return {
@@ -195,8 +214,11 @@ export async function getNewIssueData(): Promise<{ projects: ProjectOption[] }> 
   }
 }
 
-export async function getIssueEditData(id: string): Promise<IssueEdit> {
-  const { supabase } = await getAuthenticatedContext()
+export async function getIssueEditData(
+  id: string,
+  context?: AuthenticatedContext
+): Promise<IssueEdit> {
+  const { supabase } = await resolveContext(context)
   const { data: issue, error } = await supabase
     .from("issues")
     .select("id,title,prompt,agent_provider,type")
@@ -208,16 +230,17 @@ export async function getIssueEditData(id: string): Promise<IssueEdit> {
   }
 
   if (!issue) {
-    notFound()
+    throw new QueryNotFoundError("Issue not found")
   }
 
   return issueEditSchema.parse(issue)
 }
 
 export async function getIssueDetailData(
-  id: string
+  id: string,
+  context?: AuthenticatedContext
 ): Promise<IssueDetailData> {
-  const { supabase, userId } = await getAuthenticatedContext()
+  const { supabase, userId } = await resolveContext(context)
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
@@ -231,7 +254,7 @@ export async function getIssueDetailData(
   }
 
   if (!issue) {
-    notFound()
+    throw new QueryNotFoundError("Issue not found")
   }
 
   const parsedIssue = issueDetailSchema.parse(issue)
