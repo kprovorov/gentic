@@ -5,6 +5,16 @@ import { notFound } from "next/navigation"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
+import type { Tables } from "@gentic/supabase/types"
+import {
+  agentProviderSchema,
+  issueStatusSchema,
+  issueTypeSchema,
+  type IssueStatus,
+  type IssueType,
+} from "@gentic/validators/issues"
+import { chatMessageSchema } from "@gentic/validators/realtime"
+import { z } from "zod"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[id]/attachments"
@@ -14,27 +24,48 @@ const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
 const ATTACHMENT_THUMBNAIL_SIZE = 96
 
-export type IssueStatus =
-  | "draft"
-  | "todo"
-  | "queued"
-  | "held"
-  | "in-progress"
-  | "waiting-for-input"
-  | "testing"
-  | "tests-failed"
-  | "ready-for-review"
-  | "changes-requested"
-  | "approved"
-  | "merged"
-  | "deploying"
-  | "deploy-failed"
-  | "validating"
-  | "run-failed"
-  | "completed"
-  | "cancelled"
+type AttachmentRow = Pick<
+  Tables<"attachments">,
+  "id" | "file_name" | "content_type" | "size_bytes" | "storage_path"
+>
 
-export type IssueType = "issue" | "feature" | "bug" | "feedback" | "idea"
+const projectOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  repo: z.string(),
+})
+
+const homeIssueSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  status: issueStatusSchema,
+  type: issueTypeSchema,
+  created_at: z.string(),
+  projects: projectOptionSchema.nullable(),
+})
+
+const issueEditSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  prompt: z.string().nullable(),
+  agent_provider: agentProviderSchema,
+  type: issueTypeSchema,
+})
+
+const issueDetailSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  prompt: z.string().nullable(),
+  agent_provider: agentProviderSchema,
+  type: issueTypeSchema,
+  status: issueStatusSchema,
+  usage_limit_reset_at: z.string().nullable(),
+  run_started_at: z.string().nullable(),
+  pr_url: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  projects: projectOptionSchema.nullable(),
+})
 
 export type HomeIssue = {
   id: string
@@ -110,19 +141,19 @@ export async function getHomeData(): Promise<HomeData> {
     .from("issues")
     .select("id,title,status,type,created_at,projects(id,name,repo)")
     .order("created_at", { ascending: false })
-    .returns<HomeIssue[]>()
 
   if (error) {
     throw new Error(error.message)
   }
 
+  const parsedIssues = z.array(homeIssueSchema).parse(issues)
   const blockedIssueIds = await issuesService.listBlockedIssueIds(
     supabase,
-    issues.map((issue) => issue.id)
+    parsedIssues.map((issue) => issue.id)
   )
 
   return {
-    issues,
+    issues: parsedIssues,
     blockedIssueIds: Array.from(blockedIssueIds),
   }
 }
@@ -134,12 +165,18 @@ export async function getIssuesData(): Promise<IssuesData> {
 export async function getSettingsData(): Promise<SettingsData> {
   const { supabase, userId } = await getAuthenticatedContext()
   const [projects, githubIntegration] = await Promise.all([
-    projectsService.listProjects(supabase, userId) as Promise<SettingsProject[]>,
+    projectsService.listProjects(supabase, userId),
     githubIntegrationsService.getGithubIntegration(supabase, userId),
   ])
 
   return {
-    projects,
+    projects: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      repo: project.repo,
+      setup_script: project.setup_script,
+      auto_respond_to_reviews: project.auto_respond_to_reviews,
+    })),
     githubIntegration,
     githubAppConfigured: Boolean(process.env.GITHUB_APP_SLUG),
   }
@@ -147,12 +184,15 @@ export async function getSettingsData(): Promise<SettingsData> {
 
 export async function getNewIssueData(): Promise<{ projects: ProjectOption[] }> {
   const { supabase, userId } = await getAuthenticatedContext()
-  const projects = (await projectsService.listProjects(
-    supabase,
-    userId
-  )) as ProjectOption[]
+  const projects = await projectsService.listProjects(supabase, userId)
 
-  return { projects }
+  return {
+    projects: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      repo: project.repo,
+    })),
+  }
 }
 
 export async function getIssueEditData(id: string): Promise<IssueEdit> {
@@ -162,7 +202,6 @@ export async function getIssueEditData(id: string): Promise<IssueEdit> {
     .select("id,title,prompt,agent_provider,type")
     .eq("id", id)
     .maybeSingle()
-    .returns<IssueEdit | null>()
 
   if (error) {
     throw new Error(error.message)
@@ -172,7 +211,7 @@ export async function getIssueEditData(id: string): Promise<IssueEdit> {
     notFound()
   }
 
-  return issue
+  return issueEditSchema.parse(issue)
 }
 
 export async function getIssueDetailData(
@@ -186,7 +225,6 @@ export async function getIssueDetailData(
     )
     .eq("id", id)
     .maybeSingle()
-    .returns<IssueDetail | null>()
 
   if (error) {
     throw new Error(error.message)
@@ -195,6 +233,8 @@ export async function getIssueDetailData(
   if (!issue) {
     notFound()
   }
+
+  const parsedIssue = issueDetailSchema.parse(issue)
 
   const [
     { data: messages, error: messagesError },
@@ -207,22 +247,12 @@ export async function getIssueDetailData(
       .from("messages")
       .select("id,role,kind,content,status,created_at")
       .eq("issue_id", id)
-      .order("created_at", { ascending: true })
-      .returns<ChatMessage[]>(),
+      .order("created_at", { ascending: true }),
     supabase
       .from("attachments")
       .select("id,file_name,content_type,size_bytes,storage_path")
       .eq("issue_id", id)
-      .order("created_at", { ascending: true })
-      .returns<
-        Array<{
-          id: string
-          file_name: string
-          content_type: string | null
-          size_bytes: number | null
-          storage_path: string
-        }>
-      >(),
+      .order("created_at", { ascending: true }),
     issuesService.listIssuePullRequests(supabase, userId, id),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
@@ -236,7 +266,7 @@ export async function getIssueDetailData(
   }
 
   const attachments: Attachment[] = await Promise.all(
-    (attachmentRows ?? []).map(async (attachment) => {
+    ((attachmentRows ?? []) satisfies AttachmentRow[]).map(async (attachment) => {
       const isImage = attachment.content_type?.startsWith("image/") ?? false
       const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
       const [{ data: signed }, { data: thumbnail }] = await Promise.all([
@@ -270,8 +300,8 @@ export async function getIssueDetailData(
   )
 
   return {
-    issue,
-    messages: messages ?? [],
+    issue: parsedIssue,
+    messages: z.array(chatMessageSchema).parse(messages ?? []),
     attachments,
     pullRequests,
     relations,

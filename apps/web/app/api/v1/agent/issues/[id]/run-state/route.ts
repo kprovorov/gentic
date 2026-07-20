@@ -34,7 +34,7 @@ export async function PATCH(
           p_run_id: fields.active_run_id,
           p_status: fields.status,
           p_run_finished_at: fields.run_finished_at,
-          p_pr_url: fields.pr_url ?? null,
+          p_pr_url: fields.pr_url ?? undefined,
         })
         .single<boolean>()
 

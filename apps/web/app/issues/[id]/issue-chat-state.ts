@@ -2,17 +2,14 @@
 
 import { useEffect, useMemo, useReducer } from "react"
 
-import type { MessageEvent } from "@gentic/validators/realtime"
+import type {
+  ChatMessageContract,
+  MessageEvent,
+} from "@gentic/validators/realtime"
 
-export type ChatMessage = {
-  id: string
+export type ChatMessage = ChatMessageContract & {
   // Stable React key that survives optimistic-id -> server-id reconciliation.
   clientKey?: string
-  role: "user" | "assistant" | "system"
-  kind: "text" | "tool" | "thinking"
-  content: string | null
-  status: "streaming" | "complete" | "error"
-  created_at: string
   pending?: "sending" | "failed"
   deliveryError?: string
   retryContent?: string

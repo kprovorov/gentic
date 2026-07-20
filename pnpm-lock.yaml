@@ -31,6 +31,9 @@ importers:
       '@clack/prompts':
         specifier: ^1.6.0
         version: 1.6.0
+      '@gentic/validators':
+        specifier: workspace:*
+        version: link:../../packages/validators
       '@supabase/supabase-js':
         specifier: ^2.110.0
         version: 2.110.0

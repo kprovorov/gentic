@@ -47,6 +47,27 @@ Run the agent worker tests separately:
 pnpm --filter @gentic/gentic test
 ```
 
+## Supabase types
+
+Database types are generated into `packages/supabase/src/database.types.ts`
+from the local Supabase schema. Refresh them whenever a migration changes
+tables, columns, functions, or relationships:
+
+```bash
+pnpm db:types
+```
+
+CI should verify the committed file is current:
+
+```bash
+pnpm db:types:check
+```
+
+Both commands use a pinned Supabase CLI (`pnpm dlx supabase@2.109.1 gen types
+--lang=typescript --local --schema public`), so run them with the local
+Supabase database started and migrations applied. Commit the generated diff
+with the migration.
+
 For worker installation, configuration, and service-management details, see
 [`apps/gentic/readme.md`](apps/gentic/readme.md). Product documentation lives
 in [`docs`](docs/README.md).

@@ -29,11 +29,15 @@ import { cn } from "@gentic/ui/utils"
 import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import {
   issueRealtimeTopic,
+  issuePullRequestSchema,
+  issueRunStateRowSchema,
   messageEventSchema,
   REALTIME_MESSAGE_EVENT,
   REALTIME_RUN_STATE_EVENT,
   REALTIME_USER_MESSAGE_EVENT,
+  deletedRowSchema,
   runStateEventSchema,
+  type UserMessageEvent,
 } from "@gentic/validators/realtime"
 
 import { sendIssueMessage } from "@/app/issues/actions"
@@ -268,7 +272,7 @@ export function IssueChat({
             id: message.id,
             content,
             created_at: message.created_at,
-          },
+          } satisfies UserMessageEvent,
         })
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
@@ -414,14 +418,13 @@ export function IssueChat({
           filter: `id=eq.${issueId}`,
         },
         (payload) => {
-          const next = payload.new as {
-            status: IssueStatus
-            usage_limit_reset_at: string | null
-            pr_url: string | null
+          const next = issueRunStateRowSchema.safeParse(payload.new)
+          if (!next.success) {
+            return
           }
-          setStatus(next.status)
-          setUsageLimitResetAt(next.usage_limit_reset_at)
-          setPrUrl(next.pr_url)
+          setStatus(next.data.status)
+          setUsageLimitResetAt(next.data.usage_limit_reset_at)
+          setPrUrl(next.data.pr_url)
         }
       )
       .on(
@@ -434,14 +437,21 @@ export function IssueChat({
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            const removed = payload.old as { id: string }
+            const removed = deletedRowSchema.safeParse(payload.old)
+            if (!removed.success) {
+              return
+            }
             setPullRequests((current) =>
-              current.filter((pullRequest) => pullRequest.id !== removed.id)
+              current.filter((pullRequest) => pullRequest.id !== removed.data.id)
             )
             return
           }
+          const pullRequest = issuePullRequestSchema.safeParse(payload.new)
+          if (!pullRequest.success) {
+            return
+          }
           setPullRequests((current) =>
-            mergePullRequest(current, payload.new as IssuePullRequest)
+            mergePullRequest(current, pullRequest.data)
           )
         }
       )
