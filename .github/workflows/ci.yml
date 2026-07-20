@@ -23,6 +23,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Disable placeholder local Clerk auth
+        run: >-
+          perl -0pi -e
+          's/\[auth\.third_party\.clerk\]\nenabled = true/[auth.third_party.clerk]\nenabled = false/'
+          supabase/config.toml
+
       - name: Start Supabase
         run: pnpm dlx supabase@2.109.1 start
 
