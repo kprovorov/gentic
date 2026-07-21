@@ -578,6 +578,57 @@ export async function sendIssueMessage(
   )
 }
 
+export async function createIssueUserMessage(
+  supabase: Supabase,
+  issueId: string,
+  content: string
+) {
+  const message = unwrap(
+    await supabase
+      .from("messages")
+      .insert({
+        issue_id: issueId,
+        role: "user",
+        content,
+      })
+      .select("id, created_at")
+      .single<{ id: string; created_at: string }>()
+  )
+
+  return message
+}
+
+export async function deleteIssueMessage(
+  supabase: Supabase,
+  issueId: string,
+  messageId: string
+) {
+  unwrap(
+    await supabase
+      .from("messages")
+      .delete()
+      .eq("issue_id", issueId)
+      .eq("id", messageId)
+  )
+}
+
+export async function requeueIssueForUserMessage(
+  supabase: Supabase,
+  issueId: string
+) {
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        status: "todo",
+        usage_limit_reset_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issueId)
+      .not("status", "in", "(draft,todo,queued,held,in-progress)")
+  )
+}
+
 export type ChangesRequestedReviewComment = {
   path: string
   line: number | null

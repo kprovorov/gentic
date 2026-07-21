@@ -39,7 +39,7 @@ export interface AgentApi {
     runId: string,
     messageIds: string[]
   ): Promise<void>
-  fetchAttachments(issueId: string): Promise<Attachment[]>
+  fetchAttachments(issueId: string, messageId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
 }
 
@@ -148,9 +148,10 @@ export function createAgentApi(input: {
         }
       )
     },
-    async fetchAttachments(issueId) {
+    async fetchAttachments(issueId, messageId) {
+      const params = new URLSearchParams({ message_id: messageId })
       const data = await request(
-        `/agent/issues/${encodeURIComponent(issueId)}/attachments`,
+        `/agent/issues/${encodeURIComponent(issueId)}/attachments?${params}`,
         attachmentsResponseSchema
       )
       return data.attachments

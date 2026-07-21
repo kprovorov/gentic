@@ -19,7 +19,7 @@ export function createPendingMessagePromptSource(input: {
   issueId: string
   runId: string
   pollIntervalMs: number
-  buildPrompt: (content: string) => Promise<PromptTurn>
+  buildPrompt: (message: QueuedMessage) => Promise<PromptTurn>
   onFetchError?: (error: unknown) => void
 }): PendingMessagePromptSource {
   const queuedMessageIds = new Set<string>()
@@ -90,7 +90,7 @@ export function createPendingMessagePromptSource(input: {
           inFlightMessageIds.add(next.id)
           idleChecked = false
           return {
-            prompt: await input.buildPrompt(next.content),
+            prompt: await input.buildPrompt(next),
             messageIds: [next.id],
           }
         }

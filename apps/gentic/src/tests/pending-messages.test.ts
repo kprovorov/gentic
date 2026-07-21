@@ -19,7 +19,7 @@ test("startup drains unconsumed prompts in database sequence order", async () =>
     issueId: ISSUE_ID,
     runId: RUN_ID,
     pollIntervalMs: 0,
-    buildPrompt: async (content) => content,
+    buildPrompt: async (message) => message.content,
   })
 
   const first = await source.nextPrompt()
@@ -44,7 +44,7 @@ test("duplicate wake-ups do not re-deliver an in-flight prompt", async () => {
     issueId: ISSUE_ID,
     runId: RUN_ID,
     pollIntervalMs: 0,
-    buildPrompt: async (content) => content,
+    buildPrompt: async (message) => message.content,
   })
 
   const first = await source.nextPrompt()
@@ -66,7 +66,7 @@ test("polling picks up prompts without a realtime wake-up", async () => {
     issueId: ISSUE_ID,
     runId: RUN_ID,
     pollIntervalMs: 0,
-    buildPrompt: async (content) => content,
+    buildPrompt: async (message) => message.content,
   })
 
   const prompt = await source.nextPrompt()

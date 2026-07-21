@@ -132,16 +132,17 @@ export async function processIssue(
       issueId: issue.id,
       runId: issue.activeRunId,
       pollIntervalMs: config.POLL_INTERVAL_MS,
-      buildPrompt: async (content) => {
+      buildPrompt: async (message) => {
         const attachmentBlocks = await deps.buildAttachmentBlocks(
           api,
           issue.id,
+          message.id,
           attachmentsDir
         )
         if (attachmentBlocks.length > 0) {
-          return [{ type: "text", text: content }, ...attachmentBlocks]
+          return [{ type: "text", text: message.content }, ...attachmentBlocks]
         }
-        return content
+        return message.content
       },
       onFetchError: (error) => {
         logError(

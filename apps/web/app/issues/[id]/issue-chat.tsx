@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
+  IconDownload,
   IconExternalLink,
   IconGitPullRequest,
   IconLoader2,
+  IconPaperclip,
   IconRefresh,
   IconSend,
 } from "@tabler/icons-react"
@@ -45,6 +47,7 @@ import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
+import type { Attachment } from "./attachments"
 import { AttachmentPromptField } from "../attachment-prompt-field"
 import {
   ISSUE_RETRY_RESET_EVENT,
@@ -282,6 +285,15 @@ export function IssueChat({
           created_at: new Date().toISOString(),
           retryContent: content,
           retryFiles: files,
+          attachments: files
+            .filter((file) => file.size > 0)
+            .map((file) => ({
+              id: `optimistic-${crypto.randomUUID()}`,
+              fileName: file.name,
+              sizeBytes: file.size,
+              url: null,
+              thumbnailUrl: null,
+            })),
         },
       })
       setLiveMessage("Sending message.")
@@ -302,6 +314,7 @@ export function IssueChat({
           content,
           status: "complete",
           created_at: message.created_at,
+          attachments: message.attachments,
         },
       })
       setLiveMessage("Message delivered. Agent will process it shortly.")
@@ -1017,6 +1030,7 @@ function ChatMessageRow({
             {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
+            <MessageAttachments attachments={message.attachments} />
           </BubbleContent>
         </Bubble>
         {deliveryLabel || message.pending === "failed" ? (
@@ -1071,6 +1085,48 @@ function getDeliveryLabel(
     return "Delivered. Agent received it and is processing."
   }
   return "Delivered"
+}
+
+function MessageAttachments({ attachments }: { attachments?: Attachment[] }) {
+  if (!attachments || attachments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 grid gap-1.5">
+      {attachments.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex max-w-full items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
+        >
+          {attachment.thumbnailUrl ? (
+            // Supabase signs this URL with Image Transformation options.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={attachment.thumbnailUrl}
+              alt=""
+              className="size-7 shrink-0 rounded border object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <IconPaperclip className="size-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
+          {attachment.url ? (
+            <a
+              href={attachment.url}
+              target="_blank"
+              rel="noreferrer"
+              download={attachment.fileName}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <IconDownload className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function getSendErrorMessage(error: unknown) {

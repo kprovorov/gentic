@@ -129,8 +129,13 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
       await input.onPromptProcessed?.(delivery.messageIds)
       assert.equal(await input.nextPrompt(), null)
     }
-    deps.buildAttachmentBlocks = async (_api, issueId, attachmentsDir) => {
-      api.attachmentDirs.push({ issueId, attachmentsDir })
+    deps.buildAttachmentBlocks = async (
+      _api,
+      issueId,
+      messageId,
+      attachmentsDir
+    ) => {
+      api.attachmentDirs.push({ issueId, messageId, attachmentsDir })
       return [
         {
           type: "resource",
@@ -174,10 +179,12 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
     assert.deepEqual(api.attachmentDirs.toSorted(byIssueId), [
       {
         issueId: first.id,
+        messageId: "a-1",
         attachmentsDir: join(config.WORKDIR, "issue-a-attachments"),
       },
       {
         issueId: second.id,
+        messageId: "b-1",
         attachmentsDir: join(config.WORKDIR, "issue-b-attachments"),
       },
     ])
@@ -274,7 +281,11 @@ class FakeApi implements AgentApi {
   readonly runStates: { issueId: string; fields: RunStateFields }[] = []
   readonly finishedStatuses: string[] = []
   readonly publishedRunStates: string[] = []
-  readonly attachmentDirs: { issueId: string; attachmentsDir: string }[] = []
+  readonly attachmentDirs: {
+    issueId: string
+    messageId: string
+    attachmentsDir: string
+  }[] = []
   finishResults: boolean[] = [true]
   onFinishAttempt: ((attempt: number) => void) | null = null
   private finishAttempts = 0

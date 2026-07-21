@@ -16,15 +16,26 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const messageId = new URL(request.url).searchParams.get("message_id")
     const { supabase, userId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("attachments")
       .select("id,file_name,content_type,size_bytes,storage_path")
       .eq("issue_id", id)
+      .is("deleted_at", null)
+      .not("upload_completed_at", "is", null)
       .order("created_at", { ascending: true })
+
+    if (messageId) {
+      query = query.eq("message_id", messageId)
+    } else {
+      query = query.is("message_id", null)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       throw new Error(error.message)

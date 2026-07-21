@@ -146,7 +146,7 @@ describe("IssueChat delivery state", () => {
 
     expect(await screen.findByText("Failed to send")).toBeInTheDocument()
     expect(screen.getByText("Network dropped")).toBeInTheDocument()
-    expect(screen.getByText("error.log")).toBeInTheDocument()
+    expect(screen.getAllByText("error.log").length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole("button", { name: "Retry" }))
 

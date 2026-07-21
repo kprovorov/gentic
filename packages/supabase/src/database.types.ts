@@ -14,29 +14,41 @@ export type Database = {
         Row: {
           content_type: string | null
           created_at: string
+          deleted_at: string | null
           file_name: string
           id: string
           issue_id: string
+          message_id: string | null
           size_bytes: number | null
+          storage_deleted_at: string | null
           storage_path: string
+          upload_completed_at: string | null
         }
         Insert: {
           content_type?: string | null
           created_at?: string
+          deleted_at?: string | null
           file_name: string
           id?: string
           issue_id: string
+          message_id?: string | null
           size_bytes?: number | null
+          storage_deleted_at?: string | null
           storage_path: string
+          upload_completed_at?: string | null
         }
         Update: {
           content_type?: string | null
           created_at?: string
+          deleted_at?: string | null
           file_name?: string
           id?: string
           issue_id?: string
+          message_id?: string | null
           size_bytes?: number | null
+          storage_deleted_at?: string | null
           storage_path?: string
+          upload_completed_at?: string | null
         }
         Relationships: [
           {
@@ -44,6 +56,13 @@ export type Database = {
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -350,6 +369,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_old_orphaned_attachments: {
+        Args: { older_than?: string }
+        Returns: {
+          storage_path: string
+        }[]
+      }
+      delete_orphaned_attachment_rows: {
+        Args: { older_than?: string }
+        Returns: number
+      }
       finish_issue_run_if_no_pending: {
         Args: {
           p_issue_id: string
@@ -359,6 +388,10 @@ export type Database = {
           p_status: string
         }
         Returns: boolean
+      }
+      mark_attachment_storage_deleted: {
+        Args: { storage_paths: string[] }
+        Returns: number
       }
       reset_issue_run: {
         Args: { p_agent_provider: string; p_issue_id: string }

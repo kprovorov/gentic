@@ -3,7 +3,6 @@ import "server-only"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
-import type { Tables } from "@gentic/supabase/types"
 import {
   agentProviderSchema,
   issueStatusSchema,
@@ -22,10 +21,17 @@ const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
 const ATTACHMENT_THUMBNAIL_SIZE = 96
 
-type AttachmentRow = Pick<
-  Tables<"attachments">,
-  "id" | "file_name" | "content_type" | "size_bytes" | "storage_path"
->
+type AttachmentRow = {
+  id: string
+  issue_id: string
+  message_id: string | null
+  file_name: string
+  content_type: string | null
+  size_bytes: number | null
+  storage_path: string
+  upload_completed_at: string | null
+  deleted_at: string | null
+}
 
 const projectOptionSchema = z.object({
   id: z.string(),
@@ -275,7 +281,9 @@ export async function getIssueDetailData(
       .order("created_at", { ascending: true }),
     supabase
       .from("attachments")
-      .select("id,file_name,content_type,size_bytes,storage_path")
+      .select(
+        "id,issue_id,message_id,file_name,content_type,size_bytes,storage_path,upload_completed_at,deleted_at"
+      )
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
     issuesService.listIssuePullRequests(supabase, userId, id),
@@ -290,46 +298,103 @@ export async function getIssueDetailData(
     throw new Error(attachmentsError.message)
   }
 
+  const attachmentRowsByMessageId = groupCompletedAttachmentRowsByMessageId(
+    (attachmentRows ?? []) satisfies AttachmentRow[]
+  )
   const attachments: Attachment[] = await Promise.all(
-    ((attachmentRows ?? []) satisfies AttachmentRow[]).map(async (attachment) => {
-      const isImage = attachment.content_type?.startsWith("image/") ?? false
-      const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
-      const [{ data: signed }, { data: thumbnail }] = await Promise.all([
-        storage.createSignedUrl(
-          attachment.storage_path,
-          ATTACHMENT_SIGNED_URL_TTL_SECONDS
+    ((attachmentRows ?? []) satisfies AttachmentRow[])
+      .filter(
+        (attachment) =>
+          attachment.deleted_at === null &&
+          attachment.upload_completed_at !== null
+      )
+      .map((attachment) => signAttachment(supabase, attachment))
+  )
+  const messagesWithAttachments = await Promise.all(
+    z
+      .array(chatMessageSchema)
+      .parse(messages ?? [])
+      .map(async (message) => ({
+        ...message,
+        attachments: await Promise.all(
+          (attachmentRowsByMessageId.get(message.id) ?? []).map((attachment) =>
+            signAttachment(supabase, attachment)
+          )
         ),
-        isImage
-          ? storage.createSignedUrl(
-              attachment.storage_path,
-              ATTACHMENT_SIGNED_URL_TTL_SECONDS,
-              {
-                transform: {
-                  width: ATTACHMENT_THUMBNAIL_SIZE,
-                  height: ATTACHMENT_THUMBNAIL_SIZE,
-                  resize: "cover",
-                },
-              }
-            )
-          : Promise.resolve({ data: null }),
-      ])
-
-      return {
-        id: attachment.id,
-        fileName: attachment.file_name,
-        sizeBytes: attachment.size_bytes,
-        url: signed?.signedUrl ?? null,
-        thumbnailUrl: thumbnail?.signedUrl ?? null,
-      }
-    })
+      }))
   )
 
   return {
     issue: parsedIssue,
-    messages: z.array(chatMessageSchema).parse(messages ?? []),
+    messages: messagesWithAttachments,
     attachments,
     pullRequests,
     relations,
     relationCandidates,
+  }
+}
+
+function groupCompletedAttachmentRowsByMessageId(attachments: AttachmentRow[]) {
+  const grouped = new Map<string, AttachmentRow[]>()
+  for (const attachment of attachments) {
+    if (!attachment.message_id) {
+      continue
+    }
+    if (
+      attachment.upload_completed_at === null &&
+      attachment.deleted_at === null
+    ) {
+      continue
+    }
+    grouped.set(attachment.message_id, [
+      ...(grouped.get(attachment.message_id) ?? []),
+      attachment,
+    ])
+  }
+  return grouped
+}
+
+async function signAttachment(
+  supabase: AuthenticatedContext["supabase"],
+  attachment: AttachmentRow
+): Promise<Attachment> {
+  if (attachment.deleted_at) {
+    return {
+      id: attachment.id,
+      fileName: attachment.file_name,
+      sizeBytes: attachment.size_bytes,
+      url: null,
+      thumbnailUrl: null,
+    }
+  }
+
+  const isImage = attachment.content_type?.startsWith("image/") ?? false
+  const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
+  const [{ data: signed }, { data: thumbnail }] = await Promise.all([
+    storage.createSignedUrl(
+      attachment.storage_path,
+      ATTACHMENT_SIGNED_URL_TTL_SECONDS
+    ),
+    isImage
+      ? storage.createSignedUrl(
+          attachment.storage_path,
+          ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+          {
+            transform: {
+              width: ATTACHMENT_THUMBNAIL_SIZE,
+              height: ATTACHMENT_THUMBNAIL_SIZE,
+              resize: "cover",
+            },
+          }
+        )
+      : Promise.resolve({ data: null }),
+  ])
+
+  return {
+    id: attachment.id,
+    fileName: attachment.file_name,
+    sizeBytes: attachment.size_bytes,
+    url: signed?.signedUrl ?? null,
+    thumbnailUrl: thumbnail?.signedUrl ?? null,
   }
 }

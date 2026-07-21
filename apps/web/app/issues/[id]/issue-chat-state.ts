@@ -7,6 +7,8 @@ import type {
   MessageEvent,
 } from "@gentic/validators/realtime"
 
+import type { Attachment } from "./attachments"
+
 export type ChatMessage = ChatMessageContract & {
   // Stable React key that survives optimistic-id -> server-id reconciliation.
   clientKey?: string
@@ -14,6 +16,7 @@ export type ChatMessage = ChatMessageContract & {
   deliveryError?: string
   retryContent?: string
   retryFiles?: File[]
+  attachments?: Attachment[]
 }
 
 type TranscriptEntity = ChatMessage
@@ -255,6 +258,7 @@ function mergeEntity(
     deliveryError: incoming.deliveryError ?? existing.deliveryError,
     retryContent: incoming.retryContent ?? existing.retryContent,
     retryFiles: incoming.retryFiles ?? existing.retryFiles,
+    attachments: incoming.attachments ?? existing.attachments,
     pending: incoming.pending,
     status: dominantStatus(existing.status, incoming.status),
   }
@@ -264,6 +268,9 @@ function mergeEntity(
     delete merged.deliveryError
     delete merged.retryContent
     delete merged.retryFiles
+  }
+  if (merged.attachments === undefined) {
+    delete merged.attachments
   }
 
   return merged
@@ -308,6 +315,7 @@ function sameEntity(left: TranscriptEntity, right: TranscriptEntity): boolean {
     left.content === right.content &&
     left.status === right.status &&
     left.created_at === right.created_at &&
-    left.pending === right.pending
+    left.pending === right.pending &&
+    left.attachments === right.attachments
   )
 }
