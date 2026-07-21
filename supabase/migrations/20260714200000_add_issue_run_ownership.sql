@@ -35,7 +35,7 @@ create policy "Users can read runs for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = issue_runs.issue_id
-        and projects.user_id = (select auth.uid())
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
