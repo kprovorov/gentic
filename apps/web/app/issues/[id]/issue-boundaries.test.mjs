@@ -44,3 +44,12 @@ test("issue detail interactive sections are explicit client islands", () => {
   assert.match(detailView, /<IssueRelations\n\s+issueId=\{issue\.id\}/)
   assert.match(detailView, /<Attachments issueId=\{issue\.id\}/)
 })
+
+test("message realtime stays inside the chat island", () => {
+  const detailView = readRouteFile("issue-detail-view.tsx")
+  const issueChat = readRouteFile("issue-chat.tsx")
+
+  assert.match(issueChat, /table: "messages"/)
+  assert.doesNotMatch(detailView, /"messages"/)
+  assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
+})
