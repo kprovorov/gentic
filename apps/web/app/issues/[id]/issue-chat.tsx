@@ -127,6 +127,30 @@ export function IssueChat({
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
   const queryClient = useQueryClient()
+  // The `initial*` props are refetched by <RealtimeRefresh> (via react-query
+  // invalidation) whenever the underlying row changes, but this component's
+  // own postgres_changes/broadcast subscriptions below are the only other
+  // writers of this state and can miss a delivery (at-most-once, no replay).
+  // Resync from the prop during render whenever it changes so a refetch can
+  // always recover a missed live update instead of leaving e.g. "Agent is
+  // working" stuck on. (React's "adjusting state when a prop changes"
+  // pattern, not an effect, so it doesn't cascade an extra render.)
+  const [prevInitialStatus, setPrevInitialStatus] = useState(initialStatus)
+  if (initialStatus !== prevInitialStatus) {
+    setPrevInitialStatus(initialStatus)
+    setStatus(initialStatus)
+  }
+  const [prevInitialUsageLimitResetAt, setPrevInitialUsageLimitResetAt] =
+    useState(initialUsageLimitResetAt)
+  if (initialUsageLimitResetAt !== prevInitialUsageLimitResetAt) {
+    setPrevInitialUsageLimitResetAt(initialUsageLimitResetAt)
+    setUsageLimitResetAt(initialUsageLimitResetAt)
+  }
+  const [prevInitialPrUrl, setPrevInitialPrUrl] = useState(initialPrUrl)
+  if (initialPrUrl !== prevInitialPrUrl) {
+    setPrevInitialPrUrl(initialPrUrl)
+    setPrUrl(initialPrUrl)
+  }
   // The private broadcast channel from the effect below, kept in a ref so
   // `handleSubmit` can send on it without re-subscribing on every render.
   const broadcastChannelRef = useRef<ReturnType<
