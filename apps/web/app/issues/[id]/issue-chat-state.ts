@@ -139,10 +139,25 @@ function upsertPersistedMessage(
     next = removeMessage(state, optimisticId)
   }
 
-  return upsertMessage(next, {
+  const merged = upsertMessage(next, {
     ...incoming,
     clientKey,
   })
+
+  if (!incoming.event_seq) {
+    return merged
+  }
+
+  return {
+    ...merged,
+    lastSeqById: {
+      ...merged.lastSeqById,
+      [incoming.id]: Math.max(
+        merged.lastSeqById[incoming.id] ?? 0,
+        incoming.event_seq
+      ),
+    },
+  }
 }
 
 function upsertSequencedEvent(
@@ -153,6 +168,16 @@ function upsertSequencedEvent(
   const lastSeq = state.lastSeqById[event.id] ?? 0
   if (event.seq <= lastSeq) {
     return state
+  }
+  const existing = state.entities[event.id]
+  if (existing && existing.status !== "streaming" && event.status === "streaming") {
+    return {
+      ...state,
+      lastSeqById: {
+        ...state.lastSeqById,
+        [event.id]: event.seq,
+      },
+    }
   }
 
   const next = upsertMessage(state, {

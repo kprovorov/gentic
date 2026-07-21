@@ -63,6 +63,8 @@ import {
 } from "./issue-retry-events"
 import { type ChatMessage, useIssueChat } from "./issue-chat-state"
 
+export type { ChatMessage } from "./issue-chat-state"
+
 type SlashCommand = {
   name: string
   description: string
@@ -600,6 +602,27 @@ export function IssueChat({
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
 
+    async function reconcilePersistedTranscript() {
+      const { data, error } = await supabase
+        .from("messages")
+        .select(
+          "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+        )
+        .eq("issue_id", issueId)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessage[]>()
+
+      if (cancelled) {
+        return
+      }
+      if (error) {
+        console.error("failed to reconcile issue transcript:", error)
+        return
+      }
+
+      dispatch({ type: "reconnect_reconciliation", messages: data ?? [] })
+    }
+
     async function join() {
       await supabase.realtime.setAuth()
       if (cancelled) {
@@ -648,6 +671,7 @@ export function IssueChat({
             return
           }
           if (subscribeStatus === "SUBSCRIBED") {
+            void reconcilePersistedTranscript()
             setRealtimeConnectionStatus(
               "connected",
               connectionStatusRef.current === "connected"

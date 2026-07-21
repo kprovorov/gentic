@@ -107,6 +107,102 @@ test("reconnect reconciliation does not erase active streaming state", () => {
   )
 })
 
+test("reconnect reconciliation recovers a final answer after lost Broadcast", () => {
+  let state = createIssueChatState()
+
+  state = issueChatReducer(state, {
+    type: "reconnect_reconciliation",
+    messages: [
+      message({
+        id: "00000000-0000-4000-8000-000000000004",
+        content: "durable final answer",
+        status: "complete",
+        created_at: "2026-07-14T00:00:02.000Z",
+        event_seq: 2,
+      }),
+    ],
+  })
+
+  assert.deepEqual(
+    selectIssueChatMessages(state).map(({ content, status }) => ({
+      content,
+      status,
+    })),
+    [{ content: "durable final answer", status: "complete" }]
+  )
+})
+
+test("persisted final replaces streaming partial without duplicating", () => {
+  let state = createIssueChatState()
+  const id = "00000000-0000-4000-8000-000000000005"
+
+  state = issueChatReducer(state, {
+    type: "stream_delta",
+    event: {
+      id,
+      seq: 1,
+      role: "assistant",
+      kind: "text",
+      content: "partial",
+      status: "streaming",
+      ts: "2026-07-14T00:00:01.000Z",
+    },
+  })
+  state = issueChatReducer(state, {
+    type: "reconnect_reconciliation",
+    messages: [
+      message({
+        id,
+        content: "persisted final",
+        status: "complete",
+        created_at: "2026-07-14T00:00:02.000Z",
+        event_seq: 2,
+      }),
+    ],
+  })
+
+  assert.deepEqual(
+    selectIssueChatMessages(state).map(({ id: messageId, content, status }) => ({
+      id: messageId,
+      content,
+      status,
+    })),
+    [{ id, content: "persisted final", status: "complete" }]
+  )
+})
+
+test("persisted transcript wins over delayed streaming Broadcast", () => {
+  let state = createIssueChatState([
+    message({
+      id: "00000000-0000-4000-8000-000000000006",
+      content: "complete from database",
+      status: "complete",
+      event_seq: 2,
+    }),
+  ])
+
+  state = issueChatReducer(state, {
+    type: "stream_delta",
+    event: {
+      id: "00000000-0000-4000-8000-000000000006",
+      seq: 1,
+      role: "assistant",
+      kind: "text",
+      content: "partial",
+      status: "streaming",
+      ts: "2026-07-14T00:00:01.000Z",
+    },
+  })
+
+  assert.deepEqual(
+    selectIssueChatMessages(state).map(({ content, status }) => ({
+      content,
+      status,
+    })),
+    [{ content: "complete from database", status: "complete" }]
+  )
+})
+
 test("duplicate and reordered stream events cannot regress content", () => {
   let state = createIssueChatState()
   const id = "00000000-0000-4000-8000-000000000002"

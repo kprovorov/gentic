@@ -49,7 +49,7 @@ test("finalize retries transient API failure", async () => {
   assert.equal(api.inserted[0]?.message.kind, "thinking")
 })
 
-test("terminal persist failure does not reject finalize", async () => {
+test("terminal persist failure rejects finalize before complete broadcast", async () => {
   const api = fakeApi({
     failInsertAttempts: [new Error("permanent failure")],
   })
@@ -64,11 +64,32 @@ test("terminal persist failure does not reject finalize", async () => {
   )
 
   await message.append("delivered over broadcast")
-  await assert.doesNotReject(() => message.finalize())
+  await assert.rejects(() => message.finalize(), /permanent failure/)
 
   assert.equal(api.insertAttempts, 1)
   assert.equal(api.inserted.length, 0)
-  assert.equal(channel.messages.at(-1)?.status, "complete")
+  assert.equal(channel.messages.at(-1)?.status, "streaming")
+})
+
+test("tool messages are not broadcast when terminal persist fails", async () => {
+  const api = fakeApi({
+    failInsertAttempts: [new Error("database unavailable")],
+  })
+  const channel = fakeChannel()
+
+  await assert.rejects(
+    () =>
+      publishMessage(api, ISSUE_ID, channel, {
+        kind: "tool",
+        content: "Read file",
+        persistOptions: { retryDelaysMs: [] },
+      }),
+    /database unavailable/
+  )
+
+  assert.equal(api.insertAttempts, 1)
+  assert.equal(api.inserted.length, 0)
+  assert.equal(channel.messages.length, 0)
 })
 
 test("tool messages insert at emit time with the broadcast id", async () => {
