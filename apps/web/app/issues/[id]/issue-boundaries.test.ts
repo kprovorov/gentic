@@ -48,8 +48,13 @@ test("issue detail interactive sections are explicit client islands", () => {
 test("message realtime stays inside the chat island", () => {
   const detailView = readRouteFile("issue-detail-view.tsx")
   const issueChat = readRouteFile("issue-chat.tsx")
+  const issueChatState = readFileSync(
+    join(routeDir, "issue-chat", "use-issue-chat-state.ts"),
+    "utf8"
+  )
 
-  assert.match(issueChat, /REALTIME_MESSAGE_EVENT/)
+  assert.match(issueChat, /issue-chat\/chat-rendering/)
+  assert.match(issueChatState, /REALTIME_MESSAGE_EVENT/)
   assert.doesNotMatch(detailView, /"messages"/)
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })
