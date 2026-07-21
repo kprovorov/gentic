@@ -8,7 +8,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test 'app/**/*.test.mjs'",
     "lint": "eslint",
     "test": "node --import tsx --test \"app/**/*.test.ts\" \"tests/*.test.ts\" && NODE_ENV=development pnpm exec vitest run \"app/issues/[id]/issue-chat.test.tsx\"",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

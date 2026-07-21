@@ -6,11 +6,11 @@ import { test } from "node:test"
 
 const routeDir = dirname(fileURLToPath(import.meta.url))
 
-function readRouteFile(name) {
+function readRouteFile(name: string) {
   return readFileSync(join(routeDir, name), "utf8")
 }
 
-function startsWithUseClient(source) {
+function startsWithUseClient(source: string) {
   return source.trimStart().startsWith('"use client"')
 }
 
@@ -49,7 +49,7 @@ test("message realtime stays inside the chat island", () => {
   const detailView = readRouteFile("issue-detail-view.tsx")
   const issueChat = readRouteFile("issue-chat.tsx")
 
-  assert.match(issueChat, /table: "messages"/)
+  assert.match(issueChat, /REALTIME_MESSAGE_EVENT/)
   assert.doesNotMatch(detailView, /"messages"/)
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })

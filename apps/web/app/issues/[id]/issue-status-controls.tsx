@@ -1,6 +1,7 @@
 "use client"
 
-import type { IssueDetail, IssueStatus } from "@/app/queries"
+import type { IssueDetail } from "@/app/queries"
+import type { IssueStatus } from "@gentic/validators/issues"
 
 import { IssueAgentSelect } from "./issue-agent-select"
 import { IssueStatusSelect } from "./issue-status-select"
