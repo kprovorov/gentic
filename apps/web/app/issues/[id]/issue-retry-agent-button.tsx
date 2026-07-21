@@ -26,32 +26,16 @@ const agentOptions: Array<{ value: AgentProvider; label: string }> = [
   { value: "codex", label: "Codex" },
 ]
 
-export function IssueRetryAgentButton({
-  issueId,
-  issuePrompt,
-}: {
-  issueId: string
-  issuePrompt: string | null
-}) {
+export function IssueRetryAgentButton({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: resetIssueAgent,
-    onMutate: async () => {
-      const now = new Date().toISOString()
-      const optimisticMessage = {
-        id: `optimistic-retry-${now}`,
-        role: "user",
-        kind: "text",
-        content: issuePrompt ?? "",
-        status: "complete",
-        created_at: now,
-      } as const
-
+    onSuccess: async (message) => {
       window.dispatchEvent(
         new CustomEvent<IssueRetryResetEventDetail>(ISSUE_RETRY_RESET_EVENT, {
           detail: {
             issueId,
-            message: optimisticMessage,
+            message,
             status: "todo",
             usageLimitResetAt: null,
             prUrl: null,
@@ -59,10 +43,8 @@ export function IssueRetryAgentButton({
           },
         })
       )
-    },
-    onSuccess: async () => {
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
         queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])

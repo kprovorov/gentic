@@ -53,3 +53,12 @@ test("message realtime stays inside the chat island", () => {
   assert.doesNotMatch(detailView, /"messages"/)
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })
+
+test("retry controls do not serialize the issue prompt", () => {
+  const detailView = readRouteFile("issue-detail-view.tsx")
+  const retryButton = readRouteFile("issue-retry-agent-button.tsx")
+
+  assert.match(detailView, /<IssueRetryAgentButton issueId=\{issue\.id\} \/>/)
+  assert.doesNotMatch(detailView, /issuePrompt/)
+  assert.doesNotMatch(retryButton, /issuePrompt/)
+})

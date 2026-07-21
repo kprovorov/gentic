@@ -187,11 +187,18 @@ export async function resetIssueAgent(formData: FormData) {
     getString(formData, "agent_provider") || "claude_code"
   )
 
-  await issuesService.resetIssueAgent(supabase, userId, id, agentProvider)
+  const message = await issuesService.resetIssueAgent(
+    supabase,
+    userId,
+    id,
+    agentProvider
+  )
 
   revalidatePath("/home")
   revalidatePath("/issues")
   revalidatePath(`/issues/${id}`)
+
+  return message
 }
 
 export async function updateIssueStatus(formData: FormData) {

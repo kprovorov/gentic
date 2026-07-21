@@ -6,6 +6,7 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
+import type { ChatMessageContract } from "@gentic/validators/realtime"
 import type { Tables } from "@gentic/supabase/types"
 
 import { ServiceError, unwrap } from "./errors"
@@ -32,6 +33,12 @@ export type IssuePullRequest = Pick<
   IssuePullRequestRow,
   "id" | "issue_id" | "url" | "created_at"
 >
+
+export type UserChatMessage = ChatMessageContract & {
+  role: "user"
+  kind: "text"
+  status: "complete"
+}
 
 async function ensureProjectOwned(
   supabase: Supabase,
@@ -348,7 +355,7 @@ export async function resetIssueAgent(
   userId: string,
   id: string,
   agentProvider: AgentProvider
-) {
+): Promise<UserChatMessage> {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select("agent_provider,projects!inner(user_id)")
@@ -369,6 +376,21 @@ export async function resetIssueAgent(
       p_agent_provider: agentProvider,
     })
   )
+
+  const message = unwrap(
+    await supabase
+      .from("messages")
+      .select(
+        "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+      )
+      .eq("issue_id", id)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single<UserChatMessage>()
+  )
+
+  return message
 }
 
 export async function addIssueRelation(
