@@ -160,7 +160,7 @@ export function NewIssueView({
                     <Button
                       type="submit"
                       formAction={runIssue}
-                      className="min-w-0 flex-1 rounded-r-none border-r-primary-foreground/70 sm:flex-initial"
+                      className="min-w-0 flex-1 rounded-r-none border-r-primary-foreground/25 sm:flex-initial"
                       onClick={() => {
                         setAgentProvider("claude_code")
                       }}
@@ -173,7 +173,7 @@ export function NewIssueView({
                         <Button
                           type="button"
                           aria-label="Choose agent"
-                          className="shrink-0 rounded-l-none border-l-primary-foreground/70 px-2"
+                          className="shrink-0 rounded-l-none border-l-primary-foreground/25 px-2"
                         >
                           <IconChevronDown />
                         </Button>
