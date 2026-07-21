@@ -6,10 +6,13 @@ import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 
+import { getRealtimeRefreshMode } from "./realtime-refresh-mode"
+
 /**
  * Subscribes to Postgres changes on the given tables (already scoped by RLS
- * to rows the current user can see) and re-runs the enclosing Server
- * Component on any change, so props stay in sync without a full page load.
+ * to rows the current user can see) and refreshes the narrowest cache that
+ * owns the data. Query-backed views invalidate React Query only; views without
+ * a query key fall back to refreshing the current route payload.
  */
 export function RealtimeRefresh({
   channelName,
@@ -39,10 +42,14 @@ export function RealtimeRefresh({
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
-      refreshTimer = setTimeout(() => router.refresh(), 150)
-      if (queryKeyRef.current) {
-        void queryClient.invalidateQueries({ queryKey: queryKeyRef.current })
-      }
+      refreshTimer = setTimeout(() => {
+        const queryKey = queryKeyRef.current
+        if (getRealtimeRefreshMode(queryKey) === "invalidate-query") {
+          void queryClient.invalidateQueries({ queryKey })
+          return
+        }
+        router.refresh()
+      }, 150)
     }
 
     let channel = supabase.channel(channelName)

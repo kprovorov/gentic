@@ -1,6 +1,6 @@
 {
   "name": "@gentic/gentic",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Gentic agent: runs coding agents over the Agent Client Protocol for queued issues.",
   "type": "module",
   "private": true,
@@ -13,13 +13,14 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.59.0",
     "@agentclientprotocol/codex-acp": "^1.1.0",
     "@agentclientprotocol/sdk": "^1.1.0",
     "@clack/prompts": "^1.6.0",
+    "@gentic/validators": "workspace:*",
     "@supabase/supabase-js": "^2.110.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.7",
