@@ -8,6 +8,7 @@
     "./button": "./src/ui/button.tsx",
     "./card": "./src/ui/card.tsx",
     "./checkbox": "./src/ui/checkbox.tsx",
+    "./collapsible": "./src/ui/collapsible.tsx",
     "./data-table": "./src/ui/data-table.tsx",
     "./dropdown-menu": "./src/ui/dropdown-menu.tsx",
     "./form": "./src/ui/form.tsx",

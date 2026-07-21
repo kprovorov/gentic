@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
+  IconAlertCircle,
+  IconCheck,
+  IconChevronDown,
   IconDownload,
   IconExternalLink,
   IconGitPullRequest,
@@ -16,6 +19,11 @@ import { Streamdown } from "streamdown"
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import { Button } from "@gentic/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@gentic/ui/collapsible"
 import { Marker, MarkerContent, MarkerIcon } from "@gentic/ui/marker"
 import { Message, MessageContent } from "@gentic/ui/message"
 import {
@@ -190,6 +198,41 @@ function mergePullRequest(
   )
 }
 
+type DisplayItem =
+  | { kind: "message"; key: string; message: ChatMessage }
+  | { kind: "tool-group"; key: string; messages: ChatMessage[] }
+
+// Consecutive tool-call messages are collapsed into one group so a long
+// sequence of tool invocations doesn't dominate the transcript.
+function groupChatMessages(messages: ChatMessage[]): DisplayItem[] {
+  const items: DisplayItem[] = []
+  let toolRun: ChatMessage[] = []
+
+  function flushToolRun() {
+    if (toolRun.length === 0) {
+      return
+    }
+    items.push({ kind: "tool-group", key: toolRun[0].id, messages: toolRun })
+    toolRun = []
+  }
+
+  for (const message of messages) {
+    if (message.kind === "tool") {
+      toolRun.push(message)
+      continue
+    }
+    flushToolRun()
+    items.push({
+      kind: "message",
+      key: message.clientKey ?? message.id,
+      message,
+    })
+  }
+  flushToolRun()
+
+  return items
+}
+
 function formatPullRequestLabel(url: string) {
   try {
     const [, owner, repo, , number] = new URL(url).pathname.split("/")
@@ -357,6 +400,10 @@ export function IssueChat({
   const displayedPullRequests = useMemo(
     () => initialPullRequests.reduce(mergePullRequest, pullRequests),
     [pullRequests, initialPullRequests]
+  )
+  const displayItems = useMemo(
+    () => groupChatMessages(displayedMessages),
+    [displayedMessages]
   )
   const slashCommands = useMemo(
     () =>
@@ -773,20 +820,28 @@ export function IssueChat({
                   </Marker>
                 </MessageScrollerItem>
               ) : (
-                displayedMessages.map((message) => (
-                  <MessageScrollerItem
-                    key={message.clientKey ?? message.id}
-                    messageId={message.id}
-                  >
-                    <ChatMessageRow
-                      message={message}
-                      isLatestUserMessage={message.id === lastDisplayedMessage?.id}
-                      issueStatus={status}
-                      onRetry={retryFailedMessage}
-                      retryDisabled={mutation.isPending}
-                    />
-                  </MessageScrollerItem>
-                ))
+                displayItems.map((item) =>
+                  item.kind === "tool-group" ? (
+                    <MessageScrollerItem key={item.key} messageId={item.key}>
+                      <ToolCallGroup messages={item.messages} />
+                    </MessageScrollerItem>
+                  ) : (
+                    <MessageScrollerItem
+                      key={item.key}
+                      messageId={item.message.id}
+                    >
+                      <ChatMessageRow
+                        message={item.message}
+                        isLatestUserMessage={
+                          item.message.id === lastDisplayedMessage?.id
+                        }
+                        issueStatus={status}
+                        onRetry={retryFailedMessage}
+                        retryDisabled={mutation.isPending}
+                      />
+                    </MessageScrollerItem>
+                  )
+                )
               )}
               {isAgentWorkingWithoutMessage ? (
                 <MessageScrollerItem messageId="agent-working">
@@ -923,6 +978,60 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
+function firstLine(value: string): string {
+  return value.split("\n", 1)[0] ?? ""
+}
+
+// Tool calls stream in as pending -> in_progress -> completed/failed, and
+// their content includes full command output. Collapsed by default so a run
+// with many tool calls doesn't dwarf the surrounding conversation; expanding
+// reveals each call's full content.
+function ToolCallGroup({ messages }: { messages: ChatMessage[] }) {
+  const [open, setOpen] = useState(false)
+  const hasError = messages.some((message) => message.status === "error")
+  const hasStreaming = messages.some(
+    (message) => message.status === "streaming"
+  )
+  const summary =
+    messages.length === 1
+      ? firstLine(messages[0].content ?? "")
+      : `${messages.length} tool calls`
+
+  return (
+    <Message align="start">
+      <MessageContent>
+        <Bubble align="start" variant={hasError ? "destructive" : "muted"}>
+          <Collapsible open={open} onOpenChange={setOpen}>
+            <BubbleContent className="font-mono text-xs text-muted-foreground">
+              <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 text-left">
+                {hasStreaming ? (
+                  <IconLoader2 className="size-3.5 shrink-0 animate-spin" />
+                ) : hasError ? (
+                  <IconAlertCircle className="size-3.5 shrink-0" />
+                ) : (
+                  <IconCheck className="size-3.5 shrink-0" />
+                )}
+                <span className="min-w-0 flex-1 truncate">{summary}</span>
+                <IconChevronDown
+                  className={cn(
+                    "size-3.5 shrink-0 transition-transform",
+                    open && "rotate-180"
+                  )}
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 flex flex-col gap-3 overflow-hidden whitespace-pre-wrap border-t pt-2">
+                {messages.map((message) => (
+                  <div key={message.id}>{message.content}</div>
+                ))}
+              </CollapsibleContent>
+            </BubbleContent>
+          </Collapsible>
+        </Bubble>
+      </MessageContent>
+    </Message>
+  )
+}
+
 function ChatMessageRow({
   message,
   isLatestUserMessage = false,
@@ -937,7 +1046,6 @@ function ChatMessageRow({
   retryDisabled?: boolean
 }) {
   const isUser = message.role === "user"
-  const isTool = message.kind === "tool"
   const isMarker = message.role === "system" || message.kind === "thinking"
   const content = message.content ?? ""
   const isStreaming = message.status === "streaming"
@@ -1000,33 +1108,22 @@ function ChatMessageRow({
               ? "destructive"
               : isUser
                 ? "tinted"
-                : isTool
-                  ? "muted"
-                  : "secondary"
+                : "secondary"
           }
         >
-          <BubbleContent
-            className={cn(
-              "whitespace-pre-wrap",
-              isTool && "font-mono text-xs text-muted-foreground"
-            )}
-          >
-            {isTool ? (
-              content
-            ) : (
-              <Streamdown
-                className="chat-markdown"
-                controls={{
-                  code: { copy: true, download: false },
-                  mermaid: false,
-                  table: { copy: true, download: false, fullscreen: false },
-                }}
-                isAnimating={isStreaming}
-                mode={isStreaming ? "streaming" : "static"}
-              >
-                {content}
-              </Streamdown>
-            )}
+          <BubbleContent className="whitespace-pre-wrap">
+            <Streamdown
+              className="chat-markdown"
+              controls={{
+                code: { copy: true, download: false },
+                mermaid: false,
+                table: { copy: true, download: false, fullscreen: false },
+              }}
+              isAnimating={isStreaming}
+              mode={isStreaming ? "streaming" : "static"}
+            >
+              {content}
+            </Streamdown>
             {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
