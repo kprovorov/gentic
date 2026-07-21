@@ -133,13 +133,14 @@ export function NewIssueView({
                   />
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button asChild variant="outline">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                  <Button asChild variant="outline" className="sm:w-auto">
                     <Link href="/issues">Cancel</Link>
                   </Button>
                   <Button
                     type="submit"
                     variant="secondary"
+                    className="sm:w-auto"
                     onClick={() => {
                       setAgentProvider("claude_code")
                     }}
@@ -159,20 +160,20 @@ export function NewIssueView({
                     <Button
                       type="submit"
                       formAction={runIssue}
-                      className="rounded-r-none border-r-primary-foreground/70"
+                      className="min-w-0 flex-1 rounded-r-none border-r-primary-foreground/70 sm:flex-initial"
                       onClick={() => {
                         setAgentProvider("claude_code")
                       }}
                     >
                       <IconPlayerPlay />
-                      Run with Claude Code
+                      <span className="truncate">Run with Claude Code</span>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           type="button"
                           aria-label="Choose agent"
-                          className="rounded-l-none border-l-primary-foreground/70 px-2"
+                          className="shrink-0 rounded-l-none border-l-primary-foreground/70 px-2"
                         >
                           <IconChevronDown />
                         </Button>
