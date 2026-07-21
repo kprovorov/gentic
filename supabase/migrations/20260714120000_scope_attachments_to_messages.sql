@@ -44,6 +44,11 @@ security invoker
 set search_path = public
 as $$
 begin
+  if split_part(new.storage_path, '/', 1) <> new.issue_id::text then
+    raise exception 'Attachment storage path must start with the issue id'
+      using errcode = '23514';
+  end if;
+
   if new.message_id is not null and not exists (
     select 1
       from public.messages
@@ -62,7 +67,7 @@ drop trigger if exists ensure_attachment_message_issue
   on public.attachments;
 
 create trigger ensure_attachment_message_issue
-  before insert or update of issue_id, message_id
+  before insert or update of issue_id, message_id, storage_path
   on public.attachments
   for each row
   execute function public.ensure_attachment_message_issue();
@@ -77,7 +82,7 @@ create policy "Users can update attachments for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = attachments.issue_id
-        and projects.user_id = (select auth.uid())::text
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   )
   with check (
@@ -86,7 +91,7 @@ create policy "Users can update attachments for their own issues"
       from public.issues
       join public.projects on projects.id = issues.project_id
       where issues.id = attachments.issue_id
-        and projects.user_id = (select auth.uid())::text
+        and projects.user_id = ((select auth.jwt()) ->> 'sub')
     )
   );
 
@@ -154,7 +159,7 @@ declare
   deleted_count integer;
 begin
   delete from public.attachments
-   where message_id is null
+   where (message_id is null or upload_completed_at is null)
      and deleted_at is not null
      and storage_deleted_at is not null
      and created_at < now() - older_than;
