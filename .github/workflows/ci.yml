@@ -10,7 +10,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A PR's `push` event and its `pull_request` event point at the same
+  # commit but resolve `github.ref` differently (refs/heads/<branch> vs
+  # refs/pull/<n>/merge), so they don't dedupe and CI runs twice. Key the
+  # group on the underlying commit SHA instead so both collapse into one
+  # group and cancel-in-progress drops the redundant run.
+  group: ci-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
