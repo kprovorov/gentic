@@ -12,8 +12,9 @@ import type { SlashCommand } from "./slash-commands"
 
 export function IssueChatComposer({
   draft,
-  draftKey,
+  draftFiles,
   disabled,
+  invalidSlashCommand,
   slashCommands,
   selectedSlashCommandIndex,
   onDraftChange,
@@ -23,8 +24,9 @@ export function IssueChatComposer({
   onSubmit,
 }: {
   draft: string
-  draftKey: number
+  draftFiles: File[]
   disabled: boolean
+  invalidSlashCommand: boolean
   slashCommands: SlashCommand[]
   selectedSlashCommandIndex: number
   onDraftChange: (value: string) => void
@@ -44,9 +46,9 @@ export function IssueChatComposer({
           />
         ) : null}
         <AttachmentPromptField
-          key={draftKey}
           value={draft}
           onChange={onDraftChange}
+          files={draftFiles}
           onFilesChange={onFilesChange}
           onKeyDown={onKeyDown}
           rows={2}
@@ -56,7 +58,12 @@ export function IssueChatComposer({
           textareaClassName="min-h-18 resize-none"
         />
       </div>
-      <Button type="submit" size="icon" disabled={disabled || !draft.trim()}>
+      <Button
+        type="submit"
+        size="icon"
+        aria-label={disabled ? "Sending message" : "Send message to agent"}
+        disabled={disabled || !draft.trim() || invalidSlashCommand}
+      >
         <IconSend />
       </Button>
     </form>

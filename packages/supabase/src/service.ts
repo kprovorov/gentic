@@ -1,5 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
+import type { Database } from "./types"
+
 /**
  * Secret-key Supabase client for trusted server-side code. It bypasses RLS,
  * so callers must authenticate and authorize every request before querying.
@@ -18,7 +20,7 @@ export function createServiceClient() {
     throw new Error("SUPABASE_SECRET_KEY is not set")
   }
 
-  return createSupabaseClient(url, secretKey, {
+  return createSupabaseClient<Database>(url, secretKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

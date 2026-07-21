@@ -7,7 +7,8 @@ import type {
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { ensureIssueOwned, ensureProjectOwned } from "./ownership"
-import { ISSUE_WITH_PROJECT_SELECT, kickoffMessageContent } from "./shared"
+import { getIssue } from "./queries"
+import { ISSUE_WITH_PROJECT_SELECT } from "./shared"
 
 export async function createIssue(
   supabase: Supabase,
@@ -22,7 +23,7 @@ export async function createIssue(
       project_id: input.project_id,
       title: input.title ?? null,
       prompt: input.prompt ?? null,
-      status: input.status,
+      status: input.status === "todo" ? "draft" : input.status,
       agent_provider: input.agent_provider,
       type: input.type,
     })
@@ -31,17 +32,21 @@ export async function createIssue(
 
   const issue = unwrap(result)
 
-  if (input.status === "todo") {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: issue.id,
-        role: "user",
-        content: kickoffMessageContent(input.prompt ?? null),
-      })
-    )
+  if (input.status !== "todo") {
+    return issue
   }
 
-  return issue
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: issue.id }))
+  return getIssue(supabase, userId, issue.id)
+}
+
+export async function startIssueFromDraft(
+  supabase: Supabase,
+  userId: string,
+  id: string
+) {
+  await ensureIssueOwned(supabase, userId, id)
+  unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
 }
 
 // Called from the background title-generation step after an issue is saved
@@ -87,7 +92,7 @@ export async function updateIssue(
     .select("agent_provider, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ agent_provider: string }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)

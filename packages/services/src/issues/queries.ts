@@ -70,10 +70,10 @@ export async function listIssueRelations(
   supabase: Supabase,
   userId: string,
   issueId: string
-) {
+): Promise<IssueRelation[]> {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  return unwrap(
+  const relations = unwrap(
     await supabase
       .from("issue_relations")
       .select(
@@ -81,8 +81,12 @@ export async function listIssueRelations(
       )
       .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
       .order("created_at", { ascending: false })
-      .returns<IssueRelation[]>()
   )
+
+  return relations.map((relation) => ({
+    ...relation,
+    type: "blocks",
+  }))
 }
 
 export async function listIssuePullRequests(

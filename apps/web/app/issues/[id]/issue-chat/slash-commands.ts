@@ -1,8 +1,12 @@
+import { availableCommandSchema } from "@gentic/validators/chat-events"
 import type { AgentProvider } from "@gentic/validators/issues"
+
+import type { ChatMessage } from "./types"
 
 export type SlashCommand = {
   name: string
   description: string
+  input?: { hint: string } | null
 }
 
 const CLAUDE_CODE_SLASH_COMMANDS: SlashCommand[] = [
@@ -66,6 +70,14 @@ export function slashCommandQuery(value: string): string | null {
   return firstLine.toLowerCase()
 }
 
+export function slashCommandName(value: string): string | null {
+  const query = slashCommandQuery(value)
+  if (query === null || query === "/") {
+    return null
+  }
+  return query
+}
+
 export function filterSlashCommands(
   commands: SlashCommand[],
   query: string
@@ -73,4 +85,36 @@ export function filterSlashCommands(
   return commands
     .filter((command) => command.name.toLowerCase().startsWith(query))
     .slice(0, 8)
+}
+
+export function slashCommandsFromMessages(
+  messages: ChatMessage[]
+): SlashCommand[] | null {
+  const commandEvent = messages
+    .filter((message) => message.event_type === "available_commands")
+    .sort((a, b) => {
+      const time = a.created_at.localeCompare(b.created_at)
+      if (time !== 0) {
+        return time
+      }
+      return (a.event_seq ?? 0) - (b.event_seq ?? 0)
+    })
+    .at(-1)
+
+  const commands = commandEvent?.payload?.availableCommands
+  if (!Array.isArray(commands)) {
+    return null
+  }
+
+  return commands
+    .map((command) => availableCommandSchema.safeParse(command))
+    .filter((result) => result.success)
+    .map((result) => ({
+      ...result.data,
+      name: slashName(result.data.name),
+    }))
+}
+
+function slashName(name: string): string {
+  return name.startsWith("/") ? name : `/${name}`
 }

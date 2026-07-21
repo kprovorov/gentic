@@ -17,8 +17,9 @@ import {
   disconnectGithubIntegration,
   updateProject,
 } from "@/app/settings/actions"
-import { getSettingsData, type SettingsData } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { fetchSettingsData } from "@/app/client-queries"
+import type { SettingsData } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -36,8 +37,9 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
   const queryClient = useQueryClient()
   const { data } = useQuery({
     queryKey: queryKeys.settings,
-    queryFn: getSettingsData,
+    queryFn: fetchSettingsData,
     initialData,
+    staleTime: queryStaleTimes.settings,
   })
   const invalidateProjects = async () => {
     await Promise.all([

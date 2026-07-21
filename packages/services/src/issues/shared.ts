@@ -1,28 +1,23 @@
+import type { Tables } from "@gentic/supabase/types"
+
 export const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
 
-export type IssueRelationIssue = {
-  id: string
-  title: string | null
-  status: string
-}
+type IssueRow = Tables<"issues">
+type IssueRelationRow = Tables<"issue_relations">
+type IssuePullRequestRow = Tables<"issue_pull_requests">
 
-export type IssueRelation = {
-  id: string
-  source_issue_id: string
-  target_issue_id: string
+export type IssueRelationIssue = Pick<IssueRow, "id" | "title" | "status">
+
+export type IssueRelation = Pick<
+  IssueRelationRow,
+  "id" | "source_issue_id" | "target_issue_id" | "created_at"
+> & {
   type: "blocks"
-  created_at: string
   source_issue: IssueRelationIssue
   target_issue: IssueRelationIssue
 }
 
-export type IssuePullRequest = {
-  id: string
-  issue_id: string
-  url: string
-  created_at: string
-}
-
-export function kickoffMessageContent(prompt: string | null): string {
-  return prompt ?? ""
-}
+export type IssuePullRequest = Pick<
+  IssuePullRequestRow,
+  "id" | "issue_id" | "url" | "created_at"
+>

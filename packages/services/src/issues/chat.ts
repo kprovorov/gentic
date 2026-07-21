@@ -10,7 +10,22 @@ export async function sendIssueMessage(
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
 
-  const message = unwrap(
+  return unwrap(
+    await supabase
+      .rpc("send_issue_user_message", {
+        p_issue_id: issueId,
+        p_content: content,
+      })
+      .single<{ id: string; created_at: string }>()
+  )
+}
+
+export async function createIssueUserMessage(
+  supabase: Supabase,
+  issueId: string,
+  content: string
+) {
+  return unwrap(
     await supabase
       .from("messages")
       .insert({
@@ -21,10 +36,26 @@ export async function sendIssueMessage(
       .select("id, created_at")
       .single<{ id: string; created_at: string }>()
   )
+}
 
-  // A finished run has no worker polling for it anymore. Re-queue so the
-  // agent picks this follow-up up and resumes the session, unless the issue
-  // never ran or a run is already queued/in flight.
+export async function deleteIssueMessage(
+  supabase: Supabase,
+  issueId: string,
+  messageId: string
+) {
+  unwrap(
+    await supabase
+      .from("messages")
+      .delete()
+      .eq("issue_id", issueId)
+      .eq("id", messageId)
+  )
+}
+
+export async function requeueIssueForUserMessage(
+  supabase: Supabase,
+  issueId: string
+) {
   unwrap(
     await supabase
       .from("issues")
@@ -36,8 +67,6 @@ export async function sendIssueMessage(
       .eq("id", issueId)
       .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
-
-  return message
 }
 
 export type ChangesRequestedReviewComment = {
@@ -93,10 +122,7 @@ export async function applyChangesRequestedReview(
     .from("issues")
     .select("id, projects!inner(auto_respond_to_reviews)")
     .eq("pr_url", prUrl)
-    .maybeSingle<{
-      id: string
-      projects: { auto_respond_to_reviews: boolean }
-    }>()
+    .maybeSingle()
 
   if (error) {
     throw new ServiceError("internal", error.message)

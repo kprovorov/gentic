@@ -2,7 +2,8 @@ import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
-import { ISSUE_WITH_PROJECT_SELECT, kickoffMessageContent } from "./shared"
+import { getIssue } from "./queries"
+import { ISSUE_WITH_PROJECT_SELECT } from "./shared"
 
 export async function resetIssueAgent(
   supabase: Supabase,
@@ -12,13 +13,10 @@ export async function resetIssueAgent(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("prompt,agent_provider,projects!inner(user_id)")
+    .select("agent_provider,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      prompt: string | null
-      agent_provider: AgentProvider
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -27,32 +25,10 @@ export async function resetIssueAgent(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  unwrap(await supabase.from("messages").delete().eq("issue_id", id))
-  unwrap(await supabase.from("issue_pull_requests").delete().eq("issue_id", id))
-
-  const now = new Date().toISOString()
   unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        status: "todo",
-        agent_provider: agentProvider,
-        session_id: null,
-        run_error: null,
-        run_started_at: null,
-        run_finished_at: null,
-        usage_limit_reset_at: null,
-        pr_url: null,
-        updated_at: now,
-      })
-      .eq("id", id)
-  )
-
-  unwrap(
-    await supabase.from("messages").insert({
-      issue_id: id,
-      role: "user",
-      content: kickoffMessageContent(current.prompt),
+    await supabase.rpc("reset_issue_run", {
+      p_issue_id: id,
+      p_agent_provider: agentProvider,
     })
   )
 }
@@ -68,10 +44,7 @@ export async function updateIssueStatus(
     .select("status,prompt,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{
-      status: string
-      prompt: string | null
-    }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -80,30 +53,17 @@ export async function updateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  // Moving an issue from Draft to Todo starts an agent run: the worker picks
-  // up `status = 'todo'` issues and drives the selected coding agent.
+  // Starting a draft is a durable DB transition so prompt consumption and
+  // message creation stay atomic with the status change.
   const startsRun = current.status === "draft" && status === "todo"
 
-  const result = await supabase
-    .from("issues")
-    .update(startsRun ? { status, usage_limit_reset_at: null } : { status })
-    .eq("id", id)
-    .select(ISSUE_WITH_PROJECT_SELECT)
-    .single()
-
-  const data = unwrap(result)
-
   if (startsRun) {
-    unwrap(
-      await supabase.from("messages").insert({
-        issue_id: id,
-        role: "user",
-        content: kickoffMessageContent(current.prompt),
-      })
-    )
+    unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
+  } else {
+    unwrap(await supabase.from("issues").update({ status }).eq("id", id))
   }
 
-  return data
+  return getIssue(supabase, userId, id)
 }
 
 export async function updateIssueAgentProvider(
@@ -117,7 +77,7 @@ export async function updateIssueAgentProvider(
     .select("run_started_at,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
-    .maybeSingle<{ run_started_at: string | null }>()
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -159,7 +119,7 @@ export async function updateIssueStatusByPrUrl(
     .from("issue_pull_requests")
     .select("issue_id")
     .eq("url", prUrl)
-    .maybeSingle<{ issue_id: string }>()
+    .maybeSingle()
 
   if (pullRequestError) {
     throw new ServiceError("internal", pullRequestError.message)

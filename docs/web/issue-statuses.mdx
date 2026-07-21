@@ -1,0 +1,102 @@
+---
+title: "Issue Status Reference for Gentic"
+sidebarTitle: "Issue Statuses"
+description: "Reference for every Gentic issue status. Learn what each state means, how issues transition between them, and how GitHub pull request events map back to status changes."
+---
+
+Every issue in Gentic carries a single **status** field that describes both where the issue sits in your team's workflow and what the agent worker is doing with it. This page documents every possible value and the transitions between them.
+
+<Note>
+  Moving an issue from **Draft** to **Todo** is the specific transition that makes it eligible for an agent run. Until you make that change, no worker will claim it and no repository is cloned.
+</Note>
+
+## Status lifecycle
+
+A typical issue moves through the lifecycle in roughly this order:
+
+```text
+draft → todo → queued → in-progress → ready-for-review
+                                     ↘ waiting-for-input
+                                     ↘ tests-failed / run-failed
+                                     ↘ changes-requested → approved → merged
+```
+
+Not every issue visits every status. The worker drives the agent-run states, while several review and deployment states are available for manual or external workflow updates.
+
+## Pre-work
+
+These statuses cover the period before an agent worker has claimed the issue.
+
+| Status | Description |
+|---|---|
+| `draft` | The issue is being prepared. It is invisible to the worker. Use this while you are still writing or refining the prompt, uploading attachments, or setting blockers. |
+| `todo` | The issue is ready and sits in the unclaimed pool. The next worker poll that finds no other pending work will claim it. |
+
+## Agent running
+
+These statuses indicate a worker is actively handling the issue.
+
+| Status | Description |
+|---|---|
+| `queued` | A worker has claimed the issue and is preparing the run — cloning the configured repository, running the project's setup script, and starting the agent session. This is a short-lived state; if it persists, see [Troubleshooting](/guides/troubleshooting). |
+| `held` | The agent hit a usage or session limit (for example, a Claude Code quota reset or a Codex rate-limit response). The worker parses the reset time out of the error and stores it on the issue. Once the reset time has passed, the next poll re-claims the issue automatically — you do not need to do anything. |
+| `in-progress` | The agent session is live. The transcript panel streams assistant output in real time as the agent reads files, writes code, and runs commands inside the cloned repository. |
+| `waiting-for-input` | The agent has finished a turn without opening a pull request and is waiting for you to send a follow-up message. Reply in the transcript to continue the same session. |
+
+## Review
+
+These statuses cover the period between the agent opening a pull request and the PR being merged. Most transitions in this section are driven by GitHub webhook events — see [How GitHub events map to statuses](#how-github-events-map-to-statuses) below.
+
+| Status | Description |
+|---|---|
+| `testing` | Reserved for a workflow that is running automated tests against the changes. Gentic's worker does not set this automatically. |
+| `tests-failed` | Reserved for a workflow reporting failed tests. Gentic's worker does not set this automatically. |
+| `ready-for-review` | The agent has opened a pull request and it is ready for human review on GitHub. |
+| `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. Send the agent a message describing what to fix, or push changes yourself. |
+| `approved` | A reviewer submitted an **Approve** review on GitHub. The pull request is ready to merge. |
+
+## Merge and deploy
+
+| Status | Description |
+|---|---|
+| `merged` | The pull request has been merged into the target branch. Set automatically when GitHub sends a `pull_request.closed` webhook with `merged: true`. |
+| `deploying` | Reserved for an external deployment workflow that is running the merged changes. |
+| `deploy-failed` | Reserved for an external workflow reporting a deployment failure. |
+| `validating` | Reserved for an external workflow validating deployed changes. |
+
+## Terminal
+
+Issues in these statuses are no longer active. You can re-open a conversation by sending a new message in the transcript, which moves the issue back to `todo` and resumes the same agent session with full prior context.
+
+| Status | Description |
+|---|---|
+| `run-failed` | The agent run ended with an unrecoverable error before opening a pull request. Check agent activity for the error output. Use **Retry with...** after fixing the underlying cause. |
+| `completed` | The issue has been resolved and all work is done. |
+| `cancelled` | The issue was cancelled before completion, either manually or because the pull request was closed on GitHub without being merged. |
+
+## How GitHub events map to statuses
+
+If you have configured the [GitHub integration](/web/github-integration) with a webhook, Gentic listens for pull request activity on the PR that the agent opened and updates the issue automatically. The mapping is:
+
+| GitHub event | Payload condition | Resulting issue status |
+|---|---|---|
+| `pull_request.closed` | `merged: true` | `merged` |
+| `pull_request.closed` | `merged: false` | `cancelled` |
+| `pull_request.reopened` | — | `ready-for-review` |
+| `pull_request_review.submitted` | `review.state: approved` | `approved` |
+| `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
+
+Gentic matches the event to a stored pull-request URL on the issue. Comment-only reviews and other event types are ignored.
+
+To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests** and **Pull request reviews** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
+
+## Held status and usage limits
+
+The `held` status is the recovery path for temporary agent outages. When Claude Code or Codex returns a usage-limit, session-limit, rate-limit, or quota error during a run, the worker:
+
+1. Parses a reset time from the error message. Relative (`try again in 2h`), absolute, and `HH:MM (UTC)`-style resets are all supported.
+2. Moves the issue to `held` and stores the parsed reset time.
+3. Skips the issue on subsequent polls until the reset time has passed.
+4. Re-claims the issue automatically once the reset window opens, resuming the same agent session.
+
+If the worker cannot parse a reset time out of the error, the run is treated as a `run-failed` instead so you can intervene manually. You can also cancel a held issue at any time by changing its status to `cancelled`.

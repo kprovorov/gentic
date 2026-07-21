@@ -17,6 +17,7 @@ export {
   deleteIssue,
   setIssueTitle,
   setIssueType,
+  startIssueFromDraft,
   updateIssue,
 } from "./issues/mutations"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
@@ -31,5 +32,8 @@ export {
   applyChangesRequestedReview,
   type ChangesRequestedReview,
   type ChangesRequestedReviewComment,
+  createIssueUserMessage,
+  deleteIssueMessage,
+  requeueIssueForUserMessage,
   sendIssueMessage,
 } from "./issues/chat"

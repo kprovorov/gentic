@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./attachments": "./src/attachments.ts",
     "./errors": "./src/errors.ts",
     "./github-integrations": "./src/github-integrations.ts",
     "./issues": "./src/issues.ts",
@@ -12,7 +13,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,7 +25,7 @@
     "@gentic/typescript-config": "workspace:*",
     "@types/node": "^20",
     "eslint": "^9",
-    "tsx": "^4.22.4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }

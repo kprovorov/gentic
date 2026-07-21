@@ -2,6 +2,7 @@
 
 import { IconExternalLink, IconGitPullRequest } from "@tabler/icons-react"
 
+import { cn } from "@gentic/ui/utils"
 import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 
 import type { IssuePullRequest } from "@/app/queries"
@@ -9,7 +10,7 @@ import type { IssuePullRequest } from "@/app/queries"
 import { IssueChatComposer } from "./composer"
 import { formatPullRequestLabel } from "./pull-requests"
 import { IssueChatTranscript } from "./transcript"
-import type { ChatMessage } from "./types"
+import type { ChatMessage, RealtimeConnectionStatus } from "./types"
 import { useIssueChatState } from "./use-issue-chat-state"
 
 export function IssueChat({
@@ -41,6 +42,14 @@ export function IssueChat({
 
   return (
     <div className="flex flex-col gap-4">
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {chat.liveMessage}
+      </div>
       <IssueChatStatusBar
         status={chat.status}
         usageLimitResetAt={chat.usageLimitResetAt}
@@ -50,14 +59,23 @@ export function IssueChat({
 
       <IssueChatTranscript
         messages={chat.displayedMessages}
+        issueStatus={chat.status}
         isAgentWorkingWithoutMessage={chat.isAgentWorkingWithoutMessage}
         sendTick={chat.sendTick}
+        onRetry={chat.retryFailedMessage}
+        retryDisabled={chat.isSending}
+      />
+
+      <RealtimeConnectionNotice
+        status={chat.connectionStatus}
+        message={chat.connectionMessage}
       />
 
       <IssueChatComposer
         draft={chat.draft}
-        draftKey={chat.sendTick}
+        draftFiles={chat.draftFiles}
         disabled={chat.isSending}
+        invalidSlashCommand={chat.invalidSlashCommand}
         slashCommands={chat.visibleSlashCommands}
         selectedSlashCommandIndex={chat.boundedSlashCommandIndex}
         onDraftChange={chat.handleDraftChange}
@@ -66,6 +84,33 @@ export function IssueChat({
         onSelectSlashCommand={chat.selectSlashCommand}
         onSubmit={chat.handleSubmit}
       />
+    </div>
+  )
+}
+
+function RealtimeConnectionNotice({
+  status,
+  message,
+}: {
+  status: RealtimeConnectionStatus
+  message: string | null
+}) {
+  if (!message) {
+    return null
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2 text-sm",
+        status === "connected"
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      )}
+      role={status === "connected" ? "status" : "alert"}
+      aria-live="polite"
+    >
+      {message}
     </div>
   )
 }
