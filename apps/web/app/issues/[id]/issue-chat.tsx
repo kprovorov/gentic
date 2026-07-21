@@ -39,6 +39,7 @@ import {
   runStateEventSchema,
   type UserMessageEvent,
 } from "@gentic/validators/realtime"
+import { availableCommandSchema } from "@gentic/validators/chat-events"
 
 import { sendIssueMessage } from "@/app/issues/actions"
 import type { IssuePullRequest } from "@/app/queries"
@@ -54,6 +55,7 @@ import { type ChatMessage, useIssueChat } from "./issue-chat-state"
 type SlashCommand = {
   name: string
   description: string
+  input?: { hint: string } | null
 }
 
 const CLAUDE_CODE_SLASH_COMMANDS: SlashCommand[] = [
@@ -129,6 +131,46 @@ type RealtimeConnectionStatus =
   | "connected"
   | "reconnecting"
   | "offline"
+
+function slashCommandsFromMessages(messages: ChatMessage[]): SlashCommand[] | null {
+  const commandEvent = messages
+    .filter((message) => message.event_type === "available_commands")
+    .sort((a, b) => {
+      const time = a.created_at.localeCompare(b.created_at)
+      if (time !== 0) {
+        return time
+      }
+      return (a.event_seq ?? 0) - (b.event_seq ?? 0)
+    })
+    .at(-1)
+
+  const commands = commandEvent?.payload?.availableCommands
+  if (!Array.isArray(commands)) {
+    return null
+  }
+
+  const parsed = commands
+    .map((command) => availableCommandSchema.safeParse(command))
+    .filter((result) => result.success)
+    .map((result) => ({
+      ...result.data,
+      name: slashName(result.data.name),
+    }))
+
+  return parsed
+}
+
+function slashName(name: string): string {
+  return name.startsWith("/") ? name : `/${name}`
+}
+
+function slashCommandName(value: string): string | null {
+  const query = slashCommandQuery(value)
+  if (query === null || query === "/") {
+    return null
+  }
+  return query
+}
 
 function mergePullRequest(
   list: IssuePullRequest[],
@@ -304,10 +346,23 @@ export function IssueChat({
     [pullRequests, initialPullRequests]
   )
   const slashCommands = useMemo(
-    () => slashCommandsForProvider(agentProvider),
-    [agentProvider]
+    () =>
+      slashCommandsFromMessages(displayedMessages) ??
+      slashCommandsForProvider(agentProvider),
+    [displayedMessages, agentProvider]
+  )
+  const hasAcpSlashCommands = useMemo(
+    () => slashCommandsFromMessages(displayedMessages) !== null,
+    [displayedMessages]
   )
   const slashQuery = slashCommandQuery(draft)
+  const slashNameInDraft = slashCommandName(draft)
+  const invalidSlashCommand =
+    hasAcpSlashCommands &&
+    slashNameInDraft !== null &&
+    !slashCommands.some(
+      (command) => command.name.toLowerCase() === slashNameInDraft
+    )
   const matchingSlashCommands = useMemo(
     () =>
       slashQuery === null
@@ -568,7 +623,7 @@ export function IssueChat({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = draft.trim()
-    if (!content || mutation.isPending) {
+    if (!content || mutation.isPending || invalidSlashCommand) {
       return
     }
 
@@ -786,7 +841,7 @@ export function IssueChat({
           aria-label={
             mutation.isPending ? "Sending message" : "Send message to agent"
           }
-          disabled={mutation.isPending || !draft.trim()}
+          disabled={mutation.isPending || !draft.trim() || invalidSlashCommand}
         >
           <IconSend />
         </Button>

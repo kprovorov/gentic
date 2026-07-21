@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+import {
+  chatEventPayloadSchema,
+  chatEventStatusSchema,
+  chatEventTypeSchema,
+  chatMessageKindSchema,
+  chatMessageStatusSchema,
+} from "./chat-events.js"
 import { agentProviderSchema } from "./issues.js"
 import { realtimeRunStateStatusSchema } from "./realtime.js"
 
@@ -89,9 +96,17 @@ export type RealtimeTokenResponse = z.infer<typeof realtimeTokenResponseSchema>
 export const insertMessageInputSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(["assistant", "system"]),
-  kind: z.enum(["text", "tool", "thinking"]).optional(),
+  kind: chatMessageKindSchema.optional(),
   content: z.string(),
-  status: z.enum(["complete", "error"]).optional(),
+  status: chatMessageStatusSchema.optional(),
+  event_id: z.string().nullable().optional(),
+  run_id: z.string().nullable().optional(),
+  event_type: chatEventTypeSchema.nullable().optional(),
+  event_status: chatEventStatusSchema.nullable().optional(),
+  event_ts: z.string().datetime().nullable().optional(),
+  event_seq: z.number().int().positive().nullable().optional(),
+  tool_call_id: z.string().nullable().optional(),
+  payload: chatEventPayloadSchema.nullable().optional(),
 })
 
 export type InsertMessageInput = z.infer<typeof insertMessageInputSchema>

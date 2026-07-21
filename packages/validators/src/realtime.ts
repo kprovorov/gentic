@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+import {
+  chatEventPayloadSchema,
+  chatEventStatusSchema,
+  chatEventTypeSchema,
+  chatMessageKindSchema,
+  chatMessageStatusSchema,
+} from "./chat-events.js"
 import { issueStatusSchema, type IssueStatus } from "./issues.js"
 
 // Event names for the private `issue:{id}` Realtime Broadcast channel. See
@@ -14,12 +21,8 @@ export function issueRealtimeTopic(issueId: string): string {
 
 export const realtimeMessageRoleSchema = z.enum(["assistant", "system"])
 export const chatMessageRoleSchema = z.enum(["user", "assistant", "system"])
-export const realtimeMessageKindSchema = z.enum(["text", "thinking", "tool"])
-export const realtimeMessageStatusSchema = z.enum([
-  "streaming",
-  "complete",
-  "error",
-])
+export const realtimeMessageKindSchema = chatMessageKindSchema
+export const realtimeMessageStatusSchema = chatMessageStatusSchema
 
 export const chatMessageSchema = z.object({
   id: z.string(),
@@ -28,6 +31,14 @@ export const chatMessageSchema = z.object({
   content: z.string().nullable(),
   status: realtimeMessageStatusSchema,
   created_at: z.string(),
+  event_id: z.string().min(1).nullable().optional(),
+  run_id: z.string().min(1).nullable().optional(),
+  event_type: chatEventTypeSchema.nullable().optional(),
+  event_status: chatEventStatusSchema.nullable().optional(),
+  event_ts: z.string().datetime().nullable().optional(),
+  event_seq: z.number().int().positive().nullable().optional(),
+  tool_call_id: z.string().min(1).nullable().optional(),
+  payload: chatEventPayloadSchema.nullable().optional(),
 })
 
 export type ChatMessageContract = z.infer<typeof chatMessageSchema>
@@ -40,6 +51,14 @@ export const messageEventSchema = z.object({
   kind: realtimeMessageKindSchema,
   content: z.string(),
   status: realtimeMessageStatusSchema,
+  event_id: z.string().min(1).nullable().optional(),
+  run_id: z.string().min(1).nullable().optional(),
+  event_type: chatEventTypeSchema.nullable().optional(),
+  event_status: chatEventStatusSchema.nullable().optional(),
+  event_ts: z.string().datetime().nullable().optional(),
+  event_seq: z.number().int().positive().nullable().optional(),
+  tool_call_id: z.string().min(1).nullable().optional(),
+  payload: chatEventPayloadSchema.nullable().optional(),
   ts: z.string(),
 })
 
@@ -50,6 +69,14 @@ export type MessageEvent = {
   kind: z.infer<typeof realtimeMessageKindSchema>
   content: string
   status: z.infer<typeof realtimeMessageStatusSchema>
+  event_id?: string | null
+  run_id?: string | null
+  event_type?: z.infer<typeof chatEventTypeSchema> | null
+  event_status?: z.infer<typeof chatEventStatusSchema> | null
+  event_ts?: string | null
+  event_seq?: number | null
+  tool_call_id?: string | null
+  payload?: z.infer<typeof chatEventPayloadSchema> | null
   ts: string
 }
 

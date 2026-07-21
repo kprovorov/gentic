@@ -268,7 +268,9 @@ export async function getIssueDetailData(
   ] = await Promise.all([
     supabase
       .from("messages")
-      .select("id,role,kind,content,status,created_at")
+      .select(
+        "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+      )
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
     supabase

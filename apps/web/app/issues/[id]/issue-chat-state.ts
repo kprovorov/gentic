@@ -159,6 +159,14 @@ function upsertSequencedEvent(
     content: event.content,
     status: event.status ?? fallbackStatus,
     created_at: event.ts,
+    event_id: event.event_id ?? null,
+    run_id: event.run_id ?? null,
+    event_type: event.event_type ?? null,
+    event_status: event.event_status ?? null,
+    event_ts: event.event_ts ?? null,
+    event_seq: event.event_seq ?? null,
+    tool_call_id: event.tool_call_id ?? null,
+    payload: event.payload ?? null,
   })
 
   return {

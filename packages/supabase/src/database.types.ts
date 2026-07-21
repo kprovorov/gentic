@@ -241,13 +241,21 @@ export type Database = {
           consumed_by_run_id: string | null
           content: string | null
           created_at: string
+          event_id: string | null
+          event_seq: number | null
+          event_status: string | null
+          event_ts: string | null
+          event_type: string | null
           github_review_id: number | null
           id: string
           issue_id: string
           kind: string
+          payload: Json | null
           role: string
+          run_id: string | null
           seq: number
           status: string
+          tool_call_id: string | null
           updated_at: string
         }
         Insert: {
@@ -255,13 +263,21 @@ export type Database = {
           consumed_by_run_id?: string | null
           content?: string | null
           created_at?: string
+          event_id?: string | null
+          event_seq?: number | null
+          event_status?: string | null
+          event_ts?: string | null
+          event_type?: string | null
           github_review_id?: number | null
           id?: string
           issue_id: string
           kind?: string
+          payload?: Json | null
           role: string
+          run_id?: string | null
           seq?: number
           status?: string
+          tool_call_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -269,13 +285,21 @@ export type Database = {
           consumed_by_run_id?: string | null
           content?: string | null
           created_at?: string
+          event_id?: string | null
+          event_seq?: number | null
+          event_status?: string | null
+          event_ts?: string | null
+          event_type?: string | null
           github_review_id?: number | null
           id?: string
           issue_id?: string
           kind?: string
+          payload?: Json | null
           role?: string
+          run_id?: string | null
           seq?: number
           status?: string
+          tool_call_id?: string | null
           updated_at?: string
         }
         Relationships: [
