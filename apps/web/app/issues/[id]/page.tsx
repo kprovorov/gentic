@@ -10,12 +10,12 @@ export default async function IssueDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const initialData = await getIssueDetailData(id).catch((error: unknown) => {
+  const data = await getIssueDetailData(id).catch((error: unknown) => {
     if (error instanceof QueryNotFoundError) {
       notFound()
     }
     throw error
   })
 
-  return <IssueDetailView issueId={id} initialData={initialData} />
+  return <IssueDetailView data={data} />
 }

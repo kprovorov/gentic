@@ -1,4 +1,5 @@
 import type { Tables } from "@gentic/supabase/types"
+import type { ChatMessageContract } from "@gentic/validators/realtime"
 
 export const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
 
@@ -21,3 +22,9 @@ export type IssuePullRequest = Pick<
   IssuePullRequestRow,
   "id" | "issue_id" | "url" | "created_at"
 >
+
+export type UserChatMessage = ChatMessageContract & {
+  role: "user"
+  kind: "text"
+  status: "complete"
+}

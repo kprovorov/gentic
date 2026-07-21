@@ -369,6 +369,26 @@ export function useIssueChatState({
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
 
+    async function reconcilePersistedTranscript() {
+      const { data, error } = await supabase
+        .from("messages")
+        .select(
+          "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+        )
+        .eq("issue_id", issueId)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessage[]>()
+
+      if (cancelled || error) {
+        return
+      }
+
+      dispatch({
+        type: "reconnect_reconciliation",
+        messages: data ?? [],
+      })
+    }
+
     async function join() {
       await supabase.realtime.setAuth()
       if (cancelled) {
@@ -417,6 +437,7 @@ export function useIssueChatState({
             return
           }
           if (subscribeStatus === "SUBSCRIBED") {
+            void reconcilePersistedTranscript()
             setRealtimeConnectionStatus(
               "connected",
               connectionStatusRef.current === "connected"

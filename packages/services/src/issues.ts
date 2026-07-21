@@ -2,6 +2,7 @@ export {
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,
+  type UserChatMessage,
 } from "./issues/shared"
 export { ensureIssueOwned } from "./issues/ownership"
 export {

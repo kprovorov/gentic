@@ -1,7 +1,10 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
+  IconAlertCircle,
+  IconCheck,
+  IconChevronDown,
   IconDownload,
   IconLoader2,
   IconPaperclip,
@@ -11,6 +14,11 @@ import { Streamdown } from "streamdown"
 
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import { Button } from "@gentic/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@gentic/ui/collapsible"
 import { Marker, MarkerContent, MarkerIcon } from "@gentic/ui/marker"
 import { Message, MessageContent } from "@gentic/ui/message"
 import {
@@ -27,6 +35,7 @@ import type { IssueStatus } from "@gentic/validators/issues"
 
 import type { Attachment } from "../attachments"
 import type { ChatMessage } from "./types"
+import { groupChatMessages } from "./transcript-items"
 
 export function IssueChatTranscript({
   messages,
@@ -44,6 +53,7 @@ export function IssueChatTranscript({
   retryDisabled: boolean
 }) {
   const lastMessage = messages.at(-1)
+  const displayItems = useMemo(() => groupChatMessages(messages), [messages])
 
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="end">
@@ -51,7 +61,7 @@ export function IssueChatTranscript({
       <MessageScroller className="h-[28rem] max-h-[28rem]">
         <MessageScrollerViewport className="pr-1">
           <MessageScrollerContent className="gap-3">
-            {messages.length === 0 ? (
+            {displayItems.length === 0 ? (
               <MessageScrollerItem messageId="empty">
                 <Marker variant="border">
                   <MarkerContent>
@@ -61,20 +71,33 @@ export function IssueChatTranscript({
                 </Marker>
               </MessageScrollerItem>
             ) : (
-              messages.map((message) => (
-                <MessageScrollerItem
-                  key={message.clientKey ?? message.id}
-                  messageId={message.id}
-                >
-                  <ChatMessageRow
-                    message={message}
-                    isLatestUserMessage={message.id === lastMessage?.id}
-                    issueStatus={issueStatus}
-                    onRetry={onRetry}
-                    retryDisabled={retryDisabled}
-                  />
-                </MessageScrollerItem>
-              ))
+              displayItems.map((item) => {
+                if (item.kind === "tool-group") {
+                  return (
+                    <MessageScrollerItem
+                      key={item.key}
+                      messageId={item.messages[0].id}
+                    >
+                      <ToolCallGroup messages={item.messages} />
+                    </MessageScrollerItem>
+                  )
+                }
+
+                return (
+                  <MessageScrollerItem
+                    key={item.message.clientKey ?? item.message.id}
+                    messageId={item.message.id}
+                  >
+                    <ChatMessageRow
+                      message={item.message}
+                      isLatestUserMessage={item.message.id === lastMessage?.id}
+                      issueStatus={issueStatus}
+                      onRetry={onRetry}
+                      retryDisabled={retryDisabled}
+                    />
+                  </MessageScrollerItem>
+                )
+              })
             )}
             {isAgentWorkingWithoutMessage ? (
               <MessageScrollerItem messageId="agent-working">
@@ -124,7 +147,6 @@ function ChatMessageRow({
   retryDisabled?: boolean
 }) {
   const isUser = message.role === "user"
-  const isTool = message.kind === "tool"
   const isMarker = message.role === "system" || message.kind === "thinking"
   const content = message.content ?? ""
   const isStreaming = message.status === "streaming"
@@ -172,18 +194,11 @@ function ChatMessageRow({
               ? "destructive"
               : isUser
                 ? "tinted"
-                : isTool
-                  ? "muted"
-                  : "secondary"
+                : "secondary"
           }
         >
-          <BubbleContent
-            className={cn(
-              "whitespace-pre-wrap",
-              isTool && "font-mono text-xs text-muted-foreground"
-            )}
-          >
-            {isTool ? content : <ChatMarkdown content={content} isStreaming={isStreaming} />}
+          <BubbleContent className="whitespace-pre-wrap">
+            <ChatMarkdown content={content} isStreaming={isStreaming} />
             {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
@@ -217,6 +232,72 @@ function ChatMessageRow({
       </MessageContent>
     </Message>
   )
+}
+
+function ToolCallGroup({ messages }: { messages: ChatMessage[] }) {
+  const [open, setOpen] = useState(false)
+  const hasError = messages.some((message) => message.status === "error")
+  const hasStreaming = messages.some((message) => message.status === "streaming")
+  const summary =
+    messages.length === 1
+      ? firstLine(messages[0].content ?? "")
+      : `${messages.length} tool calls`
+
+  return (
+    <Message align="start">
+      <MessageContent>
+        <Bubble
+          align="start"
+          variant={hasError ? "destructive" : "muted"}
+          className="max-w-full"
+        >
+          <Collapsible open={open} onOpenChange={setOpen} className="w-full">
+            <CollapsibleTrigger asChild>
+              <BubbleContent
+                asChild
+                className="flex w-full cursor-pointer items-center gap-2 rounded-b-none px-3.5 py-2 text-left text-xs text-muted-foreground"
+              >
+                <button type="button">
+                  {hasStreaming ? (
+                    <IconLoader2 className="size-3.5 shrink-0 animate-spin" />
+                  ) : hasError ? (
+                    <IconAlertCircle className="size-3.5 shrink-0" />
+                  ) : (
+                    <IconCheck className="size-3.5 shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {summary || "Tool call"}
+                  </span>
+                  <IconChevronDown
+                    className={cn(
+                      "size-3.5 shrink-0 transition-transform",
+                      open && "rotate-180"
+                    )}
+                  />
+                </button>
+              </BubbleContent>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <BubbleContent className="w-full space-y-2 rounded-t-none border-t px-3.5 py-2">
+                {messages.map((message) => (
+                  <pre
+                    key={message.clientKey ?? message.id}
+                    className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-background/60 p-2 font-mono text-xs text-muted-foreground"
+                  >
+                    {message.content || "Tool call"}
+                  </pre>
+                ))}
+              </BubbleContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Bubble>
+      </MessageContent>
+    </Message>
+  )
+}
+
+function firstLine(value: string) {
+  return value.split(/\r?\n/, 1)[0].trim()
 }
 
 function ChatMarkdown({

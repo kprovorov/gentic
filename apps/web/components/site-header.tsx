@@ -18,7 +18,7 @@ export function SiteHeader() {
   const pathname = usePathname()
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur transition-[width,height] ease-linear">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <div aria-hidden="true" className="mx-2 h-4 w-px shrink-0 bg-border" />

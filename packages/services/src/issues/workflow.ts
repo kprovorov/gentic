@@ -3,14 +3,14 @@ import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { getIssue } from "./queries"
-import { ISSUE_WITH_PROJECT_SELECT } from "./shared"
+import { ISSUE_WITH_PROJECT_SELECT, type UserChatMessage } from "./shared"
 
 export async function resetIssueAgent(
   supabase: Supabase,
   userId: string,
   id: string,
   agentProvider: AgentProvider
-) {
+): Promise<UserChatMessage> {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select("agent_provider,projects!inner(user_id)")
@@ -30,6 +30,19 @@ export async function resetIssueAgent(
       p_issue_id: id,
       p_agent_provider: agentProvider,
     })
+  )
+
+  return unwrap(
+    await supabase
+      .from("messages")
+      .select(
+        "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+      )
+      .eq("issue_id", id)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single<UserChatMessage>()
   )
 }
 
