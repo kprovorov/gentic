@@ -375,18 +375,6 @@ async function uploadIssueAttachments(
   for (const file of files) {
     const storagePath = `${issueId}/${randomUUID()}-${sanitizeFileName(file.name)}`
 
-    const { error: uploadError } = await supabase.storage
-      .from(ATTACHMENTS_BUCKET)
-      .upload(storagePath, file, {
-        contentType: file.type || "application/octet-stream",
-      })
-
-    if (uploadError) {
-      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
-      throw new Error(uploadError.message)
-    }
-    uploadedPaths.push(storagePath)
-
     const { data, error: insertError } = await supabase
       .from("attachments")
       .insert({
@@ -406,6 +394,30 @@ async function uploadIssueAttachments(
     }
 
     attachmentIds.push(data.id)
+    uploadedPaths.push(storagePath)
+
+    const { error: uploadError } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(storagePath, file, {
+        contentType: file.type || "application/octet-stream",
+      })
+
+    if (uploadError) {
+      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
+      throw new Error(uploadError.message)
+    }
+
+    const { error: updateError } = await supabase
+      .from("attachments")
+      .update({ upload_completed_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("issue_id", issueId)
+
+    if (updateError) {
+      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
+      throw new Error(updateError.message)
+    }
+
     attachments.push({
       id: data.id,
       fileName: file.name,

@@ -1,5 +1,6 @@
 alter table public.attachments
   add column if not exists message_id uuid references public.messages(id) on delete set null,
+  add column if not exists upload_completed_at timestamptz,
   add column if not exists deleted_at timestamptz,
   add column if not exists storage_deleted_at timestamptz;
 
@@ -27,7 +28,13 @@ update public.attachments
        and messages.role = 'user'
    );
 
-grant update(message_id, deleted_at, storage_deleted_at) on public.attachments
+update public.attachments
+   set upload_completed_at = coalesce(upload_completed_at, created_at)
+ where upload_completed_at is null
+   and deleted_at is null;
+
+grant update(message_id, upload_completed_at, deleted_at, storage_deleted_at)
+  on public.attachments
   to authenticated;
 
 create or replace function public.ensure_attachment_message_issue()
@@ -96,12 +103,43 @@ language sql
 security invoker
 set search_path = public
 as $$
+  with newly_deleted as (
+    update public.attachments
+       set deleted_at = coalesce(deleted_at, now())
+     where (message_id is null or upload_completed_at is null)
+       and created_at < now() - older_than
+       and deleted_at is null
+    returning attachments.storage_path
+  )
+  select newly_deleted.storage_path
+    from newly_deleted
+  union
+  select attachments.storage_path
+    from public.attachments
+   where attachments.deleted_at is not null
+     and attachments.storage_deleted_at is null
+     and attachments.created_at < now() - older_than;
+$$;
+
+create or replace function public.mark_attachment_storage_deleted(
+  storage_paths text[]
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  updated_count integer;
+begin
   update public.attachments
-     set deleted_at = coalesce(deleted_at, now())
-   where message_id is null
-     and created_at < now() - older_than
-     and deleted_at is null
-  returning attachments.storage_path;
+     set storage_deleted_at = coalesce(storage_deleted_at, now())
+   where storage_path = any(storage_paths)
+     and deleted_at is not null;
+
+  get diagnostics updated_count = row_count;
+  return updated_count;
+end;
 $$;
 
 create or replace function public.delete_orphaned_attachment_rows(
@@ -127,6 +165,8 @@ end;
 $$;
 
 grant execute on function public.delete_old_orphaned_attachments(interval)
+  to authenticated;
+grant execute on function public.mark_attachment_storage_deleted(text[])
   to authenticated;
 grant execute on function public.delete_orphaned_attachment_rows(interval)
   to authenticated;

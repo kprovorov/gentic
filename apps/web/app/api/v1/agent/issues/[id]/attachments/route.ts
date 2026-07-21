@@ -26,6 +26,7 @@ export async function GET(
       .select("id,file_name,content_type,size_bytes,storage_path")
       .eq("issue_id", id)
       .is("deleted_at", null)
+      .not("upload_completed_at", "is", null)
       .order("created_at", { ascending: true })
 
     if (messageId) {

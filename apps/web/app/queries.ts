@@ -206,7 +206,7 @@ export async function getIssueDetailData(
     supabase
       .from("messages")
       .select(
-        "id,role,kind,content,status,created_at,attachments(id,file_name,content_type,size_bytes,storage_path,deleted_at)"
+        "id,role,kind,content,status,created_at,attachments(id,file_name,content_type,size_bytes,storage_path,upload_completed_at,deleted_at)"
       )
       .eq("issue_id", id)
       .order("created_at", { ascending: true })
@@ -219,6 +219,7 @@ export async function getIssueDetailData(
               content_type: string | null
               size_bytes: number | null
               storage_path: string
+              upload_completed_at: string | null
               deleted_at: string | null
             }>
           }
@@ -226,9 +227,12 @@ export async function getIssueDetailData(
       >(),
     supabase
       .from("attachments")
-      .select("id,file_name,content_type,size_bytes,storage_path,deleted_at")
+      .select(
+        "id,file_name,content_type,size_bytes,storage_path,upload_completed_at,deleted_at"
+      )
       .eq("issue_id", id)
       .is("deleted_at", null)
+      .not("upload_completed_at", "is", null)
       .order("created_at", { ascending: true })
       .returns<
         Array<{
@@ -237,6 +241,7 @@ export async function getIssueDetailData(
           content_type: string | null
           size_bytes: number | null
           storage_path: string
+          upload_completed_at: string | null
           deleted_at: string | null
         }>
       >(),
@@ -256,9 +261,13 @@ export async function getIssueDetailData(
     (messages ?? []).map(async (message) => ({
       ...message,
       attachments: await Promise.all(
-        (message.attachments ?? []).map((attachment) =>
-          signAttachment(supabase, attachment)
-        )
+        (message.attachments ?? [])
+          .filter(
+            (attachment) =>
+              attachment.upload_completed_at !== null ||
+              attachment.deleted_at !== null
+          )
+          .map((attachment) => signAttachment(supabase, attachment))
       ),
     }))
   )
@@ -285,6 +294,7 @@ async function signAttachment(
     content_type: string | null
     size_bytes: number | null
     storage_path: string
+    upload_completed_at: string | null
     deleted_at: string | null
   }
 ): Promise<Attachment> {

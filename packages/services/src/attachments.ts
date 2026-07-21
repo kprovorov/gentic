@@ -54,8 +54,12 @@ export async function rollbackMessageAttachmentUpload(
   let storageDeletedAt: string | null = null
 
   if (storagePaths.length > 0) {
-    await ops.removeStorageObjects(storagePaths)
-    storageDeletedAt = new Date().toISOString()
+    try {
+      await ops.removeStorageObjects(storagePaths)
+      storageDeletedAt = new Date().toISOString()
+    } catch {
+      storageDeletedAt = null
+    }
   }
 
   if (attachmentIds.length > 0) {

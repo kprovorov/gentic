@@ -79,6 +79,40 @@ test("rollbackMessageAttachmentUpload removes blobs, marks rows, then deletes me
   ])
 })
 
+test("rollbackMessageAttachmentUpload still marks rows and deletes message when blob cleanup fails", async () => {
+  const calls: string[] = []
+
+  await rollbackMessageAttachmentUpload(
+    {
+      async listAttachments() {
+        calls.push("list")
+        return [{ id: "att-1", storage_path: "issue/msg/file.txt" }]
+      },
+      async removeStorageObjects() {
+        calls.push("remove")
+        throw new Error("storage unavailable")
+      },
+      async markAttachmentsDeleted(ids, storageDeletedAt) {
+        calls.push(
+          `mark:${ids.join(",")}:${storageDeletedAt ? "deleted" : "missing"}`
+        )
+      },
+      async deleteMessage() {
+        calls.push("delete-message")
+      },
+    },
+    "issue-1",
+    "message-1"
+  )
+
+  assert.deepEqual(calls, [
+    "list",
+    "remove",
+    "mark:att-1:missing",
+    "delete-message",
+  ])
+})
+
 test("rollbackMessageAttachmentUpload deletes failed messages with no attachment rows", async () => {
   const calls: string[] = []
 
