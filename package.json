@@ -1,6 +1,6 @@
 {
   "name": "gentic",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A tool for creating coding tasks, assigning them to agents, and tracking generated pull requests.",
   "type": "module",
   "private": true,

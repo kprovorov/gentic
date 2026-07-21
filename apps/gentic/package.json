@@ -1,6 +1,6 @@
 {
   "name": "@gentic/gentic",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Gentic agent: runs coding agents over the Agent Client Protocol for queued issues.",
   "type": "module",
   "private": true,
