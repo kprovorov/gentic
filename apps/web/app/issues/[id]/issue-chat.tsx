@@ -202,6 +202,13 @@ type DisplayItem =
   | { kind: "message"; key: string; message: ChatMessage }
   | { kind: "tool-group"; key: string; messages: ChatMessage[] }
 
+// The available-commands event exists only to feed the slash-command
+// autocomplete (see slashCommandsFromMessages) — it's not conversational
+// content, so it's excluded from the visible transcript.
+function isVisibleChatMessage(message: ChatMessage): boolean {
+  return message.event_type !== "available_commands"
+}
+
 // Consecutive tool-call messages are collapsed into one group so a long
 // sequence of tool invocations doesn't dominate the transcript.
 function groupChatMessages(messages: ChatMessage[]): DisplayItem[] {
@@ -217,6 +224,9 @@ function groupChatMessages(messages: ChatMessage[]): DisplayItem[] {
   }
 
   for (const message of messages) {
+    if (!isVisibleChatMessage(message)) {
+      continue
+    }
     if (message.kind === "tool") {
       toolRun.push(message)
       continue
@@ -810,7 +820,7 @@ export function IssueChat({
         <MessageScroller className="h-[28rem] max-h-[28rem]">
           <MessageScrollerViewport className="pr-1">
             <MessageScrollerContent className="gap-3">
-              {displayedMessages.length === 0 ? (
+              {displayItems.length === 0 ? (
                 <MessageScrollerItem messageId="empty">
                   <Marker variant="border">
                     <MarkerContent>
