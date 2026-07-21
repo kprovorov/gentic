@@ -86,18 +86,22 @@ export async function POST(
       .rpc("insert_run_message", {
         p_issue_id: id,
         p_run_id: fields.run_id,
-        p_message_id: fields.id ?? null,
         p_role: fields.role,
-        p_kind: fields.kind ?? null,
         p_content: fields.content,
-        p_status: fields.status ?? null,
-        p_event_id: fields.event_id ?? null,
-        p_event_type: fields.event_type ?? null,
-        p_event_status: fields.event_status ?? null,
-        p_event_ts: fields.event_ts ?? null,
-        p_event_seq: fields.event_seq ?? null,
-        p_tool_call_id: fields.tool_call_id ?? null,
-        p_payload: (fields.payload ?? null) as Json,
+        ...(fields.id ? { p_message_id: fields.id } : {}),
+        ...(fields.kind ? { p_kind: fields.kind } : {}),
+        ...(fields.status ? { p_status: fields.status } : {}),
+        ...(fields.event_id ? { p_event_id: fields.event_id } : {}),
+        ...(fields.event_type ? { p_event_type: fields.event_type } : {}),
+        ...(fields.event_status
+          ? { p_event_status: fields.event_status }
+          : {}),
+        ...(fields.event_ts ? { p_event_ts: fields.event_ts } : {}),
+        ...(fields.event_seq ? { p_event_seq: fields.event_seq } : {}),
+        ...(fields.tool_call_id
+          ? { p_tool_call_id: fields.tool_call_id }
+          : {}),
+        ...(fields.payload ? { p_payload: fields.payload as Json } : {}),
       })
       .single<string>()
 

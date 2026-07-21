@@ -414,11 +414,7 @@ export type Database = {
     }
     Functions: {
       ack_issue_run_messages: {
-        Args: {
-          p_issue_id: string
-          p_message_ids: string[]
-          p_run_id: string
-        }
+        Args: { p_issue_id: string; p_message_ids: string[]; p_run_id: string }
         Returns: boolean
       }
       claim_issue_run: {
@@ -427,10 +423,10 @@ export type Database = {
           active_run_id: string
           agent_provider: string
           id: string
-          pr_url: string | null
+          pr_url: string
           repo: string
-          session_id: string | null
-          setup_script: string | null
+          session_id: string
+          setup_script: string
         }[]
       }
       delete_old_orphaned_attachments: {
@@ -443,25 +439,6 @@ export type Database = {
         Args: { older_than?: string }
         Returns: number
       }
-      insert_run_message: {
-        Args: {
-          p_content: string
-          p_event_id?: string | null
-          p_event_seq?: number | null
-          p_event_status?: string | null
-          p_event_ts?: string | null
-          p_event_type?: string | null
-          p_issue_id: string
-          p_kind: string | null
-          p_message_id: string | null
-          p_payload?: Json | null
-          p_role: string
-          p_run_id: string
-          p_status: string | null
-          p_tool_call_id?: string | null
-        }
-        Returns: string
-      }
       finish_issue_run_if_no_pending: {
         Args: {
           p_issue_id: string
@@ -471,6 +448,25 @@ export type Database = {
           p_status: string
         }
         Returns: boolean
+      }
+      insert_run_message: {
+        Args: {
+          p_content: string
+          p_event_id?: string
+          p_event_seq?: number
+          p_event_status?: string
+          p_event_ts?: string
+          p_event_type?: string
+          p_issue_id: string
+          p_kind?: string
+          p_message_id?: string
+          p_payload?: Json
+          p_role: string
+          p_run_id: string
+          p_status?: string
+          p_tool_call_id?: string
+        }
+        Returns: string
       }
       mark_attachment_storage_deleted: {
         Args: { storage_paths: string[] }
@@ -496,11 +492,7 @@ export type Database = {
         Returns: undefined
       }
       touch_issue_run: {
-        Args: {
-          p_issue_id: string
-          p_lease_seconds?: number
-          p_run_id: string
-        }
+        Args: { p_issue_id: string; p_lease_seconds?: number; p_run_id: string }
         Returns: boolean
       }
     }
