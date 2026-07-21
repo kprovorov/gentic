@@ -206,6 +206,7 @@ export function IssueChat({
   const [activeRunId, setActiveRunId] = useState<string | null>(
     initialActiveRunId
   )
+  const activeRunIdRef = useRef<string | null>(initialActiveRunId)
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
   )
@@ -291,6 +292,11 @@ export function IssueChat({
   })
 
   const supabase = useSupabaseClient()
+
+  useEffect(() => {
+    activeRunIdRef.current = activeRunId
+  }, [activeRunId])
+
   const isOptimisticRetryReset = initialMessages.some((message) =>
     message.id.startsWith("optimistic-retry-")
   )
@@ -465,7 +471,7 @@ export function IssueChat({
             if (!event.success) {
               return
             }
-            if (event.data.run_id !== activeRunId) {
+            if (event.data.run_id !== activeRunIdRef.current) {
               return
             }
             const lastSeq = messageSeqRef.current.get(event.data.id) ?? 0
@@ -493,7 +499,7 @@ export function IssueChat({
             if (!event.success) {
               return
             }
-            if (event.data.run_id !== activeRunId) {
+            if (event.data.run_id !== activeRunIdRef.current) {
               return
             }
             setStatus(event.data.status)
@@ -518,7 +524,7 @@ export function IssueChat({
         void supabase.removeChannel(channel)
       }
     }
-  }, [supabase, issueId, activeRunId])
+  }, [supabase, issueId])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
