@@ -11,6 +11,7 @@ import {
   type ClaimedIssue,
   type FinishRunFields,
   type InsertMessageInput,
+  type RealtimeRunStateStatus,
   type RealtimeTokenResponse,
   type RunStateFields,
   type UserMessage,
@@ -23,15 +24,21 @@ export type {
   ClaimedIssue,
   FinishRunFields,
   InsertMessageInput,
+  RealtimeRunStateStatus,
   RealtimeTokenResponse,
   RunStateFields,
   UserMessage,
 } from "@gentic/validators/agent"
 
+export type FinishRunResult = {
+  finished: boolean
+  status: RealtimeRunStateStatus
+}
+
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
   setRunState(issueId: string, fields: RunStateFields): Promise<void>
-  finishRun(issueId: string, fields: FinishRunFields): Promise<boolean>
+  finishRun(issueId: string, fields: FinishRunFields): Promise<FinishRunResult>
   insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
   fetchPendingUserMessages(issueId: string): Promise<UserMessage[]>
   ackUserMessages(
@@ -114,7 +121,7 @@ export function createAgentApi(input: {
           body: { ...fields, finish_if_no_pending: true },
         }
       )
-      return data.finished
+      return { finished: data.finished, status: data.status ?? fields.status }
     },
     async insertMessage(issueId, message) {
       const data = await request(

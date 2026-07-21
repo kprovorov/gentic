@@ -213,12 +213,15 @@ export async function processIssue(
     })
 
     const prUrl = await deps.getPullRequestUrl(dir)
-    const finished = await api.finishRun(issue.id, {
-      active_run_id: issue.activeRunId,
-      status: prUrl ? "ready-for-review" : "waiting-for-input",
-      run_finished_at: new Date().toISOString(),
-      ...(prUrl ? { pr_url: prUrl } : {}),
-    })
+    const { finished, status: finishedStatus } = await api.finishRun(
+      issue.id,
+      {
+        active_run_id: issue.activeRunId,
+        status: prUrl ? "ready-for-review" : "waiting-for-input",
+        run_finished_at: new Date().toISOString(),
+        ...(prUrl ? { pr_url: prUrl } : {}),
+      }
+    )
     if (!finished) {
       logInfo(
         `issue ${issue.id} received more prompts before finish; re-queueing`
@@ -238,7 +241,7 @@ export async function processIssue(
     }
     if (channel) {
       await channel.publishRunState({
-        status: prUrl ? "ready-for-review" : "waiting-for-input",
+        status: finishedStatus,
         pr_url: prUrl ?? null,
         usage_limit_reset_at: null,
         run_error: null,

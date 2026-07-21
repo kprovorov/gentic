@@ -1,4 +1,7 @@
 import * as issuesService from "@gentic/services/issues"
+import type { IssueStatus } from "@gentic/validators/issues"
+
+import { resolvePrFinishStatus } from "@/lib/ci-status"
 
 import {
   ensureIssueOwned,
@@ -28,6 +31,24 @@ export async function PATCH(
       "finish_if_no_pending" in body
     ) {
       const fields = finishRunSchema.parse(body)
+
+      // `finish_issue_run_if_no_pending` only accepts the two statuses a
+      // run can natively finish into. CI-gating resolves to a status the RPC
+      // doesn't know about (`testing`), so it's applied as a guarded
+      // follow-up update rather than widening the RPC's allow-list.
+      let status: IssueStatus = fields.status
+      if (status === "ready-for-review" && fields.pr_url) {
+        const repo = await issuesService.getIssueRepo(supabase, id)
+        if (repo) {
+          status = await resolvePrFinishStatus(
+            supabase,
+            userId,
+            repo,
+            fields.pr_url
+          )
+        }
+      }
+
       const { data, error } = await supabase
         .rpc("finish_issue_run_if_no_pending", {
           p_issue_id: id,
@@ -46,7 +67,15 @@ export async function PATCH(
         await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
       }
 
-      return json({ finished: data ?? false })
+      if (data && status !== fields.status) {
+        await supabase
+          .from("issues")
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("status", fields.status)
+      }
+
+      return json({ finished: data ?? false, status })
     }
 
     const fields = runStateSchema.parse(body)

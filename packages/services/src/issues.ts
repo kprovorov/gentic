@@ -24,10 +24,12 @@ export {
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export {
   attachIssuePullRequest,
+  getIssueRepo,
   resetIssueAgent,
   updateIssueAgentProvider,
   updateIssueStatus,
   updateIssueStatusByPrUrl,
+  updateIssueStatusByPrUrlIfStatus,
 } from "./issues/workflow"
 export {
   applyChangesRequestedReview,

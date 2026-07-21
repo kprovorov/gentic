@@ -131,3 +131,69 @@ export async function fetchPullRequestReviewComments(
     body: comment.body,
   }))
 }
+
+export async function fetchPullRequestHeadSha(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<string> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch pull request (${response.status})`)
+  }
+
+  const data = (await response.json()) as { head: { sha: string } }
+
+  return data.head.sha
+}
+
+export type GithubCheckSuite = {
+  status: string
+  conclusion: string | null
+}
+
+export async function fetchCheckSuitesForRef(
+  installationId: string,
+  owner: string,
+  repo: string,
+  ref: string
+): Promise<GithubCheckSuite[]> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${ref}/check-suites`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch check suites (${response.status})`)
+  }
+
+  const data = (await response.json()) as {
+    check_suites: { status: string; conclusion: string | null }[]
+  }
+
+  return data.check_suites.map((suite) => ({
+    status: suite.status,
+    conclusion: suite.conclusion,
+  }))
+}

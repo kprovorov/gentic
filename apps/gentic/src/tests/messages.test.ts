@@ -395,7 +395,7 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     },
     async setRunState() {},
     async finishRun() {
-      return true
+      return { finished: true, status: "waiting-for-input" }
     },
     async insertMessage(issueId, message) {
       api.insertAttempts += 1

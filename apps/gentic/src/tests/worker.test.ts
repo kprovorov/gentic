@@ -312,14 +312,14 @@ class FakeApi implements AgentApi {
       status: "ready-for-review" | "waiting-for-input"
       run_finished_at: string
     }
-  ): Promise<boolean> {
+  ): Promise<{ finished: boolean; status: typeof fields.status }> {
     this.finishAttempts += 1
     this.onFinishAttempt?.(this.finishAttempts)
     const result = this.finishResults.shift() ?? true
     if (result) {
       this.finishedStatuses.push(fields.status)
     }
-    return result
+    return { finished: result, status: fields.status }
   }
 
   async insertMessage(): Promise<string> {

@@ -86,7 +86,12 @@ export const realtimeRunStateStatusSchema = issueStatusSchema.extract([
   "run-failed",
   "ready-for-review",
   "waiting-for-input",
+  "testing",
 ])
+
+export type RealtimeRunStateStatus = z.infer<
+  typeof realtimeRunStateStatusSchema
+>
 
 // Worker -> browser: mirror of the run-state PATCH, for instant UI updates.
 export const runStateEventSchema = z.object({

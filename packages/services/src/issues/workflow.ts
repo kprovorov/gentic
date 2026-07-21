@@ -159,6 +159,70 @@ export async function updateIssueStatusByPrUrl(
   )
 }
 
+// Called from the run-state route (trusted server code) right before it
+// decides whether a freshly reported PR needs a CI check before going to
+// `ready-for-review`. No RLS concern here since the issue was already
+// ownership-checked earlier in the same request.
+export async function getIssueRepo(
+  supabase: Supabase,
+  issueId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("issues")
+    .select("projects!inner(repo)")
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data?.projects.repo ?? null
+}
+
+// Like `updateIssueStatusByPrUrl`, but only applies when the issue is
+// currently in `fromStatus`. Used by the `check_suite` webhook handler so a
+// CI result doesn't clobber a status the issue has since moved past (e.g. the
+// user already requested changes or merged the PR before CI finished).
+export async function updateIssueStatusByPrUrlIfStatus(
+  supabase: Supabase,
+  prUrl: string,
+  fromStatus: IssueStatus,
+  status: IssueStatus
+) {
+  const { data: pullRequest, error: pullRequestError } = await supabase
+    .from("issue_pull_requests")
+    .select("issue_id")
+    .eq("url", prUrl)
+    .maybeSingle()
+
+  if (pullRequestError) {
+    throw new ServiceError("internal", pullRequestError.message)
+  }
+
+  if (pullRequest) {
+    return unwrap(
+      await supabase
+        .from("issues")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", pullRequest.issue_id)
+        .eq("status", fromStatus)
+        .select("id")
+        .maybeSingle()
+    )
+  }
+
+  return unwrap(
+    await supabase
+      .from("issues")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("pr_url", prUrl)
+      .eq("status", fromStatus)
+      .select("id")
+      .maybeSingle()
+  )
+}
+
 export async function attachIssuePullRequest(
   supabase: Supabase,
   issueId: string,
