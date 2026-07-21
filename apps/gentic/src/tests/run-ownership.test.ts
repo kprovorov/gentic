@@ -62,6 +62,10 @@ test("run ownership migration guards overlapping claims and stale writes", () =>
 
   assert.match(sql, /create table public\.issue_runs/)
   assert.match(sql, /active_run_id uuid references public\.issue_runs/)
+  assert.match(
+    sql,
+    /create or replace function public\.patch_issue_run_state\(\s*p_issue_id uuid,\s*p_run_id uuid,\s*p_fields jsonb\s*\)/
+  )
   assert.match(sql, /for update of i skip locked/)
   assert.match(
     sql,
