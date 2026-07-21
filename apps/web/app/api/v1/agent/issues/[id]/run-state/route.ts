@@ -1,4 +1,7 @@
 import * as issuesService from "@gentic/services/issues"
+import type { IssueStatus } from "@gentic/validators/issues"
+
+import { resolvePrFinishStatus } from "@/lib/ci-status"
 
 import {
   ensureIssueOwned,
@@ -28,11 +31,25 @@ export async function PATCH(
       "finish_if_no_pending" in body
     ) {
       const fields = finishRunSchema.parse(body)
+
+      let status: IssueStatus = fields.status
+      if (status === "ready-for-review" && fields.pr_url) {
+        const repo = await issuesService.getIssueRepo(supabase, id)
+        if (repo) {
+          status = await resolvePrFinishStatus(
+            supabase,
+            userId,
+            repo,
+            fields.pr_url
+          )
+        }
+      }
+
       const { data, error } = await supabase
         .rpc("finish_issue_run_if_no_pending", {
           p_issue_id: id,
           p_run_id: fields.active_run_id,
-          p_status: fields.status,
+          p_status: status,
           p_run_finished_at: fields.run_finished_at,
           p_pr_url: fields.pr_url ?? undefined,
         })
@@ -46,7 +63,7 @@ export async function PATCH(
         await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
       }
 
-      return json({ finished: data ?? false })
+      return json({ finished: data ?? false, status })
     }
 
     const fields = runStateSchema.parse(body)

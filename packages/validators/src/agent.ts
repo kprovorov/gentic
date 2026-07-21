@@ -10,6 +10,8 @@ import {
 import { agentProviderSchema } from "./issues.js"
 import { realtimeRunStateStatusSchema } from "./realtime.js"
 
+export type { RealtimeRunStateStatus } from "./realtime.js"
+
 export const claimedIssueSchema = z.object({
   id: z.string().uuid(),
   activeRunId: z.string().uuid(),
@@ -62,6 +64,7 @@ export const okResponseSchema = z.object({
 
 export const finishRunResponseSchema = z.object({
   finished: z.boolean(),
+  status: realtimeRunStateStatusSchema.optional(),
 })
 
 export const ackMessagesInputSchema = z.object({

@@ -14,7 +14,7 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
     },
     async setRunState() {},
     async finishRun() {
-      return true
+      return { finished: true, status: "waiting-for-input" }
     },
     async insertMessage() {
       return "message"
