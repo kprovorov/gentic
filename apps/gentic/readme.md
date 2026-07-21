@@ -49,6 +49,7 @@ GENTIC_API_URL=https://gentic.chat/api/v1
 GENTIC_API_KEY=your-user-clerk-api-key
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
+MAX_CONCURRENT_ISSUES=1
 ```
 
 For local web app development, `GENTIC_API_URL` can stay as
@@ -63,6 +64,11 @@ checkout.
 `GIT_REMOTE_BASE` is prepended to each project repo stored in Supabase. For a
 project repo of `owner/repo` and the default base of `git@github.com:`, the
 agent clones `git@github.com:owner/repo`.
+
+`MAX_CONCURRENT_ISSUES` controls how many issues this worker processes at the
+same time. It defaults to `1`. Each active issue uses a separate clone and
+realtime channel, so raise it only when the host and agent-provider limits can
+support the additional work.
 
 `GENTIC_API_KEY` must be a user-scoped Clerk API key. The hosted Gentic API
 verifies it, identifies the Clerk user, and only returns or mutates issues whose
@@ -235,8 +241,9 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
 
 ## Source layout
 
-- `src/worker.ts` — worker entrypoint. Polls the Gentic API, claims one todo issue at
-  a time, clones its repo, and drives an agent session per issue.
+- `src/worker.ts` — worker entrypoint. Polls the Gentic API, claims todo issues up
+  to the configured concurrency limit, clones each repo, and drives an agent
+  session per issue.
 - `src/session.ts` — spawns Claude Code or Codex over the Agent Client Protocol and
   streams assistant output into the issue transcript, one prompt turn per user
   message. Appends an instruction to the agent's prompt or system prompt so every

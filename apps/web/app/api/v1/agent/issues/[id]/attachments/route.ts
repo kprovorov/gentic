@@ -35,15 +35,7 @@ export async function GET(
       query = query.is("message_id", null)
     }
 
-    const { data, error } = await query.returns<
-      Array<{
-        id: string
-        file_name: string
-        content_type: string | null
-        size_bytes: number | null
-        storage_path: string
-      }>
-    >()
+    const { data, error } = await query
 
     if (error) {
       throw new Error(error.message)

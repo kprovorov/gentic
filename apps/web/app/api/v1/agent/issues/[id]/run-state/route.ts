@@ -2,6 +2,7 @@ import * as issuesService from "@gentic/services/issues"
 
 import {
   ensureIssueOwned,
+  finishRunSchema,
   getAgentContext,
   handleAgentError,
   json,
@@ -16,11 +17,39 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const fields = runStateSchema.parse(await request.json())
+    const body = await request.json()
     const { supabase, userId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
 
+    if (
+      body &&
+      typeof body === "object" &&
+      "finish_if_no_pending" in body
+    ) {
+      const fields = finishRunSchema.parse(body)
+      const { data, error } = await supabase
+        .rpc("finish_issue_run_if_no_pending", {
+          p_issue_id: id,
+          p_run_id: fields.active_run_id,
+          p_status: fields.status,
+          p_run_finished_at: fields.run_finished_at,
+          p_pr_url: fields.pr_url ?? undefined,
+        })
+        .single<boolean>()
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      if (data && fields.pr_url) {
+        await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
+      }
+
+      return json({ finished: data ?? false })
+    }
+
+    const fields = runStateSchema.parse(body)
     const { error } = await supabase
       .from("issues")
       .update({

@@ -1,0 +1,76 @@
+---
+title: "Gentic MCP Server: Connect from Claude Desktop and Cursor"
+sidebarTitle: "Overview"
+description: "Gentic's MCP server lets Claude Desktop, Cursor, and other MCP-compatible clients create issues, manage projects, and trigger agent runs from your AI tool."
+---
+
+Gentic exposes a Model Context Protocol (MCP) server that makes your entire project and issue workflow available to any MCP-compatible AI assistant. Instead of switching between your AI tool and the Gentic dashboard, you can ask your assistant to create a bug report, update a project, or queue an agent run — and it will call Gentic's API on your behalf in real time.
+
+## MCP endpoint
+
+Point your MCP client at the following URL:
+
+```
+https://gentic.chat/mcp
+```
+
+This single endpoint supports all 12 Gentic tools, covering account inspection, project management, and the full issue lifecycle.
+
+<Note>
+  The MCP server uses **OAuth 2.0** for authentication. The first time your client connects, it will redirect you to gentic.chat so you can authorize access with your Gentic account. No API keys or manual token setup is required.
+</Note>
+
+## Connect Claude Desktop
+
+Claude Desktop reads MCP server configuration from a JSON file. Add the `gentic` entry to your `claude_desktop_config.json`:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "gentic": {
+      "url": "https://gentic.chat/mcp"
+    }
+  }
+}
+```
+
+After saving the file and restarting Claude Desktop, Claude will prompt you to authorize the connection through your Gentic account. Once authorized, all Gentic tools are available in your conversation.
+
+## Connect other MCP clients
+
+Any MCP-compatible client that accepts a server URL — including Cursor, Continue, and custom MCP hosts — can connect using the same endpoint. Consult your client's documentation for where to add a new MCP server entry, then supply `https://gentic.chat/mcp` as the URL.
+
+## What you can do after connecting
+
+Once connected, your AI assistant can:
+
+<CardGroup cols={2}>
+  <Card title="Manage projects" icon="folder">
+    List, create, update, and delete Gentic projects linked to your GitHub repositories.
+  </Card>
+  <Card title="Create and update issues" icon="circle-dot">
+    Create bug reports, feature requests, and ideas with titles and agent instructions.
+  </Card>
+  <Card title="Control issue workflow" icon="arrow-right-arrow-left">
+    Move issues through every workflow status, from draft all the way to completed.
+  </Card>
+  <Card title="Trigger agent runs" icon="robot">
+    Transition an issue from `draft` to `todo` to queue a background AI coding agent run immediately.
+  </Card>
+</CardGroup>
+
+## Example: create a bug report and queue an agent run
+
+You do not need to open the Gentic dashboard at all. Ask your assistant something like:
+
+> "Create a bug issue for the login project titled 'Fix null pointer in auth' with the prompt 'The login endpoint throws NPE when email is missing — add input validation.' Then move it to todo."
+
+Your assistant will call `create_issue` to create the issue in draft state, then call `update_issue_status` to move it to `todo`, which queues a background agent run automatically.
+
+<Tip>
+  Start issues in `draft` status while you refine the title and prompt. Move to `todo` only when you are ready for the agent to begin work — that transition is what triggers the run.
+</Tip>
+
+## Available tools
+
+See the [Tools reference](/mcp/tools) for a complete list of all 12 MCP tools, their parameters, and example usage.

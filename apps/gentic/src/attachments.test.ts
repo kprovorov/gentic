@@ -13,12 +13,16 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
       return null
     },
     async setRunState() {},
+    async finishRun() {
+      return true
+    },
     async insertMessage() {
       return "message"
     },
-    async fetchUserMessagesAfter() {
+    async fetchPendingUserMessages() {
       return []
     },
+    async ackUserMessages() {},
     async fetchAttachments(_issueId: string, messageId: string) {
       return byMessageId[messageId] ?? []
     },

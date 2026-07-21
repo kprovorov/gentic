@@ -3,8 +3,8 @@
   "compilerOptions": {
     "types": ["node"],
     "noEmit": false,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "rootDir": "src",
     "outDir": "dist"
   },

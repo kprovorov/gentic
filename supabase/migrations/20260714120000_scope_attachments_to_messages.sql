@@ -100,6 +100,41 @@ alter table public.attachments
   check (size_bytes is null or size_bytes <= 26214400)
   not valid;
 
+create or replace function public.start_issue_from_draft(p_issue_id uuid)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_prompt text;
+begin
+  update public.issues
+  set
+    status = 'todo',
+    usage_limit_reset_at = null,
+    updated_at = now()
+  where id = p_issue_id
+    and status = 'draft'
+  returning prompt into v_prompt;
+
+  if not found then
+    raise exception 'Issue is not a draft or was not found'
+      using errcode = 'P0002';
+  end if;
+
+  if not exists (
+    select 1
+      from public.messages
+     where messages.issue_id = p_issue_id
+       and messages.role = 'user'
+  ) then
+    insert into public.messages(issue_id, role, content)
+    values (p_issue_id, 'user', coalesce(v_prompt, ''));
+  end if;
+end;
+$$;
+
 create or replace function public.delete_old_orphaned_attachments(
   older_than interval default interval '1 day'
 )

@@ -81,7 +81,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     )
 
     if (status === "todo") {
-      await issuesService.updateIssueStatus(supabase, userId, created.id, "todo")
+      await issuesService.startIssueFromDraft(supabase, userId, created.id)
     }
   } catch (error) {
     if (message) {
