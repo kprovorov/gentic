@@ -1,6 +1,6 @@
 {
   "name": "gentic",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A tool for creating coding tasks, assigning them to agents, and tracking generated pull requests.",
   "type": "module",
   "private": true,
@@ -10,8 +10,11 @@
     "build": "turbo build",
     "start": "turbo start",
     "lint": "turbo lint",
+    "test": "turbo test",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:types": "bash scripts/generate-supabase-types.sh",
+    "db:types:check": "bash scripts/check-supabase-types.sh"
   },
   "devDependencies": {
     "turbo": "^2.10.2"

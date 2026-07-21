@@ -14,13 +14,37 @@ import {
 } from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
+import { createPendingMessagePromptSource } from "./pending-messages.js"
 import {
   connectIssueChannel,
   type IssueRealtimeChannel,
-  type RealtimeUserMessageEvent,
 } from "./realtime.js"
-import { runAgentSession, type PromptTurn } from "./session.js"
+import { runAgentSession } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
+
+export interface ProcessIssueDeps {
+  connectIssueChannel: typeof connectIssueChannel
+  cloneRepo: typeof cloneRepo
+  checkoutPullRequest: typeof checkoutPullRequest
+  hasLocalCheckout: typeof hasLocalCheckout
+  runSetupScript: typeof runSetupScript
+  setRunState: typeof setRunState
+  buildAttachmentBlocks: typeof buildAttachmentBlocks
+  runAgentSession: typeof runAgentSession
+  getPullRequestUrl: typeof getPullRequestUrl
+}
+
+const defaultProcessIssueDeps: ProcessIssueDeps = {
+  connectIssueChannel,
+  cloneRepo,
+  checkoutPullRequest,
+  hasLocalCheckout,
+  runSetupScript,
+  setRunState,
+  buildAttachmentBlocks,
+  runAgentSession,
+  getPullRequestUrl,
+}
 
 const HEARTBEAT_INTERVAL_MS = 30_000
 
@@ -78,7 +102,7 @@ export async function runWorker(): Promise<void> {
       })
     activeRuns.add(run)
     logInfo(
-      `issue ${issue.id} run ${issue.runId} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      `issue ${issue.id} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
     )
   }
 
@@ -90,13 +114,11 @@ export async function runWorker(): Promise<void> {
   logInfo("worker stopped")
 }
 
-/** One pending user follow-up, queued for the next prompt turn. */
-type QueuedMessage = { id: string; content: string; created_at: string }
-
-async function processIssue(
+export async function processIssue(
   api: AgentApi,
   config: Config,
-  issue: ClaimedIssue
+  issue: ClaimedIssue,
+  deps: ProcessIssueDeps = defaultProcessIssueDeps
 ): Promise<void> {
   const dir = join(config.WORKDIR, issue.id)
   // Sibling of the repo clone, not inside it, so downloaded attachments can
@@ -104,54 +126,47 @@ async function processIssue(
   const attachmentsDir = join(config.WORKDIR, `${issue.id}-attachments`)
 
   let channel: IssueRealtimeChannel | null = null
-  const heartbeat = startHeartbeat(api, issue)
+  let currentSessionId = issue.sessionId
+  let stopHeartbeat: (() => void) | null = null
 
   try {
-    // Push queue for user follow-ups, ordered by `created_at`. Fed by two
-    // sources deduped by message id: a one-shot REST backlog fetch below,
-    // and live `user_message` broadcast events for the rest of the run.
-    const seenMessageIds = new Set<string>()
-    const queue: QueuedMessage[] = []
-    let queueWaiter: (() => void) | null = null
+    stopHeartbeat = startHeartbeat(api, issue)
+    const promptSource = createPendingMessagePromptSource({
+      api,
+      issueId: issue.id,
+      runId: issue.activeRunId,
+      pollIntervalMs: config.POLL_INTERVAL_MS,
+      buildPrompt: async (message) => {
+        const attachmentBlocks = await deps.buildAttachmentBlocks(
+          api,
+          issue.id,
+          message.id,
+          attachmentsDir
+        )
+        if (attachmentBlocks.length > 0) {
+          return [{ type: "text", text: message.content }, ...attachmentBlocks]
+        }
+        return message.content
+      },
+      onFetchError: (error) => {
+        logError(
+          `failed to fetch pending messages for issue ${issue.id}:`,
+          describe(error)
+        )
+      },
+    })
 
-    const enqueue = (message: {
-      id: string
-      content: string | null
-      created_at: string
-    }): void => {
-      if (seenMessageIds.has(message.id)) {
-        return
-      }
-      seenMessageIds.add(message.id)
-      const entry: QueuedMessage = {
-        id: message.id,
-        content: message.content ?? "",
-        created_at: message.created_at,
-      }
-      const index = queue.findIndex(
-        (existing) => existing.created_at > entry.created_at
-      )
-      if (index === -1) {
-        queue.push(entry)
-      } else {
-        queue.splice(index, 0, entry)
-      }
-      if (queueWaiter) {
-        const resolve = queueWaiter
-        queueWaiter = null
-        resolve()
-      }
-    }
-
-    // Join the channel before doing anything else, so no follow-up sent
-    // from here on is missed between the seed fetch below and going live.
-    // A join failure fails the run like any other startup error — no
-    // silent REST fallback in this phase.
-    channel = await connectIssueChannel(
+    channel = await deps.connectIssueChannel(
       api,
       issue.id,
-      (event: RealtimeUserMessageEvent) => enqueue(event)
-    )
+      promptSource.wake
+    ).catch((error) => {
+      logError(
+        `issue ${issue.id} realtime unavailable; continuing with database polling:`,
+        describe(error)
+      )
+      return createNoopIssueChannel()
+    })
 
     await rm(attachmentsDir, { recursive: true, force: true })
 
@@ -164,103 +179,81 @@ async function processIssue(
     // new run (no session yet) or when no local checkout survived (e.g. a
     // different worker machine claimed this follow-up).
     const resumingLocalCheckout =
-      Boolean(issue.sessionId) && hasLocalCheckout(dir)
+      Boolean(issue.sessionId) && deps.hasLocalCheckout(dir)
     if (!resumingLocalCheckout) {
-      await cloneRepo({
+      await deps.cloneRepo({
         remoteBase: config.GIT_REMOTE_BASE,
         repo: issue.repo,
         dir,
       })
 
       if (issue.prUrl) {
-        await checkoutPullRequest({ prUrl: issue.prUrl, dir })
+        await deps.checkoutPullRequest({ prUrl: issue.prUrl, dir })
       }
     }
 
     if (issue.setupScript) {
-      await runSetupScript({ script: issue.setupScript, dir })
+      await deps.runSetupScript({ script: issue.setupScript, dir })
     }
 
-    await setRunState(api, channel, issue.id, issue.runId, {
+    await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
       status: "in-progress",
     })
 
-    // Seed the queue with follow-ups sent before the channel connected
-    // (including the issue's initial prompt). When resuming a session that
-    // already consumed messages, start the cursor at that run's end so they
-    // aren't replayed. A session-less retry (e.g. clone failed before the
-    // agent started) has consumed nothing, so it replays from the beginning.
-    const seedCursor =
-      issue.sessionId && issue.runFinishedAt
-        ? issue.runFinishedAt
-        : new Date(0).toISOString()
-    const backlog = await api.fetchUserMessagesAfter(issue.id, seedCursor)
-    for (const message of backlog) {
-      enqueue(message)
-    }
-
-    const waitForQueueOrTimeout = (ms: number): Promise<void> =>
-      new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          queueWaiter = null
-          resolve()
-        }, ms)
-        queueWaiter = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-      })
-
-    // Feed user messages to the session oldest-first. Follow-ups pushed while
-    // the agent is working are picked up after the current turn; once the
-    // transcript is quiet for one poll interval the session ends.
-    let idleChecked = false
-    const nextPrompt = async (): Promise<PromptTurn | null> => {
-      for (;;) {
-        const next = queue.shift()
-        if (next) {
-          idleChecked = false
-          const content = next.content
-          const attachmentBlocks = await buildAttachmentBlocks(
-            api,
-            issue.id,
-            attachmentsDir
-          )
-          if (attachmentBlocks.length > 0) {
-            return [{ type: "text", text: content }, ...attachmentBlocks]
-          }
-          return content
-        }
-        if (idleChecked) {
-          return null
-        }
-        idleChecked = true
-        await waitForQueueOrTimeout(config.POLL_INTERVAL_MS)
-      }
-    }
-
-    await runAgentSession({
+    await deps.runAgentSession({
       api,
       issueId: issue.id,
-      runId: issue.runId,
+      activeRunId: issue.activeRunId,
       channel,
       agentProvider: issue.agentProvider,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,
-      onSessionId: (sessionId) =>
-        setRunState(api, channel, issue.id, issue.runId, {
+      onSessionId: (sessionId) => {
+        currentSessionId = sessionId
+        return deps.setRunState(api, channel, issue.id, issue.activeRunId, {
           session_id: sessionId,
-        }),
-      nextPrompt,
+        })
+      },
+      onPromptProcessed: promptSource.onPromptProcessed,
+      nextPrompt: promptSource.nextPrompt,
     })
 
-    const prUrl = await getPullRequestUrl(dir)
-    await setRunState(api, channel, issue.id, issue.runId, {
+    const prUrl = await deps.getPullRequestUrl(dir)
+    const finished = await api.finishRun(issue.id, {
+      active_run_id: issue.activeRunId,
       status: prUrl ? "ready-for-review" : "waiting-for-input",
       run_finished_at: new Date().toISOString(),
       ...(prUrl ? { pr_url: prUrl } : {}),
     })
+    if (!finished) {
+      logInfo(
+        `issue ${issue.id} received more prompts before finish; re-queueing`
+      )
+      await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
+        status: "in-progress",
+      })
+      await processIssue(
+        api,
+        config,
+        {
+          ...issue,
+          sessionId: currentSessionId,
+          prUrl,
+        },
+        deps
+      )
+      return
+    }
+    if (channel) {
+      await channel.publishRunState({
+        run_id: issue.activeRunId,
+        status: prUrl ? "ready-for-review" : "waiting-for-input",
+        pr_url: prUrl ?? null,
+        usage_limit_reset_at: null,
+        run_error: null,
+      })
+    }
     logInfo(`issue ${issue.id} completed`)
   } catch (error) {
     const message = describe(error)
@@ -269,7 +262,7 @@ async function processIssue(
       logInfo(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
-      await setRunState(api, channel, issue.id, issue.runId, {
+      await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
         status: "held",
         run_error: message,
         run_finished_at: new Date().toISOString(),
@@ -281,7 +274,7 @@ async function processIssue(
     }
 
     logError(`issue ${issue.id} failed:`, message)
-    await setRunState(api, channel, issue.id, issue.runId, {
+    await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
       status: "run-failed",
       run_error: message,
       run_finished_at: new Date().toISOString(),
@@ -290,7 +283,7 @@ async function processIssue(
       logError("failed to record run failure:", describe(updateError))
     })
   } finally {
-    heartbeat.stop()
+    stopHeartbeat?.()
     if (channel) {
       await channel.close().catch((closeError) => {
         logError("failed to close realtime channel:", describe(closeError))
@@ -299,37 +292,36 @@ async function processIssue(
   }
 }
 
-function startHeartbeat(api: AgentApi, issue: ClaimedIssue): { stop(): void } {
+function startHeartbeat(api: AgentApi, issue: ClaimedIssue): () => void {
   let stopped = false
-  let timer: ReturnType<typeof setTimeout> | null = null
-
   const beat = async (): Promise<void> => {
     if (stopped) {
       return
     }
     try {
-      await api.heartbeatRun(issue.id, issue.runId)
+      await api.heartbeatRun(issue.id, issue.activeRunId)
     } catch (error) {
       logError(
-        `issue ${issue.id} run ${issue.runId} heartbeat failed:`,
+        `failed to heartbeat run ${issue.activeRunId} for issue ${issue.id}:`,
         describe(error)
       )
     }
-    if (!stopped) {
-      timer = setTimeout(() => void beat(), HEARTBEAT_INTERVAL_MS)
-    }
   }
+  void beat()
+  const interval = setInterval(() => {
+    void beat()
+  }, HEARTBEAT_INTERVAL_MS)
+  return () => {
+    stopped = true
+    clearInterval(interval)
+  }
+}
 
-  timer = setTimeout(() => void beat(), HEARTBEAT_INTERVAL_MS)
-
+function createNoopIssueChannel(): IssueRealtimeChannel {
   return {
-    stop() {
-      stopped = true
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-    },
+    async publishMessage() {},
+    async publishRunState() {},
+    async close() {},
   }
 }
 

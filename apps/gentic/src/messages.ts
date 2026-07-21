@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"
 
 import type { AgentApi, RunStateFields } from "./api.js"
@@ -6,6 +6,38 @@ import { logError } from "./log.js"
 import type { IssueRealtimeChannel } from "./realtime.js"
 
 const DEFAULT_PERSIST_RETRY_DELAYS_MS = [250, 1_000, 3_000]
+
+type MessageKind = "text" | "tool" | "thinking" | "plan" | "mode" | "commands"
+type MessageStatus = "streaming" | "complete" | "error"
+type EventType =
+  | "text"
+  | "thought"
+  | "tool_call"
+  | "plan"
+  | "mode"
+  | "available_commands"
+type EventStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failed"
+  | "removed"
+
+export interface StructuredMessageFields {
+  id: string
+  role: "assistant" | "system"
+  kind: MessageKind
+  content: string
+  status: MessageStatus
+  event_id?: string | null
+  run_id: string
+  event_type?: EventType | null
+  event_status?: EventStatus | null
+  event_ts?: string | null
+  event_seq?: number | null
+  tool_call_id?: string | null
+  payload?: Record<string, unknown> | null
+}
 
 interface PersistOptions {
   retryDelaysMs?: readonly number[]
@@ -19,23 +51,28 @@ interface PersistOptions {
  * persists the completed message once using the same id.
  */
 export class StreamingAssistantMessage {
-  private readonly id = randomUUID()
+  private readonly id: string
   private seq = 0
   private content = ""
   private dirty = false
   private timer: ReturnType<typeof setTimeout> | null = null
   private started = false
   private finalized = false
+  private lastEventTs: string | null = null
 
   constructor(
     private readonly api: AgentApi,
     private readonly issueId: string,
-    private readonly runId: string,
     private readonly channel: IssueRealtimeChannel,
     private readonly kind: "text" | "thinking" = "text",
     private readonly flushIntervalMs = 150,
-    private readonly persistOptions: PersistOptions = {}
-  ) {}
+    private readonly persistOptions: PersistOptions = {},
+    id: string | undefined,
+    private readonly runId: string,
+    private readonly eventId?: string | null
+  ) {
+    this.id = id ?? randomUUID()
+  }
 
   async append(text: string): Promise<void> {
     if (!text) {
@@ -84,13 +121,19 @@ export class StreamingAssistantMessage {
     await persistMessageWithRetry(
       this.api,
       this.issueId,
-      this.runId,
       {
         id: this.id,
         role: "assistant",
         kind: this.kind,
         content: this.content,
         status: "complete",
+        event_id: this.eventId ?? this.id,
+        run_id: this.runId,
+        event_type: this.kind === "thinking" ? "thought" : "text",
+        event_status: "completed",
+        event_ts: this.lastEventTs,
+        event_seq: this.seq,
+        payload: { content: this.content },
       },
       this.persistOptions
     )
@@ -111,13 +154,19 @@ export class StreamingAssistantMessage {
     await persistMessageWithRetry(
       this.api,
       this.issueId,
-      this.runId,
       {
         id: this.id,
         role: "assistant",
         kind: this.kind,
         content: this.content,
         status: "error",
+        event_id: this.eventId ?? this.id,
+        run_id: this.runId,
+        event_type: this.kind === "thinking" ? "thought" : "text",
+        event_status: "failed",
+        event_ts: this.lastEventTs,
+        event_seq: this.seq,
+        payload: { content: this.content },
       },
       this.persistOptions
     )
@@ -127,14 +176,27 @@ export class StreamingAssistantMessage {
     status: "streaming" | "complete" | "error"
   ): Promise<void> {
     this.seq += 1
+    const eventTs = new Date().toISOString()
+    this.lastEventTs = eventTs
     await this.channel.publishMessage({
       id: this.id,
-      run_id: this.runId,
       seq: this.seq,
       role: "assistant",
       kind: this.kind,
       content: this.content,
       status,
+      event_id: this.eventId ?? this.id,
+      run_id: this.runId,
+      event_type: this.kind === "thinking" ? "thought" : "text",
+      event_status:
+        status === "streaming"
+          ? "in_progress"
+          : status === "error"
+            ? "failed"
+            : "completed",
+      event_ts: eventTs,
+      event_seq: this.seq,
+      payload: { content: this.content },
     })
   }
 }
@@ -143,9 +205,9 @@ export class StreamingAssistantMessage {
 export async function publishMessage(
   api: AgentApi,
   issueId: string,
-  runId: string,
   channel: IssueRealtimeChannel,
   fields: {
+    runId: string
     kind?: "text" | "tool" | "thinking"
     content: string
     status?: "complete" | "error"
@@ -156,26 +218,67 @@ export async function publishMessage(
   const status = fields.status ?? "complete"
   await channel.publishMessage({
     id,
-    run_id: runId,
     seq: 1,
     role: "assistant",
     kind: fields.kind ?? "text",
     content: fields.content,
     status,
+    run_id: fields.runId,
   })
   await persistMessageWithRetry(
     api,
     issueId,
-    runId,
     {
       id,
       role: "assistant",
       kind: fields.kind ?? "text",
       content: fields.content,
       status,
+      run_id: fields.runId,
     },
     fields.persistOptions
   )
+}
+
+export function stableMessageId(parts: readonly string[]): string {
+  const hex = createHash("sha256").update(parts.join("\u001f")).digest("hex")
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `4${hex.slice(13, 16)}`,
+    ((Number.parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80)
+      .toString(16)
+      .padStart(2, "0") + hex.slice(18, 20),
+    hex.slice(20, 32),
+  ].join("-")
+}
+
+export async function publishStructuredMessage(
+  api: AgentApi,
+  issueId: string,
+  channel: IssueRealtimeChannel,
+  fields: StructuredMessageFields,
+  persistOptions?: PersistOptions
+): Promise<void> {
+  const eventTs = fields.event_ts ?? new Date().toISOString()
+  const message = { ...fields, event_ts: eventTs }
+  await channel.publishMessage({
+    id: message.id,
+    seq: message.event_seq ?? 1,
+    role: message.role,
+    kind: message.kind,
+    content: message.content,
+    status: message.status,
+    event_id: message.event_id ?? null,
+    run_id: message.run_id ?? null,
+    event_type: message.event_type ?? null,
+    event_status: message.event_status ?? null,
+    event_ts: message.event_ts,
+    event_seq: message.event_seq ?? null,
+    tool_call_id: message.tool_call_id ?? null,
+    payload: message.payload ?? null,
+  })
+  await persistMessageWithRetry(api, issueId, message, persistOptions)
 }
 
 /**
@@ -187,14 +290,14 @@ export async function setRunState(
   api: AgentApi,
   channel: IssueRealtimeChannel | null,
   issueId: string,
-  runId: string,
+  activeRunId: string,
   fields: RunStateFields
 ): Promise<void> {
-  await api.setRunState(issueId, runId, fields)
+  await api.setRunState(issueId, activeRunId, fields)
 
   if (channel && fields.status) {
     await channel.publishRunState({
-      run_id: runId,
+      run_id: activeRunId,
       status: fields.status,
       pr_url: fields.pr_url ?? null,
       usage_limit_reset_at: fields.usage_limit_reset_at ?? null,
@@ -206,13 +309,20 @@ export async function setRunState(
 async function persistMessageWithRetry(
   api: AgentApi,
   issueId: string,
-  runId: string,
   message: {
     id: string
     role: "assistant" | "system"
-    kind: "text" | "tool" | "thinking"
+    kind: MessageKind
     content: string
-    status: "complete" | "error"
+    status: MessageStatus
+    event_id?: string | null
+    run_id: string
+    event_type?: EventType | null
+    event_status?: EventStatus | null
+    event_ts?: string | null
+    event_seq?: number | null
+    tool_call_id?: string | null
+    payload?: Record<string, unknown> | null
   },
   options: PersistOptions = {}
 ): Promise<void> {
@@ -222,7 +332,7 @@ async function persistMessageWithRetry(
 
   for (;;) {
     try {
-      await api.insertMessage(issueId, runId, message)
+      await api.insertMessage(issueId, message)
       return
     } catch (error) {
       const delay = retryDelaysMs[attempt]

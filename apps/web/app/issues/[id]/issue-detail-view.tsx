@@ -33,12 +33,9 @@ import {
   IconThumbUp,
 } from "@tabler/icons-react"
 
-import {
-  getIssueDetailData,
-  type IssueDetailData,
-  type IssueStatus,
-} from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { fetchIssueDetailData } from "@/app/client-queries"
+import type { IssueDetailData } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -49,6 +46,7 @@ import {
   CardTitle,
 } from "@gentic/ui/card"
 import { cn } from "@gentic/ui/utils"
+import type { IssueStatus } from "@gentic/validators/issues"
 
 import { Attachments } from "./attachments"
 import { IssueAgentSelect } from "./issue-agent-select"
@@ -207,8 +205,9 @@ export function IssueDetailView({
 }) {
   const { data } = useQuery({
     queryKey: queryKeys.issue(issueId),
-    queryFn: () => getIssueDetailData(issueId),
+    queryFn: () => fetchIssueDetailData(issueId),
     initialData,
+    staleTime: queryStaleTimes.realtime,
   })
   const {
     issue,
@@ -249,7 +248,6 @@ export function IssueDetailView({
           "issue_pull_requests",
           "issue_relations",
           "attachments",
-          "messages",
         ]}
         queryKey={queryKeys.issue(issue.id)}
       />

@@ -17,6 +17,9 @@ create index issue_runs_issue_id_idx on public.issue_runs(issue_id);
 create index issue_runs_lease_expires_at_idx
   on public.issue_runs(lease_expires_at)
   where status = 'active';
+create index if not exists issues_active_run_id_idx
+  on public.issues(active_run_id)
+  where active_run_id is not null;
 
 alter table public.issue_runs enable row level security;
 
@@ -36,26 +39,15 @@ create policy "Users can read runs for their own issues"
     )
   );
 
-alter table public.issues
-  add column active_run_id uuid references public.issue_runs(id) on delete set null;
-
-create index issues_active_run_id_idx on public.issues(active_run_id);
-
-alter table public.messages
-  add column run_id uuid references public.issue_runs(id) on delete set null;
-
-create index messages_run_id_idx on public.messages(run_id);
-
 create or replace function public.claim_issue_run(
   p_user_id text,
   p_lease_seconds integer default 120
 )
 returns table (
   id uuid,
-  run_id uuid,
+  active_run_id uuid,
   agent_provider text,
   session_id text,
-  run_finished_at timestamptz,
   pr_url text,
   repo text,
   setup_script text
@@ -92,7 +84,6 @@ begin
   select i.id,
          i.agent_provider,
          i.session_id,
-         i.run_finished_at,
          i.pr_url,
          p.repo,
          p.setup_script
@@ -154,7 +145,6 @@ begin
          v_run_id,
          v_issue.agent_provider,
          v_issue.session_id,
-         v_issue.run_finished_at,
          v_issue.pr_url,
          v_issue.repo,
          v_issue.setup_script;
@@ -196,7 +186,14 @@ create or replace function public.insert_run_message(
   p_role text,
   p_kind text,
   p_content text,
-  p_status text
+  p_status text,
+  p_event_id text default null,
+  p_event_type text default null,
+  p_event_status text default null,
+  p_event_ts timestamptz default null,
+  p_event_seq integer default null,
+  p_tool_call_id text default null,
+  p_payload jsonb default null
 )
 returns uuid
 language plpgsql
@@ -217,21 +214,79 @@ begin
     role,
     kind,
     content,
-    status
+    status,
+    event_id,
+    event_type,
+    event_status,
+    event_ts,
+    event_seq,
+    tool_call_id,
+    payload,
+    updated_at
   )
   values (
     coalesce(p_message_id, gen_random_uuid()),
     p_issue_id,
-    p_run_id,
+    p_run_id::text,
     p_role,
     coalesce(p_kind, 'text'),
     p_content,
-    coalesce(p_status, 'complete')
+    coalesce(p_status, 'complete'),
+    p_event_id,
+    p_event_type,
+    p_event_status,
+    p_event_ts,
+    p_event_seq,
+    p_tool_call_id,
+    p_payload,
+    now()
   )
-  on conflict (id) do nothing
+  on conflict (id) do update
+  set role = excluded.role,
+      kind = excluded.kind,
+      content = excluded.content,
+      status = excluded.status,
+      event_id = excluded.event_id,
+      run_id = excluded.run_id,
+      event_type = excluded.event_type,
+      event_status = excluded.event_status,
+      event_ts = excluded.event_ts,
+      event_seq = excluded.event_seq,
+      tool_call_id = excluded.tool_call_id,
+      payload = excluded.payload,
+      updated_at = excluded.updated_at
+  where public.messages.issue_id = p_issue_id
+    and public.messages.run_id = p_run_id::text
   returning id into v_id;
 
   return coalesce(v_id, p_message_id);
+end;
+$$;
+
+create or replace function public.ack_issue_run_messages(
+  p_issue_id uuid,
+  p_run_id uuid,
+  p_message_ids uuid[]
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.touch_issue_run(p_issue_id, p_run_id) then
+    return false;
+  end if;
+
+  update public.messages
+  set consumed_by_run_id = p_run_id,
+      consumed_at = now()
+  where issue_id = p_issue_id
+    and role = 'user'
+    and consumed_by_run_id is null
+    and id = any(p_message_ids);
+
+  return true;
 end;
 $$;
 
@@ -280,6 +335,10 @@ begin
         when p_fields ? 'pr_url' then p_fields ->> 'pr_url'
         else pr_url
       end,
+      active_run_id = case
+        when v_status in ('held', 'run-failed', 'ready-for-review', 'waiting-for-input') then null
+        else active_run_id
+      end,
       updated_at = v_now
   where id = p_issue_id
     and active_run_id = p_run_id;
@@ -312,11 +371,12 @@ begin
 end;
 $$;
 
-create or replace function public.reset_issue_agent_run(
+create or replace function public.finish_issue_run_if_no_pending(
   p_issue_id uuid,
-  p_user_id text,
-  p_agent_provider text,
-  p_kickoff_content text
+  p_run_id uuid,
+  p_status text,
+  p_run_finished_at timestamptz,
+  p_pr_url text default null
 )
 returns boolean
 language plpgsql
@@ -326,15 +386,73 @@ as $$
 declare
   v_now timestamptz := now();
 begin
-  perform 1
-  from public.issues i
-  join public.projects p on p.id = i.project_id
-  where i.id = p_issue_id
-    and p.user_id = p_user_id
-  for update of i;
+  if p_status not in ('ready-for-review', 'waiting-for-input') then
+    raise exception 'Invalid terminal run status'
+      using errcode = '22023';
+  end if;
+
+  if not public.touch_issue_run(p_issue_id, p_run_id) then
+    return false;
+  end if;
+
+  update public.issues
+  set status = p_status,
+      run_finished_at = p_run_finished_at,
+      pr_url = coalesce(p_pr_url, pr_url),
+      active_run_id = null,
+      updated_at = v_now
+  where id = p_issue_id
+    and active_run_id = p_run_id
+    and not exists (
+      select 1
+      from public.messages
+      where messages.issue_id = p_issue_id
+        and messages.role = 'user'
+        and messages.consumed_by_run_id is null
+    );
 
   if not found then
     return false;
+  end if;
+
+  update public.issue_runs
+  set status = 'finished',
+      finished_at = p_run_finished_at,
+      heartbeat_at = v_now
+  where id = p_run_id
+    and issue_id = p_issue_id
+    and status = 'active';
+
+  return true;
+end;
+$$;
+
+create or replace function public.reset_issue_run(
+  p_issue_id uuid,
+  p_agent_provider text
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_prompt text;
+  v_now timestamptz := now();
+begin
+  if p_agent_provider not in ('claude_code', 'codex') then
+    raise exception 'Invalid agent provider'
+      using errcode = '22023';
+  end if;
+
+  select prompt into v_prompt
+  from public.issues
+  where id = p_issue_id
+  for update;
+
+  if not found then
+    raise exception 'Issue not found'
+      using errcode = 'P0002';
   end if;
 
   update public.issue_runs
@@ -344,14 +462,17 @@ begin
   where issue_id = p_issue_id
     and status = 'active';
 
-  delete from public.messages where issue_id = p_issue_id;
-  delete from public.issue_pull_requests where issue_id = p_issue_id;
+  delete from public.messages
+  where issue_id = p_issue_id;
+
+  delete from public.issue_pull_requests
+  where issue_id = p_issue_id;
 
   update public.issues
   set status = 'todo',
       agent_provider = p_agent_provider,
-      active_run_id = null,
       session_id = null,
+      active_run_id = null,
       run_error = null,
       run_started_at = null,
       run_finished_at = null,
@@ -360,21 +481,66 @@ begin
       updated_at = v_now
   where id = p_issue_id;
 
-  insert into public.messages (issue_id, role, content)
-  values (p_issue_id, 'user', p_kickoff_content);
-
-  return true;
+  insert into public.messages(issue_id, role, content)
+  values (p_issue_id, 'user', coalesce(v_prompt, ''));
 end;
 $$;
 
 revoke execute on function public.claim_issue_run(text, integer) from public, anon, authenticated;
 revoke execute on function public.touch_issue_run(uuid, uuid, integer) from public, anon, authenticated;
-revoke execute on function public.insert_run_message(uuid, uuid, uuid, text, text, text, text) from public, anon, authenticated;
+revoke execute on function public.insert_run_message(
+  uuid,
+  uuid,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text,
+  timestamptz,
+  integer,
+  text,
+  jsonb
+) from public, anon, authenticated;
+revoke execute on function public.ack_issue_run_messages(uuid, uuid, uuid[]) from public, anon, authenticated;
 revoke execute on function public.patch_issue_run_state(uuid, uuid, jsonb) from public, anon, authenticated;
-revoke execute on function public.reset_issue_agent_run(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.finish_issue_run_if_no_pending(
+  uuid,
+  uuid,
+  text,
+  timestamptz,
+  text
+) from public, anon, authenticated;
+revoke execute on function public.reset_issue_run(uuid, text) from public;
 
 grant execute on function public.claim_issue_run(text, integer) to service_role;
 grant execute on function public.touch_issue_run(uuid, uuid, integer) to service_role;
-grant execute on function public.insert_run_message(uuid, uuid, uuid, text, text, text, text) to service_role;
+grant execute on function public.insert_run_message(
+  uuid,
+  uuid,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text,
+  timestamptz,
+  integer,
+  text,
+  jsonb
+) to service_role;
+grant execute on function public.ack_issue_run_messages(uuid, uuid, uuid[]) to service_role;
 grant execute on function public.patch_issue_run_state(uuid, uuid, jsonb) to service_role;
-grant execute on function public.reset_issue_agent_run(uuid, text, text, text) to service_role;
+grant execute on function public.finish_issue_run_if_no_pending(
+  uuid,
+  uuid,
+  text,
+  timestamptz,
+  text
+) to service_role;
+grant execute on function public.reset_issue_run(uuid, text) to authenticated;
+grant execute on function public.reset_issue_run(uuid, text) to service_role;

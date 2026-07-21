@@ -11,8 +11,9 @@ import {
   IconSearch,
 } from "@tabler/icons-react"
 
-import { getIssuesData, type HomeIssue, type IssuesData } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import { fetchIssuesData } from "@/app/client-queries"
+import type { HomeIssue, IssuesData } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -222,8 +223,9 @@ function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
 export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const { data } = useQuery({
     queryKey: queryKeys.issues,
-    queryFn: getIssuesData,
+    queryFn: fetchIssuesData,
     initialData,
+    staleTime: queryStaleTimes.realtime,
   })
   const blockedIssueIds = useMemo(
     () => new Set(data.blockedIssueIds),

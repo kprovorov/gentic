@@ -4,6 +4,11 @@ import { clerkClient } from "@clerk/nextjs/server"
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
+import {
+  ackMessagesInputSchema,
+  finishRunFieldsSchema,
+  insertMessageInputSchema,
+} from "@gentic/validators/agent"
 import { issueStatusSchema } from "@gentic/validators/issues"
 import { z } from "zod"
 
@@ -23,10 +28,9 @@ export const runStateStatusSchema = issueStatusSchema.extract([
   "ready-for-review",
   "waiting-for-input",
 ])
-
 export const runStateSchema = z
   .object({
-    run_id: z.string().uuid(),
+    active_run_id: z.string().uuid(),
     status: runStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
     run_error: z.string().nullable().optional(),
@@ -36,16 +40,17 @@ export const runStateSchema = z
     pr_url: z.string().url().nullable().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0)
 
-export const insertMessageSchema = z.object({
-  run_id: z.string().uuid(),
-  id: z.string().uuid().optional(),
-  role: z.enum(["assistant", "system"]),
-  kind: z.enum(["text", "tool", "thinking"]).optional(),
-  content: z.string(),
-  status: z.enum(["complete", "error"]).optional(),
-})
+export const finishRunSchema = finishRunFieldsSchema
+  .extend({
+    finish_if_no_pending: z.literal(true),
+  })
+  .strict()
+
+export const ackMessagesSchema = ackMessagesInputSchema
+export const insertMessageSchema = insertMessageInputSchema
+  .partial({ id: true })
+  .extend({ run_id: z.string().uuid() })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against
 // Clerk bills one API-key usage and the worker polls constantly, so caching is

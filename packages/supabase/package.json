@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./client": "./src/client.ts",
+    "./types": "./src/types.ts",
     "./server": "./src/server.ts",
     "./service": "./src/service.ts"
   },
@@ -13,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.5.12",
+    "@clerk/nextjs": "^7.5.18",
     "@supabase/supabase-js": "^2.110.0"
   },
   "devDependencies": {

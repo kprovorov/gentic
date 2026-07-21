@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { IconPaperclip, IconTrash, IconUpload } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
@@ -47,6 +47,7 @@ export function AttachmentPromptField({
   className,
   textareaClassName,
   fileInputName = "files",
+  files,
   onFilesChange,
   onKeyDown,
 }: {
@@ -61,38 +62,49 @@ export function AttachmentPromptField({
   className?: string
   textareaClassName?: string
   fileInputName?: string
+  files?: File[]
   onFilesChange?: (files: File[]) => void
   onKeyDown?: React.KeyboardEventHandler<HTMLTextAreaElement>
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [files, setFiles] = useState<File[]>([])
+  const [internalFiles, setInternalFiles] = useState<File[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const selectedFiles = files ?? internalFiles
 
   function updateFiles(next: File[]) {
-    setFiles(next)
+    if (files === undefined) {
+      setInternalFiles(next)
+    }
     onFilesChange?.(next)
+  }
 
+  useEffect(() => {
     const input = fileInputRef.current
     if (!input) {
       return
     }
 
     const transfer = new DataTransfer()
-    for (const file of next) {
+    for (const file of selectedFiles) {
       transfer.items.add(file)
     }
-    input.files = transfer.files
-  }
+    try {
+      input.files = transfer.files
+    } catch {
+      // jsdom cannot synthesize a real FileList; the controlled file state
+      // remains authoritative for retries and client-side form construction.
+    }
+  }, [selectedFiles])
 
   function addFiles(fileList: FileList | null) {
     if (!fileList) {
       return
     }
-    updateFiles(mergeFiles(files, Array.from(fileList)))
+    updateFiles(mergeFiles(selectedFiles, Array.from(fileList)))
   }
 
   function removeFile(index: number) {
-    updateFiles(files.filter((_, fileIndex) => fileIndex !== index))
+    updateFiles(selectedFiles.filter((_, fileIndex) => fileIndex !== index))
   }
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -163,14 +175,14 @@ export function AttachmentPromptField({
         >
           <IconPaperclip />
         </Button>
-        {files.length === 0 ? (
+        {selectedFiles.length === 0 ? (
           <span className="flex min-h-8 items-center gap-1 text-xs text-muted-foreground">
             <IconUpload className="size-3.5" />
             Drop files here or attach
           </span>
         ) : (
           <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-            {files.map((file, index) => (
+            {selectedFiles.map((file, index) => (
               <li
                 key={`${file.name}-${file.size}-${file.lastModified}`}
                 className={cn(

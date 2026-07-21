@@ -1,8 +1,10 @@
 import * as issuesService from "@gentic/services/issues"
+import type { Json } from "@gentic/supabase/types"
 
 import {
   ApiError,
   ensureIssueOwned,
+  finishRunSchema,
   getAgentContext,
   handleAgentError,
   json,
@@ -17,43 +19,69 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const fields = runStateSchema.parse(await request.json())
+    const body = await request.json()
     const { supabase, userId } = await getAgentContext(request)
-    const { run_id: runId, ...stateFields } = fields
 
     await ensureIssueOwned(supabase, userId, id)
 
-    if (Object.keys(stateFields).length === 0) {
-      const { data: ok, error } = await supabase.rpc("touch_issue_run", {
-        p_issue_id: id,
-        p_run_id: runId,
-      })
+    if (
+      body &&
+      typeof body === "object" &&
+      "finish_if_no_pending" in body
+    ) {
+      const fields = finishRunSchema.parse(body)
+      const { data, error } = await supabase
+        .rpc("finish_issue_run_if_no_pending", {
+          p_issue_id: id,
+          p_run_id: fields.active_run_id,
+          p_status: fields.status,
+          p_run_finished_at: fields.run_finished_at,
+          p_pr_url: fields.pr_url ?? undefined,
+        })
+        .single<boolean>()
 
       if (error) {
         throw new Error(error.message)
       }
-      if (!ok) {
-        throw new ApiError(409, "Run is no longer active")
+
+      if (data && fields.pr_url) {
+        await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
       }
 
-      return json({ ok: true })
+      return json({ finished: data ?? false })
     }
 
-    const { data: ok, error } = await supabase.rpc("patch_issue_run_state", {
-      p_issue_id: id,
-      p_run_id: runId,
-      p_fields: stateFields,
-    })
+    const { active_run_id: activeRunId, ...stateFields } =
+      runStateSchema.parse(body)
+    const hasStateFields = Object.keys(stateFields).length > 0
+    const { data, error } = hasStateFields
+      ? await supabase
+          .rpc("patch_issue_run_state", {
+            p_issue_id: id,
+            p_run_id: activeRunId,
+            p_fields: stateFields as Json,
+          })
+          .single<boolean>()
+      : await supabase
+          .rpc("touch_issue_run", {
+            p_issue_id: id,
+            p_run_id: activeRunId,
+          })
+          .single<boolean>()
 
     if (error) {
       throw new Error(error.message)
     }
-    if (!ok) {
+    if (!data) {
       throw new ApiError(409, "Run is no longer active")
     }
 
-    if (fields.pr_url) {
-      await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
+    if (stateFields.pr_url) {
+      await issuesService.attachIssuePullRequest(
+        supabase,
+        id,
+        stateFields.pr_url
+      )
     }
 
     return json({ ok: true })

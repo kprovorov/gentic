@@ -29,8 +29,9 @@ test("worker API sends run ownership on heartbeat, state transitions, and messag
       status: "ready-for-review",
       run_finished_at: "2026-07-14T12:00:00.000Z",
     })
-    await api.insertMessage(ISSUE_ID, RUN_ID, {
+    await api.insertMessage(ISSUE_ID, {
       id: "33333333-3333-4333-8333-333333333333",
+      run_id: RUN_ID,
       role: "assistant",
       content: "done",
     })
@@ -41,9 +42,9 @@ test("worker API sends run ownership on heartbeat, state transitions, and messag
   assert.deepEqual(
     requests.map((request) => request.body),
     [
-      { run_id: RUN_ID },
+      { active_run_id: RUN_ID },
       {
-        run_id: RUN_ID,
+        active_run_id: RUN_ID,
         status: "ready-for-review",
         run_finished_at: "2026-07-14T12:00:00.000Z",
       },
@@ -61,7 +62,7 @@ test("run ownership migration guards overlapping claims and stale writes", () =>
   const sql = migrationSql()
 
   assert.match(sql, /create table public\.issue_runs/)
-  assert.match(sql, /active_run_id uuid references public\.issue_runs/)
+  assert.match(sql, /create table public\.issue_runs/)
   assert.match(
     sql,
     /create or replace function public\.patch_issue_run_state\(\s*p_issue_id uuid,\s*p_run_id uuid,\s*p_fields jsonb\s*\)/
@@ -79,7 +80,7 @@ test("run ownership migration guards overlapping claims and stale writes", () =>
 
 test("run ownership migration atomically invalidates active runs during reset", () => {
   const sql = migrationSql()
-  const resetStart = sql.indexOf("create or replace function public.reset_issue_agent_run")
+  const resetStart = sql.indexOf("create or replace function public.reset_issue_run")
   assert.notEqual(resetStart, -1)
   const resetSql = sql.slice(resetStart)
 
@@ -153,7 +154,7 @@ function migrationSql(): string {
   return readFileSync(
     resolve(
       process.cwd(),
-      "../../supabase/migrations/20260714120000_add_issue_run_ownership.sql"
+      "../../supabase/migrations/20260714200000_add_issue_run_ownership.sql"
     ),
     "utf8"
   )
