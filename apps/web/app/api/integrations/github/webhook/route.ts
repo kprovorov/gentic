@@ -7,6 +7,7 @@ import type { IssueStatus } from "@gentic/validators/issues"
 import { checkSuitesFailed } from "@/lib/ci-status"
 import {
   fetchCheckSuitesForRef,
+  fetchPullRequestNumbersForCommit,
   fetchPullRequestReviewComments,
 } from "@/lib/github-app"
 
@@ -26,7 +27,6 @@ type CheckSuitePayload = {
     head_sha: string
     status: string
     conclusion: string | null
-    pull_requests: { number: number }[]
   }
   repository: {
     name: string
@@ -156,9 +156,6 @@ async function handleCheckSuiteEvent(
   if (payload.action !== "completed") {
     return
   }
-  if (payload.check_suite.pull_requests.length === 0) {
-    return
-  }
 
   const installationId = payload.installation?.id
   if (!installationId) {
@@ -167,6 +164,31 @@ async function handleCheckSuiteEvent(
 
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
+
+  // The payload's own `check_suite.pull_requests` is only populated when the
+  // PR was already open at the moment the check suite was created. The
+  // worker pushes commits (creating the check suite) before opening the PR,
+  // so that array is unreliable here — resolve PRs from the commit SHA via
+  // the API instead.
+  let pullNumbers: number[]
+  try {
+    pullNumbers = await fetchPullRequestNumbersForCommit(
+      String(installationId),
+      owner,
+      repo,
+      payload.check_suite.head_sha
+    )
+  } catch (error) {
+    console.error(
+      "[github-webhook] failed to fetch pull requests for commit, skipping:",
+      error
+    )
+    return
+  }
+
+  if (pullNumbers.length === 0) {
+    return
+  }
 
   let suites
   try {
@@ -192,8 +214,8 @@ async function handleCheckSuiteEvent(
     ? "tests-failed"
     : "ready-for-review"
 
-  for (const pullRequest of payload.check_suite.pull_requests) {
-    const prUrl = `https://github.com/${owner}/${repo}/pull/${pullRequest.number}`
+  for (const pullNumber of pullNumbers) {
+    const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
     await issuesService.updateIssueStatusByPrUrlIfStatus(
       supabase,
       prUrl,

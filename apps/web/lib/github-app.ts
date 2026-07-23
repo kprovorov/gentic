@@ -160,6 +160,42 @@ export async function fetchPullRequestHeadSha(
   return data.head.sha
 }
 
+// The check_suite webhook payload's own `pull_requests` array is only
+// populated when a PR was already open at the moment the check suite was
+// created. The worker pushes commits (which creates the check suite) and
+// only opens the PR afterward, so that array comes back empty on every
+// delivery. This dedicated endpoint resolves PRs from the commit SHA instead,
+// which has no such ordering requirement.
+export async function fetchPullRequestNumbersForCommit(
+  installationId: string,
+  owner: string,
+  repo: string,
+  sha: string
+): Promise<number[]> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/pulls`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch pull requests for commit (${response.status})`
+    )
+  }
+
+  const data = (await response.json()) as { number: number }[]
+
+  return data.map((pullRequest) => pullRequest.number)
+}
+
 export type GithubCheckSuite = {
   status: string
   conclusion: string | null
