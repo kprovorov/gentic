@@ -1,6 +1,9 @@
 import {
+  addIssueRelationSchema,
   agentProviderSchema,
   createIssueSchema,
+  deleteIssueRelationSchema,
+  issueRelationDirectionSchema,
   issueStatusSchema,
   issueTypeSchema,
   updateIssueSchema,
@@ -54,6 +57,29 @@ const issueIdInputSchema = {
     .string()
     .uuid()
     .describe("The issue id, from list_issues, create_issue, or get_issue."),
+}
+
+const addedRelationOutputSchema = {
+  issue_id: z.string().uuid().describe("The issue id passed as issue_id."),
+  related_issue_id: z
+    .string()
+    .uuid()
+    .describe("The issue id passed as related_issue_id."),
+  added: z.literal(true).describe("True when the relation was created."),
+}
+
+const relationsOutputSchema = {
+  relations: z
+    .array(jsonObjectSchema)
+    .describe("Blocking relations involving the given issue."),
+}
+
+const relationCandidatesOutputSchema = {
+  issues: z
+    .array(jsonObjectSchema)
+    .describe(
+      "Other issues owned by the authenticated account that could be related to the given issue."
+    ),
 }
 
 const mcpHandler = createMcpHandler(
@@ -426,6 +452,112 @@ const mcpHandler = createMcpHandler(
           return { issue }
         }
       )
+    )
+
+    server.registerTool(
+      "list_issue_relations",
+      {
+        title: "List Issue Relations",
+        description:
+          "List blocking relations for an issue owned by the authenticated account, both issues it blocks and issues that block it. Use the issue id from list_issues, create_issue, or get_issue.",
+        inputSchema: issueIdInputSchema,
+        outputSchema: relationsOutputSchema,
+      },
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        const relations = await issuesService.listIssueRelations(supabase, userId, id)
+        return { relations }
+      })
+    )
+
+    server.registerTool(
+      "list_issue_relation_candidates",
+      {
+        title: "List Issue Relation Candidates",
+        description:
+          "List other issues owned by the authenticated account that could be related to the given issue with add_issue_relation. Use the issue id from list_issues, create_issue, or get_issue.",
+        inputSchema: issueIdInputSchema,
+        outputSchema: relationCandidatesOutputSchema,
+      },
+      tool(async ({ supabase, userId }, { id }: { id: string }) => {
+        const issues = await issuesService.listIssueRelationCandidates(supabase, userId, id)
+        return { issues }
+      })
+    )
+
+    server.registerTool(
+      "add_issue_relation",
+      {
+        title: "Add Issue Relation",
+        description:
+          "Create a blocking relation between two issues owned by the authenticated account. direction 'blocking' means issue_id blocks related_issue_id; 'blocked_by' means issue_id is blocked by related_issue_id.",
+        inputSchema: {
+          issue_id: z
+            .string()
+            .uuid()
+            .describe("The issue id, from list_issues, create_issue, or get_issue."),
+          related_issue_id: z
+            .string()
+            .uuid()
+            .describe(
+              "The other issue id to relate to issue_id, from list_issues or list_issue_relation_candidates."
+            ),
+          direction: issueRelationDirectionSchema.describe(
+            "'blocking' if issue_id blocks related_issue_id, or 'blocked_by' if issue_id is blocked by related_issue_id."
+          ),
+        },
+        outputSchema: addedRelationOutputSchema,
+      },
+      tool(
+        async (
+          { supabase, userId },
+          input: {
+            issue_id: string
+            related_issue_id: string
+            direction: z.infer<typeof issueRelationDirectionSchema>
+          }
+        ) => {
+          const values = addIssueRelationSchema.parse(input)
+          await issuesService.addIssueRelation(
+            supabase,
+            userId,
+            values.issue_id,
+            values.related_issue_id,
+            values.direction
+          )
+          return {
+            issue_id: values.issue_id,
+            related_issue_id: values.related_issue_id,
+            added: true as const,
+          }
+        }
+      )
+    )
+
+    server.registerTool(
+      "delete_issue_relation",
+      {
+        title: "Delete Issue Relation",
+        description:
+          "Delete a blocking relation between two issues owned by the authenticated account. Use the relation id and issue id from list_issue_relations.",
+        inputSchema: {
+          id: z
+            .string()
+            .uuid()
+            .describe("The relation id, from list_issue_relations."),
+          issue_id: z
+            .string()
+            .uuid()
+            .describe(
+              "The issue id used to look up the relation, from list_issue_relations."
+            ),
+        },
+        outputSchema: deletedOutputSchema,
+      },
+      tool(async ({ supabase, userId }, input: { id: string; issue_id: string }) => {
+        const values = deleteIssueRelationSchema.parse(input)
+        await issuesService.deleteIssueRelation(supabase, userId, values.id, values.issue_id)
+        return { id: values.id, deleted: true as const }
+      })
     )
   },
   {},
