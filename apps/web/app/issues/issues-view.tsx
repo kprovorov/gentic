@@ -31,8 +31,10 @@ import { Button } from "@gentic/ui/button"
 import { DataTable } from "@gentic/ui/data-table"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { Input } from "@gentic/ui/input"
@@ -65,6 +67,18 @@ function matchesIssue(issue: HomeIssue, filterValue: string) {
     .toLowerCase()
 
   return haystack.includes(filterValue.toLowerCase())
+}
+
+function toggleInSet<T>(set: Set<T>, value: T) {
+  const next = new Set(set)
+
+  if (next.has(value)) {
+    next.delete(value)
+  } else {
+    next.add(value)
+  }
+
+  return next
 }
 
 function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
@@ -241,13 +255,13 @@ function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
 function IssuesTableView({
   issues,
   blockedIssueIds,
-  globalFilter,
+  filterKey,
   rowSelection,
   onRowSelectionChange,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
-  globalFilter: string
+  filterKey: string
   rowSelection: RowSelectionState
   onRowSelectionChange: (selection: RowSelectionState) => void
 }) {
@@ -265,7 +279,7 @@ function IssuesTableView({
 
   useEffect(() => {
     setPagination((current) => ({ ...current, pageIndex: 0 }))
-  }, [globalFilter])
+  }, [filterKey])
 
   useEffect(() => {
     onRowSelectionChange({})
@@ -354,13 +368,48 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [collapsedStatuses, setCollapsedStatuses] = useState<
     Set<HomeIssue["status"]>
   >(() => new Set())
+  const [statusFilter, setStatusFilter] = useState<Set<HomeIssue["status"]>>(
+    () => new Set()
+  )
+  const [projectFilter, setProjectFilter] = useState<Set<string>>(
+    () => new Set()
+  )
+  const availableProjects = useMemo(() => {
+    const projects = new Map<string, { id: string; name: string }>()
+
+    for (const issue of data.issues) {
+      if (issue.projects && !projects.has(issue.projects.id)) {
+        projects.set(issue.projects.id, {
+          id: issue.projects.id,
+          name: issue.projects.name,
+        })
+      }
+    }
+
+    return Array.from(projects.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )
+  }, [data.issues])
   const filteredIssues = useMemo(
     () =>
       data.issues
         .filter((issue) => matchesIssue(issue, globalFilter))
+        .filter(
+          (issue) => statusFilter.size === 0 || statusFilter.has(issue.status)
+        )
+        .filter(
+          (issue) =>
+            projectFilter.size === 0 ||
+            (issue.projects ? projectFilter.has(issue.projects.id) : false)
+        )
         .toSorted(compareIssues),
-    [data.issues, globalFilter]
+    [data.issues, globalFilter, statusFilter, projectFilter]
   )
+  const filterKey = [
+    globalFilter,
+    Array.from(statusFilter).sort().join(","),
+    Array.from(projectFilter).sort().join(","),
+  ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
   const safePageIndex = Math.min(pageIndex, pageCount - 1)
   const pagedIssues = filteredIssues.slice(
@@ -396,6 +445,26 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
 
   function updateGlobalFilter(value: string) {
     setGlobalFilter(value)
+    setPageIndex(0)
+  }
+
+  function toggleStatusFilter(status: HomeIssue["status"]) {
+    setStatusFilter((current) => toggleInSet(current, status))
+    setPageIndex(0)
+  }
+
+  function toggleProjectFilter(projectId: string) {
+    setProjectFilter((current) => toggleInSet(current, projectId))
+    setPageIndex(0)
+  }
+
+  function clearStatusFilter() {
+    setStatusFilter(new Set())
+    setPageIndex(0)
+  }
+
+  function clearProjectFilter() {
+    setProjectFilter(new Set())
     setPageIndex(0)
   }
 
@@ -473,15 +542,114 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
           </section>
         ) : (
           <section className="grid gap-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="relative max-w-sm flex-1">
-                <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={globalFilter}
-                  onChange={(event) => updateGlobalFilter(event.target.value)}
-                  placeholder="Search issues…"
-                  className="pl-9"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative max-w-sm flex-1">
+                  <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={globalFilter}
+                    onChange={(event) =>
+                      updateGlobalFilter(event.target.value)
+                    }
+                    placeholder="Search issues…"
+                    className="pl-9"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Status
+                      {statusFilter.size > 0 ? (
+                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                          {statusFilter.size}
+                        </span>
+                      ) : null}
+                      <IconChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-60 rounded-lg bg-popover before:hidden"
+                  >
+                    {statusFilter.size > 0 ? (
+                      <>
+                        <DropdownMenuItem onSelect={clearStatusFilter}>
+                          Clear filter
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {statusOptions.map((option) => {
+                      const OptionIcon = statusIcons[option.value]
+
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={option.value}
+                          checked={statusFilter.has(option.value)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() =>
+                            toggleStatusFilter(option.value)
+                          }
+                          className="gap-3"
+                        >
+                          <OptionIcon
+                            className={cn(
+                              "size-4",
+                              statusIconStyles[option.value]
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {option.label}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Project
+                      {projectFilter.size > 0 ? (
+                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                          {projectFilter.size}
+                        </span>
+                      ) : null}
+                      <IconChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-60 rounded-lg bg-popover before:hidden"
+                  >
+                    {projectFilter.size > 0 ? (
+                      <>
+                        <DropdownMenuItem onSelect={clearProjectFilter}>
+                          Clear filter
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {availableProjects.length === 0 ? (
+                      <DropdownMenuItem disabled>No projects</DropdownMenuItem>
+                    ) : (
+                      availableProjects.map((project) => (
+                        <DropdownMenuCheckboxItem
+                          key={project.id}
+                          checked={projectFilter.has(project.id)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() =>
+                            toggleProjectFilter(project.id)
+                          }
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {project.name}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <ToggleGroup
                 type="single"
@@ -501,7 +669,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <IssuesTableView
                 issues={filteredIssues}
                 blockedIssueIds={blockedIssueIds}
-                globalFilter={globalFilter}
+                filterKey={filterKey}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
               />
