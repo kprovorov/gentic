@@ -1,4 +1,7 @@
+"use client"
+
 import Link from "next/link"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   IconAlertCircle,
@@ -7,6 +10,8 @@ import {
   IconArrowsSort,
   IconBug,
   IconBulb,
+  IconCheck,
+  IconChevronDown,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
@@ -26,12 +31,22 @@ import {
   IconSparkles,
   IconThumbUp,
 } from "@tabler/icons-react"
+import { toast } from "sonner"
 
-import type { HomeIssue } from "@/app/queries"
+import type { HomeIssue, IssuesData } from "@/app/queries"
+import { queryKeys } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus, IssueType } from "@gentic/validators/issues"
+
+import { updateIssueStatus } from "./actions"
 
 export const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
@@ -223,6 +238,123 @@ function SortableHeader({
   )
 }
 
+export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
+  const queryClient = useQueryClient()
+  const StatusIcon = statusIcons[issue.status]
+  const mutation = useMutation({
+    mutationFn: updateIssueStatus,
+    onMutate: async (formData) => {
+      const nextStatus = formData.get("status")
+
+      if (typeof nextStatus !== "string") {
+        return
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+      ])
+
+      const previousIssues = queryClient.getQueryData<IssuesData>(
+        queryKeys.issues
+      )
+      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+      const updateData = (current: IssuesData | undefined) =>
+        current
+          ? {
+              ...current,
+              issues: current.issues.map((currentIssue) =>
+                currentIssue.id === issue.id
+                  ? {
+                      ...currentIssue,
+                      status: nextStatus as HomeIssue["status"],
+                    }
+                  : currentIssue
+              ),
+            }
+          : current
+
+      queryClient.setQueryData(queryKeys.issues, updateData)
+      queryClient.setQueryData(queryKeys.home, updateData)
+
+      return { previousHome, previousIssues }
+    },
+    onError: (_error, _formData, context) => {
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+
+      toast.error("Failed to update issue status")
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+  })
+
+  function selectStatus(nextStatus: HomeIssue["status"]) {
+    if (nextStatus === issue.status || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issue.id)
+    formData.set("status", nextStatus)
+    mutation.mutate(formData)
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          aria-label={`Change status from ${statusLabels[issue.status]}`}
+          className={cn(
+            "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            statusStyles[issue.status]
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <StatusIcon className="size-3.5 shrink-0" />
+          <span className="truncate">{statusLabels[issue.status]}</span>
+          <IconChevronDown className="size-3 shrink-0 opacity-70" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-60 rounded-lg bg-popover before:hidden"
+      >
+        {statusOptions.map((option) => {
+          const OptionIcon = statusIcons[option.value]
+          const isSelected = option.value === issue.status
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              disabled={mutation.isPending}
+              onSelect={() => selectStatus(option.value)}
+              className="gap-3"
+            >
+              <OptionIcon
+                className={cn("size-4", statusIconStyles[option.value])}
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {isSelected ? <IconCheck className="size-4" /> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function getIssuesColumns(
   blockedIssueIds: Set<string>
 ): ColumnDef<HomeIssue>[] {
@@ -324,27 +456,10 @@ export function getIssuesColumns(
     },
     {
       accessorKey: "status",
-      header: ({ column }) => (
-        <SortableHeader label="Status" column={column} />
-      ),
+      header: ({ column }) => <SortableHeader label="Status" column={column} />,
       sortingFn: (rowA, rowB) =>
         statusOrder[rowA.original.status] - statusOrder[rowB.original.status],
-      cell: ({ row }) => {
-        const status = row.original.status
-        const StatusIcon = statusIcons[status]
-
-        return (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-              statusStyles[status]
-            )}
-          >
-            <StatusIcon className="size-3.5" />
-            {statusLabels[status]}
-          </span>
-        )
-      },
+      cell: ({ row }) => <IssueStatusMenu issue={row.original} />,
     },
     {
       id: "blocked",
