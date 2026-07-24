@@ -4,7 +4,7 @@ export {
   type IssueRelationIssue,
   type UserChatMessage,
 } from "./issues/shared"
-export { ensureIssueOwned } from "./issues/ownership"
+export { ensureIssueOwned, ensureIssuesOwned } from "./issues/ownership"
 export {
   getIssue,
   listBlockedIssueIds,
@@ -14,6 +14,8 @@ export {
   listIssues,
 } from "./issues/queries"
 export {
+  bulkDeleteIssues,
+  bulkUpdateIssueStatus,
   createIssue,
   deleteIssue,
   setIssueTitle,
