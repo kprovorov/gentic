@@ -1,10 +1,18 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { getCoreRowModel, useReactTable } from "@tanstack/react-table"
+import {
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type PaginationState,
+  type RowSelectionState,
+  type SortingState,
+} from "@tanstack/react-table"
 import {
   IconCheck,
   IconChevronDown,
@@ -232,23 +240,83 @@ function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
 function IssuesTableView({
   issues,
   blockedIssueIds,
+  globalFilter,
+  rowSelection,
+  onRowSelectionChange,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
+  globalFilter: string
+  rowSelection: RowSelectionState
+  onRowSelectionChange: (selection: RowSelectionState) => void
 }) {
   const columns = useMemo(
     () => getIssuesColumns(blockedIssueIds),
     [blockedIssueIds]
   )
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "created_at", desc: true },
+  ])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  })
+
+  useEffect(() => {
+    setPagination((current) => ({ ...current, pageIndex: 0 }))
+  }, [globalFilter])
+
+  useEffect(() => {
+    onRowSelectionChange({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.pageIndex])
+
   const table = useReactTable({
     data: issues,
     columns,
+    state: { sorting, pagination, rowSelection },
+    getRowId: (issue) => issue.id,
+    enableRowSelection: true,
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    onRowSelectionChange: (updater) => {
+      const next =
+        typeof updater === "function" ? updater(rowSelection) : updater
+      onRowSelectionChange(next)
+    },
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-      <DataTable table={table} columns={columns} />
+    <div className="grid gap-4">
+      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+        <DataTable table={table} columns={columns} />
+      </div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          {issues.length} issue{issues.length === 1 ? "" : "s"}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -271,6 +339,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   )
   const [globalFilter, setGlobalFilter] = useState("")
   const [pageIndex, setPageIndex] = useState(0)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [collapsedStatuses, setCollapsedStatuses] = useState<
     Set<HomeIssue["status"]>
   >(() => new Set())
@@ -421,6 +490,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <IssuesTableView
                 issues={filteredIssues}
                 blockedIssueIds={blockedIssueIds}
+                globalFilter={globalFilter}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
               />
             ) : pagedIssues.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
