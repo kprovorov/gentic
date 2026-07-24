@@ -92,6 +92,62 @@ export type GithubReviewComment = {
   body: string
 }
 
+export type GithubInstallationRepository = {
+  full_name: string
+  private: boolean
+}
+
+export async function fetchInstallationRepositories(
+  installationId: string
+): Promise<GithubInstallationRepository[]> {
+  const token = await getInstallationToken(installationId)
+  const repositories: GithubInstallationRepository[] = []
+  let page = 1
+
+  while (true) {
+    const response = await fetch(
+      `https://api.github.com/installation/repositories?per_page=100&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch installation repositories (${response.status})`
+      )
+    }
+
+    const data = (await response.json()) as {
+      repositories: {
+        full_name: string
+        private: boolean
+      }[]
+    }
+
+    repositories.push(
+      ...data.repositories.map((repository) => ({
+        full_name: repository.full_name,
+        private: repository.private,
+      }))
+    )
+
+    if (data.repositories.length < 100) {
+      break
+    }
+
+    page += 1
+  }
+
+  return repositories.toSorted((a, b) =>
+    a.full_name.localeCompare(b.full_name)
+  )
+}
+
 export async function fetchPullRequestReviewComments(
   installationId: string,
   owner: string,

@@ -16,6 +16,7 @@ import { z } from "zod"
 import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[id]/attachments"
 import type { ChatMessage } from "./issues/[id]/issue-chat-state"
+import { fetchInstallationRepositories } from "@/lib/github-app"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
@@ -95,6 +96,11 @@ export type SettingsProject = ProjectOption & {
   auto_respond_to_reviews: boolean
 }
 
+export type GithubRepositoryOption = {
+  full_name: string
+  private: boolean
+}
+
 export type IssueDetail = {
   id: string
   title: string | null
@@ -128,6 +134,8 @@ export type SettingsData = {
   projects: SettingsProject[]
   githubIntegration: githubIntegrationsService.GithubIntegration | null
   githubAppConfigured: boolean
+  githubRepositories: GithubRepositoryOption[]
+  githubRepositoriesError: string | null
 }
 
 export type IssueDetailData = {
@@ -192,6 +200,23 @@ export async function getSettingsData(
     githubIntegrationsService.getGithubIntegration(supabase, userId),
   ])
 
+  let githubRepositories: GithubRepositoryOption[] = []
+  let githubRepositoriesError: string | null = null
+
+  if (
+    githubIntegration?.status === "connected" &&
+    githubIntegration.installation_id
+  ) {
+    try {
+      githubRepositories = await fetchInstallationRepositories(
+        githubIntegration.installation_id
+      )
+    } catch (error) {
+      console.error("[settings] failed to fetch GitHub repositories:", error)
+      githubRepositoriesError = "Unable to load GitHub repositories."
+    }
+  }
+
   return {
     projects: projects.map((project) => ({
       id: project.id,
@@ -202,6 +227,8 @@ export async function getSettingsData(
     })),
     githubIntegration,
     githubAppConfigured: Boolean(process.env.GITHUB_APP_SLUG),
+    githubRepositories,
+    githubRepositoriesError,
   }
 }
 
