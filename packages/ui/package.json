@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./alert-dialog": "./src/ui/alert-dialog.tsx",
     "./bubble": "./src/ui/bubble.tsx",
     "./button": "./src/ui/button.tsx",
     "./card": "./src/ui/card.tsx",
@@ -27,6 +28,8 @@
     "./table": "./src/ui/table.tsx",
     "./textarea": "./src/ui/textarea.tsx",
     "./theme-provider": "./src/theme-provider.tsx",
+    "./toggle": "./src/ui/toggle.tsx",
+    "./toggle-group": "./src/ui/toggle-group.tsx",
     "./tooltip": "./src/ui/tooltip.tsx",
     "./use-mobile": "./src/hooks/use-mobile.ts",
     "./utils": "./src/utils.ts"
