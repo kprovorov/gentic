@@ -108,10 +108,13 @@ export function NewIssueView({
                   <NativeSelect
                     name="project_id"
                     required
-                    defaultValue={projects[0]?.id}
+                    defaultValue=""
                     id="issue-project"
                     className="w-full"
                   >
+                    <NativeSelectOption value="" disabled hidden>
+                      Select a project
+                    </NativeSelectOption>
                     {projects.map((project) => (
                       <NativeSelectOption key={project.id} value={project.id}>
                         {project.name} ({project.repo})
