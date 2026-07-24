@@ -48,6 +48,7 @@ import {
   getIssuesColumns,
   issueTypeIcons,
   issueTypeLabels,
+  issueTypeOptions,
   issueTypeStyles,
   statusIconStyles,
   statusIcons,
@@ -371,6 +372,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [statusFilter, setStatusFilter] = useState<Set<HomeIssue["status"]>>(
     () => new Set()
   )
+  const [typeFilter, setTypeFilter] = useState<Set<HomeIssue["type"]>>(
+    () => new Set()
+  )
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
@@ -397,17 +401,19 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         .filter(
           (issue) => statusFilter.size === 0 || statusFilter.has(issue.status)
         )
+        .filter((issue) => typeFilter.size === 0 || typeFilter.has(issue.type))
         .filter(
           (issue) =>
             projectFilter.size === 0 ||
             (issue.projects ? projectFilter.has(issue.projects.id) : false)
         )
         .toSorted(compareIssues),
-    [data.issues, globalFilter, statusFilter, projectFilter]
+    [data.issues, globalFilter, statusFilter, typeFilter, projectFilter]
   )
   const filterKey = [
     globalFilter,
     Array.from(statusFilter).sort().join(","),
+    Array.from(typeFilter).sort().join(","),
     Array.from(projectFilter).sort().join(","),
   ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
@@ -453,6 +459,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setPageIndex(0)
   }
 
+  function toggleTypeFilter(type: HomeIssue["type"]) {
+    setTypeFilter((current) => toggleInSet(current, type))
+    setPageIndex(0)
+  }
+
   function toggleProjectFilter(projectId: string) {
     setProjectFilter((current) => toggleInSet(current, projectId))
     setPageIndex(0)
@@ -460,6 +471,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
 
   function clearStatusFilter() {
     setStatusFilter(new Set())
+    setPageIndex(0)
+  }
+
+  function clearTypeFilter() {
+    setTypeFilter(new Set())
     setPageIndex(0)
   }
 
@@ -598,6 +614,50 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                               statusIconStyles[option.value]
                             )}
                           />
+                          <span className="min-w-0 flex-1 truncate">
+                            {option.label}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Type
+                      {typeFilter.size > 0 ? (
+                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                          {typeFilter.size}
+                        </span>
+                      ) : null}
+                      <IconChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-60 rounded-lg bg-popover before:hidden"
+                  >
+                    {typeFilter.size > 0 ? (
+                      <>
+                        <DropdownMenuItem onSelect={clearTypeFilter}>
+                          Clear filter
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {issueTypeOptions.map((option) => {
+                      const OptionIcon = issueTypeIcons[option.value]
+
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={option.value}
+                          checked={typeFilter.has(option.value)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() => toggleTypeFilter(option.value)}
+                          className="gap-3"
+                        >
+                          <OptionIcon className="size-4" />
                           <span className="min-w-0 flex-1 truncate">
                             {option.label}
                           </span>
