@@ -40,6 +40,7 @@ import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { cn } from "@gentic/ui/utils"
 
 import { updateIssueStatus } from "./actions"
+import { BulkActionsToolbar } from "./bulk-actions-toolbar"
 import {
   formatDate,
   getIssuesColumns,
@@ -288,9 +289,19 @@ function IssuesTableView({
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection]
+  )
 
   return (
     <div className="grid gap-4">
+      {selectedIds.length > 0 ? (
+        <BulkActionsToolbar
+          selectedIds={selectedIds}
+          onDone={() => onRowSelectionChange({})}
+        />
+      ) : null}
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <DataTable table={table} columns={columns} />
       </div>
