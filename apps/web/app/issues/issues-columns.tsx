@@ -29,6 +29,7 @@ import {
 
 import type { HomeIssue } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
+import { Checkbox } from "@gentic/ui/checkbox"
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus, IssueType } from "@gentic/validators/issues"
 
@@ -219,17 +220,44 @@ export function getIssuesColumns(
 ): ColumnDef<HomeIssue>[] {
   return [
     {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
+          onCheckedChange={(value) =>
+            table.toggleAllPageRowsSelected(value === true)
+          }
+          onClick={(event) => event.stopPropagation()}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(value === true)}
+          onClick={(event) => event.stopPropagation()}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
       accessorKey: "title",
       header: ({ column }) => <SortableHeader label="Issue" column={column} />,
       cell: ({ row }) => {
         const issue = row.original
-        const TypeIcon = issueTypeIcons[issue.type]
-        const isBlocked = blockedIssueIds.has(issue.id)
 
         return (
           <Link
             href={`/issues/${issue.id}`}
-            className="flex min-w-0 flex-wrap items-center gap-2"
+            className="flex min-w-0 items-center gap-2"
           >
             <span
               className={cn(
@@ -239,22 +267,28 @@ export function getIssuesColumns(
             >
               {issue.title ?? "Generating title…"}
             </span>
-            <span
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                issueTypeStyles[issue.type]
-              )}
-            >
-              <TypeIcon className="size-3" />
-              {issueTypeLabels[issue.type]}
-            </span>
-            {isBlocked ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
-                <IconLock className="size-3" />
-                Blocked
-              </span>
-            ) : null}
           </Link>
+        )
+      },
+    },
+    {
+      id: "type",
+      accessorFn: (issue) => issueTypeLabels[issue.type],
+      header: ({ column }) => <SortableHeader label="Type" column={column} />,
+      cell: ({ row }) => {
+        const issue = row.original
+        const TypeIcon = issueTypeIcons[issue.type]
+
+        return (
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              issueTypeStyles[issue.type]
+            )}
+          >
+            <TypeIcon className="size-3" />
+            {issueTypeLabels[issue.type]}
+          </span>
         )
       },
     },
@@ -303,6 +337,20 @@ export function getIssuesColumns(
           </span>
         )
       },
+    },
+    {
+      id: "blocked",
+      accessorFn: (issue) => blockedIssueIds.has(issue.id),
+      header: ({ column }) => (
+        <SortableHeader label="Blocked" column={column} />
+      ),
+      cell: ({ row }) =>
+        blockedIssueIds.has(row.original.id) ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+            <IconLock className="size-3" />
+            Blocked
+          </span>
+        ) : null,
     },
     {
       accessorKey: "created_at",
