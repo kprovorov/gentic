@@ -183,6 +183,14 @@ export const issueTypeStyles: Record<IssueType, string> = {
   idea: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 }
 
+export const issueTypeOptions: { value: IssueType; label: string }[] = [
+  { value: "issue", label: issueTypeLabels.issue },
+  { value: "feature", label: issueTypeLabels.feature },
+  { value: "bug", label: issueTypeLabels.bug },
+  { value: "feedback", label: issueTypeLabels.feedback },
+  { value: "idea", label: issueTypeLabels.idea },
+]
+
 export function formatDate(value: string) {
   const date = new Date(value)
   const now = new Date()
