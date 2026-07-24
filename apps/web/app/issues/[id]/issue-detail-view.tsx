@@ -76,7 +76,7 @@ const statusStyles: Record<IssueStatus, string> = {
   todo: "bg-muted text-muted-foreground",
   queued: "bg-primary/15 text-primary-foreground",
   held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "in-progress": "bg-primary/15 text-primary-foreground",
+  "in-progress": "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "tests-failed": "bg-red-500/15 text-red-700 dark:text-red-300",
