@@ -2,13 +2,17 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { getCoreRowModel, useReactTable } from "@tanstack/react-table"
 import {
   IconCheck,
   IconChevronDown,
+  IconList,
   IconLock,
   IconPlus,
   IconSearch,
+  IconTable,
 } from "@tabler/icons-react"
 
 import { fetchIssuesData } from "@/app/client-queries"
@@ -16,6 +20,7 @@ import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
+import { DataTable } from "@gentic/ui/data-table"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,11 +28,13 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { Input } from "@gentic/ui/input"
+import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { cn } from "@gentic/ui/utils"
 
 import { updateIssueStatus } from "./actions"
 import {
   formatDate,
+  getIssuesColumns,
   issueTypeIcons,
   issueTypeLabels,
   issueTypeStyles,
@@ -37,6 +44,8 @@ import {
   statusOptions,
   statusOrder,
 } from "./issues-columns"
+
+type IssuesViewMode = "list" | "table"
 
 const pageSize = 20
 
@@ -220,7 +229,36 @@ function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
   )
 }
 
+function IssuesTableView({
+  issues,
+  blockedIssueIds,
+}: {
+  issues: HomeIssue[]
+  blockedIssueIds: Set<string>
+}) {
+  const columns = useMemo(
+    () => getIssuesColumns(blockedIssueIds),
+    [blockedIssueIds]
+  )
+  const table = useReactTable({
+    data: issues,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <DataTable table={table} columns={columns} />
+    </div>
+  )
+}
+
 export function IssuesView({ initialData }: { initialData: IssuesData }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const view: IssuesViewMode =
+    searchParams.get("view") === "table" ? "table" : "list"
   const { data } = useQuery({
     queryKey: queryKeys.issues,
     queryFn: fetchIssuesData,
@@ -295,6 +333,25 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     })
   }
 
+  function setView(nextView: string) {
+    if (!nextView || nextView === view) {
+      return
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+
+    if (nextView === "list") {
+      params.delete("view")
+    } else {
+      params.set("view", nextView)
+    }
+
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    })
+  }
+
   return (
     <div className="bg-background px-4 py-8 md:px-8">
       <RealtimeRefresh
@@ -336,16 +393,36 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
           </section>
         ) : (
           <section className="grid gap-4">
-            <div className="relative max-w-sm">
-              <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={globalFilter}
-                onChange={(event) => updateGlobalFilter(event.target.value)}
-                placeholder="Search issues…"
-                className="pl-9"
-              />
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative max-w-sm flex-1">
+                <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={globalFilter}
+                  onChange={(event) => updateGlobalFilter(event.target.value)}
+                  placeholder="Search issues…"
+                  className="pl-9"
+                />
+              </div>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={view}
+                onValueChange={setView}
+              >
+                <ToggleGroupItem value="list" aria-label="List view">
+                  <IconList />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="table" aria-label="Table view">
+                  <IconTable />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
-            {pagedIssues.length === 0 ? (
+            {view === "table" ? (
+              <IssuesTableView
+                issues={filteredIssues}
+                blockedIssueIds={blockedIssueIds}
+              />
+            ) : pagedIssues.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                 No results.
               </div>
@@ -417,32 +494,36 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 })}
               </div>
             )}
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                {filteredIssues.length} issue
-                {filteredIssues.length === 1 ? "" : "s"}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
-                  disabled={safePageIndex === 0}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setPageIndex(Math.min(pageCount - 1, safePageIndex + 1))
-                  }
-                  disabled={safePageIndex >= pageCount - 1}
-                >
-                  Next
-                </Button>
+            {view === "list" ? (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  {filteredIssues.length} issue
+                  {filteredIssues.length === 1 ? "" : "s"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPageIndex(Math.max(0, safePageIndex - 1))
+                    }
+                    disabled={safePageIndex === 0}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPageIndex(Math.min(pageCount - 1, safePageIndex + 1))
+                    }
+                    disabled={safePageIndex >= pageCount - 1}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </section>
         )}
       </div>
