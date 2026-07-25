@@ -5,12 +5,19 @@ import { runAuthLoginPrompt } from "./auth-login.js"
 import { getConfigInput } from "./config.js"
 import type { ConfigFile } from "./config-store.js"
 import {
+  detectHomebrew,
+  detectLinuxPackageManager,
+  detectPlatform,
+  spawnInteractive,
+} from "./installers.js"
+import {
+  checkGithub,
   formatToolStatus,
   getToolStatuses,
   type ToolStatus,
   type ToolStatuses,
 } from "./tools.js"
-import { intro, log, outro } from "./ui.js"
+import { cancel, confirm, intro, isCancel, log, outro } from "./ui.js"
 
 export type OnboardingRequirement =
   | "gentic-auth"
@@ -65,7 +72,24 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   { id: "worker", label: "Worker service" },
 ]
 
+export interface GithubInstallCommand {
+  command: string
+  args: string[]
+  display: string
+}
+
+interface GithubCliOnboardingDeps {
+  checkGithub?: () => Promise<ToolStatus>
+  confirm?: typeof confirm
+  platform?: NodeJS.Platform
+  path?: string
+  spawnInteractive?: typeof spawnInteractive
+  exit?: (code: number) => never
+}
+
 const ALL_AGENT_PROVIDERS: AgentProvider[] = ["claude_code", "codex"]
+const GITHUB_REQUIRED_MESSAGE =
+  "gh is required to run gentic. Install and authenticate GitHub CLI, then run onboarding again."
 
 function maskApiKey(apiKey: string): string {
   const suffix = apiKey.slice(-4)
@@ -213,18 +237,23 @@ async function runAuthStep(
   return login.cancelled ? "cancelled" : "completed"
 }
 
-function reportGithubStep(status: OnboardingStatus, ui: RunOnboardingDeps["ui"]): void {
+async function runGithubStep(
+  status: OnboardingStatus,
+  ui: RunOnboardingDeps["ui"]
+): Promise<void> {
   ui?.info(formatStep(1, ONBOARDING_STEPS[1].label))
-  if (!status.tools.github.installed) {
-    ui?.warn("GitHub CLI is not installed.")
-  } else if (!status.tools.github.authenticated) {
-    ui?.warn("GitHub CLI is installed but not authenticated.")
-  } else {
+  if (status.tools.github.installed && status.tools.github.authenticated) {
     ui?.success("GitHub CLI is installed and authenticated.")
+    return
   }
+
+  await ensureGithubCliForOnboarding()
 }
 
-function reportAgentStep(status: OnboardingStatus, ui: RunOnboardingDeps["ui"]): void {
+function reportAgentStep(
+  status: OnboardingStatus,
+  ui: RunOnboardingDeps["ui"]
+): void {
   ui?.info(formatStep(2, ONBOARDING_STEPS[2].label))
   const agentTools = getAgentTools(status.tools)
 
@@ -269,9 +298,86 @@ export async function runOnboarding(
     status = await getStatus()
   }
 
-  reportGithubStep(status, ui)
+  await runGithubStep(status, ui)
+  status = await getStatus()
   reportAgentStep(status, ui)
   reportWorkerStep(ui)
 
   ui.outro("Onboarding checks complete.")
+}
+
+export function getGithubInstallCommand(
+  platform: NodeJS.Platform = process.platform,
+  pathValue: string | undefined = process.env.PATH
+): GithubInstallCommand {
+  const supportedPlatform = detectPlatform(platform)
+
+  if (supportedPlatform === "darwin") {
+    if (!detectHomebrew(pathValue)) {
+      throw new Error(
+        "Homebrew is required to install gh on macOS. Install Homebrew from https://brew.sh/ and run onboarding again."
+      )
+    }
+    return {
+      command: "brew",
+      args: ["install", "gh"],
+      display: "brew install gh",
+    }
+  }
+
+  const manager = detectLinuxPackageManager(pathValue)
+  if (!manager) {
+    throw new Error(
+      "No supported Linux package manager found for installing gh. Install GitHub CLI from https://cli.github.com/ and run onboarding again."
+    )
+  }
+
+  return {
+    command: "sudo",
+    args: [manager, "install", "-y", "gh"],
+    display: `sudo ${manager} install -y gh`,
+  }
+}
+
+export async function ensureGithubCliForOnboarding(
+  deps: GithubCliOnboardingDeps = {}
+): Promise<void> {
+  const check = deps.checkGithub ?? checkGithub
+  const prompt = deps.confirm ?? confirm
+  const run = deps.spawnInteractive ?? spawnInteractive
+  const exit = deps.exit ?? process.exit
+
+  let status = await check()
+  if (status.installed && status.authenticated) return
+
+  if (!status.installed) {
+    const install = getGithubInstallCommand(deps.platform, deps.path)
+    const confirmed = await prompt({
+      message: `Install GitHub CLI with \`${install.display}\`?`,
+    })
+    if (isCancel(confirmed) || !confirmed) {
+      cancel(GITHUB_REQUIRED_MESSAGE)
+      exit(1)
+    }
+
+    await run(install.command, install.args)
+    status = await check()
+  }
+
+  if (!status.authenticated) {
+    const confirmed = await prompt({
+      message: "Authenticate GitHub CLI with `gh auth login`?",
+    })
+    if (isCancel(confirmed) || !confirmed) {
+      cancel(GITHUB_REQUIRED_MESSAGE)
+      exit(1)
+    }
+
+    await run("gh", ["auth", "login"])
+    const authenticated = await check()
+    if (!authenticated.authenticated) {
+      log.error("GitHub CLI is still not authenticated.")
+      exit(1)
+    }
+  }
 }

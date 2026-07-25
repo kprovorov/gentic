@@ -5,6 +5,7 @@ import { delimiter, join } from "node:path"
 import { test } from "node:test"
 
 import {
+  detectHomebrew,
   detectLinuxPackageManager,
   detectPlatform,
   spawnInteractive,
@@ -56,6 +57,20 @@ test("detectLinuxPackageManager skips non-executable matches", async () => {
 
 test("detectLinuxPackageManager returns null when no supported manager is found", () => {
   assert.equal(detectLinuxPackageManager(""), null)
+})
+
+test("detectHomebrew reports whether brew is executable on PATH", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gentic-installers-brew-"))
+  try {
+    const brew = join(dir, "brew")
+    await writeFile(brew, "#!/bin/sh\nexit 0\n")
+    await chmod(brew, 0o755)
+
+    assert.equal(detectHomebrew(dir), true)
+    assert.equal(detectHomebrew(""), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test("spawnInteractive resolves for a zero exit code", async () => {

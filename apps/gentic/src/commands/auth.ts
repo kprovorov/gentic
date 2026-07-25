@@ -18,6 +18,7 @@ import {
 } from "../config-store.js"
 import { logError, logInfo } from "../log.js"
 import {
+  ensureGithubCliForOnboarding,
   formatOnboardingUnmet,
   getOnboardingStatus,
 } from "../onboarding.js"
@@ -131,32 +132,35 @@ export async function loginInteractive(): Promise<void> {
     return
   }
 
+  const selectedAgentProviders = parseAgentProviders(agentSelection)
   writeConfigFile({
     GENTIC_API_URL: login.apiUrl,
-    AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+    AGENT_PROVIDERS: selectedAgentProviders,
   })
+
+  await ensureGithubCliForOnboarding()
 
   let current = await getOnboardingStatus({
     configInput: {
       ...getConfigInput(),
-      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+      AGENT_PROVIDERS: selectedAgentProviders,
     },
   })
   const completedSetup = await setupSelectedAgentCLIs(
-    parseAgentProviders(agentSelection),
+    selectedAgentProviders,
     current.tools
   )
   if (!completedSetup) return
   current = await getOnboardingStatus({
     configInput: {
       ...getConfigInput(),
-      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+      AGENT_PROVIDERS: selectedAgentProviders,
     },
   })
 
   if (login.apiKeyConfigured && current.ready) {
     outro(
-      `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
+      `Saved to ${configFilePath()} (${formatAgentProviders(selectedAgentProviders)})`
     )
     return
   }
