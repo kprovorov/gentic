@@ -11,7 +11,7 @@ export default async function LoginPage() {
   const { userId } = await auth()
 
   if (userId) {
-    redirect("/")
+    redirect("/home")
   }
 
   return <SignIn path="/login" signUpUrl="/register" />
