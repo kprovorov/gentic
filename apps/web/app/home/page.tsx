@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { getHomeData } from "@/app/queries"
+import { getNewIssueData } from "@/app/queries"
 
 import { HomeView } from "./home-view"
 
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  const initialData = await getHomeData()
+  const initialData = await getNewIssueData()
 
   return <HomeView initialData={initialData} />
 }
