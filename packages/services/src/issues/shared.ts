@@ -1,7 +1,8 @@
 import type { Tables } from "@gentic/supabase/types"
 import type { ChatMessageContract } from "@gentic/validators/realtime"
 
-export const ISSUE_WITH_PROJECT_SELECT = "*, projects!inner(id,name,repo,user_id)"
+export const ISSUE_WITH_PROJECT_SELECT =
+  "*, projects!inner(id,name,repo,user_id,key)"
 
 type IssueRow = Tables<"issues">
 type IssueRelationRow = Tables<"issue_relations">
@@ -27,4 +28,8 @@ export type UserChatMessage = ChatMessageContract & {
   role: "user"
   kind: "text"
   status: "complete"
+}
+
+export function getIssueCode(projectKey: string, issueNumber: number) {
+  return `${projectKey}-${issueNumber}`
 }
