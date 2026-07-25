@@ -88,9 +88,18 @@ interface GithubCliOnboardingDeps {
   exit?: (code: number) => never
 }
 
+interface AgentCliOnboardingDeps {
+  configInput?: Partial<ConfigFile>
+  getStatus?: (deps?: OnboardingStatusDeps) => Promise<OnboardingStatus>
+  cancel?: typeof cancel
+  exit?: (code: number) => never
+}
+
 const ALL_AGENT_PROVIDERS: AgentProvider[] = ["claude_code", "codex"]
 const GITHUB_REQUIRED_MESSAGE =
   "gh is required to run gentic. Install and authenticate GitHub CLI, then run onboarding again."
+const AGENT_REQUIRED_MESSAGE =
+  "at least one agent (claude or codex) must be authenticated to run gentic"
 
 function maskApiKey(apiKey: string): string {
   const suffix = apiKey.slice(-4)
@@ -382,4 +391,23 @@ export async function ensureGithubCliForOnboarding(
       exit(1)
     }
   }
+}
+
+export async function ensureAgentCliForOnboarding(
+  deps: AgentCliOnboardingDeps = {}
+): Promise<OnboardingStatus> {
+  const getStatus = deps.getStatus ?? getOnboardingStatus
+  const cancelPrompt = deps.cancel ?? cancel
+  const exit = deps.exit ?? process.exit
+  const status = await getStatus(
+    deps.configInput ? { configInput: deps.configInput } : undefined
+  )
+
+  const hasAuthenticatedAgent = getAgentTools(status.tools).some(
+    (tool) => tool.installed && tool.authenticated
+  )
+  if (hasAuthenticatedAgent) return status
+
+  cancelPrompt(AGENT_REQUIRED_MESSAGE)
+  return exit(1)
 }

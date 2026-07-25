@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { test } from "node:test"
 
 import {
+  ensureAgentCliForOnboarding,
   ensureGithubCliForOnboarding,
   formatOnboardingUnmet,
   getGithubInstallCommand,
@@ -297,7 +298,7 @@ test("ensureGithubCliForOnboarding installs and authenticates gh", async () => {
 test("ensureGithubCliForOnboarding exits immediately when install is declined", async () => {
   const dir = await mkdtemp(join(tmpdir(), "gentic-onboarding-decline-"))
   let exitCode: number | undefined
-  let cancelMessage: string | undefined
+  let message: string | undefined
 
   try {
     const aptGet = join(dir, "apt-get")
@@ -310,8 +311,8 @@ test("ensureGithubCliForOnboarding exits immediately when install is declined", 
         path: dir,
         checkGithub: async () => missingTool,
         confirm: async () => false,
-        cancel: (message) => {
-          cancelMessage = message
+        cancel: (value) => {
+          message = value
         },
         spawnInteractive: async () => {
           throw new Error("should not spawn")
@@ -327,6 +328,75 @@ test("ensureGithubCliForOnboarding exits immediately when install is declined", 
     await rm(dir, { recursive: true, force: true })
   }
 
+  assert.equal(
+    message,
+    "gh is required to run gentic. Install and authenticate GitHub CLI, then run onboarding again."
+  )
   assert.equal(exitCode, 1)
-  assert.match(cancelMessage ?? "", /gh is required to run gentic/)
+})
+
+test("ensureAgentCliForOnboarding returns live status when one agent is authenticated", async () => {
+  const status = await ensureAgentCliForOnboarding({
+    getStatus: async () => ({
+      ready: true,
+      auth: {
+        authenticated: true,
+        apiUrl: "https://gentic.example/api/v1",
+        maskedApiKey: "tes...-key",
+        missing: [],
+      },
+      agentProviders: ["claude_code", "codex"],
+      tools: {
+        github: readyTool,
+        claude: missingTool,
+        codex: readyTool,
+      },
+      unmet: [],
+    }),
+    exit: () => {
+      throw new Error("exit should not be called")
+    },
+  })
+
+  assert.equal(status.tools.codex?.authenticated, true)
+})
+
+test("ensureAgentCliForOnboarding exits immediately when no agent is authenticated", async () => {
+  let exitCode: number | undefined
+  let message: string | undefined
+
+  await assert.rejects(
+    ensureAgentCliForOnboarding({
+      getStatus: async () => ({
+        ready: false,
+        auth: {
+          authenticated: true,
+          apiUrl: "https://gentic.example/api/v1",
+          maskedApiKey: "tes...-key",
+          missing: [],
+        },
+        agentProviders: ["claude_code", "codex"],
+        tools: {
+          github: readyTool,
+          claude: missingTool,
+          codex: { ...readyTool, authenticated: false },
+        },
+        unmet: ["agent-cli-authenticated"],
+      }),
+      cancel: (value) => {
+        message = value
+      },
+      exit: (code): never => {
+        exitCode = code
+        throw new Error("exited")
+      },
+    }),
+    /exited/
+  )
+
+  assert.equal(
+    message,
+    "at least one agent (claude or codex) must be authenticated to run gentic"
+  )
+  assert.equal(exitCode, 1)
 })
