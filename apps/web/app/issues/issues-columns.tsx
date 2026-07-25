@@ -35,6 +35,7 @@ import { toast } from "sonner"
 
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
+import { getIssueHref } from "@/app/issues/urls"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -403,10 +404,11 @@ export function getIssuesColumns(
       header: ({ column }) => <SortableHeader label="Issue" column={column} />,
       cell: ({ row }) => {
         const issue = row.original
+        const issueHref = getIssueHref(issue) ?? "/issues"
 
         return (
           <Link
-            href={`/issues/${issue.id}`}
+            href={issueHref}
             className="flex min-w-0 items-center gap-2"
           >
             <span

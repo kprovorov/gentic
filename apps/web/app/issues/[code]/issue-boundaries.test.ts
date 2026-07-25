@@ -10,17 +10,23 @@ function readRouteFile(name: string) {
   return readFileSync(join(routeDir, name), "utf8")
 }
 
+function readDetailRouteFile(name: string) {
+  return readFileSync(join(routeDir, "[[...slug]]", name), "utf8")
+}
+
 function startsWithUseClient(source: string) {
   return source.trimStart().startsWith('"use client"')
 }
 
 test("issue detail page and shell remain server-owned", () => {
-  const page = readRouteFile("page.tsx")
+  const page = readDetailRouteFile("page.tsx")
   const detailView = readRouteFile("issue-detail-view.tsx")
 
   assert.equal(startsWithUseClient(page), false)
   assert.equal(startsWithUseClient(detailView), false)
-  assert.match(page, /await getIssueDetailData\(id\)/)
+  assert.match(page, /await getIssueDetailData\(/)
+  assert.match(page, /parseIssueCode\(code\)/)
+  assert.match(page, /redirect\(canonicalHref\)/)
   assert.match(page, /<IssueDetailView data=\{data\} \/>/)
   assert.doesNotMatch(detailView, /useQuery\(/)
   assert.doesNotMatch(detailView, /getIssueDetailData/)

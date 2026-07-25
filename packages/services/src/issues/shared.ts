@@ -8,7 +8,12 @@ type IssueRow = Tables<"issues">
 type IssueRelationRow = Tables<"issue_relations">
 type IssuePullRequestRow = Tables<"issue_pull_requests">
 
-export type IssueRelationIssue = Pick<IssueRow, "id" | "title" | "status">
+export type IssueRelationIssue = Pick<
+  IssueRow,
+  "id" | "number" | "title" | "status"
+> & {
+  projects: Pick<Tables<"projects">, "key"> | null
+}
 
 export type IssueRelation = Pick<
   IssueRelationRow,

@@ -82,7 +82,7 @@ export async function listIssueRelationCandidates(
   return unwrap(
     await supabase
       .from("issues")
-      .select("id,title,status,projects!inner(user_id)")
+      .select("id,number,title,status,projects!inner(key,user_id)")
       .eq("projects.user_id", userId)
       .neq("id", issueId)
       .order("created_at", { ascending: false })
@@ -101,7 +101,7 @@ export async function listIssueRelations(
     await supabase
       .from("issue_relations")
       .select(
-        "id,source_issue_id,target_issue_id,type,created_at,source_issue:issues!issue_relations_source_issue_id_fkey(id,title,status),target_issue:issues!issue_relations_target_issue_id_fkey(id,title,status)"
+        "id,source_issue_id,target_issue_id,type,created_at,source_issue:issues!issue_relations_source_issue_id_fkey(id,number,title,status,projects(key)),target_issue:issues!issue_relations_target_issue_id_fkey(id,number,title,status,projects(key))"
       )
       .or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`)
       .order("created_at", { ascending: false })

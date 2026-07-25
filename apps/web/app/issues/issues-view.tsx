@@ -27,6 +27,7 @@ import {
 import { fetchIssuesData } from "@/app/client-queries"
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import { getIssueHref } from "@/app/issues/urls"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import { DataTable } from "@gentic/ui/data-table"
@@ -111,13 +112,14 @@ function IssueRow({
   isBlocking: boolean
 }) {
   const TypeIcon = issueTypeIcons[issue.type]
+  const issueHref = getIssueHref(issue) ?? "/issues"
 
   return (
     <div className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <IssueStatusMenu issue={issue} />
         <Link
-          href={`/issues/${issue.id}`}
+          href={issueHref}
           className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {issue.code ? (
