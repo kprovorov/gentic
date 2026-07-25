@@ -13,6 +13,7 @@ import {
 } from "../config-store.js"
 import { logError, logInfo } from "../log.js"
 import {
+  ensureAgentCliForOnboarding,
   ensureGithubCliForOnboarding,
   formatOnboardingUnmet,
   getOnboardingStatus,
@@ -199,7 +200,7 @@ export async function loginInteractive(): Promise<void> {
     current.tools
   )
   if (!completedSetup) return
-  current = await getOnboardingStatus({
+  current = await ensureAgentCliForOnboarding({
     configInput: {
       ...getConfigInput(),
       AGENT_PROVIDERS: selectedAgentProviders,

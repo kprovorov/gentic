@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { test } from "node:test"
 
 import {
+  ensureAgentCliForOnboarding,
   ensureGithubCliForOnboarding,
   formatOnboardingUnmet,
   getGithubInstallCommand,
@@ -225,5 +226,71 @@ test("ensureGithubCliForOnboarding exits immediately when install is declined", 
     await rm(dir, { recursive: true, force: true })
   }
 
+  assert.equal(exitCode, 1)
+})
+
+test("ensureAgentCliForOnboarding returns live status when one agent is authenticated", async () => {
+  const status = await ensureAgentCliForOnboarding({
+    getStatus: async () => ({
+      ready: true,
+      auth: {
+        authenticated: true,
+        apiUrl: "https://gentic.example/api/v1",
+        maskedApiKey: "tes...-key",
+        missing: [],
+      },
+      agentProviders: ["claude_code", "codex"],
+      tools: {
+        github: readyTool,
+        claude: missingTool,
+        codex: readyTool,
+      },
+      unmet: [],
+    }),
+    exit: () => {
+      throw new Error("exit should not be called")
+    },
+  })
+
+  assert.equal(status.tools.codex?.authenticated, true)
+})
+
+test("ensureAgentCliForOnboarding exits immediately when no agent is authenticated", async () => {
+  let exitCode: number | undefined
+  let message: string | undefined
+
+  await assert.rejects(
+    ensureAgentCliForOnboarding({
+      getStatus: async () => ({
+        ready: false,
+        auth: {
+          authenticated: true,
+          apiUrl: "https://gentic.example/api/v1",
+          maskedApiKey: "tes...-key",
+          missing: [],
+        },
+        agentProviders: ["claude_code", "codex"],
+        tools: {
+          github: readyTool,
+          claude: missingTool,
+          codex: { ...readyTool, authenticated: false },
+        },
+        unmet: ["agent-cli-authenticated"],
+      }),
+      cancel: (value) => {
+        message = value
+      },
+      exit: (code): never => {
+        exitCode = code
+        throw new Error("exited")
+      },
+    }),
+    /exited/
+  )
+
+  assert.equal(
+    message,
+    "at least one agent (claude or codex) must be authenticated to run gentic"
+  )
   assert.equal(exitCode, 1)
 })
