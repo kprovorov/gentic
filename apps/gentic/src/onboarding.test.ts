@@ -200,6 +200,7 @@ test("ensureGithubCliForOnboarding installs and authenticates gh", async () => {
 test("ensureGithubCliForOnboarding exits immediately when install is declined", async () => {
   const dir = await mkdtemp(join(tmpdir(), "gentic-onboarding-decline-"))
   let exitCode: number | undefined
+  let message: string | undefined
 
   try {
     const aptGet = join(dir, "apt-get")
@@ -212,6 +213,9 @@ test("ensureGithubCliForOnboarding exits immediately when install is declined", 
         path: dir,
         checkGithub: async () => missingTool,
         confirm: async () => false,
+        cancel: (value) => {
+          message = value
+        },
         spawnInteractive: async () => {
           throw new Error("should not spawn")
         },
@@ -226,6 +230,10 @@ test("ensureGithubCliForOnboarding exits immediately when install is declined", 
     await rm(dir, { recursive: true, force: true })
   }
 
+  assert.equal(
+    message,
+    "gh is required to run gentic. Install and authenticate GitHub CLI, then run onboarding again."
+  )
   assert.equal(exitCode, 1)
 })
 

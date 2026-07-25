@@ -53,6 +53,7 @@ export interface GithubInstallCommand {
 interface GithubCliOnboardingDeps {
   checkGithub?: () => Promise<ToolStatus>
   confirm?: typeof confirm
+  cancel?: typeof cancel
   platform?: NodeJS.Platform
   path?: string
   spawnInteractive?: typeof spawnInteractive
@@ -233,6 +234,7 @@ export async function ensureGithubCliForOnboarding(
 ): Promise<void> {
   const check = deps.checkGithub ?? checkGithub
   const prompt = deps.confirm ?? confirm
+  const cancelPrompt = deps.cancel ?? cancel
   const run = deps.spawnInteractive ?? spawnInteractive
   const exit = deps.exit ?? process.exit
 
@@ -245,7 +247,7 @@ export async function ensureGithubCliForOnboarding(
       message: `Install GitHub CLI with \`${install.display}\`?`,
     })
     if (isCancel(confirmed) || !confirmed) {
-      cancel(GITHUB_REQUIRED_MESSAGE)
+      cancelPrompt(GITHUB_REQUIRED_MESSAGE)
       exit(1)
     }
 
@@ -258,7 +260,7 @@ export async function ensureGithubCliForOnboarding(
       message: "Authenticate GitHub CLI with `gh auth login`?",
     })
     if (isCancel(confirmed) || !confirmed) {
-      cancel(GITHUB_REQUIRED_MESSAGE)
+      cancelPrompt(GITHUB_REQUIRED_MESSAGE)
       exit(1)
     }
 
