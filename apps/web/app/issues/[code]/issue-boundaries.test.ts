@@ -38,6 +38,7 @@ test("issue detail interactive sections are explicit client islands", () => {
     "issue-status-controls.tsx",
     "issue-relations.tsx",
     "attachments.tsx",
+    "issue-slug-url-sync.tsx",
   ]
 
   for (const file of clientIslandFiles) {
@@ -49,6 +50,10 @@ test("issue detail interactive sections are explicit client islands", () => {
   assert.match(detailView, /<IssueStatusControls\n\s+issueId=\{issue\.id\}/)
   assert.match(detailView, /<IssueRelations\n\s+issueId=\{issue\.id\}/)
   assert.match(detailView, /<Attachments issueId=\{issue\.id\}/)
+  assert.match(
+    detailView,
+    /<IssueSlugUrlSync key=\{issue\.title \?\? ""\} issue=\{issue\} \/>/
+  )
 })
 
 test("message realtime stays inside the chat island", () => {
