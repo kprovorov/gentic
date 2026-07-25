@@ -15,7 +15,10 @@ import {
 } from "@tanstack/react-table"
 import {
   IconChevronDown,
+  IconCircleCheck,
+  IconGitBranch,
   IconGitMerge,
+  IconLinkOff,
   IconList,
   IconLock,
   IconPlus,
@@ -36,6 +39,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
@@ -60,15 +65,57 @@ import {
 } from "./issues-columns"
 
 type IssuesViewMode = "list" | "table"
-type BlockingFilter = "all" | "blocking" | "non-blocking"
+type RelationFilter = "all" | "blocked" | "blocking" | "non-blocking"
 
 const pageSize = 20
 
-const blockingFilterLabels: Record<BlockingFilter, string> = {
+const relationFilterOptions: {
+  value: RelationFilter
+  label: string
+  icon: typeof IconCircleCheck
+  className: string
+  chipClassName: string
+}[] = [
+  {
+    value: "all",
+    label: "All",
+    icon: IconCircleCheck,
+    className: "text-muted-foreground",
+    chipClassName: "bg-muted text-muted-foreground",
+  },
+  {
+    value: "blocked",
+    label: "Blocked",
+    icon: IconLock,
+    className: "text-red-600 dark:text-red-300",
+    chipClassName: "bg-red-500/15 text-red-700 dark:text-red-300",
+  },
+  {
+    value: "blocking",
+    label: "Blocking",
+    icon: IconGitBranch,
+    className: "text-amber-600 dark:text-amber-300",
+    chipClassName: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  },
+  {
+    value: "non-blocking",
+    label: "Non-blocking",
+    icon: IconLinkOff,
+    className: "text-muted-foreground",
+    chipClassName: "bg-muted text-foreground",
+  },
+]
+
+const relationFilterLabels: Record<RelationFilter, string> = {
   all: "All",
+  blocked: "Blocked",
   blocking: "Blocking",
   "non-blocking": "Non-blocking",
 }
+
+const relationFilterChipStyles = Object.fromEntries(
+  relationFilterOptions.map((option) => [option.value, option.chipClassName])
+) as Record<RelationFilter, string>
 
 function matchesIssue(issue: HomeIssue, filterValue: string) {
   const haystack = [
@@ -308,7 +355,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [typeFilter, setTypeFilter] = useState<Set<HomeIssue["type"]>>(
     () => new Set()
   )
-  const [blockingFilter, setBlockingFilter] = useState<BlockingFilter>("all")
+  const [relationFilter, setRelationFilter] = useState<RelationFilter>("all")
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
@@ -316,7 +363,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     globalFilter.length > 0 ||
     statusFilter.size > 0 ||
     typeFilter.size > 0 ||
-    blockingFilter !== "all" ||
+    relationFilter !== "all" ||
     projectFilter.size > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
@@ -344,10 +391,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         .filter((issue) => typeFilter.size === 0 || typeFilter.has(issue.type))
         .filter(
           (issue) =>
-            blockingFilter === "all" ||
-            (blockingFilter === "blocking"
-              ? blockingIssueIds.has(issue.id)
-              : !blockingIssueIds.has(issue.id))
+            relationFilter === "all" ||
+            (relationFilter === "blocked"
+              ? blockedIssueIds.has(issue.id)
+              : relationFilter === "blocking"
+                ? blockingIssueIds.has(issue.id)
+                : !blockingIssueIds.has(issue.id))
         )
         .filter(
           (issue) =>
@@ -360,7 +409,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       globalFilter,
       statusFilter,
       typeFilter,
-      blockingFilter,
+      relationFilter,
+      blockedIssueIds,
       blockingIssueIds,
       projectFilter,
     ]
@@ -369,7 +419,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     globalFilter,
     Array.from(statusFilter).sort().join(","),
     Array.from(typeFilter).sort().join(","),
-    blockingFilter,
+    relationFilter,
     Array.from(projectFilter).sort().join(","),
   ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
@@ -425,8 +475,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setPageIndex(0)
   }
 
-  function updateBlockingFilter(value: BlockingFilter) {
-    setBlockingFilter(value)
+  function updateRelationFilter(value: RelationFilter) {
+    setRelationFilter(value)
     setPageIndex(0)
   }
 
@@ -449,7 +499,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setGlobalFilter("")
     setStatusFilter(new Set())
     setTypeFilter(new Set())
-    setBlockingFilter("all")
+    setRelationFilter("all")
     setProjectFilter(new Set())
     setPageIndex(0)
   }
@@ -637,10 +687,15 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
-                      Blocking
-                      {blockingFilter !== "all" ? (
-                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
-                          {blockingFilterLabels[blockingFilter]}
+                      Blockers
+                      {relationFilter !== "all" ? (
+                        <span
+                          className={cn(
+                            "ml-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium",
+                            relationFilterChipStyles[relationFilter]
+                          )}
+                        >
+                          {relationFilterLabels[relationFilter]}
                         </span>
                       ) : null}
                       <IconChevronDown className="size-3.5" />
@@ -650,29 +705,31 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     align="start"
                     className="w-60 rounded-lg bg-popover before:hidden"
                   >
-                    {(["all", "blocking", "non-blocking"] as const).map(
-                      (option) => (
-                        <DropdownMenuCheckboxItem
-                          key={option}
-                          checked={blockingFilter === option}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() => updateBlockingFilter(option)}
-                          className="gap-3"
-                        >
-                          <IconGitMerge
-                            className={cn(
-                              "size-4",
-                              option === "blocking"
-                                ? "text-amber-600 dark:text-amber-300"
-                                : "text-muted-foreground"
-                            )}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {blockingFilterLabels[option]}
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    )}
+                    <DropdownMenuRadioGroup
+                      value={relationFilter}
+                      onValueChange={(value) =>
+                        updateRelationFilter(value as RelationFilter)
+                      }
+                    >
+                      {relationFilterOptions.map((option) => {
+                        const OptionIcon = option.icon
+
+                        return (
+                          <DropdownMenuRadioItem
+                            key={option.value}
+                            value={option.value}
+                            className="gap-3"
+                          >
+                            <OptionIcon
+                              className={cn("size-4", option.className)}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {option.label}
+                            </span>
+                          </DropdownMenuRadioItem>
+                        )
+                      })}
+                    </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <DropdownMenu>
