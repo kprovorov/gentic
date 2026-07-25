@@ -24,6 +24,7 @@ export {
   updateIssue,
 } from "./issues/mutations"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
+export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
   getIssueRepo,
