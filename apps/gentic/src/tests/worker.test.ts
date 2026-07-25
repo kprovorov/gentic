@@ -35,14 +35,20 @@ test("consumes persisted prompts in order, dedupes in-flight fetches, and acks p
 
     await processIssue(api, config, issue, deps)
 
-    assert.deepEqual(prompts, ["Initial prompt", "Live middle", "Backlog later"])
+    assert.deepEqual(prompts, [
+      "Initial prompt",
+      "Live middle",
+      "Backlog later",
+    ])
     assert.deepEqual(api.acked, [
       { issueId: issue.id, runId: issue.activeRunId, messageIds: ["initial"] },
       { issueId: issue.id, runId: issue.activeRunId, messageIds: ["middle"] },
       { issueId: issue.id, runId: issue.activeRunId, messageIds: ["later"] },
     ])
     assert.deepEqual(
-      api.runStates.map((entry) => entry.fields.status ?? entry.fields.session_id),
+      api.runStates.map(
+        (entry) => entry.fields.status ?? entry.fields.session_id
+      ),
       ["in-progress", "session-1"]
     )
     assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
@@ -56,7 +62,10 @@ test("finish-window prompts keep the run open and are processed before final sta
     api.finishResults = [false, true]
     api.onFinishAttempt = (attempt) => {
       if (attempt === 1) {
-        api.addMessage(issue.id, message("follow-up", "Finish-window prompt", 2))
+        api.addMessage(
+          issue.id,
+          message("follow-up", "Finish-window prompt", 2)
+        )
       }
     }
 
@@ -76,13 +85,15 @@ test("finish-window prompts keep the run open and are processed before final sta
     assert.deepEqual(prompts, ["Initial prompt", "Finish-window prompt"])
     assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
     assert.deepEqual(
-      api.runStates.map((entry) => entry.fields.status ?? entry.fields.session_id),
+      api.runStates.map(
+        (entry) => entry.fields.status ?? entry.fields.session_id
+      ),
       ["in-progress", "session-0", "in-progress", "in-progress", "session-1"]
     )
-    assert.deepEqual(api.acked.map((entry) => entry.messageIds), [
-      ["initial"],
-      ["follow-up"],
-    ])
+    assert.deepEqual(
+      api.acked.map((entry) => entry.messageIds),
+      [["initial"], ["follow-up"]]
+    )
   })
 })
 
@@ -205,6 +216,7 @@ async function withHarness(
     const config: Config = {
       GENTIC_API_KEY: "test-key",
       GENTIC_API_URL: "https://gentic.example",
+      AGENT_PROVIDERS: ["claude_code"],
       GIT_REMOTE_BASE: "git@github.com:",
       WORKDIR: workdir,
       POLL_INTERVAL_MS: 1,
@@ -277,7 +289,8 @@ function fakeChannel(api: FakeApi): IssueRealtimeChannel {
 class FakeApi implements AgentApi {
   readonly messages = new Map<string, UserMessage[]>()
   readonly ackedIds = new Map<string, Set<string>>()
-  readonly acked: { issueId: string; runId: string; messageIds: string[] }[] = []
+  readonly acked: { issueId: string; runId: string; messageIds: string[] }[] =
+    []
   readonly runStates: { issueId: string; fields: RunStateFields }[] = []
   readonly finishedStatuses: string[] = []
   readonly publishedRunStates: string[] = []

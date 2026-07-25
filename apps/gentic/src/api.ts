@@ -1,5 +1,6 @@
 import {
   attachmentsResponseSchema,
+  claimIssueInputSchema,
   claimIssueResponseSchema,
   finishRunResponseSchema,
   insertMessageResponseSchema,
@@ -17,6 +18,8 @@ import {
   type UserMessage,
 } from "@gentic/validators/agent"
 import type { z } from "zod"
+
+import type { AgentProvider } from "./agents.js"
 
 export type {
   AckMessagesInput,
@@ -53,8 +56,12 @@ export interface AgentApi {
 export function createAgentApi(input: {
   apiUrl: string
   apiKey: string
+  agentProviders?: AgentProvider[]
 }): AgentApi {
   const apiUrl = input.apiUrl.replace(/\/+$/, "")
+  const claimInput = claimIssueInputSchema.parse({
+    agent_providers: input.agentProviders,
+  })
 
   async function request<T>(
     path: string,
@@ -98,7 +105,7 @@ export function createAgentApi(input: {
       const data = await request(
         "/agent/issues/claim",
         claimIssueResponseSchema,
-        { method: "POST" }
+        { method: "POST", body: claimInput }
       )
       return data.issue
     },

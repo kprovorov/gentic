@@ -15,10 +15,7 @@ import {
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import { createPendingMessagePromptSource } from "./pending-messages.js"
-import {
-  connectIssueChannel,
-  type IssueRealtimeChannel,
-} from "./realtime.js"
+import { connectIssueChannel, type IssueRealtimeChannel } from "./realtime.js"
 import { runAgentSession } from "./session.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 
@@ -51,6 +48,7 @@ export async function runWorker(): Promise<void> {
   const api = createAgentApi({
     apiUrl: config.GENTIC_API_URL,
     apiKey: config.GENTIC_API_KEY,
+    agentProviders: config.AGENT_PROVIDERS,
   })
 
   let running = true
@@ -70,7 +68,10 @@ export async function runWorker(): Promise<void> {
     if (activeRuns.size >= config.MAX_CONCURRENT_ISSUES) {
       // Wake promptly when a run frees a slot, but periodically re-check the
       // stop flag when every slot remains occupied.
-      await Promise.race([Promise.race(activeRuns), sleep(config.POLL_INTERVAL_MS)])
+      await Promise.race([
+        Promise.race(activeRuns),
+        sleep(config.POLL_INTERVAL_MS),
+      ])
       continue
     }
 
@@ -152,17 +153,15 @@ export async function processIssue(
       },
     })
 
-    channel = await deps.connectIssueChannel(
-      api,
-      issue.id,
-      promptSource.wake
-    ).catch((error) => {
-      logError(
-        `issue ${issue.id} realtime unavailable; continuing with database polling:`,
-        describe(error)
-      )
-      return createNoopIssueChannel()
-    })
+    channel = await deps
+      .connectIssueChannel(api, issue.id, promptSource.wake)
+      .catch((error) => {
+        logError(
+          `issue ${issue.id} realtime unavailable; continuing with database polling:`,
+          describe(error)
+        )
+        return createNoopIssueChannel()
+      })
 
     await rm(attachmentsDir, { recursive: true, force: true })
 
@@ -213,15 +212,12 @@ export async function processIssue(
     })
 
     const prUrl = await deps.getPullRequestUrl(dir)
-    const { finished, status: finishedStatus } = await api.finishRun(
-      issue.id,
-      {
-        active_run_id: issue.activeRunId,
-        status: prUrl ? "ready-for-review" : "waiting-for-input",
-        run_finished_at: new Date().toISOString(),
-        ...(prUrl ? { pr_url: prUrl } : {}),
-      }
-    )
+    const { finished, status: finishedStatus } = await api.finishRun(issue.id, {
+      active_run_id: issue.activeRunId,
+      status: prUrl ? "ready-for-review" : "waiting-for-input",
+      run_finished_at: new Date().toISOString(),
+      ...(prUrl ? { pr_url: prUrl } : {}),
+    })
     if (!finished) {
       logInfo(
         `issue ${issue.id} received more prompts before finish; re-queueing`
@@ -255,26 +251,30 @@ export async function processIssue(
       logInfo(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
-      await deps.setRunState(api, channel, issue.id, {
-        status: "held",
-        run_error: message,
-        run_finished_at: new Date().toISOString(),
-        usage_limit_reset_at: usageLimitResetAt,
-      }).catch((updateError) => {
-        logError("failed to record usage-limit hold:", describe(updateError))
-      })
+      await deps
+        .setRunState(api, channel, issue.id, {
+          status: "held",
+          run_error: message,
+          run_finished_at: new Date().toISOString(),
+          usage_limit_reset_at: usageLimitResetAt,
+        })
+        .catch((updateError) => {
+          logError("failed to record usage-limit hold:", describe(updateError))
+        })
       return
     }
 
     logError(`issue ${issue.id} failed:`, message)
-    await deps.setRunState(api, channel, issue.id, {
-      status: "run-failed",
-      run_error: message,
-      run_finished_at: new Date().toISOString(),
-      usage_limit_reset_at: null,
-    }).catch((updateError) => {
-      logError("failed to record run failure:", describe(updateError))
-    })
+    await deps
+      .setRunState(api, channel, issue.id, {
+        status: "run-failed",
+        run_error: message,
+        run_finished_at: new Date().toISOString(),
+        usage_limit_reset_at: null,
+      })
+      .catch((updateError) => {
+        logError("failed to record run failure:", describe(updateError))
+      })
   } finally {
     if (channel) {
       await channel.close().catch((closeError) => {

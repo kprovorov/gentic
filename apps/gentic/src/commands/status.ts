@@ -1,5 +1,6 @@
 import type { Command } from "commander"
 
+import { formatAgentProviders } from "../agents.js"
 import { getServiceBackend } from "../service/index.js"
 import type { ServiceScope, ServiceStatus } from "../service/index.js"
 import { formatToolStatus, getToolStatuses } from "../tools.js"
@@ -31,11 +32,13 @@ function formatUptime(since: Date): string {
 }
 
 function toolsJson(tools: ToolStatuses) {
-  return {
-    github: tools.github,
-    claude: tools.claude,
-    codex: tools.codex,
-  }
+  return Object.fromEntries(
+    Object.entries({
+      github: tools.github,
+      claude: tools.claude,
+      codex: tools.codex,
+    }).filter(([, value]) => value !== undefined)
+  )
 }
 
 // Only colorize when stdout is a real terminal and the user hasn't opted out
@@ -53,11 +56,9 @@ function statusIcon(status: ToolStatus): string {
 }
 
 function formatToolLines(tools: ToolStatuses): string[] {
-  const rows: [string, ToolStatus][] = [
-    ["GitHub CLI", tools.github],
-    ["Claude", tools.claude],
-    ["Codex", tools.codex],
-  ]
+  const rows: [string, ToolStatus][] = [["GitHub CLI", tools.github]]
+  if (tools.claude) rows.push(["Claude", tools.claude])
+  if (tools.codex) rows.push(["Codex", tools.codex])
   const labelWidth = Math.max(...rows.map(([label]) => label.length))
 
   return rows.map(([label, tool]) => {
@@ -97,7 +98,7 @@ export function registerStatusCommand(program: Command): void {
 
 async function status(opts: StatusOptions): Promise<void> {
   const auth = getAuthState()
-  const tools = await getToolStatuses()
+  const tools = await getToolStatuses(auth.agentProviders)
 
   if (!auth.authenticated) {
     if (opts.json) {
@@ -130,6 +131,7 @@ async function status(opts: StatusOptions): Promise<void> {
           auth: "configured",
           apiUrl: auth.apiUrl,
           maskedApiKey: auth.maskedApiKey,
+          agents: auth.agentProviders,
           serviceError: describe(error),
           tools: toolsJson(tools),
         })
@@ -152,6 +154,7 @@ async function status(opts: StatusOptions): Promise<void> {
         auth: "configured",
         apiUrl: auth.apiUrl,
         maskedApiKey: auth.maskedApiKey,
+        agents: auth.agentProviders,
         service: serviceStatus.state,
         serviceBackend: backendName,
         pid: serviceStatus.pid,
@@ -172,6 +175,7 @@ async function status(opts: StatusOptions): Promise<void> {
   note(
     [
       `Auth:     configured (api key: ${auth.maskedApiKey}, url: ${auth.apiUrl})`,
+      `Agents:   ${formatAgentProviders(auth.agentProviders)}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,
       `Last run: ${lastRun}`,
