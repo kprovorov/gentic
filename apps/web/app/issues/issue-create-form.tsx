@@ -26,10 +26,23 @@ export function IssueCreateForm({
   className?: string
 }) {
   const [prompt, setPrompt] = useState("")
+  const [projectError, setProjectError] = useState("")
   const formRef = useRef<HTMLFormElement>(null)
+  const projectSelectRef = useRef<HTMLSelectElement>(null)
   const agentProviderRef = useRef<HTMLInputElement>(null)
   const codexSubmitRef = useRef<HTMLButtonElement>(null)
   const draftSubmitRef = useRef<HTMLButtonElement>(null)
+  const projectErrorId = "issue-project-error"
+  const requireProject = () => {
+    const projectSelect = projectSelectRef.current
+    if (!projectSelect || projectSelect.value) {
+      return true
+    }
+
+    setProjectError("Select a project before running this issue.")
+    projectSelect.focus()
+    return false
+  }
   const setAgentProvider = (agentProvider: "claude_code" | "codex") => {
     if (agentProviderRef.current) {
       agentProviderRef.current.value = agentProvider
@@ -56,6 +69,11 @@ export function IssueCreateForm({
       encType="multipart/form-data"
       className={className}
       id="new-issue-form"
+      onInvalidCapture={(event) => {
+        if (event.target === projectSelectRef.current) {
+          setProjectError("Select a project before running this issue.")
+        }
+      }}
     >
       <input
         ref={agentProviderRef}
@@ -94,17 +112,21 @@ export function IssueCreateForm({
         className="bg-background ring-border rounded-[1.75rem] shadow-sm ring-1"
         textareaClassName="min-h-36 resize-none px-5 py-4 text-base md:text-base"
         footerStart={
-          <>
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="sr-only" htmlFor="issue-project">
               Project
             </label>
             <NativeSelect
+              ref={projectSelectRef}
               name="project_id"
               required
               defaultValue=""
               id="issue-project"
               size="sm"
+              aria-invalid={projectError ? true : undefined}
+              aria-describedby={projectError ? projectErrorId : undefined}
               className="max-w-full min-w-0 sm:w-56"
+              onChange={() => setProjectError("")}
             >
               <NativeSelectOption value="" disabled hidden>
                 Select project
@@ -115,7 +137,12 @@ export function IssueCreateForm({
                 </NativeSelectOption>
               ))}
             </NativeSelect>
-          </>
+            {projectError ? (
+              <p id={projectErrorId} className="text-xs text-destructive">
+                {projectError}
+              </p>
+            ) : null}
+          </div>
         }
         footerEnd={
           <div className="ml-auto flex min-w-0 items-center">
@@ -123,8 +150,11 @@ export function IssueCreateForm({
               type="submit"
               formAction={runIssue}
               className="border-r-primary-foreground/25 min-w-0 flex-1 rounded-r-none sm:flex-initial"
-              onClick={() => {
+              onClick={(event) => {
                 setAgentProvider("claude_code")
+                if (!requireProject()) {
+                  event.preventDefault()
+                }
               }}
             >
               <AgentProviderIcon provider="claude_code" tone="mono" />
@@ -143,6 +173,9 @@ export function IssueCreateForm({
               <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem
                   onSelect={() => {
+                    if (!requireProject()) {
+                      return
+                    }
                     setAgentProvider("codex")
                     formRef.current?.requestSubmit(
                       codexSubmitRef.current ?? undefined
