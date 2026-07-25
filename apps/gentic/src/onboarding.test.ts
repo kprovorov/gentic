@@ -139,12 +139,23 @@ function createUiRecorder() {
   }
 }
 
+function defaultRunOnboardingDeps(status: OnboardingStatus) {
+  return {
+    select: async () => "codex",
+    writeConfig: () => {},
+    setupAgentCLIs: async () => true,
+    ensureAgentCli: async () => status,
+  }
+}
+
 test("runOnboarding shows welcome and skips auth prompt when already authenticated", async () => {
   const { messages, ui } = createUiRecorder()
   let loginCalls = 0
+  const status = makeStatus(true)
 
   await runOnboarding({
-    getStatus: async () => makeStatus(true),
+    ...defaultRunOnboardingDeps(status),
+    getStatus: async () => status,
     runAuthLogin: async () => {
       loginCalls += 1
       return { cancelled: false, apiKeyConfigured: true }
@@ -170,9 +181,11 @@ test("runOnboarding shows welcome and skips auth prompt when already authenticat
 test("runOnboarding calls auth prompt when credentials are missing", async () => {
   const { messages, ui } = createUiRecorder()
   let loginCalls = 0
+  const readyStatus = makeStatus(true)
   const statuses = [makeStatus(false), makeStatus(true)]
 
   await runOnboarding({
+    ...defaultRunOnboardingDeps(readyStatus),
     getStatus: async () => statuses.shift() ?? makeStatus(true),
     runAuthLogin: async () => {
       loginCalls += 1
@@ -187,6 +200,9 @@ test("runOnboarding calls auth prompt when credentials are missing", async () =>
     messages.includes(`info:Step 2/${ONBOARDING_STEPS.length}: GitHub CLI`)
   )
   assert.ok(
+    messages.includes(`info:Step 3/${ONBOARDING_STEPS.length}: Agent CLI`)
+  )
+  assert.ok(
     messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
   )
   assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
@@ -196,9 +212,11 @@ test("runOnboarding prints ready summary and starts worker when confirmed", asyn
   const { messages, ui } = createUiRecorder()
   const prompts: string[] = []
   let startCalls = 0
+  const status = makeStatus(true)
 
   await runOnboarding({
-    getStatus: async () => makeStatus(true),
+    ...defaultRunOnboardingDeps(status),
+    getStatus: async () => status,
     runAuthLogin: async () => {
       throw new Error("auth prompt should not be called")
     },
@@ -223,9 +241,11 @@ test("runOnboarding prints ready summary and starts worker when confirmed", asyn
 test("runOnboarding prints gentic start instructions when worker enable is declined", async () => {
   const { messages, ui } = createUiRecorder()
   let startCalls = 0
+  const status = makeStatus(true)
 
   await runOnboarding({
-    getStatus: async () => makeStatus(true),
+    ...defaultRunOnboardingDeps(status),
+    getStatus: async () => status,
     runAuthLogin: async () => {
       throw new Error("auth prompt should not be called")
     },
@@ -240,6 +260,95 @@ test("runOnboarding prints gentic start instructions when worker enable is decli
   assert.equal(startCalls, 0)
   assert.ok(messages.includes("info:Run `gentic start` later to enable the worker."))
   assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
+})
+
+test("runOnboarding exits immediately when required gh setup declines", async () => {
+  const { messages, ui } = createUiRecorder()
+  const missingGithubStatus: OnboardingStatus = {
+    ...makeStatus(true),
+    tools: {
+      github: missingTool,
+      codex: readyTool,
+    },
+    unmet: ["github-cli-installed"],
+    ready: false,
+  }
+  let selectCalls = 0
+  let workerCalls = 0
+
+  await assert.rejects(
+    runOnboarding({
+      getStatus: async () => missingGithubStatus,
+      runAuthLogin: async () => {
+        throw new Error("auth prompt should not be called")
+      },
+      ensureGithubCli: async () => {
+        throw new Error("exited")
+      },
+      select: async () => {
+        selectCalls += 1
+        return "codex"
+      },
+      startWorker: async () => {
+        workerCalls += 1
+        return true
+      },
+      ui,
+    }),
+    /exited/
+  )
+
+  assert.equal(selectCalls, 0)
+  assert.equal(workerCalls, 0)
+  assert.ok(
+    !messages.includes(`info:Step 3/${ONBOARDING_STEPS.length}: Agent CLI`)
+  )
+  assert.ok(
+    !messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
+  )
+})
+
+test("runOnboarding exits immediately when no selected agent is authenticated", async () => {
+  const { messages, ui } = createUiRecorder()
+  const unauthenticatedAgentStatus: OnboardingStatus = {
+    ...makeStatus(true),
+    tools: {
+      github: readyTool,
+      codex: { ...readyTool, authenticated: false },
+    },
+    unmet: ["agent-cli-authenticated"],
+    ready: false,
+  }
+  let workerCalls = 0
+
+  await assert.rejects(
+    runOnboarding({
+      getStatus: async () => unauthenticatedAgentStatus,
+      runAuthLogin: async () => {
+        throw new Error("auth prompt should not be called")
+      },
+      select: async () => "codex",
+      writeConfig: () => {},
+      setupAgentCLIs: async () => true,
+      ensureAgentCli: async () => {
+        throw new Error("exited")
+      },
+      startWorker: async () => {
+        workerCalls += 1
+        return true
+      },
+      ui,
+    }),
+    /exited/
+  )
+
+  assert.equal(workerCalls, 0)
+  assert.ok(
+    !messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
+  )
+  assert.ok(
+    !messages.some((message) => message.startsWith("info:Gentic auth:"))
+  )
 })
 
 test("getGithubInstallCommand returns the macOS brew command", async () => {
