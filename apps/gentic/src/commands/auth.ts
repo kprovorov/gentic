@@ -179,32 +179,33 @@ export async function loginInteractive(): Promise<void> {
     return
   }
 
+  const selectedAgentProviders = parseAgentProviders(agentSelection)
   writeConfigFile({
     GENTIC_API_URL: apiUrl,
-    AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+    AGENT_PROVIDERS: selectedAgentProviders,
   })
 
   let current = await getOnboardingStatus({
     configInput: {
       ...getConfigInput(),
-      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+      AGENT_PROVIDERS: selectedAgentProviders,
     },
   })
   const completedSetup = await setupSelectedAgentCLIs(
-    parseAgentProviders(agentSelection),
+    selectedAgentProviders,
     current.tools
   )
   if (!completedSetup) return
   current = await getOnboardingStatus({
     configInput: {
       ...getConfigInput(),
-      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+      AGENT_PROVIDERS: selectedAgentProviders,
     },
   })
 
   if (apiKeyConfigured && current.ready) {
     outro(
-      `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
+      `Saved to ${configFilePath()} (${formatAgentProviders(selectedAgentProviders)})`
     )
     return
   }

@@ -26,6 +26,87 @@ test("skips codex setup when codex is not selected", async () => {
   assert.deepEqual(deps.commands, [])
 })
 
+test("skips claude setup when claude is installed and authenticated", async () => {
+  const deps = fakeDeps()
+
+  const completed = await setupSelectedAgentCLIs(
+    ["claude_code"],
+    {
+      github: ready,
+      claude: ready,
+    },
+    deps
+  )
+
+  assert.equal(completed, true)
+  assert.deepEqual(deps.prompts, [])
+  assert.deepEqual(deps.commands, [])
+})
+
+test("installs claude with the official installer then runs auth login", async () => {
+  const deps = fakeDeps()
+
+  const completed = await setupSelectedAgentCLIs(
+    ["claude_code"],
+    {
+      github: ready,
+      claude: missing,
+    },
+    deps
+  )
+
+  assert.equal(completed, true)
+  assert.deepEqual(deps.prompts, [
+    "Claude Code is not installed. Run `curl -fsSL https://claude.ai/install.sh | bash` now?",
+    "Claude Code is not authenticated. Run `claude auth login` now?",
+  ])
+  assert.deepEqual(deps.commands, [
+    {
+      command: "bash",
+      args: ["-lc", "curl -fsSL https://claude.ai/install.sh | bash"],
+    },
+    { command: "claude", args: ["auth", "login"] },
+  ])
+})
+
+test("runs claude auth login when installed but not authenticated", async () => {
+  const deps = fakeDeps()
+
+  await setupSelectedAgentCLIs(
+    ["claude_code"],
+    {
+      github: ready,
+      claude: { installed: true, authenticated: false, version: "1.0.0" },
+    },
+    deps
+  )
+
+  assert.deepEqual(deps.prompts, [
+    "Claude Code is not authenticated. Run `claude auth login` now?",
+  ])
+  assert.deepEqual(deps.commands, [
+    { command: "claude", args: ["auth", "login"] },
+  ])
+})
+
+test("declining claude setup skips that agent without cancelling onboarding", async () => {
+  const deps = fakeDeps({ answers: [false] })
+
+  const completed = await setupSelectedAgentCLIs(
+    ["claude_code", "codex"],
+    {
+      github: ready,
+      claude: missing,
+      codex: ready,
+    },
+    deps
+  )
+
+  assert.equal(completed, true)
+  assert.equal(deps.cancelled, false)
+  assert.deepEqual(deps.commands, [])
+})
+
 test("skips codex setup when codex is installed and authenticated", async () => {
   const deps = fakeDeps()
 
