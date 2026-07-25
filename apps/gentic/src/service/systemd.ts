@@ -1,10 +1,11 @@
-import { execFile as execFileCb, spawn } from "node:child_process"
+import { execFile as execFileCb } from "node:child_process"
 import { existsSync } from "node:fs"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { homedir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
 
+import { spawnInteractive } from "../installers.js"
 import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceScope, ServiceStatus } from "./types.js"
@@ -197,13 +198,6 @@ WantedBy=default.target
     const args = [...this.scopeArgs(), "-u", SERVICE_NAME]
     args.push(opts.follow ? "-f" : "--no-pager")
 
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("journalctl", args, { stdio: "inherit" })
-      child.on("error", reject)
-      child.on("exit", (code) => {
-        if (code === 0 || code === null) resolve()
-        else reject(new Error(`journalctl exited with code ${code}`))
-      })
-    })
+    await spawnInteractive("journalctl", args)
   }
 }

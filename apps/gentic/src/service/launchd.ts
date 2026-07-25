@@ -1,10 +1,11 @@
-import { execFile as execFileCb, spawn } from "node:child_process"
+import { execFile as execFileCb } from "node:child_process"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
 
+import { spawnInteractive } from "../installers.js"
 import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
@@ -178,13 +179,6 @@ ${programArguments}
     }
 
     const args = opts.follow ? ["-f", log] : ["-n", "200", log]
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("tail", args, { stdio: "inherit" })
-      child.on("error", reject)
-      child.on("exit", (code) => {
-        if (code === 0 || code === null) resolve()
-        else reject(new Error(`tail exited with code ${code}`))
-      })
-    })
+    await spawnInteractive("tail", args)
   }
 }

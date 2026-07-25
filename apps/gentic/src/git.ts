@@ -3,6 +3,8 @@ import { existsSync } from "node:fs"
 import { mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
+import { spawnInteractive } from "./installers.js"
+
 /** Whether `dir` already holds a git checkout, e.g. from an earlier run. */
 export function hasLocalCheckout(dir: string): boolean {
   return existsSync(join(dir, ".git"))
@@ -72,20 +74,7 @@ function run(
   args: string[],
   options: { cwd?: string } = {}
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ["ignore", "inherit", "inherit"],
-      cwd: options.cwd,
-    })
-    child.on("error", reject)
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve()
-      } else {
-        reject(new Error(`${command} ${args.join(" ")} exited with code ${code}`))
-      }
-    })
-  })
+  return spawnInteractive(command, args, options)
 }
 
 function runCapture(
