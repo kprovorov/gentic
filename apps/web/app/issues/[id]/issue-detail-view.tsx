@@ -290,13 +290,17 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
                 Agent: {agentProviderLabels[issue.agent_provider]}
               </div>
             </div>
-            <h1
-              className={cn(
-                "text-3xl leading-tight md:text-4xl",
-                !issue.title && "text-muted-foreground italic"
-              )}
-            >
-              {issue.title ?? "Generating title…"}
+            <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-2 text-3xl leading-tight md:text-4xl">
+              {issue.code ? (
+                <span className="font-mono text-lg font-semibold text-muted-foreground md:text-xl">
+                  {issue.code}
+                </span>
+              ) : null}
+              <span
+                className={cn(!issue.title && "text-muted-foreground italic")}
+              >
+                {issue.title ?? "Generating title…"}
+              </span>
             </h1>
             <p className="text-sm text-muted-foreground">
               Created {formatDateTime(issue.created_at)}

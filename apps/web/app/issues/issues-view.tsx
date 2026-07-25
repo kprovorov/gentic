@@ -61,7 +61,12 @@ type IssuesViewMode = "list" | "table"
 const pageSize = 20
 
 function matchesIssue(issue: HomeIssue, filterValue: string) {
-  const haystack = [issue.title, issue.projects?.name, issue.projects?.repo]
+  const haystack = [
+    issue.code,
+    issue.title,
+    issue.projects?.name,
+    issue.projects?.repo,
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -89,7 +94,8 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
   }
 
   return (
-    new Date(issueB.created_at).getTime() - new Date(issueA.created_at).getTime()
+    new Date(issueB.created_at).getTime() -
+    new Date(issueA.created_at).getTime()
   )
 }
 
@@ -108,12 +114,21 @@ function IssueRow({
         <IssueStatusMenu issue={issue} />
         <Link
           href={`/issues/${issue.id}`}
-          className={cn(
-            "min-w-0 truncate font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            !issue.title && "text-muted-foreground italic"
-          )}
+          className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {issue.title ?? "Generating title..."}
+          {issue.code ? (
+            <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+              {issue.code}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              "truncate font-medium",
+              !issue.title && "text-muted-foreground italic"
+            )}
+          >
+            {issue.title ?? "Generating title..."}
+          </span>
         </Link>
         <span
           className={cn(
@@ -457,9 +472,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={globalFilter}
-                    onChange={(event) =>
-                      updateGlobalFilter(event.target.value)
-                    }
+                    onChange={(event) => updateGlobalFilter(event.target.value)}
                     placeholder="Search issues…"
                     className="pl-9"
                   />
@@ -708,9 +721,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      setPageIndex(Math.max(0, safePageIndex - 1))
-                    }
+                    onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
                     disabled={safePageIndex === 0}
                   >
                     Previous
