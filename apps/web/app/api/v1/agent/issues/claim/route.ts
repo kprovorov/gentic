@@ -12,7 +12,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, agent_provider, session_id, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, status, agent_provider, session_id, pr_url, prompt, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 export async function POST(request: Request) {
   try {
@@ -91,6 +91,10 @@ async function claimNextQueuedIssue(
     throw new Error("Issue has no associated project repo")
   }
 
+  if (candidate.status === "todo") {
+    await ensureTodoIssueHasPendingPrompt(supabase, id, candidate.prompt)
+  }
+
   return {
     id,
     activeRunId,
@@ -99,5 +103,36 @@ async function claimNextQueuedIssue(
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
     prUrl: candidate.pr_url,
+  }
+}
+
+export async function ensureTodoIssueHasPendingPrompt(
+  supabase: Supabase,
+  issueId: string,
+  prompt: string | null
+) {
+  const { data: pendingMessages, error: pendingMessagesError } = await supabase
+    .from("messages")
+    .select("id")
+    .eq("issue_id", issueId)
+    .eq("role", "user")
+    .is("consumed_by_run_id", null)
+    .limit(1)
+
+  if (pendingMessagesError) {
+    throw new Error(pendingMessagesError.message)
+  }
+  if (pendingMessages && pendingMessages.length > 0) {
+    return
+  }
+
+  const { error: insertError } = await supabase.from("messages").insert({
+    issue_id: issueId,
+    role: "user",
+    content: prompt ?? "",
+  })
+
+  if (insertError) {
+    throw new Error(insertError.message)
   }
 }
