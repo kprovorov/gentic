@@ -50,6 +50,8 @@ export function AttachmentPromptField({
   files,
   onFilesChange,
   onKeyDown,
+  footerStart,
+  footerEnd,
 }: {
   id?: string
   name?: string
@@ -65,6 +67,8 @@ export function AttachmentPromptField({
   files?: File[]
   onFilesChange?: (files: File[]) => void
   onKeyDown?: React.KeyboardEventHandler<HTMLTextAreaElement>
+  footerStart?: React.ReactNode
+  footerEnd?: React.ReactNode
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [internalFiles, setInternalFiles] = useState<File[]>([])
@@ -175,8 +179,9 @@ export function AttachmentPromptField({
         >
           <IconPaperclip />
         </Button>
+        {footerStart}
         {selectedFiles.length === 0 ? (
-          <span className="flex min-h-8 items-center gap-1 text-xs text-muted-foreground">
+          <span className="flex min-h-8 min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground max-sm:hidden">
             <IconUpload className="size-3.5" />
             Drop files here or attach
           </span>
@@ -208,6 +213,7 @@ export function AttachmentPromptField({
             ))}
           </ul>
         )}
+        {footerEnd}
       </div>
     </div>
   )
