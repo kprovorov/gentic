@@ -108,6 +108,7 @@ test("resumed runs reuse local checkout and existing pull request context", asyn
     deps.runAgentSession = async (input) => {
       assert.equal(input.resumeSessionId, "existing-session")
       assert.equal(input.existingPrUrl, issue.prUrl)
+      assert.equal(input.existingPrCheckedOut, true)
       await input.onSessionId("existing-session")
       prompts.push(await consumePrompt(input))
       assert.equal(await input.nextPrompt(), null)
@@ -118,6 +119,32 @@ test("resumed runs reuse local checkout and existing pull request context", asyn
     assert.deepEqual(prompts, ["Follow-up"])
     assert.equal(api.cloneCalls, 0)
     assert.equal(api.checkoutCalls, 0)
+  })
+})
+
+test("fresh follow-up continues when previous pull request branch is gone", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.sessionId = "existing-session"
+    issue.prUrl = "https://github.com/acme/repo/pull/5"
+    api.addMessage(issue.id, message("follow-up", "Follow-up", 1))
+    deps.checkoutPullRequest = async () => {
+      api.checkoutCalls += 1
+      return false
+    }
+
+    deps.runAgentSession = async (input) => {
+      assert.equal(input.resumeSessionId, "existing-session")
+      assert.equal(input.existingPrUrl, issue.prUrl)
+      assert.equal(input.existingPrCheckedOut, false)
+      await input.onSessionId("existing-session")
+      assert.equal(await consumePrompt(input), "Follow-up")
+      assert.equal(await input.nextPrompt(), null)
+    }
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.cloneCalls, 1)
+    assert.equal(api.checkoutCalls, 1)
   })
 })
 
@@ -247,6 +274,7 @@ function fakeDeps(
     },
     async checkoutPullRequest() {
       api.checkoutCalls += 1
+      return true
     },
     hasLocalCheckout() {
       return false
