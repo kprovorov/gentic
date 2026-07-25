@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import envPaths from "env-paths"
 
+import { spawnInteractive } from "../installers.js"
 import { resolveGenticExecutable } from "./entry.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
 
@@ -128,13 +129,6 @@ export class FallbackBackend implements ServiceBackend {
     }
 
     const args = opts.follow ? ["-f", LOG_FILE] : ["-n", "200", LOG_FILE]
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("tail", args, { stdio: "inherit" })
-      child.on("error", reject)
-      child.on("exit", (code) => {
-        if (code === 0 || code === null) resolve()
-        else reject(new Error(`tail exited with code ${code}`))
-      })
-    })
+    await spawnInteractive("tail", args)
   }
 }
