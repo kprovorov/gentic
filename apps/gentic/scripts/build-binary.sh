@@ -28,6 +28,11 @@ fi
 
 mkdir -p "$OUT/vendor/claude-agent-acp" "$OUT/vendor/codex-acp"
 
+VERSION_DEFINE=()
+if [ -n "${GENTIC_VERSION:-}" ]; then
+  VERSION_DEFINE=(--define "process.env.GENTIC_VERSION=\"$GENTIC_VERSION\"")
+fi
+
 echo "==> Compiling claude-agent-acp sidecar ($TARGET)"
 bun build node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js \
   --compile --target="$TARGET" \
@@ -62,6 +67,6 @@ bun build node_modules/@agentclientprotocol/codex-acp/dist/index.js \
   --outfile "$OUT/vendor/codex-acp/codex-acp"
 
 echo "==> Compiling gentic CLI ($TARGET)"
-bun build src/cli.ts --compile --target="$TARGET" --outfile "$OUT/gentic"
+bun build src/cli.ts --compile --target="$TARGET" "${VERSION_DEFINE[@]}" --outfile "$OUT/gentic"
 
 echo "==> Done: $OUT"

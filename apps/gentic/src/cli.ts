@@ -25,7 +25,7 @@ const program = new Command()
 program
   .name("gentic")
   .description("Run and manage Gentic coding agents")
-  .version(packageJson.version ?? "0.0.0")
+  .version(process.env.GENTIC_VERSION ?? packageJson.version ?? "0.0.0")
 
 registerAuthCommand(program)
 registerLogsCommand(program)

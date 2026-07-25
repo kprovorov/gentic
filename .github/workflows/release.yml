@@ -36,162 +36,34 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Detect previous tag
-        id: previous-tag
+      - name: Create release request PR
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || true)
-          echo "tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
-          if [ -n "$PREVIOUS_TAG" ]; then
-            echo "Previous tag: $PREVIOUS_TAG"
-          else
-            echo "Previous tag: none"
-          fi
-
-      - name: Detect bump type
-        id: bump
-        run: |
-          PREVIOUS_TAG="${{ steps.previous-tag.outputs.tag }}"
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"%s%n%b" "$PREVIOUS_TAG"..HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"%s%n%b")
-          fi
-
-          COMMIT_COUNT=$(printf '%s\n' "$COMMITS" | awk 'NF { count++ } END { print count + 0 }')
-          echo "Analyzing $COMMIT_COUNT commit lines"
-          printf '%s\n' "$COMMITS"
-
-          if printf '%s\n' "$COMMITS" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
-            BUMP="major"
-          elif printf '%s\n' "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
-            BUMP="minor"
-          else
-            BUMP="patch"
-          fi
-
-          echo "type=$BUMP" >> "$GITHUB_OUTPUT"
-          echo "Detected bump type: $BUMP"
-
-      - name: Bump package versions
-        id: bump-version
-        run: |
-          BUMP_TYPE="${{ steps.bump.outputs.type }}"
-          OLD_VERSION=$(node -p "require('./apps/gentic/package.json').version")
-          NEW_VERSION=$(node -e "
-            const bump = process.argv[1]
-            const [major, minor, patch] = require('./apps/gentic/package.json').version.split('.').map(Number)
-            if (bump === 'major') console.log([major + 1, 0, 0].join('.'))
-            else if (bump === 'minor') console.log([major, minor + 1, 0].join('.'))
-            else console.log([major, minor, patch + 1].join('.'))
-          " "$BUMP_TYPE")
-
-          node -e "
-            const fs = require('node:fs')
-            const version = process.argv[1]
-            for (const file of ['package.json', 'apps/gentic/package.json']) {
-              const json = JSON.parse(fs.readFileSync(file, 'utf8'))
-              json.version = version
-              fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n')
-            }
-          " "$NEW_VERSION"
-
-          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Bumped $OLD_VERSION -> $NEW_VERSION"
-
-      - name: Verify tag does not exist
-        run: |
-          TAG="${{ steps.bump-version.outputs.tag }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists"
-            exit 1
-          fi
-
-      - name: Generate changelog
-        run: |
-          PREVIOUS_TAG="${{ steps.previous-tag.outputs.tag }}"
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"%s" "$PREVIOUS_TAG"..HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"%s")
-          fi
-
-          BREAKING=""
-          FEATURES=""
-          FIXES=""
-          OTHER=""
-
-          while IFS= read -r msg; do
-            if printf '%s\n' "$msg" | grep -qE '^$|auto-bump version|\[skip ci\]'; then
-              continue
-            fi
-
-            if printf '%s\n' "$msg" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
-              BREAKING="$BREAKING"$'\n'"- $msg"
-            elif printf '%s\n' "$msg" | grep -qE '^feat(\(.+\))?:'; then
-              FEATURES="$FEATURES"$'\n'"- $msg"
-            elif printf '%s\n' "$msg" | grep -qE '^fix(\(.+\))?:'; then
-              FIXES="$FIXES"$'\n'"- $msg"
-            else
-              OTHER="$OTHER"$'\n'"- $msg"
-            fi
-          done <<< "$COMMITS"
-
-          CHANGELOG="## What's Changed"
-
-          if [ -n "$BREAKING" ]; then
-            CHANGELOG="$CHANGELOG"$'\n\n'"### Breaking Changes"$'\n'"$BREAKING"
-          fi
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="$CHANGELOG"$'\n\n'"### New Features"$'\n'"$FEATURES"
-          fi
-          if [ -n "$FIXES" ]; then
-            CHANGELOG="$CHANGELOG"$'\n\n'"### Bug Fixes"$'\n'"$FIXES"
-          fi
-          if [ -n "$OTHER" ]; then
-            CHANGELOG="$CHANGELOG"$'\n\n'"### Other Changes"$'\n'"$OTHER"
-          fi
-          if [ "$CHANGELOG" = "## What's Changed" ]; then
-            CHANGELOG="$CHANGELOG"$'\n\n'"No notable changes."
-          fi
-
-          printf '%s\n' "$CHANGELOG" > changelog.md
-          cat changelog.md
-
-      - name: Commit and push version bump
-        run: |
-          VERSION="${{ steps.bump-version.outputs.version }}"
-          TAG="${{ steps.bump-version.outputs.tag }}"
-          BRANCH="release/${TAG}"
-          BASE_SHA=$(git rev-parse HEAD)
+          BRANCH="release/request-${{ github.run_id }}"
 
           git switch -c "$BRANCH"
-          git add package.json apps/gentic/package.json
-          git commit -m "chore: release $TAG"
+          git commit --allow-empty -m "chore: request release"
           git push --force-with-lease origin "$BRANCH"
 
           cat > release-pr.md <<EOF
-          ## Release $TAG
+          ## Release Request
 
-          This PR bumps package versions to $VERSION.
+          Merge this PR to build, tag, and publish a release from the current default branch.
 
-          The release workflow will build, tag, and publish the release after this PR is merged.
+          The release workflow computes the version bump after merge, so commits that land before this PR merges are included in the release calculation.
 
-          Release-Base-SHA: $BASE_SHA
+          Release-Request: true
           EOF
 
           if PR_URL=$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null); then
             echo "Release PR already exists: $PR_URL"
             gh pr edit "$BRANCH" \
-              --title "chore: release $TAG" \
+              --title "chore: request release" \
               --body-file release-pr.md
           else
             gh pr create \
               --base "${{ github.event.repository.default_branch }}" \
               --head "$BRANCH" \
-              --title "chore: release $TAG" \
+              --title "chore: request release" \
               --body-file release-pr.md
           fi
         env:
@@ -202,8 +74,9 @@ jobs:
       ${{
         github.event_name == 'pull_request' &&
         github.event.pull_request.merged == true &&
-        startsWith(github.event.pull_request.head.ref, 'release/v') &&
-        startsWith(github.event.pull_request.title, 'chore: release v')
+        startsWith(github.event.pull_request.head.ref, 'release/') &&
+        github.event.pull_request.title == 'chore: request release' &&
+        contains(github.event.pull_request.body, 'Release-Request: true')
       }}
     runs-on: ubuntu-latest
     permissions:
@@ -223,37 +96,39 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify release PR is current
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          BASE_SHA=$(printf '%s\n' "$PR_BODY" | sed -n 's/^Release-Base-SHA: //p' | tail -n 1)
-
-          if [ -z "$BASE_SHA" ]; then
-            echo "Release PR is missing Release-Base-SHA metadata."
-            echo "Re-run the release workflow to create a fresh release PR."
-            exit 1
-          fi
-
-          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            echo "Release base commit $BASE_SHA is not available."
-            exit 1
-          fi
-
-          FIRST_PARENT_COMMITS=$(git rev-list --first-parent --count "$BASE_SHA"..HEAD)
-          if [ "$FIRST_PARENT_COMMITS" -ne 1 ]; then
-            echo "main changed after this release PR was created."
-            echo "Release base: $BASE_SHA"
-            echo "Merged HEAD: $(git rev-parse HEAD)"
-            echo "Re-run the release workflow to recalculate the version bump and create a fresh release PR."
-            exit 1
-          fi
-
       - name: Detect release metadata
         id: release-metadata
         run: |
-          VERSION=$(node -p "require('./apps/gentic/package.json').version")
-          TAG="v${VERSION}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || true)
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%s%n%b" "$PREVIOUS_TAG"..HEAD)
+            OLD_VERSION="${PREVIOUS_TAG#v}"
+          else
+            COMMITS=$(git log --pretty=format:"%s%n%b")
+            OLD_VERSION=$(node -p "require('./apps/gentic/package.json').version")
+          fi
+
+          COMMIT_COUNT=$(printf '%s\n' "$COMMITS" | awk 'NF { count++ } END { print count + 0 }')
+          echo "Analyzing $COMMIT_COUNT commit lines"
+          printf '%s\n' "$COMMITS"
+
+          if printf '%s\n' "$COMMITS" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
+            BUMP="major"
+          elif printf '%s\n' "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          VERSION=$(node -e "
+            const bump = process.argv[1]
+            const [major, minor, patch] = process.argv[2].split('.').map(Number)
+            if (bump === 'major') console.log([major + 1, 0, 0].join('.'))
+            else if (bump === 'minor') console.log([major, minor + 1, 0].join('.'))
+            else console.log([major, minor, patch + 1].join('.'))
+          " "$BUMP" "$OLD_VERSION")
+          TAG="v$VERSION"
 
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists"
@@ -263,6 +138,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Detected $BUMP release: $OLD_VERSION -> $VERSION"
           echo "Preparing release $TAG from $(git rev-parse HEAD)"
 
       - name: Detect previous tag
@@ -292,7 +168,7 @@ jobs:
           OTHER=""
 
           while IFS= read -r msg; do
-            if printf '%s\n' "$msg" | grep -qE '^$|^chore: release v'; then
+            if printf '%s\n' "$msg" | grep -qE '^$|^chore: request release'; then
               continue
             fi
 
@@ -362,6 +238,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      GENTIC_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
