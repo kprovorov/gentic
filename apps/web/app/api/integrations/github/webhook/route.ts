@@ -59,6 +59,23 @@ type CheckRunPayload = {
   }
 }
 
+type WorkflowRunPayload = {
+  action: string
+  workflow_run: {
+    head_sha: string
+    pull_requests?: { number: number }[]
+  }
+  repository: {
+    name: string
+    owner: {
+      login: string
+    }
+  }
+  installation?: {
+    id: number
+  }
+}
+
 type PullRequestReviewPayload = {
   action: string
   review: {
@@ -115,6 +132,8 @@ export async function POST(request: Request) {
     await handleCheckSuiteEvent(supabase, payload as CheckSuitePayload)
   } else if (event === "check_run") {
     await handleCheckRunEvent(supabase, payload as CheckRunPayload)
+  } else if (event === "workflow_run") {
+    await handleWorkflowRunEvent(supabase, payload as WorkflowRunPayload)
   }
 
   return Response.json({ ok: true })
@@ -220,6 +239,42 @@ async function handleCheckRunEvent(
     repo,
     payload.check_run.head_sha,
     payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number)
+  )
+}
+
+async function handleWorkflowRunEvent(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: WorkflowRunPayload
+) {
+  if (payload.action !== "completed") {
+    return
+  }
+
+  const installationId = payload.installation?.id
+  if (!installationId) {
+    return
+  }
+
+  const owner = payload.repository.owner.login
+  const repo = payload.repository.name
+
+  await resolveCompletedChecksForRef(
+    supabase,
+    String(installationId),
+    owner,
+    repo,
+    payload.workflow_run.head_sha,
+    getWorkflowRunPullNumbers(payload)
+  )
+}
+
+export function getWorkflowRunPullNumbers(
+  payload: Pick<WorkflowRunPayload, "workflow_run">
+): number[] {
+  return (
+    payload.workflow_run.pull_requests?.map(
+      (pullRequest) => pullRequest.number
+    ) ?? []
   )
 }
 
