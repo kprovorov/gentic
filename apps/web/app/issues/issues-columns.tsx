@@ -356,7 +356,8 @@ export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
 }
 
 export function getIssuesColumns(
-  blockedIssueIds: Set<string>
+  blockedIssueIds: Set<string>,
+  blockingIssueIds: Set<string>
 ): ColumnDef<HomeIssue>[] {
   return [
     {
@@ -481,6 +482,20 @@ export function getIssuesColumns(
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
             <IconLock className="size-3" />
             Blocked
+          </span>
+        ) : null,
+    },
+    {
+      id: "blocking",
+      accessorFn: (issue) => blockingIssueIds.has(issue.id),
+      header: ({ column }) => (
+        <SortableHeader label="Blocking" column={column} />
+      ),
+      cell: ({ row }) =>
+        blockingIssueIds.has(row.original.id) ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <IconGitMerge className="size-3" />
+            Blocking
           </span>
         ) : null,
     },

@@ -10,6 +10,7 @@ export {
   getIssue,
   getIssueByCode,
   listBlockedIssueIds,
+  listBlockingIssueIds,
   listIssuePullRequests,
   listIssueRelationCandidates,
   listIssueRelations,
