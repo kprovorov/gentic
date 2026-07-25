@@ -32,6 +32,12 @@ export function detectLinuxPackageManager(
   return null
 }
 
+export function detectHomebrew(
+  pathValue: string | undefined = process.env.PATH
+): boolean {
+  return isCommandOnPath("brew", pathValue)
+}
+
 export function spawnInteractive(
   command: string,
   args: string[],
