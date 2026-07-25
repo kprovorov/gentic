@@ -2,20 +2,23 @@ name: release
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  prepare:
+  create-release-pr:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      commit_sha: ${{ steps.commit-version.outputs.commit_sha }}
-      tag: ${{ steps.bump-version.outputs.tag }}
-      version: ${{ steps.bump-version.outputs.version }}
+      pull-requests: write
     steps:
       - name: Checkout default branch
         uses: actions/checkout@v7
@@ -158,13 +161,140 @@ jobs:
           cat changelog.md
 
       - name: Commit and push version bump
-        id: commit-version
         run: |
           VERSION="${{ steps.bump-version.outputs.version }}"
+          TAG="${{ steps.bump-version.outputs.tag }}"
+          BRANCH="release/${TAG}"
+
+          git switch -c "$BRANCH"
           git add package.json apps/gentic/package.json
-          git commit -m "chore: auto-bump version to $VERSION [skip ci]"
-          git push origin HEAD:${{ github.event.repository.default_branch }}
+          git commit -m "chore: release $TAG"
+          git push --force-with-lease origin "$BRANCH"
+
+          cat > release-pr.md <<EOF
+          ## Release $TAG
+
+          This PR bumps package versions to $VERSION.
+
+          The release workflow will build, tag, and publish the release after this PR is merged.
+          EOF
+
+          if PR_URL=$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null); then
+            echo "Release PR already exists: $PR_URL"
+          else
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$BRANCH" \
+              --title "chore: release $TAG" \
+              --body-file release-pr.md
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prepare:
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'release/v') &&
+        startsWith(github.event.pull_request.title, 'chore: release v')
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      commit_sha: ${{ steps.release-metadata.outputs.commit_sha }}
+      tag: ${{ steps.release-metadata.outputs.tag }}
+      version: ${{ steps.release-metadata.outputs.version }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Detect release metadata
+        id: release-metadata
+        run: |
+          VERSION=$(node -p "require('./apps/gentic/package.json').version")
+          TAG="v${VERSION}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Preparing release $TAG from $(git rev-parse HEAD)"
+
+      - name: Detect previous tag
+        id: previous-tag
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || true)
+          echo "tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Previous tag: $PREVIOUS_TAG"
+          else
+            echo "Previous tag: none"
+          fi
+
+      - name: Generate changelog
+        run: |
+          PREVIOUS_TAG="${{ steps.previous-tag.outputs.tag }}"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%s" "$PREVIOUS_TAG"..HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"%s")
+          fi
+
+          BREAKING=""
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+
+          while IFS= read -r msg; do
+            if printf '%s\n' "$msg" | grep -qE '^$|^chore: release v'; then
+              continue
+            fi
+
+            if printf '%s\n' "$msg" | grep -qE 'BREAKING CHANGE|^major(\(.+\))?!?:|^.+!:'; then
+              BREAKING="$BREAKING"$'\n'"- $msg"
+            elif printf '%s\n' "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              FEATURES="$FEATURES"$'\n'"- $msg"
+            elif printf '%s\n' "$msg" | grep -qE '^fix(\(.+\))?:'; then
+              FIXES="$FIXES"$'\n'"- $msg"
+            else
+              OTHER="$OTHER"$'\n'"- $msg"
+            fi
+          done <<< "$COMMITS"
+
+          CHANGELOG="## What's Changed"
+
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Breaking Changes"$'\n'"$BREAKING"
+          fi
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### New Features"$'\n'"$FEATURES"
+          fi
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Bug Fixes"$'\n'"$FIXES"
+          fi
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"### Other Changes"$'\n'"$OTHER"
+          fi
+          if [ "$CHANGELOG" = "## What's Changed" ]; then
+            CHANGELOG="$CHANGELOG"$'\n\n'"No notable changes."
+          fi
+
+          printf '%s\n' "$CHANGELOG" > changelog.md
+          cat changelog.md
 
       - uses: actions/upload-artifact@v7
         with:
