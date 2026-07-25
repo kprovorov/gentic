@@ -107,11 +107,9 @@ incorrect key surfaces as a failure on the worker's first poll instead.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
-`@agentclientprotocol/codex-acp`. A worker only claims issues for the providers
-selected during login, or for `AGENT_PROVIDERS` when configured through the
-environment. Codex runs assume the Codex CLI is already installed and
-authenticated in the worker environment, the same way Claude Code credentials
-are managed outside Gentic. Codex runs default to
+`@agentclientprotocol/codex-acp`. Workers claim issues for all supported agent
+providers, so both Claude Code and Codex CLIs must be installed and
+authenticated in the worker environment. Codex runs default to
 `INITIAL_AGENT_MODE=agent-full-access` unless overridden in the worker
 environment.
 

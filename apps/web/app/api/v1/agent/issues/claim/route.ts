@@ -17,15 +17,9 @@ const CLAIM_ISSUE_SELECT =
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
-    const input = claimIssueInputSchema.parse(
-      await request.json().catch(() => ({}))
-    )
+    claimIssueInputSchema.parse(await request.json().catch(() => ({})))
     return json({
-      issue: await claimNextQueuedIssue(
-        supabase,
-        userId,
-        input.agent_providers
-      ),
+      issue: await claimNextQueuedIssue(supabase, userId),
     })
   } catch (error) {
     return handleAgentError(error)
@@ -34,8 +28,7 @@ export async function POST(request: Request) {
 
 async function claimNextQueuedIssue(
   supabase: Supabase,
-  userId: string,
-  agentProviders: Array<"claude_code" | "codex">
+  userId: string
 ) {
   const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
@@ -43,7 +36,6 @@ async function claimNextQueuedIssue(
     .select(CLAIM_ISSUE_SELECT)
     .or(`status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`)
     .eq("projects.user_id", userId)
-    .in("agent_provider", agentProviders)
     .eq("unfinished_blockers.type", "blocks")
     .not(
       "unfinished_blockers.source_issue.status",

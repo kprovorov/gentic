@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { formatAgentProviders, parseAgentProviders } from "./agents.js"
+import { formatAgentProviders } from "./agents.js"
 import { formatToolStatus } from "./tools.js"
 
 test("formatToolStatus reports a missing CLI", () => {
@@ -31,17 +31,6 @@ test("formatToolStatus reports an installed and authenticated CLI", () => {
     }),
     "installed, authenticated"
   )
-})
-
-test("parseAgentProviders defaults to Claude Code", () => {
-  assert.deepEqual(parseAgentProviders(undefined), ["claude_code"])
-})
-
-test("parseAgentProviders accepts the combined single-select value", () => {
-  assert.deepEqual(parseAgentProviders("claude_code,codex"), [
-    "claude_code",
-    "codex",
-  ])
 })
 
 test("formatAgentProviders labels the selected providers", () => {

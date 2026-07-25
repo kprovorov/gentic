@@ -19,8 +19,6 @@ import {
 } from "@gentic/validators/agent"
 import type { z } from "zod"
 
-import type { AgentProvider } from "./agents.js"
-
 export type {
   AckMessagesInput,
   Attachment,
@@ -56,12 +54,9 @@ export interface AgentApi {
 export function createAgentApi(input: {
   apiUrl: string
   apiKey: string
-  agentProviders?: AgentProvider[]
 }): AgentApi {
   const apiUrl = input.apiUrl.replace(/\/+$/, "")
-  const claimInput = claimIssueInputSchema.parse({
-    agent_providers: input.agentProviders,
-  })
+  const claimInput = claimIssueInputSchema.parse({})
 
   async function request<T>(
     path: string,

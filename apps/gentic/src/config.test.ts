@@ -52,7 +52,6 @@ test("loadConfig works with only env vars set (no config file)", () => {
   const loaded = loadConfig()
   assert.equal(loaded.GENTIC_API_KEY, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://env.example.com")
-  assert.deepEqual(loaded.AGENT_PROVIDERS, ["claude_code"])
   assert.equal(loaded.GIT_REMOTE_BASE, "git@github.com:")
   assert.equal(loaded.POLL_INTERVAL_MS, 3000)
   assert.equal(loaded.MAX_CONCURRENT_ISSUES, 1)
@@ -89,20 +88,19 @@ test("loadConfig accepts a concurrent-issue limit", () => {
   assert.equal(loadConfig().MAX_CONCURRENT_ISSUES, 3)
 })
 
-test("loadConfig accepts selected agent providers from env", () => {
+test("loadConfig ignores legacy selected agent providers from env", () => {
   process.env.GENTIC_API_KEY = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.AGENT_PROVIDERS = "claude_code,codex"
 
-  assert.deepEqual(loadConfig().AGENT_PROVIDERS, ["claude_code", "codex"])
+  assert.equal("AGENT_PROVIDERS" in loadConfig(), false)
 })
 
-test("loadConfig accepts selected agent providers from config file", () => {
+test("loadConfig ignores legacy selected agent providers from config file", () => {
   writeConfigFile({
     GENTIC_API_KEY: "file-key",
     GENTIC_API_URL: "https://file.example.com",
-    AGENT_PROVIDERS: ["codex"],
   })
 
-  assert.deepEqual(loadConfig().AGENT_PROVIDERS, ["codex"])
+  assert.equal("AGENT_PROVIDERS" in loadConfig(), false)
 })

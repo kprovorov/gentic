@@ -1,7 +1,5 @@
 import { spawn } from "node:child_process"
 
-import { DEFAULT_AGENT_PROVIDERS, type AgentProvider } from "./agents.js"
-
 /** Status of one external CLI gentic depends on for running issues. */
 export interface ToolStatus {
   installed: boolean
@@ -109,16 +107,11 @@ async function checkCodex(): Promise<ToolStatus> {
  * gentic-specific auth is required to run it.
  */
 export async function getToolStatuses(
-  agentProviders: AgentProvider[] = DEFAULT_AGENT_PROVIDERS
 ): Promise<ToolStatuses> {
   const [github, claude, codex] = await Promise.all([
     checkGithub(),
-    agentProviders.includes("claude_code")
-      ? checkClaude()
-      : Promise.resolve(undefined),
-    agentProviders.includes("codex")
-      ? checkCodex()
-      : Promise.resolve(undefined),
+    checkClaude(),
+    checkCodex(),
   ])
   return { github, claude, codex }
 }

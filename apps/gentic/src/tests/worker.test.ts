@@ -243,7 +243,6 @@ async function withHarness(
     const config: Config = {
       GENTIC_API_KEY: "test-key",
       GENTIC_API_URL: "https://gentic.example",
-      AGENT_PROVIDERS: ["claude_code"],
       GIT_REMOTE_BASE: "git@github.com:",
       WORKDIR: workdir,
       POLL_INTERVAL_MS: 1,

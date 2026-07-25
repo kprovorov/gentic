@@ -239,7 +239,7 @@ The worker clones repositories using the `GIT_REMOTE_BASE` value (default: `git@
 
 ## Agent credentials setup
 
-During `gentic auth login`, choose which coding agent(s) this worker will run. The prompt defaults to **Claude Code**. Gentic uses that selection to decide which provider checks to run and which issues this worker can claim; unselected providers are skipped entirely.
+Gentic workers can claim issues for any supported agent provider. Install and authenticate both Claude Code and Codex in the worker environment before starting the worker.
 
 ### Claude Code
 

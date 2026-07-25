@@ -1,6 +1,6 @@
 import type { Command } from "commander"
 
-import { formatAgentProviders } from "../agents.js"
+import { agentProviders, formatAgentProviders } from "../agents.js"
 import { getServiceBackend } from "../service/index.js"
 import type { ServiceScope, ServiceStatus } from "../service/index.js"
 import { formatToolStatus, getToolStatuses } from "../tools.js"
@@ -98,7 +98,7 @@ export function registerStatusCommand(program: Command): void {
 
 async function status(opts: StatusOptions): Promise<void> {
   const auth = getAuthState()
-  const tools = await getToolStatuses(auth.agentProviders)
+  const tools = await getToolStatuses()
 
   if (!auth.authenticated) {
     if (opts.json) {
@@ -131,7 +131,7 @@ async function status(opts: StatusOptions): Promise<void> {
           auth: "configured",
           apiUrl: auth.apiUrl,
           maskedApiKey: auth.maskedApiKey,
-          agents: auth.agentProviders,
+          agents: agentProviders,
           serviceError: describe(error),
           tools: toolsJson(tools),
         })
@@ -154,7 +154,7 @@ async function status(opts: StatusOptions): Promise<void> {
         auth: "configured",
         apiUrl: auth.apiUrl,
         maskedApiKey: auth.maskedApiKey,
-        agents: auth.agentProviders,
+        agents: agentProviders,
         service: serviceStatus.state,
         serviceBackend: backendName,
         pid: serviceStatus.pid,
@@ -175,7 +175,7 @@ async function status(opts: StatusOptions): Promise<void> {
   note(
     [
       `Auth:     configured (api key: ${auth.maskedApiKey}, url: ${auth.apiUrl})`,
-      `Agents:   ${formatAgentProviders(auth.agentProviders)}`,
+      `Agents:   ${formatAgentProviders([...agentProviders])}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,
       `Last run: ${lastRun}`,

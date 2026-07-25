@@ -1,4 +1,3 @@
-import type { AgentProvider } from "./agents.js"
 import { detectPlatform, spawnInteractive } from "./installers.js"
 import type { ToolStatus, ToolStatuses } from "./tools.js"
 import { cancel, confirm, isCancel, log } from "./ui.js"
@@ -29,17 +28,16 @@ const defaultDeps: AgentCliSetupDeps = {
   spawnInteractive,
 }
 
-export async function setupSelectedAgentCLIs(
-  agentProviders: AgentProvider[],
+export async function setupAgentCLIs(
   tools: ToolStatuses,
   deps: AgentCliSetupDeps = defaultDeps
 ): Promise<boolean> {
-  if (agentProviders.includes("claude_code") && tools.claude) {
+  if (tools.claude) {
     const completedClaudeSetup = await setupClaudeCode(tools.claude, deps)
     if (!completedClaudeSetup) return false
   }
 
-  if (!agentProviders.includes("codex") || !tools.codex) return true
+  if (!tools.codex) return true
 
   return setupCodex(tools.codex, deps)
 }
