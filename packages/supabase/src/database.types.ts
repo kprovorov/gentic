@@ -337,6 +337,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          next_issue_number: number
           repo: string
           setup_script: string | null
           updated_at: string
@@ -347,6 +348,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          next_issue_number?: number
           repo: string
           setup_script?: string | null
           updated_at?: string
@@ -357,6 +359,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          next_issue_number?: number
           repo?: string
           setup_script?: string | null
           updated_at?: string
@@ -391,6 +394,10 @@ export type Database = {
       }
       mark_attachment_storage_deleted: {
         Args: { storage_paths: string[] }
+        Returns: number
+      }
+      next_issue_number_for_project: {
+        Args: { p_project_id: string }
         Returns: number
       }
       reset_issue_run: {
