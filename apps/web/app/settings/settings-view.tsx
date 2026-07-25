@@ -5,7 +5,6 @@ import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   IconAlertCircle,
-  IconBrandGithub,
   IconCheck,
   IconChevronDown,
   IconExternalLink,
@@ -24,6 +23,7 @@ import {
 import { fetchSettingsData } from "@/app/client-queries"
 import type { SettingsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import { BrandIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -132,7 +132,7 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted">
-                  <IconBrandGithub className="size-5" />
+                  <BrandIcon name="github" className="size-5" />
                 </div>
                 <div className="grid gap-1">
                   <CardTitle>GitHub integration</CardTitle>
@@ -277,10 +277,7 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                     name="auto_respond_to_reviews"
                     defaultChecked
                   />
-                  <Label
-                    htmlFor="project-auto-respond"
-                    className="font-normal"
-                  >
+                  <Label htmlFor="project-auto-respond" className="font-normal">
                     Auto-respond to review feedback
                   </Label>
                 </div>
@@ -325,7 +322,10 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                         <div className="grid gap-2">
                           <Label htmlFor={`repo-${project.id}`}>Repo</Label>
                           <div className="relative">
-                            <IconBrandGithub className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <BrandIcon
+                              name="github"
+                              className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
                             <Input
                               id={`repo-${project.id}`}
                               name="repo"

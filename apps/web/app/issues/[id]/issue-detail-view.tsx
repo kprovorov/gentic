@@ -23,7 +23,6 @@ import {
   IconMessageQuestion,
   IconPencil,
   IconPlayerPause,
-  IconRobot,
   IconRocket,
   IconShieldCheck,
   IconSparkles,
@@ -31,6 +30,7 @@ import {
 } from "@tabler/icons-react"
 
 import type { IssueDetailData } from "@/app/queries"
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -286,7 +286,10 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
                 </div>
               ) : null}
               <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
-                <IconRobot className="size-3.5" />
+                <AgentProviderIcon
+                  provider={issue.agent_provider}
+                  className="size-3.5"
+                />
                 Agent: {agentProviderLabels[issue.agent_provider]}
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { IconChevronDown, IconRefresh } from "@tabler/icons-react"
 
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -108,6 +109,10 @@ export function IssueRetryAgentButton({ issueId }: { issueId: string }) {
                   className="w-full"
                   onClick={() => handleRetry(option.value)}
                 >
+                  <AgentProviderIcon
+                    provider={option.value}
+                    className="size-4"
+                  />
                   Retry with {option.label}
                 </button>
               </DropdownMenuItem>

@@ -2,14 +2,10 @@
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  IconChevronDown,
-  IconCode,
-  IconRobot,
-  IconTrash,
-} from "@tabler/icons-react"
+import { IconChevronDown, IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
 
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { queryKeys } from "@/app/query-keys"
 import {
   AlertDialog,
@@ -52,10 +48,9 @@ const agentLabels: Record<AgentProvider, string> = {
 const agentOptions: {
   value: AgentProvider
   label: string
-  icon: typeof IconRobot
 }[] = [
-  { value: "claude_code", label: agentLabels.claude_code, icon: IconRobot },
-  { value: "codex", label: agentLabels.codex, icon: IconCode },
+  { value: "claude_code", label: agentLabels.claude_code },
+  { value: "codex", label: agentLabels.codex },
 ]
 
 function pluralize(count: number, noun: string) {
@@ -180,7 +175,9 @@ export function BulkActionsToolbar({
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
-      <span className="text-sm font-medium">{pluralize(count, "issue")} selected</span>
+      <span className="text-sm font-medium">
+        {pluralize(count, "issue")} selected
+      </span>
       <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -226,8 +223,6 @@ export function BulkActionsToolbar({
             className="w-48 rounded-lg bg-popover before:hidden"
           >
             {agentOptions.map((option) => {
-              const OptionIcon = option.icon
-
               return (
                 <DropdownMenuItem
                   key={option.value}
@@ -235,7 +230,10 @@ export function BulkActionsToolbar({
                   onSelect={() => setAgentProvider(option.value)}
                   className="gap-3"
                 >
-                  <OptionIcon className="size-4 text-muted-foreground" />
+                  <AgentProviderIcon
+                    provider={option.value}
+                    className="size-4"
+                  />
                   <span className="min-w-0 flex-1 truncate">
                     {option.label}
                   </span>
@@ -257,8 +255,9 @@ export function BulkActionsToolbar({
                 Delete {pluralize(count, "issue")}?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the selected {count === 1 ? "issue" : "issues"}.
-                This action cannot be undone.
+                This will permanently delete the selected{" "}
+                {count === 1 ? "issue" : "issues"}. This action cannot be
+                undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
