@@ -5,6 +5,7 @@ import {
   formatAgentProviders,
   parseAgentProviders,
 } from "../agents.js"
+import { setupSelectedAgentCLIs } from "../agent-cli-setup.js"
 import { getConfigInput } from "../config.js"
 import {
   configFilePath,
@@ -183,12 +184,24 @@ export async function loginInteractive(): Promise<void> {
     AGENT_PROVIDERS: parseAgentProviders(agentSelection),
   })
 
-  const current = await getOnboardingStatus({
+  let current = await getOnboardingStatus({
     configInput: {
       ...getConfigInput(),
       AGENT_PROVIDERS: parseAgentProviders(agentSelection),
     },
   })
+  const completedSetup = await setupSelectedAgentCLIs(
+    parseAgentProviders(agentSelection),
+    current.tools
+  )
+  if (!completedSetup) return
+  current = await getOnboardingStatus({
+    configInput: {
+      ...getConfigInput(),
+      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+    },
+  })
+
   if (apiKeyConfigured && current.ready) {
     outro(
       `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
