@@ -8,6 +8,7 @@ import { registerLogsCommand } from "./commands/logs.js"
 import { registerRunCommand } from "./commands/run.js"
 import { registerServiceCommands } from "./commands/service.js"
 import { registerStatusCommand } from "./commands/status.js"
+import { checkOnboardingGate } from "./cli-gate.js"
 import { logError } from "./log.js"
 import {
   formatOnboardingUnmet,
@@ -52,7 +53,9 @@ program
     process.exitCode = 1
   })
 
-program.parseAsync(process.argv).catch((error: unknown) => {
-  logError("fatal:", describe(error))
-  process.exit(1)
-})
+checkOnboardingGate()
+  .then(() => program.parseAsync(process.argv))
+  .catch((error: unknown) => {
+    logError("fatal:", describe(error))
+    process.exit(1)
+  })
