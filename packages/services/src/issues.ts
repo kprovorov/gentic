@@ -27,6 +27,7 @@ export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
+  bulkUpdateIssueAgentProvider,
   getIssueRepo,
   resetIssueAgent,
   updateIssueAgentProvider,

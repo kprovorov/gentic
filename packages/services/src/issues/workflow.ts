@@ -119,6 +119,44 @@ export async function updateIssueAgentProvider(
   return unwrap(result)
 }
 
+export async function bulkUpdateIssueAgentProvider(
+  supabase: Supabase,
+  userId: string,
+  issueIds: string[],
+  agentProvider: AgentProvider
+) {
+  const uniqueIds = Array.from(new Set(issueIds))
+  const { data: issues, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,run_started_at,projects!inner(user_id)")
+    .in("id", uniqueIds)
+    .eq("projects.user_id", userId)
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!issues || issues.length !== uniqueIds.length) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+  if (issues.some((issue) => issue.run_started_at)) {
+    throw new ServiceError(
+      "validation",
+      "Agent cannot be changed after an issue has started"
+    )
+  }
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        agent_provider: agentProvider,
+        session_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", uniqueIds)
+  )
+}
+
 // Called from the GitHub webhook route, which is trusted server code
 // authenticated by the webhook signature rather than a Clerk user. There is no
 // `userId` to check ownership against, so the exact PR URL is used to find a
