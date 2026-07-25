@@ -45,6 +45,22 @@ function sanitizeFileName(name: string): string {
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file"
 }
 
+function revalidateIssuePath(issue: Parameters<typeof getIssueHref>[0]) {
+  const href = getIssueHref(issue)
+
+  if (href) {
+    revalidatePath(href)
+  }
+}
+
+async function revalidateIssuePathById(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  userId: string,
+  issueId: string
+) {
+  revalidateIssuePath(await issuesService.getIssue(supabase, userId, issueId))
+}
+
 async function createIssue(status: IssueStatus, formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const fields = createIssueFormSchema.parse({
@@ -166,7 +182,7 @@ export async function updateIssue(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${id}`)
+  revalidateIssuePath(issue)
   redirect(getIssueHref(issue) ?? "/issues")
 }
 
@@ -197,7 +213,7 @@ export async function resetIssueAgent(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${id}`)
+  await revalidateIssuePathById(supabase, userId, id)
 
   return message
 }
@@ -211,7 +227,7 @@ export async function updateIssueStatus(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${id}`)
+  await revalidateIssuePathById(supabase, userId, id)
 }
 
 export async function bulkUpdateIssueStatus(formData: FormData) {
@@ -269,7 +285,7 @@ export async function updateIssueAgentProvider(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${id}`)
+  await revalidateIssuePathById(supabase, userId, id)
 }
 
 export async function addIssueRelation(formData: FormData) {
@@ -291,7 +307,7 @@ export async function addIssueRelation(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${issue_id}`)
+  await revalidateIssuePathById(supabase, userId, issue_id)
 }
 
 export async function deleteIssueRelation(formData: FormData) {
@@ -305,7 +321,7 @@ export async function deleteIssueRelation(formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  revalidatePath(`/issues/${issue_id}`)
+  await revalidateIssuePathById(supabase, userId, issue_id)
 }
 
 export async function sendIssueMessage(formData: FormData) {
@@ -333,7 +349,7 @@ export async function sendIssueMessage(formData: FormData) {
     )
     await issuesService.requeueIssueForUserMessage(supabase, issue_id)
 
-    revalidatePath(`/issues/${issue_id}`)
+    await revalidateIssuePathById(supabase, userId, issue_id)
 
     return { ...message, attachments }
   } catch (error) {
@@ -381,7 +397,7 @@ export async function uploadAttachments(formData: FormData) {
     throw error
   }
 
-  revalidatePath(`/issues/${issueId}`)
+  await revalidateIssuePathById(supabase, userId, issueId)
 }
 
 function getAttachmentFiles(formData: FormData) {
@@ -558,7 +574,7 @@ const deleteAttachmentSchema = z.object({
 })
 
 export async function deleteAttachment(formData: FormData) {
-  const { supabase } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedContext()
   const { id, issue_id } = deleteAttachmentSchema.parse({
     id: getString(formData, "id"),
     issue_id: getString(formData, "issue_id"),
@@ -604,5 +620,5 @@ export async function deleteAttachment(formData: FormData) {
     throw new Error(error.message)
   }
 
-  revalidatePath(`/issues/${issue_id}`)
+  await revalidateIssuePathById(supabase, userId, issue_id)
 }
