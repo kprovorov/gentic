@@ -70,7 +70,7 @@ Auto-respond needs two credentials **in addition to** the webhook secret used by
     In your GitHub App settings, generate a **webhook secret** and set the **Webhook URL** to `https://YOUR_GENTIC_DOMAIN/api/integrations/github/webhook`. Put the secret in the web app environment as `GITHUB_WEBHOOK_SECRET`. This is required for the base integration too.
   </Step>
   <Step title="Subscribe to required webhook events">
-    In the GitHub App's **Subscribe to events** section, enable **Pull requests**, **Pull request reviews**, **Check runs**, and **Check suites**. The app needs at least read access to the **Checks** permission to receive check events. Check events are required for issues in `testing` to move automatically to `ready-for-review` or `tests-failed` after CI finishes.
+    In the GitHub App's **Subscribe to events** section, enable **Pull requests**, **Pull request reviews**, **Check runs**, **Check suites**, and **Workflow runs**. The app needs at least read access to the **Checks** permission to receive check events. Check and workflow-run events are required for issues in `testing` to move automatically to `ready-for-review` or `tests-failed` after CI finishes.
   </Step>
   <Step title="Add the App ID and private key">
     In the GitHub App's **General** settings, copy the **App ID** shown at the top of the page. Under **Private keys**, click **Generate a private key** to download a `.pem` file. Set both values in your web app environment:
