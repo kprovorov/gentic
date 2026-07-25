@@ -1,4 +1,5 @@
 export {
+  getIssueCode,
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,
@@ -7,6 +8,7 @@ export {
 export { ensureIssueOwned, ensureIssuesOwned } from "./issues/ownership"
 export {
   getIssue,
+  getIssueByCode,
   listBlockedIssueIds,
   listIssuePullRequests,
   listIssueRelationCandidates,
@@ -24,6 +26,7 @@ export {
   updateIssue,
 } from "./issues/mutations"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
+export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
   getIssueRepo,

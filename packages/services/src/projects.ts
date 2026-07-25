@@ -3,6 +3,51 @@ import type { ProjectValues } from "@gentic/validators/projects"
 import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
 
+/**
+ * First word of the name, uppercased letters only, truncated/padded to 3
+ * characters (falls back to "PRJ" if the first word has no letters at all).
+ * Must stay in lockstep with the backfill logic in
+ * supabase/migrations/20260725120000_add_project_key.sql.
+ */
+function deriveProjectKeyBase(name: string): string {
+  const firstWord = name.trim().split(/\s+/)[0] ?? ""
+  const letters = firstWord.toUpperCase().replace(/[^A-Z]/g, "")
+
+  if (letters.length === 0) {
+    return "PRJ"
+  }
+  if (letters.length >= 3) {
+    return letters.slice(0, 3)
+  }
+  return letters.padEnd(3, letters[letters.length - 1])
+}
+
+async function generateProjectKey(
+  supabase: Supabase,
+  userId: string,
+  name: string
+): Promise<string> {
+  const base = deriveProjectKeyBase(name)
+
+  for (let suffix = 0; ; suffix++) {
+    const candidate = suffix === 0 ? base : `${base}${suffix + 1}`
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("key", candidate)
+      .maybeSingle()
+
+    if (error) {
+      throw new ServiceError("internal", error.message)
+    }
+    if (!data) {
+      return candidate
+    }
+  }
+}
+
 export async function listProjects(supabase: Supabase, userId: string) {
   return unwrap(
     await supabase
@@ -40,9 +85,11 @@ export async function createProject(
   userId: string,
   input: ProjectValues
 ) {
+  const key = await generateProjectKey(supabase, userId, input.name)
+
   const result = await supabase
     .from("projects")
-    .insert({ ...input, user_id: userId })
+    .insert({ ...input, user_id: userId, key })
     .select("*")
     .single()
 

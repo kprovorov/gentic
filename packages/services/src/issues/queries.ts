@@ -48,6 +48,30 @@ export async function getIssue(supabase: Supabase, userId: string, id: string) {
   return data
 }
 
+export async function getIssueByCode(
+  supabase: Supabase,
+  userId: string,
+  projectKey: string,
+  issueNumber: number
+) {
+  const { data, error } = await supabase
+    .from("issues")
+    .select(ISSUE_WITH_PROJECT_SELECT)
+    .eq("number", issueNumber)
+    .eq("projects.key", projectKey)
+    .eq("projects.user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+
+  return data
+}
+
 export async function listIssueRelationCandidates(
   supabase: Supabase,
   userId: string,
