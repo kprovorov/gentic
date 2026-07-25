@@ -1,7 +1,7 @@
 import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
-import { resolvePrFinishStatus } from "@/lib/ci-status"
+import { resolvePrFinishState } from "@/lib/ci-status"
 
 import {
   ensureIssueOwned,
@@ -37,15 +37,18 @@ export async function PATCH(
       // doesn't know about (`testing`), so it's applied as a guarded
       // follow-up update rather than widening the RPC's allow-list.
       let status: IssueStatus = fields.status
+      let headSha: string | null = null
       if (status === "ready-for-review" && fields.pr_url) {
         const repo = await issuesService.getIssueRepo(supabase, id)
         if (repo) {
-          status = await resolvePrFinishStatus(
+          const finishState = await resolvePrFinishState(
             supabase,
             userId,
             repo,
             fields.pr_url
           )
+          status = finishState.status
+          headSha = finishState.headSha
         }
       }
 
@@ -64,7 +67,12 @@ export async function PATCH(
       }
 
       if (data && fields.pr_url) {
-        await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
+        await issuesService.attachIssuePullRequest(
+          supabase,
+          id,
+          fields.pr_url,
+          headSha
+        )
       }
 
       if (data && status !== fields.status) {

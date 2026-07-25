@@ -39,6 +39,11 @@ export function resolveCheckSuiteStatus(
   return checkSuitesFailed(suites) ? "tests-failed" : "ready-for-review"
 }
 
+export type PrFinishState = {
+  status: IssueStatus
+  headSha: string | null
+}
+
 function parsePullNumber(prUrl: string): number | null {
   const match = prUrl.match(/\/pull\/(\d+)/)
   return match ? Number(match[1]) : null
@@ -57,11 +62,20 @@ export async function resolvePrFinishStatus(
   repo: string,
   prUrl: string
 ): Promise<IssueStatus> {
+  return (await resolvePrFinishState(supabase, userId, repo, prUrl)).status
+}
+
+export async function resolvePrFinishState(
+  supabase: Supabase,
+  userId: string,
+  repo: string,
+  prUrl: string
+): Promise<PrFinishState> {
   const pullNumber = parsePullNumber(prUrl)
   const [owner, name] = repo.split("/")
 
   if (!pullNumber || !owner || !name) {
-    return "ready-for-review"
+    return { status: "ready-for-review", headSha: null }
   }
 
   try {
@@ -71,7 +85,7 @@ export async function resolvePrFinishStatus(
     )
 
     if (!integration?.installation_id) {
-      return "ready-for-review"
+      return { status: "ready-for-review", headSha: null }
     }
 
     const headSha = await fetchPullRequestHeadSha(
@@ -80,19 +94,28 @@ export async function resolvePrFinishStatus(
       name,
       pullNumber
     )
-    const suites = await fetchCheckSuitesForRef(
-      integration.installation_id,
-      owner,
-      name,
-      headSha
-    )
 
-    return resolveCheckSuiteStatus(suites)
+    try {
+      const suites = await fetchCheckSuitesForRef(
+        integration.installation_id,
+        owner,
+        name,
+        headSha
+      )
+
+      return { status: resolveCheckSuiteStatus(suites), headSha }
+    } catch (error) {
+      console.error(
+        "[ci-status] failed to check CI suites, defaulting to ready-for-review:",
+        error
+      )
+      return { status: "ready-for-review", headSha }
+    }
   } catch (error) {
     console.error(
-      "[ci-status] failed to check CI status, defaulting to ready-for-review:",
+      "[ci-status] failed to check PR head SHA, defaulting to ready-for-review:",
       error
     )
-    return "ready-for-review"
+    return { status: "ready-for-review", headSha: null }
   }
 }

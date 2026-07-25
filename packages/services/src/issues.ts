@@ -35,6 +35,7 @@ export {
   resetIssueAgent,
   updateIssueAgentProvider,
   updateIssueStatus,
+  updateIssueStatusByPrHeadShaIfStatus,
   updateIssueStatusByPrUrl,
   updateIssueStatusByPrUrlIfStatus,
 } from "./issues/workflow"

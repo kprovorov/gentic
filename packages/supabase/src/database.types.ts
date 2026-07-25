@@ -124,18 +124,21 @@ export type Database = {
       issue_pull_requests: {
         Row: {
           created_at: string
+          head_sha: string | null
           id: string
           issue_id: string
           url: string
         }
         Insert: {
           created_at?: string
+          head_sha?: string | null
           id?: string
           issue_id: string
           url: string
         }
         Update: {
           created_at?: string
+          head_sha?: string | null
           id?: string
           issue_id?: string
           url?: string
@@ -553,4 +556,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

@@ -4,11 +4,12 @@ import { createServiceClient } from "@gentic/supabase/service"
 import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
-import { resolveCheckSuiteStatus } from "@/lib/ci-status"
+import { checkSuitesFailed, resolveCheckSuiteStatus } from "@/lib/ci-status"
 import {
   fetchCheckSuitesForRef,
   fetchPullRequestNumbersForCommit,
   fetchPullRequestReviewComments,
+  type GithubCheckSuite,
 } from "@/lib/github-app"
 
 export const runtime = "nodejs"
@@ -193,7 +194,8 @@ async function handleCheckSuiteEvent(
     owner,
     repo,
     payload.check_suite.head_sha,
-    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number)
+    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number),
+    payload.check_suite
   )
 }
 
@@ -219,7 +221,8 @@ async function handleCheckRunEvent(
     owner,
     repo,
     payload.check_run.head_sha,
-    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number)
+    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number),
+    payload.check_run
   )
 }
 
@@ -229,7 +232,8 @@ async function resolveCompletedChecksForRef(
   owner: string,
   repo: string,
   headSha: string,
-  fallbackPullNumbers: number[] = []
+  fallbackPullNumbers: number[] = [],
+  fallbackCheck: GithubCheckSuite
 ) {
   // The payload's own `check_suite.pull_requests` is only populated when the
   // PR was already open at the moment the check suite was created. The
@@ -258,12 +262,11 @@ async function resolveCompletedChecksForRef(
 
   if (pullNumbers.length === 0) {
     console.error(
-      "[github-webhook] could not resolve pull requests for completed checks, skipping"
+      "[github-webhook] could not resolve pull requests for completed checks, falling back to head SHA"
     )
-    return
   }
 
-  let suites
+  let suites: GithubCheckSuite[]
   try {
     suites = await fetchCheckSuitesForRef(
       installationId,
@@ -273,13 +276,15 @@ async function resolveCompletedChecksForRef(
     )
   } catch (error) {
     console.error(
-      "[github-webhook] failed to fetch check suites for ref, skipping:",
+      "[github-webhook] failed to fetch check suites for ref, falling back to payload:",
       error
     )
-    return
+    suites = [fallbackCheck]
   }
 
-  const status = resolveCheckSuiteStatus(suites)
+  const status = checkSuitesFailed([fallbackCheck])
+    ? "tests-failed"
+    : resolveCheckSuiteStatus(suites)
 
   if (status === "testing") {
     return
@@ -294,6 +299,13 @@ async function resolveCompletedChecksForRef(
       status
     )
   }
+
+  await issuesService.updateIssueStatusByPrHeadShaIfStatus(
+    supabase,
+    headSha,
+    "testing",
+    status
+  )
 }
 
 async function handlePullRequestReviewEvent(

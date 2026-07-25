@@ -311,17 +311,49 @@ export async function updateIssueStatusByPrUrlIfStatus(
   )
 }
 
+export async function updateIssueStatusByPrHeadShaIfStatus(
+  supabase: Supabase,
+  headSha: string,
+  fromStatus: IssueStatus,
+  status: IssueStatus
+) {
+  const { data: pullRequests, error: pullRequestError } = await supabase
+    .from("issue_pull_requests")
+    .select("issue_id")
+    .eq("head_sha", headSha)
+
+  if (pullRequestError) {
+    throw new ServiceError("internal", pullRequestError.message)
+  }
+
+  const issueIds = pullRequests?.map((pullRequest) => pullRequest.issue_id) ?? []
+
+  if (issueIds.length === 0) {
+    return []
+  }
+
+  return unwrap(
+    await supabase
+      .from("issues")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("status", fromStatus)
+      .in("id", issueIds)
+      .select("id")
+  )
+}
+
 export async function attachIssuePullRequest(
   supabase: Supabase,
   issueId: string,
-  prUrl: string
+  prUrl: string,
+  headSha?: string | null
 ) {
   return unwrap(
     await supabase
       .from("issue_pull_requests")
       .upsert(
-        { issue_id: issueId, url: prUrl },
-        { onConflict: "url", ignoreDuplicates: true }
+        { issue_id: issueId, url: prUrl, head_sha: headSha ?? null },
+        { onConflict: "url" }
       )
   )
 }
