@@ -106,7 +106,7 @@ function loginNonInteractive(opts: {
   )
 }
 
-async function loginInteractive(): Promise<void> {
+export async function loginInteractive(): Promise<void> {
   intro("gentic auth login")
 
   const apiUrl = await text({
