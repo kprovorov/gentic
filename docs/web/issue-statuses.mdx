@@ -83,12 +83,16 @@ If you have configured the [GitHub integration](/web/github-integration) with a 
 | `pull_request.closed` | `merged: true` | `merged` |
 | `pull_request.closed` | `merged: false` | `cancelled` |
 | `pull_request.reopened` | — | `ready-for-review` |
+| `check_run.completed` | all suites completed and any suite failed | `tests-failed` |
+| `check_run.completed` | all suites completed and no suite failed | `ready-for-review` |
+| `check_suite.completed` | all suites completed and any suite failed | `tests-failed` |
+| `check_suite.completed` | all suites completed and no suite failed | `ready-for-review` |
 | `pull_request_review.submitted` | `review.state: approved` | `approved` |
 | `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
 
-Gentic matches the event to a stored pull-request URL on the issue. Comment-only reviews and other event types are ignored.
+Gentic matches pull request and review events to a stored pull-request URL on the issue. For check events, Gentic resolves the pull request from the check's commit SHA and only updates issues that are still in `testing`, so late CI results do not overwrite review or merge statuses. Comment-only reviews and other event types are ignored.
 
-To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests** and **Pull request reviews** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
+To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests**, **Pull request reviews**, **Check runs**, and **Check suites** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
 
 ## Held status and usage limits
 

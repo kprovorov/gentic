@@ -4,7 +4,7 @@ import { createServiceClient } from "@gentic/supabase/service"
 import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
-import { checkSuitesFailed } from "@/lib/ci-status"
+import { resolveCheckSuiteStatus } from "@/lib/ci-status"
 import {
   fetchCheckSuitesForRef,
   fetchPullRequestNumbersForCommit,
@@ -27,6 +27,26 @@ type CheckSuitePayload = {
     head_sha: string
     status: string
     conclusion: string | null
+    pull_requests?: { number: number }[]
+  }
+  repository: {
+    name: string
+    owner: {
+      login: string
+    }
+  }
+  installation?: {
+    id: number
+  }
+}
+
+type CheckRunPayload = {
+  action: string
+  check_run: {
+    head_sha: string
+    status: string
+    conclusion: string | null
+    pull_requests?: { number: number }[]
   }
   repository: {
     name: string
@@ -93,6 +113,8 @@ export async function POST(request: Request) {
     )
   } else if (event === "check_suite") {
     await handleCheckSuiteEvent(supabase, payload as CheckSuitePayload)
+  } else if (event === "check_run") {
+    await handleCheckRunEvent(supabase, payload as CheckRunPayload)
   }
 
   return Response.json({ ok: true })
@@ -165,6 +187,50 @@ async function handleCheckSuiteEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
+  await resolveCompletedChecksForRef(
+    supabase,
+    String(installationId),
+    owner,
+    repo,
+    payload.check_suite.head_sha,
+    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number)
+  )
+}
+
+async function handleCheckRunEvent(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: CheckRunPayload
+) {
+  if (payload.action !== "completed") {
+    return
+  }
+
+  const installationId = payload.installation?.id
+  if (!installationId) {
+    return
+  }
+
+  const owner = payload.repository.owner.login
+  const repo = payload.repository.name
+
+  await resolveCompletedChecksForRef(
+    supabase,
+    String(installationId),
+    owner,
+    repo,
+    payload.check_run.head_sha,
+    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number)
+  )
+}
+
+async function resolveCompletedChecksForRef(
+  supabase: ReturnType<typeof createServiceClient>,
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  fallbackPullNumbers: number[] = []
+) {
   // The payload's own `check_suite.pull_requests` is only populated when the
   // PR was already open at the moment the check suite was created. The
   // worker pushes commits (creating the check suite) before opening the PR,
@@ -173,30 +239,37 @@ async function handleCheckSuiteEvent(
   let pullNumbers: number[]
   try {
     pullNumbers = await fetchPullRequestNumbersForCommit(
-      String(installationId),
+      installationId,
       owner,
       repo,
-      payload.check_suite.head_sha
+      headSha
     )
   } catch (error) {
     console.error(
-      "[github-webhook] failed to fetch pull requests for commit, skipping:",
+      "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
       error
     )
-    return
+    pullNumbers = fallbackPullNumbers
   }
 
   if (pullNumbers.length === 0) {
+    pullNumbers = fallbackPullNumbers
+  }
+
+  if (pullNumbers.length === 0) {
+    console.error(
+      "[github-webhook] could not resolve pull requests for completed checks, skipping"
+    )
     return
   }
 
   let suites
   try {
     suites = await fetchCheckSuitesForRef(
-      String(installationId),
+      installationId,
       owner,
       repo,
-      payload.check_suite.head_sha
+      headSha
     )
   } catch (error) {
     console.error(
@@ -206,13 +279,11 @@ async function handleCheckSuiteEvent(
     return
   }
 
-  if (suites.some((suite) => suite.status !== "completed")) {
+  const status = resolveCheckSuiteStatus(suites)
+
+  if (status === "testing") {
     return
   }
-
-  const status: IssueStatus = checkSuitesFailed(suites)
-    ? "tests-failed"
-    : "ready-for-review"
 
   for (const pullNumber of pullNumbers) {
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
