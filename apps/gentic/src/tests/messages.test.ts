@@ -349,6 +349,13 @@ test("issue run instructions update an existing pull request on follow-up", () =
   assert.doesNotMatch(instructions, /open a pull request against/)
 })
 
+test("issue run instructions open a ready for review pull request", () => {
+  const instructions = issueRunInstructions()
+
+  assert.match(instructions, /ready for review/)
+  assert.match(instructions, /do not create it as a draft/)
+})
+
 function fakeChannel(): IssueRealtimeChannel & {
   messages: RealtimeMessageEvent[]
 } {
