@@ -23,7 +23,6 @@ import {
   IconMessageQuestion,
   IconPencil,
   IconPlayerPause,
-  IconRobot,
   IconRocket,
   IconShieldCheck,
   IconSparkles,
@@ -31,6 +30,8 @@ import {
 } from "@tabler/icons-react"
 
 import type { IssueDetailData } from "@/app/queries"
+import { getIssueEditHref } from "@/app/issues/urls"
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import {
@@ -220,6 +221,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
       relation.source_issue.status !== "completed" &&
       relation.source_issue.status !== "cancelled"
   )
+  const editHref = getIssueEditHref(issue) ?? "/issues"
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -251,7 +253,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
                 </Button>
               ))}
               <Button asChild variant="outline">
-                <Link href={`/issues/${issue.id}/edit`}>
+                <Link href={editHref}>
                   <IconPencil />
                   Edit
                 </Link>
@@ -286,17 +288,24 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
                 </div>
               ) : null}
               <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
-                <IconRobot className="size-3.5" />
+                <AgentProviderIcon
+                  provider={issue.agent_provider}
+                  className="size-3.5"
+                />
                 Agent: {agentProviderLabels[issue.agent_provider]}
               </div>
             </div>
-            <h1
-              className={cn(
-                "text-3xl leading-tight md:text-4xl",
-                !issue.title && "text-muted-foreground italic"
-              )}
-            >
-              {issue.title ?? "Generating title…"}
+            <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-2 text-3xl leading-tight md:text-4xl">
+              {issue.code ? (
+                <span className="font-mono text-lg font-semibold text-muted-foreground md:text-xl">
+                  {issue.code}
+                </span>
+              ) : null}
+              <span
+                className={cn(!issue.title && "text-muted-foreground italic")}
+              >
+                {issue.title ?? "Generating title…"}
+              </span>
             </h1>
             <p className="text-sm text-muted-foreground">
               Created {formatDateTime(issue.created_at)}

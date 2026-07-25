@@ -25,6 +25,20 @@ export function checkSuitesFailed(suites: GithubCheckSuite[]): boolean {
   )
 }
 
+export function resolveCheckSuiteStatus(
+  suites: GithubCheckSuite[]
+): IssueStatus {
+  if (suites.length === 0) {
+    return "ready-for-review"
+  }
+
+  if (suites.some((suite) => suite.status !== "completed")) {
+    return "testing"
+  }
+
+  return checkSuitesFailed(suites) ? "tests-failed" : "ready-for-review"
+}
+
 function parsePullNumber(prUrl: string): number | null {
   const match = prUrl.match(/\/pull\/(\d+)/)
   return match ? Number(match[1]) : null
@@ -73,7 +87,7 @@ export async function resolvePrFinishStatus(
       headSha
     )
 
-    return suites.length > 0 ? "testing" : "ready-for-review"
+    return resolveCheckSuiteStatus(suites)
   } catch (error) {
     console.error(
       "[ci-status] failed to check CI status, defaulting to ready-for-review:",

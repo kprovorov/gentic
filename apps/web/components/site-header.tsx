@@ -10,7 +10,7 @@ function pageTitle(pathname: string) {
   if (pathname === "/settings") return "Projects"
   if (pathname === "/issues/new") return "New issue"
   if (/^\/issues\/[^/]+\/edit$/.test(pathname)) return "Edit issue"
-  if (/^\/issues\/[^/]+$/.test(pathname)) return "Issue"
+  if (/^\/issues\/[^/]+(?:\/[^/]+)?$/.test(pathname)) return "Issue"
   return "Gentic"
 }
 

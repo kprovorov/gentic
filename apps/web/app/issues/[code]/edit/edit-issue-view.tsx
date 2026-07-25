@@ -6,6 +6,7 @@ import { IconArrowLeft, IconDeviceFloppy } from "@tabler/icons-react"
 
 import { fetchIssueEditData } from "@/app/client-queries"
 import { updateIssue } from "@/app/issues/actions"
+import { getIssueHref } from "@/app/issues/urls"
 import type { IssueEdit } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
@@ -33,13 +34,14 @@ export function EditIssueView({
     initialData,
     staleTime: queryStaleTimes.formOptions,
   })
+  const issueHref = getIssueHref(issue) ?? "/issues"
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
           <Button asChild variant="ghost" className="w-fit">
-            <Link href={`/issues/${issue.id}`}>
+            <Link href={issueHref}>
               <IconArrowLeft />
               Back
             </Link>
@@ -122,7 +124,7 @@ export function EditIssueView({
 
               <div className="flex justify-end gap-2">
                 <Button asChild variant="outline">
-                  <Link href={`/issues/${issue.id}`}>Cancel</Link>
+                  <Link href={issueHref}>Cancel</Link>
                 </Button>
                 <Button type="submit">
                   <IconDeviceFloppy />

@@ -35,6 +35,7 @@ import { toast } from "sonner"
 
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
+import { getIssueHref } from "@/app/issues/urls"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -356,7 +357,8 @@ export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
 }
 
 export function getIssuesColumns(
-  blockedIssueIds: Set<string>
+  blockedIssueIds: Set<string>,
+  blockingIssueIds: Set<string>
 ): ColumnDef<HomeIssue>[] {
   return [
     {
@@ -389,14 +391,24 @@ export function getIssuesColumns(
       enableHiding: false,
     },
     {
+      accessorKey: "code",
+      header: ({ column }) => <SortableHeader label="Code" column={column} />,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs font-semibold text-muted-foreground">
+          {row.original.code ?? "—"}
+        </span>
+      ),
+    },
+    {
       accessorKey: "title",
       header: ({ column }) => <SortableHeader label="Issue" column={column} />,
       cell: ({ row }) => {
         const issue = row.original
+        const issueHref = getIssueHref(issue) ?? "/issues"
 
         return (
           <Link
-            href={`/issues/${issue.id}`}
+            href={issueHref}
             className="flex min-w-0 items-center gap-2"
           >
             <span
@@ -472,6 +484,20 @@ export function getIssuesColumns(
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
             <IconLock className="size-3" />
             Blocked
+          </span>
+        ) : null,
+    },
+    {
+      id: "blocking",
+      accessorFn: (issue) => blockingIssueIds.has(issue.id),
+      header: ({ column }) => (
+        <SortableHeader label="Blocking" column={column} />
+      ),
+      cell: ({ row }) =>
+        blockingIssueIds.has(row.original.id) ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <IconGitMerge className="size-3" />
+            Blocking
           </span>
         ) : null,
     },

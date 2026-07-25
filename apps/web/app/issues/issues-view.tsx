@@ -15,16 +15,19 @@ import {
 } from "@tanstack/react-table"
 import {
   IconChevronDown,
+  IconGitMerge,
   IconList,
   IconLock,
   IconPlus,
   IconSearch,
   IconTable,
+  IconX,
 } from "@tabler/icons-react"
 
 import { fetchIssuesData } from "@/app/client-queries"
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import { getIssueHref } from "@/app/issues/urls"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import { DataTable } from "@gentic/ui/data-table"
@@ -61,7 +64,12 @@ type IssuesViewMode = "list" | "table"
 const pageSize = 20
 
 function matchesIssue(issue: HomeIssue, filterValue: string) {
-  const haystack = [issue.title, issue.projects?.name, issue.projects?.repo]
+  const haystack = [
+    issue.code,
+    issue.title,
+    issue.projects?.name,
+    issue.projects?.repo,
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -89,31 +97,44 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
   }
 
   return (
-    new Date(issueB.created_at).getTime() - new Date(issueA.created_at).getTime()
+    new Date(issueB.created_at).getTime() -
+    new Date(issueA.created_at).getTime()
   )
 }
 
 function IssueRow({
   issue,
   isBlocked,
+  isBlocking,
 }: {
   issue: HomeIssue
   isBlocked: boolean
+  isBlocking: boolean
 }) {
   const TypeIcon = issueTypeIcons[issue.type]
+  const issueHref = getIssueHref(issue) ?? "/issues"
 
   return (
     <div className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <IssueStatusMenu issue={issue} />
         <Link
-          href={`/issues/${issue.id}`}
-          className={cn(
-            "min-w-0 truncate font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            !issue.title && "text-muted-foreground italic"
-          )}
+          href={issueHref}
+          className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {issue.title ?? "Generating title..."}
+          {issue.code ? (
+            <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+              {issue.code}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              "truncate font-medium",
+              !issue.title && "text-muted-foreground italic"
+            )}
+          >
+            {issue.title ?? "Generating title..."}
+          </span>
         </Link>
         <span
           className={cn(
@@ -128,6 +149,12 @@ function IssueRow({
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
             <IconLock className="size-3" />
             Blocked
+          </span>
+        ) : null}
+        {isBlocking ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <IconGitMerge className="size-3" />
+            Blocking
           </span>
         ) : null}
       </div>
@@ -149,19 +176,21 @@ function IssueRow({
 function IssuesTableView({
   issues,
   blockedIssueIds,
+  blockingIssueIds,
   filterKey,
   rowSelection,
   onRowSelectionChange,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
+  blockingIssueIds: Set<string>
   filterKey: string
   rowSelection: RowSelectionState
   onRowSelectionChange: (selection: RowSelectionState) => void
 }) {
   const columns = useMemo(
-    () => getIssuesColumns(blockedIssueIds),
-    [blockedIssueIds]
+    () => getIssuesColumns(blockedIssueIds, blockingIssueIds),
+    [blockedIssueIds, blockingIssueIds]
   )
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true },
@@ -256,6 +285,10 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     () => new Set(data.blockedIssueIds),
     [data.blockedIssueIds]
   )
+  const blockingIssueIds = useMemo(
+    () => new Set(data.blockingIssueIds),
+    [data.blockingIssueIds]
+  )
   const [globalFilter, setGlobalFilter] = useState("")
   const [pageIndex, setPageIndex] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -271,6 +304,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
+  const hasActiveFilters =
+    globalFilter.length > 0 ||
+    statusFilter.size > 0 ||
+    typeFilter.size > 0 ||
+    projectFilter.size > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
 
@@ -377,6 +415,14 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setPageIndex(0)
   }
 
+  function clearFilters() {
+    setGlobalFilter("")
+    setStatusFilter(new Set())
+    setTypeFilter(new Set())
+    setProjectFilter(new Set())
+    setPageIndex(0)
+  }
+
   function toggleStatus(status: HomeIssue["status"]) {
     setCollapsedStatuses((current) => {
       const next = new Set(current)
@@ -457,9 +503,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={globalFilter}
-                    onChange={(event) =>
-                      updateGlobalFilter(event.target.value)
-                    }
+                    onChange={(event) => updateGlobalFilter(event.target.value)}
                     placeholder="Search issues…"
                     className="pl-9"
                   />
@@ -603,6 +647,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                {hasActiveFilters ? (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <IconX className="size-3.5" />
+                    Clear filters
+                  </Button>
+                ) : null}
               </div>
               <ToggleGroup
                 type="single"
@@ -622,6 +672,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <IssuesTableView
                 issues={filteredIssues}
                 blockedIssueIds={blockedIssueIds}
+                blockingIssueIds={blockingIssueIds}
                 filterKey={filterKey}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
@@ -689,6 +740,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                               key={issue.id}
                               issue={issue}
                               isBlocked={blockedIssueIds.has(issue.id)}
+                              isBlocking={blockingIssueIds.has(issue.id)}
                             />
                           ))}
                         </div>
@@ -708,9 +760,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      setPageIndex(Math.max(0, safePageIndex - 1))
-                    }
+                    onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
                     disabled={safePageIndex === 0}
                   >
                     Previous

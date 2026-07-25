@@ -10,6 +10,7 @@ export {
   getIssue,
   getIssueByCode,
   listBlockedIssueIds,
+  listBlockingIssueIds,
   listIssuePullRequests,
   listIssueRelationCandidates,
   listIssueRelations,
@@ -17,7 +18,6 @@ export {
 } from "./issues/queries"
 export {
   bulkDeleteIssues,
-  bulkUpdateIssueStatus,
   createIssue,
   deleteIssue,
   setIssueTitle,
@@ -30,6 +30,7 @@ export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
   bulkUpdateIssueAgentProvider,
+  bulkUpdateIssueStatus,
   getIssueRepo,
   resetIssueAgent,
   updateIssueAgentProvider,

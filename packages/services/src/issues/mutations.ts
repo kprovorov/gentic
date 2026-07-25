@@ -1,6 +1,5 @@
 import type {
   CreateIssueValues,
-  IssueStatus,
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
@@ -140,23 +139,6 @@ export async function deleteIssue(
   await ensureIssueOwned(supabase, userId, id)
 
   unwrap(await supabase.from("issues").delete().eq("id", id))
-}
-
-export async function bulkUpdateIssueStatus(
-  supabase: Supabase,
-  userId: string,
-  issueIds: string[],
-  status: IssueStatus
-) {
-  const uniqueIds = Array.from(new Set(issueIds))
-  await ensureIssuesOwned(supabase, userId, uniqueIds)
-
-  unwrap(
-    await supabase
-      .from("issues")
-      .update({ status, updated_at: new Date().toISOString() })
-      .in("id", uniqueIds)
-  )
 }
 
 export async function bulkDeleteIssues(
