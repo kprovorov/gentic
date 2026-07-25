@@ -30,6 +30,7 @@ import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
 import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
+import { getIssueHref } from "./urls"
 
 const ATTACHMENTS_BUCKET = "attachments"
 
@@ -134,7 +135,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
 
   revalidatePath("/home")
   revalidatePath("/issues")
-  redirect(`/issues/${created.id}`)
+  redirect(getIssueHref(created) ?? "/issues")
 }
 
 export async function saveIssueDraft(formData: FormData) {
@@ -155,7 +156,7 @@ export async function updateIssue(formData: FormData) {
     type: getString(formData, "type") || "feature",
   })
 
-  await issuesService.updateIssue(supabase, userId, id, {
+  const issue = await issuesService.updateIssue(supabase, userId, id, {
     id,
     title,
     prompt,
@@ -166,7 +167,7 @@ export async function updateIssue(formData: FormData) {
   revalidatePath("/home")
   revalidatePath("/issues")
   revalidatePath(`/issues/${id}`)
-  redirect(`/issues/${id}`)
+  redirect(getIssueHref(issue) ?? "/issues")
 }
 
 export async function deleteIssue(formData: FormData) {

@@ -3,6 +3,7 @@ import "server-only"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
+import { ServiceError } from "@gentic/services/errors"
 import {
   agentProviderSchema,
   issueStatusSchema,
@@ -14,8 +15,8 @@ import { chatMessageSchema } from "@gentic/validators/realtime"
 import { z } from "zod"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
-import type { Attachment } from "./issues/[id]/attachments"
-import type { ChatMessage } from "./issues/[id]/issue-chat-state"
+import type { Attachment } from "./issues/[code]/attachments"
+import type { ChatMessage } from "./issues/[code]/issue-chat-state"
 import { fetchInstallationRepositories } from "@/lib/github-app"
 
 const ATTACHMENTS_BUCKET = "attachments"
@@ -38,49 +39,49 @@ const projectOptionSchema = z.object({
   id: z.string(),
   name: z.string(),
   repo: z.string(),
-})
-
-const issueProjectSchema = projectOptionSchema.extend({
   key: z.string(),
 })
 
 const homeIssueSchema = z.object({
   id: z.string(),
+  number: z.number().int().positive(),
   title: z.string().nullable(),
   status: issueStatusSchema,
   type: issueTypeSchema,
-  number: z.number(),
   created_at: z.string(),
-  projects: issueProjectSchema.nullable(),
+  projects: projectOptionSchema.nullable(),
 })
 
 const issueEditSchema = z.object({
   id: z.string(),
+  number: z.number().int().positive(),
   title: z.string().nullable(),
   prompt: z.string().nullable(),
   agent_provider: agentProviderSchema,
   type: issueTypeSchema,
+  projects: projectOptionSchema.nullable(),
 })
 
 const issueDetailSchema = z.object({
   id: z.string(),
+  number: z.number().int().positive(),
   title: z.string().nullable(),
   prompt: z.string().nullable(),
   agent_provider: agentProviderSchema,
   type: issueTypeSchema,
   status: issueStatusSchema,
-  number: z.number(),
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   pr_url: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  projects: issueProjectSchema.nullable(),
+  projects: projectOptionSchema.nullable(),
 })
 
 export type HomeIssue = {
   id: string
   code: string | null
+  number: number
   title: string | null
   status: IssueStatus
   type: IssueType
@@ -89,6 +90,7 @@ export type HomeIssue = {
     id: string
     name: string
     repo: string
+    key: string
   } | null
 }
 
@@ -96,6 +98,7 @@ export type ProjectOption = {
   id: string
   name: string
   repo: string
+  key: string
 }
 
 export type SettingsProject = ProjectOption & {
@@ -111,6 +114,7 @@ export type GithubRepositoryOption = {
 export type IssueDetail = {
   id: string
   code: string | null
+  number: number
   title: string | null
   prompt: string | null
   agent_provider: "claude_code" | "codex"
@@ -128,7 +132,14 @@ export type IssuePullRequest = issuesService.IssuePullRequest
 
 export type IssueEdit = Pick<
   IssueDetail,
-  "id" | "title" | "prompt" | "agent_provider" | "type"
+  | "id"
+  | "code"
+  | "number"
+  | "title"
+  | "prompt"
+  | "agent_provider"
+  | "type"
+  | "projects"
 >
 
 export type HomeData = {
@@ -157,6 +168,8 @@ export type IssueDetailData = {
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
+type IssueDetailRow = z.infer<typeof issueDetailSchema>
+type IssueEditRow = z.infer<typeof issueEditSchema>
 
 export class QueryNotFoundError extends Error {
   constructor(message = "Not found") {
@@ -178,14 +191,47 @@ function getDisplayIssueCode(issue: {
     : null
 }
 
-function toProjectOption(project: z.infer<typeof issueProjectSchema> | null) {
+function toProjectOption(project: ProjectOption | null) {
   return project
     ? {
         id: project.id,
         name: project.name,
         repo: project.repo,
+        key: project.key,
       }
     : null
+}
+
+function toIssueDetail(issue: IssueDetailRow): IssueDetail {
+  return {
+    id: issue.id,
+    code: getDisplayIssueCode(issue),
+    number: issue.number,
+    title: issue.title,
+    prompt: issue.prompt,
+    agent_provider: issue.agent_provider,
+    type: issue.type,
+    status: issue.status,
+    usage_limit_reset_at: issue.usage_limit_reset_at,
+    run_started_at: issue.run_started_at,
+    pr_url: issue.pr_url,
+    created_at: issue.created_at,
+    updated_at: issue.updated_at,
+    projects: toProjectOption(issue.projects),
+  }
+}
+
+function toIssueEdit(issue: IssueEditRow): IssueEdit {
+  return {
+    id: issue.id,
+    code: getDisplayIssueCode(issue),
+    number: issue.number,
+    title: issue.title,
+    prompt: issue.prompt,
+    agent_provider: issue.agent_provider,
+    type: issue.type,
+    projects: toProjectOption(issue.projects),
+  }
 }
 
 export async function getHomeData(
@@ -207,6 +253,7 @@ export async function getHomeData(
     .map((issue) => ({
       id: issue.id,
       code: getDisplayIssueCode(issue),
+      number: issue.number,
       title: issue.title,
       status: issue.status,
       type: issue.type,
@@ -263,6 +310,7 @@ export async function getSettingsData(
       id: project.id,
       name: project.name,
       repo: project.repo,
+      key: project.key,
       setup_script: project.setup_script,
       auto_respond_to_reviews: project.auto_respond_to_reviews,
     })),
@@ -284,6 +332,7 @@ export async function getNewIssueData(
       id: project.id,
       name: project.name,
       repo: project.repo,
+      key: project.key,
     })),
   }
 }
@@ -295,30 +344,8 @@ export async function getIssueEditData(
   const { supabase } = await resolveContext(context)
   const { data: issue, error } = await supabase
     .from("issues")
-    .select("id,title,prompt,agent_provider,type")
-    .eq("id", id)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  if (!issue) {
-    throw new QueryNotFoundError("Issue not found")
-  }
-
-  return issueEditSchema.parse(issue)
-}
-
-export async function getIssueDetailData(
-  id: string,
-  context?: AuthenticatedContext
-): Promise<IssueDetailData> {
-  const { supabase, userId } = await resolveContext(context)
-  const { data: issue, error } = await supabase
-    .from("issues")
     .select(
-      "id,title,prompt,agent_provider,type,status,number,usage_limit_reset_at,run_started_at,pr_url,created_at,updated_at,projects(id,name,repo,key)"
+      "id,number,title,prompt,agent_provider,type,projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -331,22 +358,99 @@ export async function getIssueDetailData(
     throw new QueryNotFoundError("Issue not found")
   }
 
-  const parsedIssueRow = issueDetailSchema.parse(issue)
-  const parsedIssue: IssueDetail = {
-    id: parsedIssueRow.id,
-    code: getDisplayIssueCode(parsedIssueRow),
-    title: parsedIssueRow.title,
-    prompt: parsedIssueRow.prompt,
-    agent_provider: parsedIssueRow.agent_provider,
-    type: parsedIssueRow.type,
-    status: parsedIssueRow.status,
-    usage_limit_reset_at: parsedIssueRow.usage_limit_reset_at,
-    run_started_at: parsedIssueRow.run_started_at,
-    pr_url: parsedIssueRow.pr_url,
-    created_at: parsedIssueRow.created_at,
-    updated_at: parsedIssueRow.updated_at,
-    projects: toProjectOption(parsedIssueRow.projects),
+  return toIssueEdit(issueEditSchema.parse(issue))
+}
+
+export async function getIssueEditDataByCode(
+  projectKey: string,
+  issueNumber: number,
+  context?: AuthenticatedContext
+): Promise<IssueEdit> {
+  const { supabase, userId } = await resolveContext(context)
+  const issue = await getScopedIssueByCode(
+    supabase,
+    userId,
+    projectKey,
+    issueNumber
+  )
+
+  return toIssueEdit(issue)
+}
+
+export async function getIssueDetailData(
+  projectKey: string,
+  issueNumber: number,
+  context?: AuthenticatedContext
+): Promise<IssueDetailData> {
+  const { supabase, userId } = await resolveContext(context)
+  const issue = await getScopedIssueByCode(
+    supabase,
+    userId,
+    projectKey,
+    issueNumber
+  )
+
+  return getIssueDetailDataForIssue(issue, { supabase, userId })
+}
+
+export async function getIssueDetailDataById(
+  id: string,
+  context?: AuthenticatedContext
+): Promise<IssueDetailData> {
+  const { supabase, userId } = await resolveContext(context)
+  const issue = await getScopedIssueById(supabase, userId, id)
+
+  return getIssueDetailDataForIssue(issue, { supabase, userId })
+}
+
+async function getScopedIssueByCode(
+  supabase: AuthenticatedContext["supabase"],
+  userId: string,
+  projectKey: string,
+  issueNumber: number
+) {
+  try {
+    return toIssueDetail(
+      issueDetailSchema.parse(
+        await issuesService.getIssueByCode(
+          supabase,
+          userId,
+          projectKey,
+          issueNumber
+        )
+      )
+    )
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "not_found") {
+      throw new QueryNotFoundError("Issue not found")
+    }
+    throw error
   }
+}
+
+async function getScopedIssueById(
+  supabase: AuthenticatedContext["supabase"],
+  userId: string,
+  id: string
+) {
+  try {
+    return toIssueDetail(
+      issueDetailSchema.parse(await issuesService.getIssue(supabase, userId, id))
+    )
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "not_found") {
+      throw new QueryNotFoundError("Issue not found")
+    }
+    throw error
+  }
+}
+
+async function getIssueDetailDataForIssue(
+  parsedIssue: IssueDetail,
+  context?: AuthenticatedContext
+): Promise<IssueDetailData> {
+  const { supabase, userId } = await resolveContext(context)
+  const id = parsedIssue.id
 
   const [
     { data: messages, error: messagesError },

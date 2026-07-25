@@ -30,6 +30,7 @@ import {
 } from "@tabler/icons-react"
 
 import type { IssueDetailData } from "@/app/queries"
+import { getIssueEditHref } from "@/app/issues/urls"
 import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
@@ -220,6 +221,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
       relation.source_issue.status !== "completed" &&
       relation.source_issue.status !== "cancelled"
   )
+  const editHref = getIssueEditHref(issue) ?? "/issues"
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -251,7 +253,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
                 </Button>
               ))}
               <Button asChild variant="outline">
-                <Link href={`/issues/${issue.id}/edit`}>
+                <Link href={editHref}>
                   <IconPencil />
                   Edit
                 </Link>

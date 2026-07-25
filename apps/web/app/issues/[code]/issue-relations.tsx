@@ -9,6 +9,7 @@ import { Button } from "@gentic/ui/button"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 import { addIssueRelation, deleteIssueRelation } from "@/app/issues/actions"
+import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 
@@ -28,6 +29,7 @@ function RelationRow({
   relatedIssue: IssueRelationIssue
 }) {
   const queryClient = useQueryClient()
+  const relatedIssueHref = getIssueHref(relatedIssue) ?? "/issues"
   const mutation = useMutation({
     mutationFn: deleteIssueRelation,
     onSuccess: async () => {
@@ -47,7 +49,7 @@ function RelationRow({
   return (
     <li className="flex items-center justify-between gap-3 rounded-2xl bg-muted/40 px-3 py-2">
       <Link
-        href={`/issues/${relatedIssue.id}`}
+        href={relatedIssueHref}
         className="min-w-0 text-sm font-medium hover:text-primary"
       >
         <span className="line-clamp-1">
