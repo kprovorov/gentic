@@ -21,6 +21,7 @@ import {
   IconPlus,
   IconSearch,
   IconTable,
+  IconX,
 } from "@tabler/icons-react"
 
 import { fetchIssuesData } from "@/app/client-queries"
@@ -301,6 +302,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
+  const hasActiveFilters =
+    globalFilter.length > 0 ||
+    statusFilter.size > 0 ||
+    typeFilter.size > 0 ||
+    projectFilter.size > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
 
@@ -403,6 +409,14 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   }
 
   function clearProjectFilter() {
+    setProjectFilter(new Set())
+    setPageIndex(0)
+  }
+
+  function clearFilters() {
+    setGlobalFilter("")
+    setStatusFilter(new Set())
+    setTypeFilter(new Set())
     setProjectFilter(new Set())
     setPageIndex(0)
   }
@@ -631,6 +645,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                {hasActiveFilters ? (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <IconX className="size-3.5" />
+                    Clear filters
+                  </Button>
+                ) : null}
               </div>
               <ToggleGroup
                 type="single"
