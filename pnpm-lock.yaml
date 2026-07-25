@@ -107,6 +107,9 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@thesvg/react':
+        specifier: ^3.2.12
+        version: 3.2.12(react@19.2.4)
       '@upstash/redis':
         specifier: ^1.34.3
         version: 1.38.0
@@ -2376,6 +2379,12 @@ packages:
     engines: {node: '>=12', npm: '>=6'}
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
+
+  '@thesvg/react@3.2.12':
+    resolution: {integrity: sha512-cnMoaUW/MSc/s+DIbpCUtX/4JxHNhHB09ccuhBdIpS3S9b+KvvWiWgWZg+TwC/jLO1c4UHSPLGKJyqnqst6ORw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: '>=18'
 
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
@@ -7810,6 +7819,10 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.1
 
+  '@thesvg/react@3.2.12(react@19.2.4)':
+    dependencies:
+      react: 19.2.4
+
   '@ts-morph/common@0.27.0':
     dependencies:
       fast-glob: 3.3.3
@@ -9400,6 +9413,10 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  fdir@6.5.0(picomatch@4.0.5):
+    optionalDependencies:
+      picomatch: 4.0.5
 
   figures@6.1.0:
     dependencies:
@@ -11508,8 +11525,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
+      fdir: 6.5.0(picomatch@4.0.5)
+      picomatch: 4.0.5
 
   tinyrainbow@3.1.0: {}
 

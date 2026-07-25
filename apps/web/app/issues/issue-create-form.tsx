@@ -2,14 +2,11 @@
 
 import Link from "next/link"
 import { useRef, useState } from "react"
-import {
-  IconChevronDown,
-  IconDeviceFloppy,
-  IconPlayerPlay,
-} from "@tabler/icons-react"
+import { IconChevronDown, IconDeviceFloppy } from "@tabler/icons-react"
 
 import { runIssue, saveIssueDraft } from "@/app/issues/actions"
 import type { ProjectOption } from "@/app/queries"
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -130,7 +127,7 @@ export function IssueCreateForm({
                 setAgentProvider("claude_code")
               }}
             >
-              <IconPlayerPlay />
+              <AgentProviderIcon provider="claude_code" tone="mono" />
               <span className="truncate">Run with Claude Code</span>
             </Button>
             <DropdownMenu>
@@ -152,7 +149,7 @@ export function IssueCreateForm({
                     )
                   }}
                 >
-                  <IconPlayerPlay />
+                  <AgentProviderIcon provider="codex" />
                   Run with Codex
                 </DropdownMenuItem>
                 <DropdownMenuItem
