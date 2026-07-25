@@ -6,6 +6,11 @@ import {
   parseAgentProviders,
 } from "../agents.js"
 import { setupSelectedAgentCLIs } from "../agent-cli-setup.js"
+import {
+  DEFAULT_API_URL,
+  runAuthLoginPrompt,
+  unvalidatedKeyNotice,
+} from "../auth-login.js"
 import { getConfigInput } from "../config.js"
 import {
   configFilePath,
@@ -24,12 +29,8 @@ import {
   isCancel,
   log,
   outro,
-  password,
   select,
-  text,
 } from "../ui.js"
-
-const DEFAULT_API_URL = "https://gentic.chat/api/v1"
 
 export interface AuthState {
   authenticated: boolean
@@ -56,16 +57,6 @@ export function getAuthState(): AuthState {
 function maskApiKey(apiKey: string): string {
   const suffix = apiKey.slice(-4)
   return `${apiKey.slice(0, 3)}...${suffix}`
-}
-
-// The Gentic API currently has no read-only authenticated endpoint: the only
-// agent route that doesn't require an existing issue id is POST
-// /agent/issues/claim, which has side effects (it claims an issue), so it
-// can't be used as a "does this key work" probe. Adding a dedicated
-// health-check endpoint is out of scope here, so we skip live validation and
-// say so clearly instead of pretending to have checked.
-function unvalidatedKeyNotice(): string {
-  return "No read-only Gentic API endpoint is available to validate credentials against yet; saved without validation and will fail on first poll if incorrect."
 }
 
 export function registerAuthCommand(program: Command): void {
@@ -124,47 +115,8 @@ function loginNonInteractive(opts: { apiUrl?: string; apiKey?: string }): void {
 
 export async function loginInteractive(): Promise<void> {
   intro("gentic auth login")
-  const existing = await getOnboardingStatus()
-
-  let apiUrl = existing.auth.apiUrl
-  let apiKeyConfigured = !existing.auth.missing.includes("GENTIC_API_KEY")
-
-  if (apiUrl === undefined) {
-    const answer = await text({
-      message: "Gentic API URL",
-      defaultValue: DEFAULT_API_URL,
-      placeholder: DEFAULT_API_URL,
-    })
-    if (isCancel(answer)) {
-      cancel("Cancelled.")
-      return
-    }
-    apiUrl = answer || DEFAULT_API_URL
-  } else {
-    log.info(`Gentic API URL already configured: ${apiUrl}`)
-  }
-
-  if (!apiKeyConfigured) {
-    const apiKey = await password({
-      message: "Gentic API key",
-      validate: (value) =>
-        !value || value.length === 0 ? "API key is required" : undefined,
-    })
-    if (isCancel(apiKey)) {
-      cancel("Cancelled.")
-      return
-    }
-
-    log.warn(unvalidatedKeyNotice())
-
-    writeConfigFile({
-      GENTIC_API_KEY: apiKey,
-      GENTIC_API_URL: apiUrl,
-    })
-    apiKeyConfigured = true
-  } else {
-    log.info(`Gentic API key already configured: ${existing.auth.maskedApiKey}`)
-  }
+  const login = await runAuthLoginPrompt()
+  if (login.cancelled) return
 
   const agentSelection = await select({
     message: "Which coding agent(s) will this worker run?",
@@ -182,7 +134,7 @@ export async function loginInteractive(): Promise<void> {
 
   const selectedAgentProviders = parseAgentProviders(agentSelection)
   writeConfigFile({
-    GENTIC_API_URL: apiUrl,
+    GENTIC_API_URL: login.apiUrl,
     AGENT_PROVIDERS: selectedAgentProviders,
   })
 
@@ -206,7 +158,7 @@ export async function loginInteractive(): Promise<void> {
     },
   })
 
-  if (apiKeyConfigured && current.ready) {
+  if (login.apiKeyConfigured && current.ready) {
     outro(
       `Saved to ${configFilePath()} (${formatAgentProviders(selectedAgentProviders)})`
     )
