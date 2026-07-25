@@ -22,10 +22,17 @@ export async function createIssue(
 ) {
   await ensureProjectOwned(supabase, userId, input.project_id)
 
+  const number = unwrap(
+    await supabase.rpc("next_issue_number_for_project", {
+      p_project_id: input.project_id,
+    })
+  )
+
   const result = await supabase
     .from("issues")
     .insert({
       project_id: input.project_id,
+      number,
       title: input.title ?? null,
       prompt: input.prompt ?? null,
       status: input.status === "todo" ? "draft" : input.status,

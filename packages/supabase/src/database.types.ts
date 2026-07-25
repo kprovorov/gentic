@@ -195,6 +195,7 @@ export type Database = {
           agent_provider: string
           created_at: string
           id: string
+          number: number
           pr_url: string | null
           project_id: string
           prompt: string | null
@@ -213,6 +214,7 @@ export type Database = {
           agent_provider?: string
           created_at?: string
           id?: string
+          number: number
           pr_url?: string | null
           project_id: string
           prompt?: string | null
@@ -231,6 +233,7 @@ export type Database = {
           agent_provider?: string
           created_at?: string
           id?: string
+          number?: number
           pr_url?: string | null
           project_id?: string
           prompt?: string | null
