@@ -79,6 +79,56 @@ export async function updateIssueStatus(
   return getIssue(supabase, userId, id)
 }
 
+export async function bulkUpdateIssueStatus(
+  supabase: Supabase,
+  userId: string,
+  issueIds: string[],
+  status: IssueStatus
+) {
+  const uniqueIds = Array.from(new Set(issueIds))
+  const { data: issues, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,status,projects!inner(user_id)")
+    .in("id", uniqueIds)
+    .eq("projects.user_id", userId)
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!issues || issues.length !== uniqueIds.length) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+
+  const draftIds =
+    status === "todo"
+      ? issues
+          .filter((issue) => issue.status === "draft")
+          .map((issue) => issue.id)
+      : []
+  const draftIdSet = new Set(draftIds)
+  const directUpdateIds =
+    status === "todo"
+      ? uniqueIds.filter((id) => !draftIdSet.has(id))
+      : uniqueIds
+
+  await Promise.all(
+    draftIds.map(async (id) => {
+      unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
+    })
+  )
+
+  if (directUpdateIds.length === 0) {
+    return
+  }
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ status, updated_at: new Date().toISOString() })
+      .in("id", directUpdateIds)
+  )
+}
+
 export async function updateIssueAgentProvider(
   supabase: Supabase,
   userId: string,
