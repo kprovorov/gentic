@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto"
 
+import { claimIssueInputSchema } from "@gentic/validators/agent"
+
 import {
   getAgentContext,
   handleAgentError,
@@ -15,19 +17,33 @@ const CLAIM_ISSUE_SELECT =
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
-    return json({ issue: await claimNextQueuedIssue(supabase, userId) })
+    const input = claimIssueInputSchema.parse(
+      await request.json().catch(() => ({}))
+    )
+    return json({
+      issue: await claimNextQueuedIssue(
+        supabase,
+        userId,
+        input.agent_providers
+      ),
+    })
   } catch (error) {
     return handleAgentError(error)
   }
 }
 
-async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
+async function claimNextQueuedIssue(
+  supabase: Supabase,
+  userId: string,
+  agentProviders: Array<"claude_code" | "codex">
+) {
   const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
     .or(`status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`)
     .eq("projects.user_id", userId)
+    .in("agent_provider", agentProviders)
     .eq("unfinished_blockers.type", "blocks")
     .not(
       "unfinished_blockers.source_issue.status",

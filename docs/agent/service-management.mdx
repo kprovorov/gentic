@@ -7,22 +7,28 @@ description: "Use gentic start, stop, restart, status, and logs to manage the ag
 The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. When you need to update the worker or change its configuration, `gentic restart` applies the change without touching your service unit file.
 
 <Tip>
-  Always use `gentic start` in production instead of running `gentic run` directly in a terminal session. The managed service handles automatic restarts on crash and survives reboots; a foreground process in a terminal does not.
+  Always use `gentic start` in production instead of running `gentic run`
+  directly in a terminal session. The managed service handles automatic restarts
+  on crash and survives reboots; a foreground process in a terminal does not.
 </Tip>
 
 ## Platform behavior
 
 The service backend is selected automatically based on the host operating system.
 
-| Platform | Backend | Service file location |
-|---|---|---|
-| Linux (user scope) | systemd user unit | `~/.config/systemd/user/gentic.service` |
-| Linux (system scope) | systemd system unit | `/etc/systemd/system/gentic.service` |
-| macOS | launchd agent | `~/Library/LaunchAgents/dev.gentic.agent.plist` |
-| Other | Detached process + pidfile | N/A |
+| Platform             | Backend                    | Service file location                           |
+| -------------------- | -------------------------- | ----------------------------------------------- |
+| Linux (user scope)   | systemd user unit          | `~/.config/systemd/user/gentic.service`         |
+| Linux (system scope) | systemd system unit        | `/etc/systemd/system/gentic.service`            |
+| macOS                | launchd agent              | `~/Library/LaunchAgents/dev.gentic.agent.plist` |
+| Other                | Detached process + pidfile | N/A                                             |
 
 <Warning>
-  On platforms without a native service manager (anything other than Linux with systemd or macOS), `gentic start` falls back to launching a detached background process tracked by a pidfile. The worker will **not** restart on crash and **will not** survive a reboot. Use a dedicated process manager on those platforms.
+  On platforms without a native service manager (anything other than Linux with
+  systemd or macOS), `gentic start` falls back to launching a detached
+  background process tracked by a pidfile. The worker will **not** restart on
+  crash and **will not** survive a reboot. Use a dedicated process manager on
+  those platforms.
 </Warning>
 
 ---
@@ -129,17 +135,18 @@ gentic run
 
 `gentic status` displays a summary panel with the following fields.
 
-| Field | Description |
-|---|---|
-| **Auth** | Whether credentials are configured, with the API key masked (first 3 and last 4 characters shown) and the API URL displayed in full. |
-| **Service** | The service state (`running`, `stopped`, or `not-installed`), the backend name (e.g. `systemd`, `launchd`, or `fallback`), the process PID if running, and the uptime since the process started. |
-| **Boot** | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`). |
-| **Last run** | Currently reports `unknown (no API support yet)`. The CLI does not yet receive a last-run timestamp from the API. |
-| **Tools** | Install and authentication state of the external CLIs each issue run shells out to: `GitHub CLI` (`gh`), `Claude` (`claude`), and `Codex` (`codex`). Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
+| Field        | Description                                                                                                                                                                                                                                                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth**     | Whether credentials are configured, with the API key masked (first 3 and last 4 characters shown) and the API URL displayed in full.                                                                                                                                                                                                                 |
+| **Service**  | The service state (`running`, `stopped`, or `not-installed`), the backend name (e.g. `systemd`, `launchd`, or `fallback`), the process PID if running, and the uptime since the process started.                                                                                                                                                     |
+| **Boot**     | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`).                                                                                                                                                                                                                                                 |
+| **Last run** | Currently reports `unknown (no API support yet)`. The CLI does not yet receive a last-run timestamp from the API.                                                                                                                                                                                                                                    |
+| **Agents**   | The agent providers this worker is configured to run.                                                                                                                                                                                                                                                                                                |
+| **Tools**    | Install and authentication state of the external CLIs this worker shells out to: `GitHub CLI` (`gh`) plus only the selected agent provider CLIs (`Claude` and/or `Codex`). Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
 
 ### Why the tools check matters
 
-Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the agent provider configured for the project. If any of these CLIs is missing or not authenticated on the worker host, runs will fail even though the worker service itself is healthy. Checking `gentic status` after installing the worker — and any time you rotate credentials — surfaces those problems before you queue a real issue.
+Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the issue's agent provider. The worker only claims issues for providers selected during `gentic auth login` or through `AGENT_PROVIDERS`, so `gentic status` only checks those provider CLIs. Checking `gentic status` after installing the worker — and any time you rotate credentials — surfaces those problems before you queue a real issue.
 
 The `--json` flag returns the same information as a JSON object with the following top-level keys: `auth`, `apiUrl`, `maskedApiKey`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
 

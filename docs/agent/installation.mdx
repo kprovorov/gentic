@@ -11,16 +11,16 @@ The agent worker ships as a standalone binary compiled with [Bun](https://bun.sh
 - **[Prebuilt tarball](#option-c-prebuilt-tarball)** — a portable `.tar.gz` you can drop onto any Linux or macOS server.
 - **[From source with Node.js](#option-d-from-source-with-nodejs)** — for development or when you need to build a target that is not published.
 
-All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) and [agent credentials](#agent-credentials-setup) setup below before starting the worker.
+All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) setup below, then configure credentials only for the agent providers this worker will run.
 
 **Supported platforms**
 
-| OS/arch | Homebrew | `.deb` / `.rpm` / `.apk` | Tarball |
-|---|---|---|---|
-| macOS, Apple Silicon (`darwin-arm64`) | ✅ | — | ✅ |
-| macOS, Intel (`darwin-x64`) | ✅ | — | ✅ |
-| Linux, x86-64 (`linux-x64`) | ✅ (Linuxbrew) | ✅ | ✅ |
-| Linux, ARM64 (`linux-arm64`) | ✅ (Linuxbrew) | ✅ | ✅ |
+| OS/arch                               | Homebrew       | `.deb` / `.rpm` / `.apk` | Tarball |
+| ------------------------------------- | -------------- | ------------------------ | ------- |
+| macOS, Apple Silicon (`darwin-arm64`) | ✅             | —                        | ✅      |
+| macOS, Intel (`darwin-x64`)           | ✅             | —                        | ✅      |
+| Linux, x86-64 (`linux-x64`)           | ✅ (Linuxbrew) | ✅                       | ✅      |
+| Linux, ARM64 (`linux-arm64`)          | ✅ (Linuxbrew) | ✅                       | ✅      |
 
 ## Option A: Homebrew (macOS and Linux)
 
@@ -38,6 +38,7 @@ The Gentic Homebrew tap publishes a formula for every release, with per-platform
     brew tap kprovorov/tap
     brew install gentic
     ```
+
   </Step>
   <Step title="Upgrade later">
     ```bash
@@ -64,6 +65,7 @@ The packages install the binary to `/usr/lib/gentic/gentic` with its `vendor/` s
     ```
 
     Replace `<version>` with the release version (e.g. `0.4.2`) and `linux-x64` with `linux-arm64` on ARM64 hosts.
+
   </Tab>
   <Tab title="RHEL / Fedora (.rpm)">
     ```bash
@@ -81,7 +83,9 @@ The packages install the binary to `/usr/lib/gentic/gentic` with its `vendor/` s
 </Tabs>
 
 <Tip>
-  The exact filenames — including the version — are listed on the [Releases page](https://github.com/kprovorov/gentic/releases). Checksums for every artifact are published in `checksums.txt` on the same release.
+  The exact filenames — including the version — are listed on the [Releases
+  page](https://github.com/kprovorov/gentic/releases). Checksums for every
+  artifact are published in `checksums.txt` on the same release.
 </Tip>
 
 ## Option C: Prebuilt tarball
@@ -89,7 +93,10 @@ The packages install the binary to `/usr/lib/gentic/gentic` with its `vendor/` s
 If you don't want a package manager to own the binary — for example, when deploying into a container image or a locked-down server — download the raw tarball and extract it yourself.
 
 <Note>
-  The archive contains the `gentic` binary **plus** vendor sidecars (`vendor/claude-agent-acp/` and `vendor/codex-acp/`) that are spawned as child processes at runtime. Always keep the entire extracted directory together — do not copy `gentic` on its own.
+  The archive contains the `gentic` binary **plus** vendor sidecars
+  (`vendor/claude-agent-acp/` and `vendor/codex-acp/`) that are spawned as child
+  processes at runtime. Always keep the entire extracted directory together — do
+  not copy `gentic` on its own.
 </Note>
 
 Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0.4.2-linux-x64.tar.gz`.
@@ -103,6 +110,7 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
     ```
 
     Substitute `<version>` with the release version and `linux-x64` with your platform slug (`linux-arm64`, `darwin-x64`, or `darwin-arm64`).
+
   </Step>
   <Step title="Verify the checksum">
     ```bash
@@ -115,6 +123,7 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
     ```
 
     You will see the `gentic` binary and the `vendor/` directory alongside it.
+
   </Step>
   <Step title="Run the worker">
     Set your credentials in the environment and start the worker:
@@ -126,11 +135,16 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
     ```
 
     For production use, run `gentic start` instead to install a managed system service. See [Service Management](/agent/service-management).
+
   </Step>
 </Steps>
 
 <Warning>
-  macOS binaries are not code-signed or notarized. On first run, Gatekeeper will block execution with a security warning. To allow it, open **System Settings → Privacy & Security** and click **Allow Anyway**, or run `xattr -dr com.apple.quarantine ./gentic` from the terminal. The Homebrew formula handles this automatically.
+  macOS binaries are not code-signed or notarized. On first run, Gatekeeper will
+  block execution with a security warning. To allow it, open **System Settings →
+  Privacy & Security** and click **Allow Anyway**, or run `xattr -dr
+  com.apple.quarantine ./gentic` from the terminal. The Homebrew formula handles
+  this automatically.
 </Warning>
 
 ## Option D: From source with Node.js
@@ -156,6 +170,7 @@ If you just need a `gentic` binary for a target that is not in the release matri
     ```
 
     Valid targets are `bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, and `bun-darwin-arm64`.
+
   </Step>
   <Step title="Copy the output directory to your server">
     ```bash
@@ -189,6 +204,7 @@ If you just need a `gentic` binary for a target that is not in the release matri
     ```
 
     This runs `gentic run` in the foreground. For production, use `gentic start` to install a managed system service instead. See [Service Management](/agent/service-management).
+
   </Step>
 </Steps>
 
@@ -215,12 +231,15 @@ The worker clones repositories using the `GIT_REMOTE_BASE` value (default: `git@
       IdentityFile ~/.ssh/gentic_deploy
       IdentitiesOnly yes
     ```
+
   </Step>
 </Steps>
 
 ---
 
 ## Agent credentials setup
+
+During `gentic auth login`, choose which coding agent(s) this worker will run. The prompt defaults to **Claude Code**. Gentic uses that selection to decide which provider checks to run and which issues this worker can claim; unselected providers are skipped entirely.
 
 ### Claude Code
 
@@ -241,9 +260,12 @@ Claude Code credentials are managed entirely outside Gentic, the same way you wo
     ```bash
     export CODEX_PATH=/usr/local/bin/codex
     ```
+
   </Step>
 </Steps>
 
 <Tip>
-  Codex runs default to `INITIAL_AGENT_MODE=agent-full-access`. You can override this by setting the variable in the worker's environment before starting the service.
+  Codex runs default to `INITIAL_AGENT_MODE=agent-full-access`. You can override
+  this by setting the variable in the worker's environment before starting the
+  service.
 </Tip>

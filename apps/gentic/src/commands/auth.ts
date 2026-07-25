@@ -1,6 +1,11 @@
 import type { Command } from "commander"
 
 import {
+  DEFAULT_AGENT_PROVIDERS,
+  formatAgentProviders,
+  parseAgentProviders,
+} from "../agents.js"
+import {
   configFilePath,
   readConfigFile,
   writeConfigFile,
@@ -14,6 +19,7 @@ import {
   log,
   outro,
   password,
+  select,
   text,
 } from "../ui.js"
 
@@ -23,18 +29,21 @@ export interface AuthState {
   authenticated: boolean
   apiUrl?: string
   maskedApiKey?: string
+  agentProviders: ReturnType<typeof parseAgentProviders>
 }
 
 /** Reused by any future `gentic status` dashboard that wants auth info. */
 export function getAuthState(): AuthState {
   const config = readConfigFile()
+  const agentProviders = parseAgentProviders(config.AGENT_PROVIDERS)
   if (!config.GENTIC_API_KEY || !config.GENTIC_API_URL) {
-    return { authenticated: false }
+    return { authenticated: false, agentProviders }
   }
   return {
     authenticated: true,
     apiUrl: config.GENTIC_API_URL,
     maskedApiKey: maskApiKey(config.GENTIC_API_KEY),
+    agentProviders,
   }
 }
 
@@ -87,10 +96,7 @@ export function registerAuthCommand(program: Command): void {
     })
 }
 
-function loginNonInteractive(opts: {
-  apiUrl?: string
-  apiKey?: string
-}): void {
+function loginNonInteractive(opts: { apiUrl?: string; apiKey?: string }): void {
   const apiUrl = opts.apiUrl ?? DEFAULT_API_URL
   const apiKey = opts.apiKey
 
@@ -100,7 +106,11 @@ function loginNonInteractive(opts: {
     return
   }
 
-  writeConfigFile({ GENTIC_API_KEY: apiKey, GENTIC_API_URL: apiUrl })
+  writeConfigFile({
+    GENTIC_API_KEY: apiKey,
+    GENTIC_API_URL: apiUrl,
+    AGENT_PROVIDERS: DEFAULT_AGENT_PROVIDERS,
+  })
   logInfo(
     `auth login: saved to ${configFilePath()} (${unvalidatedKeyNotice()})`
   )
@@ -129,14 +139,31 @@ async function loginInteractive(): Promise<void> {
     return
   }
 
+  const agentSelection = await select({
+    message: "Which coding agent(s) will this worker run?",
+    initialValue: "claude_code",
+    options: [
+      { value: "claude_code", label: "Claude Code" },
+      { value: "codex", label: "Codex" },
+      { value: "claude_code,codex", label: "Claude Code and Codex" },
+    ],
+  })
+  if (isCancel(agentSelection)) {
+    cancel("Cancelled.")
+    return
+  }
+
   log.warn(unvalidatedKeyNotice())
 
   writeConfigFile({
     GENTIC_API_KEY: apiKey,
     GENTIC_API_URL: apiUrl || DEFAULT_API_URL,
+    AGENT_PROVIDERS: parseAgentProviders(agentSelection),
   })
 
-  outro(`Saved to ${configFilePath()}`)
+  outro(
+    `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
+  )
 }
 
 async function logout(opts: { yes?: boolean }): Promise<void> {
@@ -151,7 +178,8 @@ async function logout(opts: { yes?: boolean }): Promise<void> {
   }
 
   // Clears only the auth keys, not the whole config file, so unrelated
-  // settings (GIT_REMOTE_BASE, WORKDIR, POLL_INTERVAL_MS) survive a logout.
+  // settings (AGENT_PROVIDERS, GIT_REMOTE_BASE, WORKDIR, POLL_INTERVAL_MS)
+  // survive a logout.
   writeConfigFile({ GENTIC_API_KEY: undefined, GENTIC_API_URL: undefined })
   log.success("Cleared stored Gentic API credentials.")
 }
@@ -166,4 +194,5 @@ function status(): void {
 
   log.info(`API URL: ${state.apiUrl}`)
   log.info(`API key: ${state.maskedApiKey}`)
+  log.info(`Agents: ${formatAgentProviders(state.agentProviders)}`)
 }

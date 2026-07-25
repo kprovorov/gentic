@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process"
 
+import { DEFAULT_AGENT_PROVIDERS, type AgentProvider } from "./agents.js"
+
 /** Status of one external CLI gentic depends on for running issues. */
 export interface ToolStatus {
   installed: boolean
@@ -10,8 +12,8 @@ export interface ToolStatus {
 
 export interface ToolStatuses {
   github: ToolStatus
-  claude: ToolStatus
-  codex: ToolStatus
+  claude?: ToolStatus
+  codex?: ToolStatus
 }
 
 const COMMAND_TIMEOUT_MS = 10_000
@@ -79,7 +81,11 @@ async function checkClaude(): Promise<ToolStatus> {
   if (auth.code !== 0) return { installed: true, authenticated: false, version }
   try {
     const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean }
-    return { installed: true, authenticated: parsed.loggedIn === true, version }
+    return {
+      installed: true,
+      authenticated: parsed.loggedIn === true,
+      version,
+    }
   } catch {
     return { installed: true, authenticated: false, version }
   }
@@ -102,11 +108,17 @@ async function checkCodex(): Promise<ToolStatus> {
  * `codex` (codex issues). Each check is a local, fast subprocess call — no
  * gentic-specific auth is required to run it.
  */
-export async function getToolStatuses(): Promise<ToolStatuses> {
+export async function getToolStatuses(
+  agentProviders: AgentProvider[] = DEFAULT_AGENT_PROVIDERS
+): Promise<ToolStatuses> {
   const [github, claude, codex] = await Promise.all([
     checkGithub(),
-    checkClaude(),
-    checkCodex(),
+    agentProviders.includes("claude_code")
+      ? checkClaude()
+      : Promise.resolve(undefined),
+    agentProviders.includes("codex")
+      ? checkCodex()
+      : Promise.resolve(undefined),
   ])
   return { github, claude, codex }
 }
