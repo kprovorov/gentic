@@ -1,0 +1,309 @@
+{
+  "projectId": "ac7bdf5b-ab0e-423d-bf3c-859f2b49d846",
+  "shape": "package",
+  "pkg": "@gentic/ui",
+  "globalName": "GenticUI",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".ds-cache/tailwind-compiled.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraFonts": [
+    "../../.design-sync/.cache/fonts/brand-fonts.css"
+  ],
+  "overrides": {
+    "Button": {
+      "cardMode": "column"
+    },
+    "AlertDialog": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogAction": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogCancel": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogContent": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogDescription": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogFooter": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogHeader": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogMedia": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogOverlay": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogPortal": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogTitle": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "AlertDialogTrigger": {
+      "cardMode": "single",
+      "primaryStory": "DeleteConfirmation"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuCheckboxItem": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuContent": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuGroup": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuItem": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuLabel": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuPortal": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuRadioGroup": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuRadioItem": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuSeparator": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuShortcut": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuSub": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuSubContent": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuSubTrigger": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "DropdownMenuTrigger": {
+      "cardMode": "single",
+      "primaryStory": "RowActions"
+    },
+    "Select": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectContent": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectGroup": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectItem": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectLabel": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectScrollDownButton": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectScrollUpButton": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectSeparator": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectTrigger": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "SelectValue": {
+      "cardMode": "single",
+      "primaryStory": "IssueStatus"
+    },
+    "Sheet": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetClose": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetContent": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetDescription": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetFooter": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetHeader": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetTitle": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SheetTrigger": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Sidebar": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarContent": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarFooter": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarGroup": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarGroupAction": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarGroupContent": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarGroupLabel": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarHeader": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarInput": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarInset": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenu": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuAction": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuBadge": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuButton": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuItem": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuSkeleton": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuSub": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuSubButton": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarMenuSubItem": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarProvider": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarRail": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarSeparator": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SidebarTrigger": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "primaryStory": "OnButton"
+    },
+    "TooltipContent": {
+      "cardMode": "single",
+      "primaryStory": "OnButton"
+    },
+    "TooltipProvider": {
+      "cardMode": "single",
+      "primaryStory": "OnButton"
+    },
+    "TooltipTrigger": {
+      "cardMode": "single",
+      "primaryStory": "OnButton"
+    },
+    "DataTable": {
+      "cardMode": "column"
+    }
+  },
+  "buildCmd": "pnpm --filter @gentic/ui build:types && node .ds-sync/compile-tailwind.mjs && node .ds-sync/package-build.mjs --config .design-sync/config.json --node-modules ./packages/ui/node_modules --entry ./packages/ui/dist/index.js --out ./ds-bundle"
+}
