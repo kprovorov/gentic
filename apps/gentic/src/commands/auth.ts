@@ -5,12 +5,16 @@ import {
   formatAgentProviders,
   parseAgentProviders,
 } from "../agents.js"
+import { getConfigInput } from "../config.js"
 import {
   configFilePath,
-  readConfigFile,
   writeConfigFile,
 } from "../config-store.js"
 import { logError, logInfo } from "../log.js"
+import {
+  formatOnboardingUnmet,
+  getOnboardingStatus,
+} from "../onboarding.js"
 import {
   cancel,
   confirm,
@@ -34,7 +38,7 @@ export interface AuthState {
 
 /** Reused by any future `gentic status` dashboard that wants auth info. */
 export function getAuthState(): AuthState {
-  const config = readConfigFile()
+  const config = getConfigInput()
   const agentProviders = parseAgentProviders(config.AGENT_PROVIDERS)
   if (!config.GENTIC_API_KEY || !config.GENTIC_API_URL) {
     return { authenticated: false, agentProviders }
@@ -118,25 +122,46 @@ function loginNonInteractive(opts: { apiUrl?: string; apiKey?: string }): void {
 
 export async function loginInteractive(): Promise<void> {
   intro("gentic auth login")
+  const existing = await getOnboardingStatus()
 
-  const apiUrl = await text({
-    message: "Gentic API URL",
-    defaultValue: DEFAULT_API_URL,
-    placeholder: DEFAULT_API_URL,
-  })
-  if (isCancel(apiUrl)) {
-    cancel("Cancelled.")
-    return
+  let apiUrl = existing.auth.apiUrl
+  let apiKeyConfigured = !existing.auth.missing.includes("GENTIC_API_KEY")
+
+  if (apiUrl === undefined) {
+    const answer = await text({
+      message: "Gentic API URL",
+      defaultValue: DEFAULT_API_URL,
+      placeholder: DEFAULT_API_URL,
+    })
+    if (isCancel(answer)) {
+      cancel("Cancelled.")
+      return
+    }
+    apiUrl = answer || DEFAULT_API_URL
+  } else {
+    log.info(`Gentic API URL already configured: ${apiUrl}`)
   }
 
-  const apiKey = await password({
-    message: "Gentic API key",
-    validate: (value) =>
-      !value || value.length === 0 ? "API key is required" : undefined,
-  })
-  if (isCancel(apiKey)) {
-    cancel("Cancelled.")
-    return
+  if (!apiKeyConfigured) {
+    const apiKey = await password({
+      message: "Gentic API key",
+      validate: (value) =>
+        !value || value.length === 0 ? "API key is required" : undefined,
+    })
+    if (isCancel(apiKey)) {
+      cancel("Cancelled.")
+      return
+    }
+
+    log.warn(unvalidatedKeyNotice())
+
+    writeConfigFile({
+      GENTIC_API_KEY: apiKey,
+      GENTIC_API_URL: apiUrl,
+    })
+    apiKeyConfigured = true
+  } else {
+    log.info(`Gentic API key already configured: ${existing.auth.maskedApiKey}`)
   }
 
   const agentSelection = await select({
@@ -153,17 +178,28 @@ export async function loginInteractive(): Promise<void> {
     return
   }
 
-  log.warn(unvalidatedKeyNotice())
-
   writeConfigFile({
-    GENTIC_API_KEY: apiKey,
-    GENTIC_API_URL: apiUrl || DEFAULT_API_URL,
+    GENTIC_API_URL: apiUrl,
     AGENT_PROVIDERS: parseAgentProviders(agentSelection),
   })
 
-  outro(
-    `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
-  )
+  const current = await getOnboardingStatus({
+    configInput: {
+      ...getConfigInput(),
+      AGENT_PROVIDERS: parseAgentProviders(agentSelection),
+    },
+  })
+  if (apiKeyConfigured && current.ready) {
+    outro(
+      `Saved to ${configFilePath()} (${formatAgentProviders(parseAgentProviders(agentSelection))})`
+    )
+    return
+  }
+
+  outro(`Saved to ${configFilePath()}`)
+  for (const line of formatOnboardingUnmet(current)) {
+    log.warn(line)
+  }
 }
 
 async function logout(opts: { yes?: boolean }): Promise<void> {
