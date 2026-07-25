@@ -60,8 +60,15 @@ import {
 } from "./issues-columns"
 
 type IssuesViewMode = "list" | "table"
+type BlockingFilter = "all" | "blocking" | "non-blocking"
 
 const pageSize = 20
+
+const blockingFilterLabels: Record<BlockingFilter, string> = {
+  all: "All",
+  blocking: "Blocking",
+  "non-blocking": "Non-blocking",
+}
 
 function matchesIssue(issue: HomeIssue, filterValue: string) {
   const haystack = [
@@ -301,6 +308,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [typeFilter, setTypeFilter] = useState<Set<HomeIssue["type"]>>(
     () => new Set()
   )
+  const [blockingFilter, setBlockingFilter] = useState<BlockingFilter>("all")
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
@@ -308,6 +316,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     globalFilter.length > 0 ||
     statusFilter.size > 0 ||
     typeFilter.size > 0 ||
+    blockingFilter !== "all" ||
     projectFilter.size > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
@@ -335,16 +344,32 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         .filter((issue) => typeFilter.size === 0 || typeFilter.has(issue.type))
         .filter(
           (issue) =>
+            blockingFilter === "all" ||
+            (blockingFilter === "blocking"
+              ? blockingIssueIds.has(issue.id)
+              : !blockingIssueIds.has(issue.id))
+        )
+        .filter(
+          (issue) =>
             projectFilter.size === 0 ||
             (issue.projects ? projectFilter.has(issue.projects.id) : false)
         )
         .toSorted(compareIssues),
-    [data.issues, globalFilter, statusFilter, typeFilter, projectFilter]
+    [
+      data.issues,
+      globalFilter,
+      statusFilter,
+      typeFilter,
+      blockingFilter,
+      blockingIssueIds,
+      projectFilter,
+    ]
   )
   const filterKey = [
     globalFilter,
     Array.from(statusFilter).sort().join(","),
     Array.from(typeFilter).sort().join(","),
+    blockingFilter,
     Array.from(projectFilter).sort().join(","),
   ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
@@ -400,6 +425,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setPageIndex(0)
   }
 
+  function updateBlockingFilter(value: BlockingFilter) {
+    setBlockingFilter(value)
+    setPageIndex(0)
+  }
+
   function clearStatusFilter() {
     setStatusFilter(new Set())
     setPageIndex(0)
@@ -419,6 +449,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setGlobalFilter("")
     setStatusFilter(new Set())
     setTypeFilter(new Set())
+    setBlockingFilter("all")
     setProjectFilter(new Set())
     setPageIndex(0)
   }
@@ -601,6 +632,47 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                         </DropdownMenuCheckboxItem>
                       )
                     })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Blocking
+                      {blockingFilter !== "all" ? (
+                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                          {blockingFilterLabels[blockingFilter]}
+                        </span>
+                      ) : null}
+                      <IconChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-60 rounded-lg bg-popover before:hidden"
+                  >
+                    {(["all", "blocking", "non-blocking"] as const).map(
+                      (option) => (
+                        <DropdownMenuCheckboxItem
+                          key={option}
+                          checked={blockingFilter === option}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() => updateBlockingFilter(option)}
+                          className="gap-3"
+                        >
+                          <IconGitMerge
+                            className={cn(
+                              "size-4",
+                              option === "blocking"
+                                ? "text-amber-600 dark:text-amber-300"
+                                : "text-muted-foreground"
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {blockingFilterLabels[option]}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      )
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <DropdownMenu>
