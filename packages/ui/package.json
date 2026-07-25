@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "types": ".ds-cache/dist-types/index.d.ts",
   "exports": {
     "./alert-dialog": "./src/ui/alert-dialog.tsx",
     "./bubble": "./src/ui/bubble.tsx",
@@ -36,7 +37,8 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:types": "tsc -p tsconfig.dts.json"
   },
   "dependencies": {
     "@shadcn/react": "0.2.1",
