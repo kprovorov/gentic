@@ -24,6 +24,8 @@ interface CommandResult {
   missing: boolean
 }
 
+type RunCommand = (command: string, args: string[]) => Promise<CommandResult>
+
 function runCommand(command: string, args: string[]): Promise<CommandResult> {
   return new Promise((resolve) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] })
@@ -59,25 +61,27 @@ function parseVersion(pattern: RegExp, output: string): string | null {
   return pattern.exec(output)?.[1] ?? null
 }
 
-export async function checkGithub(): Promise<ToolStatus> {
-  const versionResult = await runCommand("gh", ["--version"])
+export async function checkGithub(
+  run: RunCommand = runCommand
+): Promise<ToolStatus> {
+  const versionResult = await run("gh", ["--version"])
   if (versionResult.missing) {
     return { installed: false, authenticated: false, version: null }
   }
   const version = parseVersion(/gh version (\S+)/, versionResult.stdout)
 
-  const auth = await runCommand("gh", ["auth", "status"])
+  const auth = await run("gh", ["auth", "status"])
   return { installed: true, authenticated: auth.code === 0, version }
 }
 
-async function checkClaude(): Promise<ToolStatus> {
-  const versionResult = await runCommand("claude", ["--version"])
+async function checkClaude(run: RunCommand = runCommand): Promise<ToolStatus> {
+  const versionResult = await run("claude", ["--version"])
   if (versionResult.missing) {
     return { installed: false, authenticated: false, version: null }
   }
   const version = parseVersion(/^(\S+)/, versionResult.stdout)
 
-  const auth = await runCommand("claude", ["auth", "status", "--json"])
+  const auth = await run("claude", ["auth", "status", "--json"])
   if (auth.code !== 0) return { installed: true, authenticated: false, version }
   try {
     const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean }
@@ -91,14 +95,14 @@ async function checkClaude(): Promise<ToolStatus> {
   }
 }
 
-async function checkCodex(): Promise<ToolStatus> {
-  const versionResult = await runCommand("codex", ["--version"])
+async function checkCodex(run: RunCommand = runCommand): Promise<ToolStatus> {
+  const versionResult = await run("codex", ["--version"])
   if (versionResult.missing) {
     return { installed: false, authenticated: false, version: null }
   }
   const version = parseVersion(/codex-cli (\S+)/, versionResult.stdout)
 
-  const auth = await runCommand("codex", ["login", "status"])
+  const auth = await run("codex", ["login", "status"])
   return { installed: true, authenticated: auth.code === 0, version }
 }
 
@@ -109,15 +113,16 @@ async function checkCodex(): Promise<ToolStatus> {
  * gentic-specific auth is required to run it.
  */
 export async function getToolStatuses(
-  agentProviders: AgentProvider[] = DEFAULT_AGENT_PROVIDERS
+  agentProviders: AgentProvider[] = DEFAULT_AGENT_PROVIDERS,
+  run: RunCommand = runCommand
 ): Promise<ToolStatuses> {
   const [github, claude, codex] = await Promise.all([
-    checkGithub(),
+    checkGithub(run),
     agentProviders.includes("claude_code")
-      ? checkClaude()
+      ? checkClaude(run)
       : Promise.resolve(undefined),
     agentProviders.includes("codex")
-      ? checkCodex()
+      ? checkCodex(run)
       : Promise.resolve(undefined),
   ])
   return { github, claude, codex }

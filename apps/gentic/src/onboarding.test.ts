@@ -351,6 +351,115 @@ test("runOnboarding exits immediately when no selected agent is authenticated", 
   )
 })
 
+test("runOnboarding errors when both selected agent setups are declined", async () => {
+  const { messages, ui } = createUiRecorder()
+  const noAgentStatus: OnboardingStatus = {
+    ...makeStatus(true),
+    agentProviders: ["claude_code", "codex"],
+    tools: {
+      github: readyTool,
+      claude: missingTool,
+      codex: missingTool,
+    },
+    unmet: ["agent-cli-installed"],
+    ready: false,
+  }
+  let setupCalls = 0
+  let exitCode: number | undefined
+  let cancelMessage: string | undefined
+
+  await assert.rejects(
+    runOnboarding({
+      getStatus: async () => noAgentStatus,
+      runAuthLogin: async () => {
+        throw new Error("auth prompt should not be called")
+      },
+      select: async () => "claude_code,codex",
+      writeConfig: () => {},
+      setupAgentCLIs: async (agentProviders) => {
+        setupCalls += 1
+        assert.deepEqual(agentProviders, ["claude_code", "codex"])
+        return true
+      },
+      ensureAgentCli: async () =>
+        ensureAgentCliForOnboarding({
+          getStatus: async () => noAgentStatus,
+          cancel: (message) => {
+            cancelMessage = message
+          },
+          exit: (code): never => {
+            exitCode = code
+            throw new Error("exited")
+          },
+        }),
+      ui,
+    }),
+    /exited/
+  )
+
+  assert.equal(setupCalls, 1)
+  assert.equal(exitCode, 1)
+  assert.equal(
+    cancelMessage,
+    "at least one agent (claude or codex) must be authenticated to run gentic"
+  )
+  assert.ok(
+    !messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
+  )
+})
+
+test("runOnboarding passes when one selected agent setup is accepted", async () => {
+  const { messages, ui } = createUiRecorder()
+  const initialStatus: OnboardingStatus = {
+    ...makeStatus(true),
+    agentProviders: ["claude_code", "codex"],
+    tools: {
+      github: readyTool,
+      claude: missingTool,
+      codex: missingTool,
+    },
+    unmet: ["agent-cli-installed"],
+    ready: false,
+  }
+  const oneAgentReadyStatus: OnboardingStatus = {
+    ...initialStatus,
+    tools: {
+      github: readyTool,
+      claude: missingTool,
+      codex: readyTool,
+    },
+    unmet: [],
+    ready: true,
+  }
+  let workerCalls = 0
+
+  await runOnboarding({
+    getStatus: async () => initialStatus,
+    runAuthLogin: async () => {
+      throw new Error("auth prompt should not be called")
+    },
+    select: async () => "claude_code,codex",
+    writeConfig: () => {},
+    setupAgentCLIs: async (agentProviders) => {
+      assert.deepEqual(agentProviders, ["claude_code", "codex"])
+      return true
+    },
+    ensureAgentCli: async () => oneAgentReadyStatus,
+    confirm: async () => true,
+    startWorker: async () => {
+      workerCalls += 1
+      return true
+    },
+    ui,
+  })
+
+  assert.equal(workerCalls, 1)
+  assert.ok(
+    messages.includes("success:Claude Code, Codex has an authenticated CLI.")
+  )
+  assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
+})
+
 test("getGithubInstallCommand returns the macOS brew command", async () => {
   const dir = await mkdtemp(join(tmpdir(), "gentic-onboarding-brew-"))
   try {
