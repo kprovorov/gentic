@@ -224,6 +224,24 @@ export async function bulkUpdateIssueStatus(formData: FormData) {
   revalidatePath("/issues")
 }
 
+export async function bulkUpdateIssueAgentProvider(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
+  const agentProvider = agentProviderSchema.parse(
+    getString(formData, "agent_provider")
+  )
+
+  await issuesService.bulkUpdateIssueAgentProvider(
+    supabase,
+    userId,
+    ids,
+    agentProvider
+  )
+
+  revalidatePath("/home")
+  revalidatePath("/issues")
+}
+
 export async function bulkDeleteIssues(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))

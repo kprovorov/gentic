@@ -2,7 +2,12 @@
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { IconChevronDown, IconTrash } from "@tabler/icons-react"
+import {
+  IconChevronDown,
+  IconCode,
+  IconRobot,
+  IconTrash,
+} from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { queryKeys } from "@/app/query-keys"
@@ -25,10 +30,33 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import type { IssueStatus } from "@gentic/validators/issues"
+import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 
-import { bulkDeleteIssues, bulkUpdateIssueStatus } from "./actions"
-import { statusIconStyles, statusIcons, statusLabels, statusOptions } from "./issues-columns"
+import {
+  bulkDeleteIssues,
+  bulkUpdateIssueAgentProvider,
+  bulkUpdateIssueStatus,
+} from "./actions"
+import {
+  statusIconStyles,
+  statusIcons,
+  statusLabels,
+  statusOptions,
+} from "./issues-columns"
+
+const agentLabels: Record<AgentProvider, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+}
+
+const agentOptions: {
+  value: AgentProvider
+  label: string
+  icon: typeof IconRobot
+}[] = [
+  { value: "claude_code", label: agentLabels.claude_code, icon: IconRobot },
+  { value: "codex", label: agentLabels.codex, icon: IconCode },
+]
 
 function pluralize(count: number, noun: string) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`
@@ -71,6 +99,25 @@ export function BulkActionsToolbar({
     },
   })
 
+  const agentMutation = useMutation({
+    mutationFn: bulkUpdateIssueAgentProvider,
+    onSuccess: async (_data, formData) => {
+      const agentProvider = formData.get("agent_provider")
+      await invalidateQueries()
+      onDone()
+      toast.success(
+        `Updated ${pluralize(count, "issue")} to ${
+          typeof agentProvider === "string"
+            ? agentLabels[agentProvider as AgentProvider]
+            : "new agent"
+        }`
+      )
+    },
+    onError: () => {
+      toast.error(`Failed to update agent for ${pluralize(count, "issue")}`)
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteIssues,
     onSuccess: async () => {
@@ -84,7 +131,10 @@ export function BulkActionsToolbar({
     },
   })
 
-  const isPending = statusMutation.isPending || deleteMutation.isPending
+  const isPending =
+    statusMutation.isPending ||
+    agentMutation.isPending ||
+    deleteMutation.isPending
 
   function setStatus(status: IssueStatus) {
     if (count === 0 || statusMutation.isPending) {
@@ -97,6 +147,19 @@ export function BulkActionsToolbar({
     }
     formData.set("status", status)
     statusMutation.mutate(formData)
+  }
+
+  function setAgentProvider(agentProvider: AgentProvider) {
+    if (count === 0 || agentMutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    for (const id of selectedIds) {
+      formData.append("id", id)
+    }
+    formData.set("agent_provider", agentProvider)
+    agentMutation.mutate(formData)
   }
 
   function confirmDelete() {
@@ -143,6 +206,36 @@ export function BulkActionsToolbar({
                   <OptionIcon
                     className={cn("size-4", statusIconStyles[option.value])}
                   />
+                  <span className="min-w-0 flex-1 truncate">
+                    {option.label}
+                  </span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" disabled={isPending}>
+              Set agent
+              <IconChevronDown className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-48 rounded-lg bg-popover before:hidden"
+          >
+            {agentOptions.map((option) => {
+              const OptionIcon = option.icon
+
+              return (
+                <DropdownMenuItem
+                  key={option.value}
+                  disabled={agentMutation.isPending}
+                  onSelect={() => setAgentProvider(option.value)}
+                  className="gap-3"
+                >
+                  <OptionIcon className="size-4 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate">
                     {option.label}
                   </span>
