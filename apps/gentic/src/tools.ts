@@ -59,7 +59,7 @@ function parseVersion(pattern: RegExp, output: string): string | null {
   return pattern.exec(output)?.[1] ?? null
 }
 
-async function checkGithub(): Promise<ToolStatus> {
+export async function checkGithub(): Promise<ToolStatus> {
   const versionResult = await runCommand("gh", ["--version"])
   if (versionResult.missing) {
     return { installed: false, authenticated: false, version: null }

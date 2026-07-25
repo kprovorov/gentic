@@ -13,6 +13,7 @@ import {
 } from "../config-store.js"
 import { logError, logInfo } from "../log.js"
 import {
+  ensureGithubCliForOnboarding,
   formatOnboardingUnmet,
   getOnboardingStatus,
 } from "../onboarding.js"
@@ -184,6 +185,8 @@ export async function loginInteractive(): Promise<void> {
     GENTIC_API_URL: apiUrl,
     AGENT_PROVIDERS: selectedAgentProviders,
   })
+
+  await ensureGithubCliForOnboarding()
 
   let current = await getOnboardingStatus({
     configInput: {
