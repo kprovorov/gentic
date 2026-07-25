@@ -257,6 +257,22 @@ export type GithubCheckSuite = {
   conclusion: string | null
 }
 
+type RawCheckSuite = {
+  status: string
+  conclusion: string | null
+  latest_check_runs_count: number
+}
+
+// GitHub auto-registers a check suite for every app installed on the account
+// that has the `checks` permission (Vercel, Sentry, Netlify, this very Claude
+// Code app, etc.), even when that app never runs a check against this repo.
+// Those suites sit at `latest_check_runs_count: 0` and status `queued`
+// forever, so counting them would mean CI never resolves. Only suites that
+// actually reported at least one check run represent real CI signal.
+export function isRelevantCheckSuite(suite: RawCheckSuite): boolean {
+  return suite.latest_check_runs_count > 0
+}
+
 export async function fetchCheckSuitesForRef(
   installationId: string,
   owner: string,
@@ -281,10 +297,10 @@ export async function fetchCheckSuitesForRef(
   }
 
   const data = (await response.json()) as {
-    check_suites: { status: string; conclusion: string | null }[]
+    check_suites: RawCheckSuite[]
   }
 
-  return data.check_suites.map((suite) => ({
+  return data.check_suites.filter(isRelevantCheckSuite).map((suite) => ({
     status: suite.status,
     conclusion: suite.conclusion,
   }))
