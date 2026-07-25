@@ -28,7 +28,7 @@ const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>
 
-const CONFIG_KEYS = [
+export const CONFIG_KEYS = [
   "GENTIC_API_KEY",
   "GENTIC_API_URL",
   "AGENT_PROVIDERS",
@@ -48,10 +48,16 @@ function pickPresentEnvKeys(env: NodeJS.ProcessEnv): Partial<ConfigFile> {
   return present
 }
 
-export function loadConfig(): Config {
+export function getConfigInput(
+  env: NodeJS.ProcessEnv = process.env
+): Partial<ConfigFile> {
   const configFile = readConfigFile()
-  const envOverrides = pickPresentEnvKeys(process.env)
-  const merged = { ...configFile, ...envOverrides }
+  const envOverrides = pickPresentEnvKeys(env)
+  return { ...configFile, ...envOverrides }
+}
+
+export function loadConfig(): Config {
+  const merged = getConfigInput()
 
   if (!merged.GENTIC_API_KEY || !merged.GENTIC_API_URL) {
     throw new Error(
