@@ -49,6 +49,7 @@ import { IssueChat } from "./issue-chat"
 import { IssueDeleteButton } from "./issue-delete-button"
 import { IssueRelations } from "./issue-relations"
 import { IssueRetryAgentButton } from "./issue-retry-agent-button"
+import { IssueSlugUrlSync } from "./issue-slug-url-sync"
 import { IssueStatusControls } from "./issue-status-controls"
 
 const statusLabels: Record<IssueStatus, string> = {
@@ -234,6 +235,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           "attachments",
         ]}
       />
+      <IssueSlugUrlSync key={issue.title ?? ""} issue={issue} />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-col gap-5 border-b pb-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
