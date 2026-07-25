@@ -40,13 +40,18 @@ const projectOptionSchema = z.object({
   repo: z.string(),
 })
 
+const issueProjectSchema = projectOptionSchema.extend({
+  key: z.string(),
+})
+
 const homeIssueSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
   status: issueStatusSchema,
   type: issueTypeSchema,
+  number: z.number(),
   created_at: z.string(),
-  projects: projectOptionSchema.nullable(),
+  projects: issueProjectSchema.nullable(),
 })
 
 const issueEditSchema = z.object({
@@ -64,16 +69,18 @@ const issueDetailSchema = z.object({
   agent_provider: agentProviderSchema,
   type: issueTypeSchema,
   status: issueStatusSchema,
+  number: z.number(),
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   pr_url: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  projects: projectOptionSchema.nullable(),
+  projects: issueProjectSchema.nullable(),
 })
 
 export type HomeIssue = {
   id: string
+  code: string | null
   title: string | null
   status: IssueStatus
   type: IssueType
@@ -103,6 +110,7 @@ export type GithubRepositoryOption = {
 
 export type IssueDetail = {
   id: string
+  code: string | null
   title: string | null
   prompt: string | null
   agent_provider: "claude_code" | "codex"
@@ -160,20 +168,50 @@ async function resolveContext(context?: AuthenticatedContext) {
   return context ?? getAuthenticatedContext()
 }
 
+function getDisplayIssueCode(issue: {
+  number: number
+  projects: { key: string } | null
+}) {
+  return issue.projects
+    ? issuesService.getIssueCode(issue.projects.key, issue.number)
+    : null
+}
+
+function toProjectOption(project: z.infer<typeof issueProjectSchema> | null) {
+  return project
+    ? {
+        id: project.id,
+        name: project.name,
+        repo: project.repo,
+      }
+    : null
+}
+
 export async function getHomeData(
   context?: AuthenticatedContext
 ): Promise<HomeData> {
   const { supabase } = await resolveContext(context)
   const { data: issues, error } = await supabase
     .from("issues")
-    .select("id,title,status,type,created_at,projects(id,name,repo)")
+    .select("id,title,status,type,number,created_at,projects(id,name,repo,key)")
     .order("created_at", { ascending: false })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  const parsedIssues = z.array(homeIssueSchema).parse(issues)
+  const parsedIssues = z
+    .array(homeIssueSchema)
+    .parse(issues)
+    .map((issue) => ({
+      id: issue.id,
+      code: getDisplayIssueCode(issue),
+      title: issue.title,
+      status: issue.status,
+      type: issue.type,
+      created_at: issue.created_at,
+      projects: toProjectOption(issue.projects),
+    }))
   const blockedIssueIds = await issuesService.listBlockedIssueIds(
     supabase,
     parsedIssues.map((issue) => issue.id)
@@ -277,7 +315,7 @@ export async function getIssueDetailData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,title,prompt,agent_provider,type,status,usage_limit_reset_at,run_started_at,pr_url,created_at,updated_at,projects(id,name,repo)"
+      "id,title,prompt,agent_provider,type,status,number,usage_limit_reset_at,run_started_at,pr_url,created_at,updated_at,projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -290,7 +328,22 @@ export async function getIssueDetailData(
     throw new QueryNotFoundError("Issue not found")
   }
 
-  const parsedIssue = issueDetailSchema.parse(issue)
+  const parsedIssueRow = issueDetailSchema.parse(issue)
+  const parsedIssue: IssueDetail = {
+    id: parsedIssueRow.id,
+    code: getDisplayIssueCode(parsedIssueRow),
+    title: parsedIssueRow.title,
+    prompt: parsedIssueRow.prompt,
+    agent_provider: parsedIssueRow.agent_provider,
+    type: parsedIssueRow.type,
+    status: parsedIssueRow.status,
+    usage_limit_reset_at: parsedIssueRow.usage_limit_reset_at,
+    run_started_at: parsedIssueRow.run_started_at,
+    pr_url: parsedIssueRow.pr_url,
+    created_at: parsedIssueRow.created_at,
+    updated_at: parsedIssueRow.updated_at,
+    projects: toProjectOption(parsedIssueRow.projects),
+  }
 
   const [
     { data: messages, error: messagesError },

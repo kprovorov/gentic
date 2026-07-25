@@ -389,6 +389,15 @@ export function getIssuesColumns(
       enableHiding: false,
     },
     {
+      accessorKey: "code",
+      header: ({ column }) => <SortableHeader label="Code" column={column} />,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs font-semibold text-muted-foreground">
+          {row.original.code ?? "—"}
+        </span>
+      ),
+    },
+    {
       accessorKey: "title",
       header: ({ column }) => <SortableHeader label="Issue" column={column} />,
       cell: ({ row }) => {
