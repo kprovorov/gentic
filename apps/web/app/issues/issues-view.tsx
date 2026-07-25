@@ -14,8 +14,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import {
+  IconArrowBarToRight,
   IconChevronDown,
-  IconGitMerge,
   IconList,
   IconLock,
   IconPlus,
@@ -45,6 +45,7 @@ import { cn } from "@gentic/ui/utils"
 
 import { BulkActionsToolbar } from "./bulk-actions-toolbar"
 import {
+  blockingBadgeStyles,
   formatDate,
   getIssuesColumns,
   IssueStatusMenu,
@@ -60,14 +61,54 @@ import {
 } from "./issues-columns"
 
 type IssuesViewMode = "list" | "table"
-type BlockingFilter = "all" | "blocking" | "non-blocking"
+type BlockingFilter = "all" | "blocked" | "blocking" | "non-blocking"
 
 const pageSize = 20
 
 const blockingFilterLabels: Record<BlockingFilter, string> = {
   all: "All",
+  blocked: "Blocked",
   blocking: "Blocking",
   "non-blocking": "Non-blocking",
+}
+
+const blockingFilterOptions = [
+  "all",
+  "blocked",
+  "blocking",
+  "non-blocking",
+] as const
+
+const blockingFilterBadgeStyles: Partial<Record<BlockingFilter, string>> = {
+  blocked: blockingBadgeStyles.blocked,
+  blocking: blockingBadgeStyles.blocking,
+  "non-blocking": "bg-muted text-muted-foreground",
+}
+
+const blockingFilterIconStyles: Partial<Record<BlockingFilter, string>> = {
+  blocked: "text-red-700 dark:text-red-300",
+  blocking: "text-amber-700 dark:text-amber-300",
+}
+
+function matchesBlockingFilter(
+  issue: HomeIssue,
+  filter: BlockingFilter,
+  blockedIssueIds: Set<string>,
+  blockingIssueIds: Set<string>
+) {
+  const isBlocked = blockedIssueIds.has(issue.id)
+  const isBlocking = blockingIssueIds.has(issue.id)
+
+  switch (filter) {
+    case "blocked":
+      return isBlocked
+    case "blocking":
+      return isBlocking
+    case "non-blocking":
+      return !isBlocked && !isBlocking
+    case "all":
+      return true
+  }
 }
 
 function matchesIssue(issue: HomeIssue, filterValue: string) {
@@ -127,7 +168,7 @@ function IssueRow({
         <IssueStatusMenu issue={issue} />
         <Link
           href={issueHref}
-          className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
         >
           {issue.code ? (
             <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
@@ -153,14 +194,24 @@ function IssueRow({
           {issueTypeLabels[issue.type]}
         </span>
         {isBlocked ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              blockingBadgeStyles.blocked
+            )}
+          >
             <IconLock className="size-3" />
             Blocked
           </span>
         ) : null}
         {isBlocking ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-            <IconGitMerge className="size-3" />
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              blockingBadgeStyles.blocking
+            )}
+          >
+            <IconArrowBarToRight className="size-3" />
             Blocking
           </span>
         ) : null}
@@ -342,12 +393,13 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
           (issue) => statusFilter.size === 0 || statusFilter.has(issue.status)
         )
         .filter((issue) => typeFilter.size === 0 || typeFilter.has(issue.type))
-        .filter(
-          (issue) =>
-            blockingFilter === "all" ||
-            (blockingFilter === "blocking"
-              ? blockingIssueIds.has(issue.id)
-              : !blockingIssueIds.has(issue.id))
+        .filter((issue) =>
+          matchesBlockingFilter(
+            issue,
+            blockingFilter,
+            blockedIssueIds,
+            blockingIssueIds
+          )
         )
         .filter(
           (issue) =>
@@ -361,6 +413,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       statusFilter,
       typeFilter,
       blockingFilter,
+      blockedIssueIds,
       blockingIssueIds,
       projectFilter,
     ]
@@ -639,7 +692,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <Button variant="outline" size="sm">
                       Blocking
                       {blockingFilter !== "all" ? (
-                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                        <span
+                          className={cn(
+                            "ml-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium",
+                            blockingFilterBadgeStyles[blockingFilter]
+                          )}
+                        >
                           {blockingFilterLabels[blockingFilter]}
                         </span>
                       ) : null}
@@ -650,8 +708,17 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     align="start"
                     className="w-60 rounded-lg bg-popover before:hidden"
                   >
-                    {(["all", "blocking", "non-blocking"] as const).map(
-                      (option) => (
+                    {blockingFilterOptions.map((option) => {
+                      const OptionIcon =
+                        option === "all"
+                          ? IconList
+                          : option === "blocked"
+                            ? IconLock
+                            : option === "non-blocking"
+                              ? IconX
+                              : IconArrowBarToRight
+
+                      return (
                         <DropdownMenuCheckboxItem
                           key={option}
                           checked={blockingFilter === option}
@@ -659,12 +726,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                           onCheckedChange={() => updateBlockingFilter(option)}
                           className="gap-3"
                         >
-                          <IconGitMerge
+                          <OptionIcon
                             className={cn(
                               "size-4",
-                              option === "blocking"
-                                ? "text-amber-600 dark:text-amber-300"
-                                : "text-muted-foreground"
+                              blockingFilterIconStyles[option] ??
+                                "text-muted-foreground"
                             )}
                           />
                           <span className="min-w-0 flex-1 truncate">
@@ -672,7 +738,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                           </span>
                         </DropdownMenuCheckboxItem>
                       )
-                    )}
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <DropdownMenu>
