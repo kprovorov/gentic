@@ -149,6 +149,7 @@ test("runOnboarding shows welcome and skips auth prompt when already authenticat
       loginCalls += 1
       return { cancelled: false, apiKeyConfigured: true }
     },
+    confirm: async () => false,
     ui,
   })
 
@@ -177,6 +178,7 @@ test("runOnboarding calls auth prompt when credentials are missing", async () =>
       loginCalls += 1
       return { cancelled: false, apiKeyConfigured: true }
     },
+    confirm: async () => false,
     ui,
   })
 
@@ -187,6 +189,56 @@ test("runOnboarding calls auth prompt when credentials are missing", async () =>
   assert.ok(
     messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
   )
+  assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
+})
+
+test("runOnboarding prints ready summary and starts worker when confirmed", async () => {
+  const { messages, ui } = createUiRecorder()
+  const prompts: string[] = []
+  let startCalls = 0
+
+  await runOnboarding({
+    getStatus: async () => makeStatus(true),
+    runAuthLogin: async () => {
+      throw new Error("auth prompt should not be called")
+    },
+    confirm: async ({ message }) => {
+      prompts.push(message)
+      return true
+    },
+    startWorker: async () => {
+      startCalls += 1
+      return true
+    },
+    ui,
+  })
+
+  assert.deepEqual(prompts, ["Enable the gentic worker now?"])
+  assert.equal(startCalls, 1)
+  assert.ok(messages.includes("info:Gentic auth: configured (tes...-key, https://gentic.example/api/v1)"))
+  assert.ok(messages.includes("info:GitHub CLI: installed, authenticated"))
+  assert.ok(messages.includes("info:Agent CLI: Codex installed, authenticated"))
+})
+
+test("runOnboarding prints gentic start instructions when worker enable is declined", async () => {
+  const { messages, ui } = createUiRecorder()
+  let startCalls = 0
+
+  await runOnboarding({
+    getStatus: async () => makeStatus(true),
+    runAuthLogin: async () => {
+      throw new Error("auth prompt should not be called")
+    },
+    confirm: async () => false,
+    startWorker: async () => {
+      startCalls += 1
+      return true
+    },
+    ui,
+  })
+
+  assert.equal(startCalls, 0)
+  assert.ok(messages.includes("info:Run `gentic start` later to enable the worker."))
   assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
 })
 

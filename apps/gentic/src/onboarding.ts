@@ -2,6 +2,7 @@ import type { AgentProvider } from "./agents.js"
 import { DEFAULT_AGENT_PROVIDERS, formatAgentProviders } from "./agents.js"
 import type { AuthLoginPromptResult } from "./auth-login.js"
 import { runAuthLoginPrompt } from "./auth-login.js"
+import { startGenticService } from "./commands/service.js"
 import { getConfigInput } from "./config.js"
 import type { ConfigFile } from "./config-store.js"
 import {
@@ -56,6 +57,8 @@ export interface OnboardingStep {
 interface RunOnboardingDeps {
   getStatus?: () => Promise<OnboardingStatus>
   runAuthLogin?: () => Promise<AuthLoginPromptResult>
+  confirm?: typeof confirm
+  startWorker?: typeof startGenticService
   ui?: {
     intro: typeof intro
     outro: typeof outro
@@ -280,9 +283,47 @@ function reportAgentStep(
   }
 }
 
-function reportWorkerStep(ui: RunOnboardingDeps["ui"]): void {
+function formatOnboardingSummary(status: OnboardingStatus): string[] {
+  const auth = status.auth.authenticated
+    ? `configured (${status.auth.maskedApiKey}, ${status.auth.apiUrl})`
+    : "not configured"
+  const agents = Object.entries({
+    Claude: status.tools.claude,
+    Codex: status.tools.codex,
+  })
+    .filter(([, tool]) => tool !== undefined)
+    .map(([name, tool]) => `${name} ${formatToolStatus(tool as ToolStatus)}`)
+    .join(", ")
+
+  return [
+    `Gentic auth: ${auth}`,
+    `GitHub CLI: ${formatToolStatus(status.tools.github)}`,
+    `Agent CLI: ${agents || "no selected agent CLI"}`,
+  ]
+}
+
+async function runWorkerStep(
+  status: OnboardingStatus,
+  deps: Pick<RunOnboardingDeps, "confirm" | "startWorker" | "ui">
+): Promise<boolean> {
+  const ui = deps.ui
+  const prompt = deps.confirm ?? confirm
+  const startWorker = deps.startWorker ?? startGenticService
+
   ui?.info(formatStep(3, ONBOARDING_STEPS[3].label))
-  ui?.info("Worker setup will be connected here in a follow-up.")
+  for (const line of formatOnboardingSummary(status)) {
+    ui?.info(line)
+  }
+
+  const confirmed = await prompt({
+    message: "Enable the gentic worker now?",
+  })
+  if (isCancel(confirmed) || !confirmed) {
+    ui?.info("Run `gentic start` later to enable the worker.")
+    return true
+  }
+
+  return startWorker()
 }
 
 export async function runOnboarding(
@@ -311,7 +352,24 @@ export async function runOnboarding(
   await runGithubStep(status, ui)
   status = await getStatus()
   reportAgentStep(status, ui)
-  reportWorkerStep(ui)
+
+  if (!status.ready) {
+    for (const line of formatOnboardingUnmet(status)) {
+      ui.warn(line)
+    }
+    ui.outro("Onboarding checks incomplete.")
+    return
+  }
+
+  const workerComplete = await runWorkerStep(status, {
+    confirm: deps.confirm,
+    startWorker: deps.startWorker,
+    ui,
+  })
+  if (!workerComplete) {
+    ui.outro("Onboarding checks complete, but the worker did not start.")
+    return
+  }
 
   ui.outro("Onboarding checks complete.")
 }

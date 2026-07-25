@@ -12,6 +12,10 @@ interface StartOptions extends ScopeOptions {
   boot: boolean
 }
 
+export interface StartGenticServiceOptions extends ScopeOptions {
+  boot?: boolean
+}
+
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -27,6 +31,35 @@ function addScopeOption(command: Command): Command {
   )
 }
 
+export async function startGenticService(
+  opts: StartGenticServiceOptions = {}
+): Promise<boolean> {
+  const backend = getServiceBackend({ scope: resolveScope(opts) })
+  const enableOnBoot = opts.boot ?? true
+  const s = spinner()
+  s.start(`Starting gentic (${backend.name})`)
+  try {
+    await backend.install({ enableOnBoot })
+    await backend.start()
+    s.stop("gentic is running")
+
+    if (backend.name === "fallback") {
+      log.warn(
+        "No native service manager was found, so gentic is running as a detached " +
+          "process. It will not restart automatically on crash or survive a reboot.",
+      )
+    } else if (!enableOnBoot) {
+      log.warn("--no-boot was set: the service will not start automatically after a reboot.")
+    }
+    return true
+  } catch (error) {
+    s.stop("Failed to start gentic")
+    log.error(describe(error))
+    process.exitCode = 1
+    return false
+  }
+}
+
 export function registerServiceCommands(program: Command): void {
   addScopeOption(
     program
@@ -34,27 +67,7 @@ export function registerServiceCommands(program: Command): void {
       .description("Install (if needed) and start the gentic worker as a background service")
       .option("--no-boot", "do not start the service automatically on boot/login"),
   ).action(async (opts: StartOptions) => {
-    const backend = getServiceBackend({ scope: resolveScope(opts) })
-    const s = spinner()
-    s.start(`Starting gentic (${backend.name})`)
-    try {
-      await backend.install({ enableOnBoot: opts.boot })
-      await backend.start()
-      s.stop("gentic is running")
-
-      if (backend.name === "fallback") {
-        log.warn(
-          "No native service manager was found, so gentic is running as a detached " +
-            "process. It will not restart automatically on crash or survive a reboot.",
-        )
-      } else if (!opts.boot) {
-        log.warn("--no-boot was set: the service will not start automatically after a reboot.")
-      }
-    } catch (error) {
-      s.stop("Failed to start gentic")
-      log.error(describe(error))
-      process.exitCode = 1
-    }
+    await startGenticService(opts)
   })
 
   addScopeOption(program.command("stop").description("Stop the gentic background service")).action(
