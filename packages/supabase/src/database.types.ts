@@ -336,6 +336,7 @@ export type Database = {
           auto_respond_to_reviews: boolean
           created_at: string
           id: string
+          key: string
           name: string
           repo: string
           setup_script: string | null
@@ -346,6 +347,7 @@ export type Database = {
           auto_respond_to_reviews?: boolean
           created_at?: string
           id?: string
+          key: string
           name: string
           repo: string
           setup_script?: string | null
@@ -356,6 +358,7 @@ export type Database = {
           auto_respond_to_reviews?: boolean
           created_at?: string
           id?: string
+          key?: string
           name?: string
           repo?: string
           setup_script?: string | null
