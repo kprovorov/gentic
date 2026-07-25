@@ -1,9 +1,9 @@
 import {
   Anthropic,
-  ClaudeCode,
-  CodexOpenai,
+  Claude,
   Github,
   Openai,
+  OpenaiChatgpt,
   type SvgIconProps,
 } from "@thesvg/react"
 
@@ -29,11 +29,23 @@ export function BrandIcon({ name, tone = "brand", ...props }: BrandIconProps) {
   }
 
   if (name === "claude_code") {
-    return <ClaudeCode variant={variant} aria-hidden="true" {...props} />
+    return (
+      <Claude
+        variant={tone === "brand" ? "default" : "mono"}
+        aria-hidden="true"
+        {...props}
+      />
+    )
   }
 
   if (name === "codex") {
-    return <CodexOpenai variant={variant} aria-hidden="true" {...props} />
+    return (
+      <OpenaiChatgpt
+        variant={tone === "brand" ? "default" : "mono"}
+        aria-hidden="true"
+        {...props}
+      />
+    )
   }
 
   if (name === "github") {
