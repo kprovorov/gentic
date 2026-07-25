@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 
+import { RESOLVED_ISSUE_BLOCKER_STATUSES } from "@gentic/services/issues"
 import { claimIssueInputSchema } from "@gentic/validators/agent"
 
 import {
@@ -13,6 +14,7 @@ export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
   "id, agent_provider, session_id, pr_url, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+const RESOLVED_BLOCKER_STATUS_FILTER = `(${RESOLVED_ISSUE_BLOCKER_STATUSES.join(",")})`
 
 export async function POST(request: Request) {
   try {
@@ -48,7 +50,7 @@ async function claimNextQueuedIssue(
     .not(
       "unfinished_blockers.source_issue.status",
       "in",
-      "(completed,cancelled)"
+      RESOLVED_BLOCKER_STATUS_FILTER
     )
     .is("unfinished_blockers", null)
     .order("updated_at", { ascending: true })

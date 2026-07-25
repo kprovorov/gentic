@@ -1,5 +1,7 @@
 export {
   getIssueCode,
+  isIssueBlockerResolved,
+  RESOLVED_ISSUE_BLOCKER_STATUSES,
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,

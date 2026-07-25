@@ -1,8 +1,18 @@
 import type { Tables } from "@gentic/supabase/types"
+import type { IssueStatus } from "@gentic/validators/issues"
 import type { ChatMessageContract } from "@gentic/validators/realtime"
 
 export const ISSUE_WITH_PROJECT_SELECT =
   "*, projects!inner(id,name,repo,user_id,key)"
+
+export const RESOLVED_ISSUE_BLOCKER_STATUSES = [
+  "merged",
+  "deploying",
+  "deploy-failed",
+  "validating",
+  "completed",
+  "cancelled",
+] as const satisfies IssueStatus[]
 
 type IssueRow = Tables<"issues">
 type IssueRelationRow = Tables<"issue_relations">
@@ -37,4 +47,10 @@ export type UserChatMessage = ChatMessageContract & {
 
 export function getIssueCode(projectKey: string, issueNumber: number) {
   return `${projectKey}-${issueNumber}`
+}
+
+export function isIssueBlockerResolved(status: string): boolean {
+  return (RESOLVED_ISSUE_BLOCKER_STATUSES as readonly string[]).includes(
+    status
+  )
 }

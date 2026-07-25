@@ -3,6 +3,7 @@ import type { Supabase } from "../types"
 import { ensureIssueOwned, ensureProjectOwned } from "./ownership"
 import {
   ISSUE_WITH_PROJECT_SELECT,
+  isIssueBlockerResolved,
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,
@@ -152,10 +153,7 @@ export async function listBlockedIssueIds(
 
   const blockedIssueIds = new Set<string>()
   for (const relation of data) {
-    if (
-      relation.source_issue.status !== "completed" &&
-      relation.source_issue.status !== "cancelled"
-    ) {
+    if (!isIssueBlockerResolved(relation.source_issue.status)) {
       blockedIssueIds.add(relation.target_issue_id)
     }
   }
@@ -185,10 +183,7 @@ export async function listBlockingIssueIds(
 
   const blockingIssueIds = new Set<string>()
   for (const relation of data) {
-    if (
-      relation.target_issue.status !== "completed" &&
-      relation.target_issue.status !== "cancelled"
-    ) {
+    if (!isIssueBlockerResolved(relation.target_issue.status)) {
       blockingIssueIds.add(relation.source_issue_id)
     }
   }

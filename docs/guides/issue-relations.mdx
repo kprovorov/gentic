@@ -1,14 +1,14 @@
 ---
 title: "Sequence and Block Issues with Gentic Issue Relations"
 sidebarTitle: "Issue Relations"
-description: "Use issue relations in Gentic to declare dependencies between tasks. A blocked issue is skipped by the worker until its blocker completes or cancels."
+description: "Use issue relations in Gentic to declare dependencies between tasks. A blocked issue is skipped by the worker until its blocker is resolved."
 ---
 
-Issue relations let you describe dependencies between coding tasks so the agent worker executes them in the right order. When one issue blocks another, Gentic automatically holds the blocked issue in the queue until its dependency is completed or cancelled — no manual coordination required.
+Issue relations let you describe dependencies between coding tasks so the agent worker executes them in the right order. When one issue blocks another, Gentic automatically holds the blocked issue in the queue until its dependency is resolved — no manual coordination required.
 
 ## What issue relations are
 
-A relation connects two issues with a directional dependency: issue A **blocks** issue B. The agent worker respects this constraint at the moment it polls for work. If issue B is in the `Todo` queue but it is blocked by issue A, the worker skips issue B and moves on. Once issue A reaches a `completed` or `cancelled` state, issue B becomes eligible and the worker picks it up on the next poll cycle.
+A relation connects two issues with a directional dependency: issue A **blocks** issue B. The agent worker respects this constraint at the moment it polls for work. If issue B is in the `Todo` queue but it is blocked by issue A, the worker skips issue B and moves on. Once issue A reaches a resolved state such as `merged`, `completed`, or `cancelled`, issue B becomes eligible and the worker picks it up on the next poll cycle.
 
 This is useful any time one piece of work must land before another can safely begin — for example, a database migration that must run before the API layer that depends on the new schema, or a shared utility module that must exist before the features that import it.
 
@@ -22,7 +22,7 @@ The enforcement happens at the worker level, not the UI level. The Gentic API fi
 
 - You can move a blocked issue to `Todo` at any time — it simply will not be executed until the blocker clears.
 - The issue detail page shows a **Blocked** badge when an issue has an unresolved blocker.
-- A blocker is considered resolved when its status is `completed` or `cancelled`.
+- A blocker is considered resolved when its work has landed or ended, such as `merged`, `completed`, or `cancelled`.
 
 ## How to add a relation
 
@@ -53,8 +53,8 @@ Click **Add** to save. The relation appears in the **Relations** card immediatel
 
 | Direction | Meaning | Effect |
 |-----------|---------|--------|
-| **This issue is blocked by** issue A | Issue A must complete before this issue runs | Worker skips this issue until A is `completed` or `cancelled` |
-| **This issue blocks** issue B | This issue must complete before issue B runs | Worker skips issue B until this issue is `completed` or `cancelled` |
+| **This issue is blocked by** issue A | Issue A must resolve before this issue runs | Worker skips this issue until A is `merged`, `completed`, or `cancelled` |
+| **This issue blocks** issue B | This issue must resolve before issue B runs | Worker skips issue B until this issue is `merged`, `completed`, or `cancelled` |
 
 ## How to remove a relation
 
