@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-table"
 import {
   IconChevronDown,
+  IconGitMerge,
   IconList,
   IconLock,
   IconPlus,
@@ -102,9 +103,11 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
 function IssueRow({
   issue,
   isBlocked,
+  isBlocking,
 }: {
   issue: HomeIssue
   isBlocked: boolean
+  isBlocking: boolean
 }) {
   const TypeIcon = issueTypeIcons[issue.type]
 
@@ -145,6 +148,12 @@ function IssueRow({
             Blocked
           </span>
         ) : null}
+        {isBlocking ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <IconGitMerge className="size-3" />
+            Blocking
+          </span>
+        ) : null}
       </div>
       <div className="min-w-0 text-sm text-muted-foreground">
         <span className="block truncate">
@@ -164,19 +173,21 @@ function IssueRow({
 function IssuesTableView({
   issues,
   blockedIssueIds,
+  blockingIssueIds,
   filterKey,
   rowSelection,
   onRowSelectionChange,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
+  blockingIssueIds: Set<string>
   filterKey: string
   rowSelection: RowSelectionState
   onRowSelectionChange: (selection: RowSelectionState) => void
 }) {
   const columns = useMemo(
-    () => getIssuesColumns(blockedIssueIds),
-    [blockedIssueIds]
+    () => getIssuesColumns(blockedIssueIds, blockingIssueIds),
+    [blockedIssueIds, blockingIssueIds]
   )
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true },
@@ -270,6 +281,10 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const blockedIssueIds = useMemo(
     () => new Set(data.blockedIssueIds),
     [data.blockedIssueIds]
+  )
+  const blockingIssueIds = useMemo(
+    () => new Set(data.blockingIssueIds),
+    [data.blockingIssueIds]
   )
   const [globalFilter, setGlobalFilter] = useState("")
   const [pageIndex, setPageIndex] = useState(0)
@@ -635,6 +650,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               <IssuesTableView
                 issues={filteredIssues}
                 blockedIssueIds={blockedIssueIds}
+                blockingIssueIds={blockingIssueIds}
                 filterKey={filterKey}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
@@ -702,6 +718,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                               key={issue.id}
                               issue={issue}
                               isBlocked={blockedIssueIds.has(issue.id)}
+                              isBlocking={blockingIssueIds.has(issue.id)}
                             />
                           ))}
                         </div>

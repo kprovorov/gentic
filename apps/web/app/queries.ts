@@ -134,6 +134,7 @@ export type IssueEdit = Pick<
 export type HomeData = {
   issues: HomeIssue[]
   blockedIssueIds: string[]
+  blockingIssueIds: string[]
 }
 
 export type IssuesData = HomeData
@@ -212,14 +213,16 @@ export async function getHomeData(
       created_at: issue.created_at,
       projects: toProjectOption(issue.projects),
     }))
-  const blockedIssueIds = await issuesService.listBlockedIssueIds(
-    supabase,
-    parsedIssues.map((issue) => issue.id)
-  )
+  const issueIds = parsedIssues.map((issue) => issue.id)
+  const [blockedIssueIds, blockingIssueIds] = await Promise.all([
+    issuesService.listBlockedIssueIds(supabase, issueIds),
+    issuesService.listBlockingIssueIds(supabase, issueIds),
+  ])
 
   return {
     issues: parsedIssues,
     blockedIssueIds: Array.from(blockedIssueIds),
+    blockingIssueIds: Array.from(blockingIssueIds),
   }
 }
 

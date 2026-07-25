@@ -15,11 +15,19 @@ test("client query fetches use typed API routes", async () => {
     assert.equal(init?.credentials, "same-origin")
     assert.deepEqual(init?.headers, { Accept: "application/json" })
 
-    return Response.json({ issues: [], blockedIssueIds: [] })
+    return Response.json({
+      issues: [],
+      blockedIssueIds: [],
+      blockingIssueIds: [],
+    })
   }
 
   try {
-    assert.deepEqual(await fetchHomeData(), { issues: [], blockedIssueIds: [] })
+    assert.deepEqual(await fetchHomeData(), {
+      issues: [],
+      blockedIssueIds: [],
+      blockingIssueIds: [],
+    })
     await fetchIssueDetailData("issue id/with slash")
   } finally {
     globalThis.fetch = originalFetch
