@@ -6,6 +6,35 @@ description: "Configure the Gentic agent worker with gentic auth login or enviro
 
 The primary way to configure the agent worker is with `gentic auth login`, which saves your API key and API URL to a persistent config file on disk. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
 
+## First-run behavior
+
+When you run a `gentic` command for the first time, the CLI checks whether the worker is ready before it continues. This onboarding gate runs for normal worker commands, including `gentic start`, `gentic run`, and `gentic status`. It does not run for `gentic auth`, `--help`, or `--version`, so you can always configure credentials or inspect the CLI without completing onboarding first.
+
+If the command is running in an interactive terminal and any required setup is missing, Gentic starts the first-run flow automatically. The flow has four steps:
+
+1. **Gentic auth** — prompts for `GENTIC_API_URL`, `GENTIC_API_KEY`, and the agent provider(s) this worker should run. This is required.
+2. **GitHub CLI** — checks that `gh` is installed and authenticated, and offers to install or run `gh auth login` when possible. This is required because agents use GitHub CLI access to open pull requests.
+3. **Agent CLI** — asks which agent provider(s) to support, then checks the selected provider CLIs. At least one selected agent CLI must be installed and authenticated. Claude Code setup is only required when `claude_code` is selected; Codex setup is only required when `codex` is selected.
+4. **Worker service** — shows a summary and asks whether to enable the background worker with `gentic start`. This step is optional; you can decline and run `gentic start` later.
+
+For CI, containers, or other non-interactive environments, bypass the prompts by providing the required settings up front:
+
+```bash
+GENTIC_API_URL=https://gentic.chat/api/v1 \
+GENTIC_API_KEY=<your-key> \
+AGENT_PROVIDERS=codex \
+gentic run
+```
+
+You can also write credentials to the config file non-interactively before starting the worker:
+
+```bash
+gentic auth login --api-url https://gentic.chat/api/v1 --api-key <your-key>
+gentic run
+```
+
+Non-interactive runs still require `gh` and at least one selected agent CLI to be installed and authenticated before the worker command starts. If any required item is missing, Gentic exits with the unmet requirements instead of prompting.
+
 ## Authentication via CLI
 
 The recommended way to configure credentials is with the `gentic auth` commands. These commands read and write an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
