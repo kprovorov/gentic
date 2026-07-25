@@ -7,6 +7,7 @@ import {
   IconAlertCircle,
   IconAlertOctagon,
   IconAlertTriangle,
+  IconArrowBarToRight,
   IconArrowsSort,
   IconBug,
   IconBulb,
@@ -199,6 +200,11 @@ export const issueTypeStyles: Record<IssueType, string> = {
   idea: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 }
 
+export const blockingBadgeStyles = {
+  blocked: "bg-red-500/15 text-red-700 dark:text-red-300",
+  blocking: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+} as const
+
 export const issueTypeOptions: { value: IssueType; label: string }[] = [
   { value: "issue", label: issueTypeLabels.issue },
   { value: "feature", label: issueTypeLabels.feature },
@@ -318,7 +324,7 @@ export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
-            "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
             statusStyles[issue.status]
           )}
           onClick={(event) => event.stopPropagation()}
@@ -407,10 +413,7 @@ export function getIssuesColumns(
         const issueHref = getIssueHref(issue) ?? "/issues"
 
         return (
-          <Link
-            href={issueHref}
-            className="flex min-w-0 items-center gap-2"
-          >
+          <Link href={issueHref} className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
                 "truncate font-medium hover:text-primary",
@@ -481,7 +484,12 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockedIssueIds.has(row.original.id) ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              blockingBadgeStyles.blocked
+            )}
+          >
             <IconLock className="size-3" />
             Blocked
           </span>
@@ -495,8 +503,13 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockingIssueIds.has(row.original.id) ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-            <IconGitMerge className="size-3" />
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              blockingBadgeStyles.blocking
+            )}
+          >
+            <IconArrowBarToRight className="size-3" />
             Blocking
           </span>
         ) : null,
