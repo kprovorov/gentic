@@ -175,6 +175,7 @@ export async function processIssue(
     // different worker machine claimed this follow-up).
     const resumingLocalCheckout =
       Boolean(issue.sessionId) && deps.hasLocalCheckout(dir)
+    let existingPrCheckedOut = resumingLocalCheckout && Boolean(issue.prUrl)
     if (!resumingLocalCheckout) {
       await deps.cloneRepo({
         remoteBase: config.GIT_REMOTE_BASE,
@@ -183,7 +184,15 @@ export async function processIssue(
       })
 
       if (issue.prUrl) {
-        await deps.checkoutPullRequest({ prUrl: issue.prUrl, dir })
+        existingPrCheckedOut = await deps.checkoutPullRequest({
+          prUrl: issue.prUrl,
+          dir,
+        })
+        if (!existingPrCheckedOut) {
+          logInfo(
+            `issue ${issue.id} previous pull request branch could not be checked out; agent will create a new pull request if changes are needed`
+          )
+        }
       }
     }
 
@@ -201,6 +210,7 @@ export async function processIssue(
       cwd: dir,
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,
+      existingPrCheckedOut,
       onSessionId: (sessionId) => {
         currentSessionId = sessionId
         return deps.setRunState(api, channel, issue.id, {

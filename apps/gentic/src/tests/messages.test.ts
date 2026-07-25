@@ -342,11 +342,26 @@ test("run error path best-effort persists the current partial", async () => {
 })
 
 test("issue run instructions update an existing pull request on follow-up", () => {
-  const instructions = issueRunInstructions("https://github.com/acme/app/pull/7")
+  const instructions = issueRunInstructions(
+    "https://github.com/acme/app/pull/7",
+    true
+  )
 
-  assert.match(instructions, /existing pull request branch/)
+  assert.match(instructions, /existing open pull request/)
+  assert.match(instructions, /same branch/)
   assert.match(instructions, /Do not open a new pull request/)
   assert.doesNotMatch(instructions, /open a pull request against/)
+})
+
+test("issue run instructions create a new pull request after merged follow-up", () => {
+  const instructions = issueRunInstructions("https://github.com/acme/app/pull/7")
+
+  assert.match(instructions, /previous pull request recorded/)
+  assert.match(instructions, /If the pull request is merged or closed/)
+  assert.match(instructions, /branch was deleted/)
+  assert.match(instructions, /create a new branch/)
+  assert.match(instructions, /open a new ready-for-review pull request/)
+  assert.doesNotMatch(instructions, /Do not open a new pull request/)
 })
 
 test("issue run instructions open a ready for review pull request", () => {

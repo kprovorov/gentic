@@ -29,14 +29,21 @@ export async function cloneRepo(options: {
 }
 
 /**
- * Checks out the branch for an existing pull request so follow-up runs update
- * that PR instead of creating a second one.
+ * Checks out the branch for an existing pull request so follow-up runs can
+ * update that PR instead of creating a second one. Returns false when GitHub
+ * can no longer check out the branch, e.g. after the PR was merged and the
+ * branch was deleted.
  */
 export async function checkoutPullRequest(options: {
   prUrl: string
   dir: string
-}): Promise<void> {
-  await run("gh", ["pr", "checkout", options.prUrl], { cwd: options.dir })
+}): Promise<boolean> {
+  try {
+    await run("gh", ["pr", "checkout", options.prUrl], { cwd: options.dir })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
