@@ -1,5 +1,7 @@
 import type { AgentProvider } from "./agents.js"
 import { DEFAULT_AGENT_PROVIDERS, formatAgentProviders } from "./agents.js"
+import type { AuthLoginPromptResult } from "./auth-login.js"
+import { runAuthLoginPrompt } from "./auth-login.js"
 import { getConfigInput } from "./config.js"
 import type { ConfigFile } from "./config-store.js"
 import {
@@ -8,6 +10,7 @@ import {
   type ToolStatus,
   type ToolStatuses,
 } from "./tools.js"
+import { intro, log, outro } from "./ui.js"
 
 export type OnboardingRequirement =
   | "gentic-auth"
@@ -35,6 +38,32 @@ interface OnboardingStatusDeps {
   configInput?: Partial<ConfigFile>
   getTools?: (agentProviders: AgentProvider[]) => Promise<ToolStatuses>
 }
+
+type OnboardingStepId = "auth" | "gh" | "agent" | "worker"
+
+export interface OnboardingStep {
+  id: OnboardingStepId
+  label: string
+}
+
+interface RunOnboardingDeps {
+  getStatus?: () => Promise<OnboardingStatus>
+  runAuthLogin?: () => Promise<AuthLoginPromptResult>
+  ui?: {
+    intro: typeof intro
+    outro: typeof outro
+    info: typeof log.info
+    success: typeof log.success
+    warn: typeof log.warn
+  }
+}
+
+export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
+  { id: "auth", label: "Gentic auth" },
+  { id: "gh", label: "GitHub CLI" },
+  { id: "agent", label: "Agent CLI" },
+  { id: "worker", label: "Worker service" },
+]
 
 const ALL_AGENT_PROVIDERS: AgentProvider[] = ["claude_code", "codex"]
 
@@ -159,4 +188,90 @@ export function formatOnboardingUnmet(status: OnboardingStatus): string[] {
   }
 
   return lines
+}
+
+function formatStep(index: number, label: string): string {
+  return `Step ${index + 1}/${ONBOARDING_STEPS.length}: ${label}`
+}
+
+async function runAuthStep(
+  status: OnboardingStatus,
+  deps: Required<Pick<RunOnboardingDeps, "runAuthLogin">> &
+    Pick<RunOnboardingDeps, "ui">
+): Promise<"completed" | "cancelled" | "skipped"> {
+  const ui = deps.ui
+  ui?.info(formatStep(0, ONBOARDING_STEPS[0].label))
+
+  if (status.auth.authenticated) {
+    ui?.success(
+      `Gentic auth already configured (${status.auth.maskedApiKey}, ${status.auth.apiUrl}).`
+    )
+    return "skipped"
+  }
+
+  const login = await deps.runAuthLogin()
+  return login.cancelled ? "cancelled" : "completed"
+}
+
+function reportGithubStep(status: OnboardingStatus, ui: RunOnboardingDeps["ui"]): void {
+  ui?.info(formatStep(1, ONBOARDING_STEPS[1].label))
+  if (!status.tools.github.installed) {
+    ui?.warn("GitHub CLI is not installed.")
+  } else if (!status.tools.github.authenticated) {
+    ui?.warn("GitHub CLI is installed but not authenticated.")
+  } else {
+    ui?.success("GitHub CLI is installed and authenticated.")
+  }
+}
+
+function reportAgentStep(status: OnboardingStatus, ui: RunOnboardingDeps["ui"]): void {
+  ui?.info(formatStep(2, ONBOARDING_STEPS[2].label))
+  const agentTools = getAgentTools(status.tools)
+
+  if (!agentTools.some((tool) => tool.installed)) {
+    ui?.warn("No selected agent CLI is installed.")
+  } else if (
+    !agentTools.some((tool) => tool.installed && tool.authenticated)
+  ) {
+    ui?.warn("No selected agent CLI is authenticated.")
+  } else {
+    ui?.success(
+      `${formatAgentProviders(status.agentProviders)} has an authenticated CLI.`
+    )
+  }
+}
+
+function reportWorkerStep(ui: RunOnboardingDeps["ui"]): void {
+  ui?.info(formatStep(3, ONBOARDING_STEPS[3].label))
+  ui?.info("Worker setup will be connected here in a follow-up.")
+}
+
+export async function runOnboarding(
+  deps: RunOnboardingDeps = {}
+): Promise<void> {
+  const ui = deps.ui ?? {
+    intro,
+    outro,
+    info: log.info,
+    success: log.success,
+    warn: log.warn,
+  }
+  const getStatus = deps.getStatus ?? (() => getOnboardingStatus())
+  const runAuthLogin = deps.runAuthLogin ?? runAuthLoginPrompt
+
+  ui.intro("Welcome to Gentic")
+
+  let status = await getStatus()
+  const authResult = await runAuthStep(status, { runAuthLogin, ui })
+  if (authResult === "cancelled") return
+
+  if (authResult === "completed") {
+    status = await getStatus()
+  }
+
+  reportGithubStep(status, ui)
+  reportAgentStep(status, ui)
+  reportWorkerStep(ui)
+
+  ui.outro("Onboarding checks complete.")
 }
