@@ -6,6 +6,7 @@ export {
   type UserChatMessage,
 } from "./issues/shared"
 export { ensureIssueOwned, ensureIssuesOwned } from "./issues/ownership"
+export { logIssueEvent, type IssueEventType } from "./issues/events"
 export {
   getIssue,
   getIssueByCode,

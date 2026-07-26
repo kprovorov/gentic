@@ -177,11 +177,17 @@ async function handlePullRequestEvent(
     return
   }
 
-  await issuesService.updateIssueStatusByPrUrl(
+  const result = await issuesService.updateIssueStatusByPrUrl(
     supabase,
     payload.pull_request.html_url,
     status
   )
+
+  if (result && payload.pull_request.merged) {
+    await issuesService.logIssueEvent(supabase, result.id, "pr_merged", {
+      pr_url: payload.pull_request.html_url,
+    })
+  }
 }
 
 // A commit can have several check suites (GitHub Actions plus any other CI
