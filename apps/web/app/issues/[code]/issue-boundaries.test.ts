@@ -34,10 +34,9 @@ test("issue detail page and shell remain server-owned", () => {
 
 test("issue detail interactive sections are explicit client islands", () => {
   const clientIslandFiles = [
-    "issue-chat.tsx",
-    "issue-status-controls.tsx",
-    "issue-relations.tsx",
-    "attachments.tsx",
+    "issue-detail-header.tsx",
+    "issue-detail-timeline-panel.tsx",
+    "issue-detail-rail.tsx",
     "issue-slug-url-sync.tsx",
   ]
 
@@ -46,35 +45,37 @@ test("issue detail interactive sections are explicit client islands", () => {
   }
 
   const detailView = readRouteFile("issue-detail-view.tsx")
-  assert.match(detailView, /<IssueChat\n\s+issueId=\{issue\.id\}/)
-  assert.match(detailView, /<IssueStatusControls\n\s+issueId=\{issue\.id\}/)
-  assert.match(detailView, /<IssueRelations\n\s+issueId=\{issue\.id\}/)
-  assert.match(detailView, /<Attachments issueId=\{issue\.id\}/)
+  assert.match(detailView, /<IssueDetailHeader issue=\{issue\} \/>/)
+  assert.match(detailView, /<IssueDetailTimelinePanel\n\s+issueId=\{issue\.id\}/)
+  assert.match(detailView, /<IssueDetailRail\n\s+issueId=\{issue\.id\}/)
   assert.match(
     detailView,
     /<IssueSlugUrlSync key=\{issue\.title \?\? ""\} issue=\{issue\} \/>/
   )
 })
 
-test("message realtime stays inside the chat island", () => {
+test("message realtime stays inside the timeline island", () => {
   const detailView = readRouteFile("issue-detail-view.tsx")
-  const issueChat = readRouteFile("issue-chat.tsx")
+  const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
   const issueChatState = readFileSync(
     join(routeDir, "issue-chat", "use-issue-chat-state.ts"),
     "utf8"
   )
 
-  assert.match(issueChat, /issue-chat\/chat-rendering/)
+  assert.match(timelinePanel, /issue-chat\/use-issue-chat-state/)
   assert.match(issueChatState, /REALTIME_MESSAGE_EVENT/)
   assert.doesNotMatch(detailView, /"messages"/)
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })
 
-test("retry controls do not serialize the issue prompt", () => {
-  const detailView = readRouteFile("issue-detail-view.tsx")
+test("the issue prompt is only serialized into the timeline island", () => {
+  const header = readRouteFile("issue-detail-header.tsx")
+  const rail = readRouteFile("issue-detail-rail.tsx")
   const retryButton = readRouteFile("issue-retry-agent-button.tsx")
+  const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
 
-  assert.match(detailView, /<IssueRetryAgentButton issueId=\{issue\.id\} \/>/)
-  assert.doesNotMatch(detailView, /issuePrompt/)
+  assert.match(timelinePanel, /issuePrompt/)
+  assert.doesNotMatch(header, /issuePrompt/)
+  assert.doesNotMatch(rail, /issuePrompt/)
   assert.doesNotMatch(retryButton, /issuePrompt/)
 })
