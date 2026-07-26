@@ -61,32 +61,47 @@ export function IssueDetailHeader({
   const { isPending, handleDelete } = useIssueDelete(issue.id)
 
   return (
-    <header className="flex min-w-0 flex-col gap-3 border-b pb-6">
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <nav
-          aria-label="Breadcrumb"
-          className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground"
+    <header className="flex min-w-0 flex-none flex-col gap-2 px-6 py-5">
+      <div className="flex min-w-0 items-start gap-3.5">
+        <span
+          className={cn(
+            "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+            issueTypeBadgeStyles[issue.type]
+          )}
         >
-          <Link href="/issues" className="shrink-0 hover:text-foreground">
-            Issues
-          </Link>
-          {issue.code ? (
-            <>
-              <span aria-hidden className="shrink-0">
-                /
+          <TypeIcon className={cn("size-4.5", issueTypeStyles[issue.type])} />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h1
+            className={cn(
+              "text-2xl leading-tight font-semibold tracking-tight break-words",
+              !issue.title && "text-muted-foreground italic"
+            )}
+          >
+            {issue.title ?? "Generating title…"}
+          </h1>
+
+          {issue.projects ? (
+            <Link
+              href={`https://github.com/${issue.projects.repo}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <IconBrandGithub className="size-3.5 shrink-0" />
+              <span className="min-w-0 truncate font-mono">
+                {issue.projects.repo}
               </span>
-              <span className="min-w-0 truncate font-mono text-foreground">
-                {issue.code}
-              </span>
-            </>
+            </Link>
           ) : null}
-        </nav>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               aria-label="Issue actions"
               className="shrink-0"
             >
@@ -114,39 +129,6 @@ export function IssueDetailHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-xl",
-            issueTypeBadgeStyles[issue.type]
-          )}
-        >
-          <TypeIcon
-            className={cn("size-4.5", issueTypeStyles[issue.type])}
-          />
-        </span>
-        <h1
-          className={cn(
-            "max-w-full min-w-0 text-2xl leading-tight break-words md:text-4xl",
-            !issue.title && "text-muted-foreground italic"
-          )}
-        >
-          {issue.title ?? "Generating title…"}
-        </h1>
-      </div>
-
-      {issue.projects ? (
-        <Link
-          href={`https://github.com/${issue.projects.repo}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <IconBrandGithub className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">{issue.projects.repo}</span>
-        </Link>
-      ) : null}
     </header>
   )
 }

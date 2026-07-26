@@ -71,7 +71,7 @@ export function IssueDetailTimelinePanel({
   )
 
   return (
-    <div className="grid w-full min-w-0 gap-4">
+    <div className="flex min-w-0 flex-1 flex-col xl:min-h-0">
       <div
         className="sr-only"
         role="status"
@@ -81,41 +81,49 @@ export function IssueDetailTimelinePanel({
         {chat.liveMessage}
       </div>
 
-      {chat.usageLimitResetAt && chat.status === "held" ? (
-        <div className="inline-flex h-7 max-w-full items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
-          Resets {formatDateTime(chat.usageLimitResetAt)}
+      <div className="min-w-0 flex-1 px-6 pt-5 pb-2 xl:min-h-0 xl:overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[840px] min-w-0 flex-col gap-4">
+          {chat.usageLimitResetAt && chat.status === "held" ? (
+            <div className="inline-flex h-7 max-w-full items-center gap-1 self-start rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+              Resets {formatDateTime(chat.usageLimitResetAt)}
+            </div>
+          ) : null}
+
+          <IssueTimeline
+            items={timelineItems}
+            issuePrompt={issuePrompt}
+            attachments={attachments}
+            currentUserName={currentUserName}
+          />
         </div>
-      ) : null}
+      </div>
 
-      <IssueTimeline
-        items={timelineItems}
-        issuePrompt={issuePrompt}
-        attachments={attachments}
-        currentUserName={currentUserName}
-      />
+      <div className="flex-none border-t px-6 py-4">
+        <div className="mx-auto flex w-full max-w-[840px] min-w-0 flex-col gap-2.5">
+          <RealtimeConnectionNotice
+            status={chat.connectionStatus}
+            message={chat.connectionMessage}
+          />
 
-      <RealtimeConnectionNotice
-        status={chat.connectionStatus}
-        message={chat.connectionMessage}
-      />
-
-      <MessageComposer
-        draft={chat.draft}
-        draftFiles={chat.draftFiles}
-        disabled={chat.isSending}
-        invalidSlashCommand={chat.invalidSlashCommand}
-        slashCommands={chat.visibleSlashCommands}
-        selectedSlashCommandIndex={chat.boundedSlashCommandIndex}
-        onDraftChange={chat.handleDraftChange}
-        onFilesChange={chat.setDraftFiles}
-        onKeyDown={chat.handlePromptKeyDown}
-        onSelectSlashCommand={chat.selectSlashCommand}
-        onSubmit={chat.handleSubmit}
-        agentProvider={agentProvider}
-        hasMessages={chat.displayedMessages.length > 0}
-        onAgentProviderChange={onAgentProviderChange}
-        agentPickerDisabled={isAgentProviderPending}
-      />
+          <MessageComposer
+            draft={chat.draft}
+            draftFiles={chat.draftFiles}
+            disabled={chat.isSending}
+            invalidSlashCommand={chat.invalidSlashCommand}
+            slashCommands={chat.visibleSlashCommands}
+            selectedSlashCommandIndex={chat.boundedSlashCommandIndex}
+            onDraftChange={chat.handleDraftChange}
+            onFilesChange={chat.setDraftFiles}
+            onKeyDown={chat.handlePromptKeyDown}
+            onSelectSlashCommand={chat.selectSlashCommand}
+            onSubmit={chat.handleSubmit}
+            agentProvider={agentProvider}
+            hasMessages={chat.displayedMessages.length > 0}
+            onAgentProviderChange={onAgentProviderChange}
+            agentPickerDisabled={isAgentProviderPending}
+          />
+        </div>
+      </div>
     </div>
   )
 }

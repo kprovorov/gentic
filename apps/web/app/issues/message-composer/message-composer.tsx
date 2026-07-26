@@ -56,7 +56,7 @@ export function MessageComposer({
   return (
     <form
       onSubmit={onSubmit}
-      className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end"
+      className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-end"
     >
       <div className="relative min-w-0 flex-1">
         {slashCommands.length > 0 ? (
@@ -66,6 +66,17 @@ export function MessageComposer({
             onSelect={(command) => onSelectSlashCommand?.(command)}
           />
         ) : null}
+        <span className="pointer-events-none absolute top-2.5 right-3.5 z-10 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-sm:hidden">
+          <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
+            /
+          </kbd>
+          for commands
+          <span aria-hidden="true">·</span>
+          <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
+            ⌘↵
+          </kbd>
+          to send
+        </span>
         <AttachmentPromptField
           value={draft}
           onChange={onDraftChange}
@@ -76,7 +87,7 @@ export function MessageComposer({
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0"
-          textareaClassName="min-h-18 resize-none"
+          textareaClassName="min-h-16 resize-none"
           footerStart={
             <AgentProviderPicker
               agentProvider={agentProvider}
@@ -84,19 +95,6 @@ export function MessageComposer({
               disabled={disabled || agentPickerDisabled}
               onAgentProviderChange={onAgentProviderChange}
             />
-          }
-          footerEnd={
-            <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground max-sm:hidden">
-              <kbd className="rounded border border-border/60 bg-background px-1 font-mono">
-                /
-              </kbd>
-              for commands
-              <span aria-hidden="true">·</span>
-              <kbd className="rounded border border-border/60 bg-background px-1 font-mono">
-                ⌘↵
-              </kbd>
-              to send
-            </span>
           }
         />
       </div>

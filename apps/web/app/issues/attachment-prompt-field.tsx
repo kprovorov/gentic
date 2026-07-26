@@ -120,7 +120,7 @@ export function AttachmentPromptField({
   return (
     <div
       className={cn(
-        "relative rounded-3xl border border-transparent bg-input/50 transition-[color,box-shadow,background-color] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30",
+        "relative rounded-[22px] border border-transparent bg-input/50 transition-[color,box-shadow,background-color] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30",
         isDragging && "border-ring ring-3 ring-ring/30",
         className
       )}
@@ -154,12 +154,12 @@ export function AttachmentPromptField({
         required={required}
         disabled={disabled}
         className={cn(
-          "w-full resize-y bg-transparent px-4 py-3 text-base outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
+          "w-full resize-y bg-transparent px-4 pt-3 pb-1 text-base outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
           textareaClassName
         )}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3">
         <input
           ref={fileInputRef}
           type="file"
