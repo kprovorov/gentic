@@ -76,7 +76,7 @@ importers:
         version: 0.6.0(@clerk/express@2.1.35(express@5.2.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@clerk/nextjs@7.5.18(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(express@5.2.1)(hono@4.12.27)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(redis@4.7.1)(zod@4.4.3)
       '@clerk/nextjs':
         specifier: ^7.5.18
-        version: 7.5.18(next@16.2.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.18(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gentic/services':
         specifier: workspace:*
         version: link:../../packages/services
@@ -261,7 +261,7 @@ importers:
     dependencies:
       '@clerk/nextjs':
         specifier: ^7.5.18
-        version: 7.5.18(next@16.2.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.18(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@supabase/supabase-js':
         specifier: ^2.110.0
         version: 2.110.0
@@ -363,9 +363,15 @@ importers:
       '@gentic/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
       eslint:
         specifier: ^9
         version: 9.39.4(jiti@2.7.0)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -6269,7 +6275,7 @@ snapshots:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
     optionalDependencies:
       '@clerk/express': 2.1.35(express@5.2.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@clerk/nextjs': 7.5.18(next@16.2.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@clerk/nextjs': 7.5.18(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       express: 5.2.1
       hono: 4.12.27
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -6279,7 +6285,7 @@ snapshots:
       - supports-color
       - zod
 
-  '@clerk/nextjs@7.5.18(next@16.2.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@clerk/nextjs@7.5.18(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@clerk/backend': 3.11.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@clerk/react': 6.12.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

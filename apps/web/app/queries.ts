@@ -11,7 +11,10 @@ import {
   type IssueStatus,
   type IssueType,
 } from "@gentic/validators/issues"
-import { chatMessageSchema } from "@gentic/validators/realtime"
+import {
+  chatMessageSchema,
+  issueEventSchema,
+} from "@gentic/validators/realtime"
 import { z } from "zod"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
@@ -130,6 +133,8 @@ export type IssueDetail = {
 
 export type IssuePullRequest = issuesService.IssuePullRequest
 
+export type IssueEvent = z.infer<typeof issueEventSchema>
+
 export type IssueEdit = Pick<
   IssueDetail,
   | "id"
@@ -165,6 +170,7 @@ export type IssueDetailData = {
   pullRequests: IssuePullRequest[]
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
+  events: IssueEvent[]
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
@@ -455,6 +461,7 @@ async function getIssueDetailDataForIssue(
   const [
     { data: messages, error: messagesError },
     { data: attachmentRows, error: attachmentsError },
+    { data: eventRows, error: eventsError },
     pullRequests,
     relations,
     relationCandidates,
@@ -473,6 +480,11 @@ async function getIssueDetailDataForIssue(
       )
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("issue_events")
+      .select("id,issue_id,type,payload,created_at")
+      .eq("issue_id", id)
+      .order("created_at", { ascending: true }),
     issuesService.listIssuePullRequests(supabase, userId, id),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
@@ -484,6 +496,11 @@ async function getIssueDetailDataForIssue(
   if (attachmentsError) {
     throw new Error(attachmentsError.message)
   }
+  if (eventsError) {
+    throw new Error(eventsError.message)
+  }
+
+  const events = z.array(issueEventSchema).parse(eventRows ?? [])
 
   const attachmentRowsByMessageId = groupCompletedAttachmentRowsByMessageId(
     (attachmentRows ?? []) satisfies AttachmentRow[]
@@ -518,6 +535,7 @@ async function getIssueDetailDataForIssue(
     pullRequests,
     relations,
     relationCandidates,
+    events,
   }
 }
 
