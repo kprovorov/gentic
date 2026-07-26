@@ -28,20 +28,17 @@ const missingTool = {
   version: null,
 }
 
-test("getOnboardingStatus reports ready when credentials, gh, and one agent are authenticated", async () => {
+test("getOnboardingStatus reports ready when credentials, gh, and all agents are authenticated", async () => {
   const status = await getOnboardingStatus({
     configInput: {
       GENTIC_API_KEY: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
     },
-    getTools: async (agentProviders): Promise<ToolStatuses> => {
-      assert.deepEqual(agentProviders, ["claude_code", "codex"])
-      return {
-        github: readyTool,
-        claude: missingTool,
-        codex: readyTool,
-      }
-    },
+    getTools: async (): Promise<ToolStatuses> => ({
+      github: readyTool,
+      claude: readyTool,
+      codex: readyTool,
+    }),
   })
 
   assert.equal(status.ready, true)
@@ -53,15 +50,12 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
   const status = await getOnboardingStatus({
     configInput: {
       GENTIC_API_URL: "https://gentic.example/api/v1",
-      AGENT_PROVIDERS: ["codex"],
     },
-    getTools: async (agentProviders): Promise<ToolStatuses> => {
-      assert.deepEqual(agentProviders, ["codex"])
-      return {
-        github: { ...readyTool, authenticated: false },
-        codex: { ...readyTool, authenticated: false },
-      }
-    },
+    getTools: async (): Promise<ToolStatuses> => ({
+      github: { ...readyTool, authenticated: false },
+      claude: readyTool,
+      codex: { ...readyTool, authenticated: false },
+    }),
   })
 
   assert.equal(status.ready, false)
@@ -78,12 +72,11 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
   )
 })
 
-test("getOnboardingStatus reports agent install only when no selected agent CLI exists", async () => {
+test("getOnboardingStatus reports agent install when any agent CLI is missing", async () => {
   const status = await getOnboardingStatus({
     configInput: {
       GENTIC_API_KEY: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
-      AGENT_PROVIDERS: ["claude_code", "codex"],
     },
     getTools: async (): Promise<ToolStatuses> => ({
       github: readyTool,
@@ -106,9 +99,10 @@ function makeStatus(authenticated: boolean): OnboardingStatus {
         ? []
         : ["GENTIC_API_KEY", "GENTIC_API_URL"],
     },
-    agentProviders: ["codex"],
+    agentProviders: ["claude_code", "codex"],
     tools: {
       github: readyTool,
+      claude: readyTool,
       codex: readyTool,
     },
     unmet: authenticated ? [] : ["gentic-auth"],
@@ -141,8 +135,6 @@ function createUiRecorder() {
 
 function defaultRunOnboardingDeps(status: OnboardingStatus) {
   return {
-    select: async () => "codex",
-    writeConfig: () => {},
     setupAgentCLIs: async () => true,
     ensureAgentCli: async () => status,
   }
@@ -235,7 +227,11 @@ test("runOnboarding prints ready summary and starts worker when confirmed", asyn
   assert.equal(startCalls, 1)
   assert.ok(messages.includes("info:Gentic auth: configured (tes...-key, https://gentic.example/api/v1)"))
   assert.ok(messages.includes("info:GitHub CLI: installed, authenticated"))
-  assert.ok(messages.includes("info:Agent CLI: Codex installed, authenticated"))
+  assert.ok(
+    messages.includes(
+      "info:Agent CLI: Claude installed, authenticated, Codex installed, authenticated"
+    )
+  )
 })
 
 test("runOnboarding prints gentic start instructions when worker enable is declined", async () => {
@@ -273,7 +269,6 @@ test("runOnboarding exits immediately when required gh setup declines", async ()
     unmet: ["github-cli-installed"],
     ready: false,
   }
-  let selectCalls = 0
   let workerCalls = 0
 
   await assert.rejects(
@@ -285,10 +280,6 @@ test("runOnboarding exits immediately when required gh setup declines", async ()
       ensureGithubCli: async () => {
         throw new Error("exited")
       },
-      select: async () => {
-        selectCalls += 1
-        return "codex"
-      },
       startWorker: async () => {
         workerCalls += 1
         return true
@@ -298,7 +289,6 @@ test("runOnboarding exits immediately when required gh setup declines", async ()
     /exited/
   )
 
-  assert.equal(selectCalls, 0)
   assert.equal(workerCalls, 0)
   assert.ok(
     !messages.includes(`info:Step 3/${ONBOARDING_STEPS.length}: Agent CLI`)
@@ -308,12 +298,13 @@ test("runOnboarding exits immediately when required gh setup declines", async ()
   )
 })
 
-test("runOnboarding exits immediately when no selected agent is authenticated", async () => {
+test("runOnboarding exits immediately when an agent is not authenticated", async () => {
   const { messages, ui } = createUiRecorder()
   const unauthenticatedAgentStatus: OnboardingStatus = {
     ...makeStatus(true),
     tools: {
       github: readyTool,
+      claude: readyTool,
       codex: { ...readyTool, authenticated: false },
     },
     unmet: ["agent-cli-authenticated"],
@@ -327,8 +318,6 @@ test("runOnboarding exits immediately when no selected agent is authenticated", 
       runAuthLogin: async () => {
         throw new Error("auth prompt should not be called")
       },
-      select: async () => "codex",
-      writeConfig: () => {},
       setupAgentCLIs: async () => true,
       ensureAgentCli: async () => {
         throw new Error("exited")
@@ -351,7 +340,7 @@ test("runOnboarding exits immediately when no selected agent is authenticated", 
   )
 })
 
-test("runOnboarding errors when both selected agent setups are declined", async () => {
+test("runOnboarding errors when agent setups are declined", async () => {
   const { messages, ui } = createUiRecorder()
   const noAgentStatus: OnboardingStatus = {
     ...makeStatus(true),
@@ -374,11 +363,9 @@ test("runOnboarding errors when both selected agent setups are declined", async 
       runAuthLogin: async () => {
         throw new Error("auth prompt should not be called")
       },
-      select: async () => "claude_code,codex",
-      writeConfig: () => {},
-      setupAgentCLIs: async (agentProviders) => {
+      setupAgentCLIs: async (tools) => {
         setupCalls += 1
-        assert.deepEqual(agentProviders, ["claude_code", "codex"])
+        assert.deepEqual(tools, noAgentStatus.tools)
         return true
       },
       ensureAgentCli: async () =>
@@ -401,14 +388,14 @@ test("runOnboarding errors when both selected agent setups are declined", async 
   assert.equal(exitCode, 1)
   assert.equal(
     cancelMessage,
-    "at least one agent (claude or codex) must be authenticated to run gentic"
+    "both Claude Code and Codex must be installed and authenticated to run gentic"
   )
   assert.ok(
     !messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
   )
 })
 
-test("runOnboarding passes when one selected agent setup is accepted", async () => {
+test("runOnboarding passes when all agent setups are accepted", async () => {
   const { messages, ui } = createUiRecorder()
   const initialStatus: OnboardingStatus = {
     ...makeStatus(true),
@@ -421,11 +408,11 @@ test("runOnboarding passes when one selected agent setup is accepted", async () 
     unmet: ["agent-cli-installed"],
     ready: false,
   }
-  const oneAgentReadyStatus: OnboardingStatus = {
+  const allAgentsReadyStatus: OnboardingStatus = {
     ...initialStatus,
     tools: {
       github: readyTool,
-      claude: missingTool,
+      claude: readyTool,
       codex: readyTool,
     },
     unmet: [],
@@ -438,13 +425,11 @@ test("runOnboarding passes when one selected agent setup is accepted", async () 
     runAuthLogin: async () => {
       throw new Error("auth prompt should not be called")
     },
-    select: async () => "claude_code,codex",
-    writeConfig: () => {},
-    setupAgentCLIs: async (agentProviders) => {
-      assert.deepEqual(agentProviders, ["claude_code", "codex"])
+    setupAgentCLIs: async (tools) => {
+      assert.deepEqual(tools, initialStatus.tools)
       return true
     },
-    ensureAgentCli: async () => oneAgentReadyStatus,
+    ensureAgentCli: async () => allAgentsReadyStatus,
     confirm: async () => true,
     startWorker: async () => {
       workerCalls += 1
@@ -631,7 +616,7 @@ test("ensureAgentCliForOnboarding returns live status when one agent is authenti
   assert.equal(status.tools.codex?.authenticated, true)
 })
 
-test("ensureAgentCliForOnboarding exits immediately when no agent is authenticated", async () => {
+test("ensureAgentCliForOnboarding exits immediately when any agent is not authenticated", async () => {
   let exitCode: number | undefined
   let message: string | undefined
 
@@ -666,7 +651,7 @@ test("ensureAgentCliForOnboarding exits immediately when no agent is authenticat
 
   assert.equal(
     message,
-    "at least one agent (claude or codex) must be authenticated to run gentic"
+    "both Claude Code and Codex must be installed and authenticated to run gentic"
   )
   assert.equal(exitCode, 1)
 })

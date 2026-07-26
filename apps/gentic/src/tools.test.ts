@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { formatAgentProviders, parseAgentProviders } from "./agents.js"
+import { formatAgentProviders } from "./agents.js"
 import { checkGithub, formatToolStatus, getToolStatuses } from "./tools.js"
 
 test("formatToolStatus reports a missing CLI", () => {
@@ -31,17 +31,6 @@ test("formatToolStatus reports an installed and authenticated CLI", () => {
     }),
     "installed, authenticated"
   )
-})
-
-test("parseAgentProviders defaults to Claude Code", () => {
-  assert.deepEqual(parseAgentProviders(undefined), ["claude_code"])
-})
-
-test("parseAgentProviders accepts the combined single-select value", () => {
-  assert.deepEqual(parseAgentProviders("claude_code,codex"), [
-    "claude_code",
-    "codex",
-  ])
 })
 
 test("formatAgentProviders labels the selected providers", () => {
@@ -96,34 +85,10 @@ test("checkGithub reports gh installed and authenticated", async () => {
   })
 })
 
-test("getToolStatuses checks only selected agent CLIs", async () => {
+test("getToolStatuses checks all agent CLIs", async () => {
   const commands: string[] = []
 
-  const statuses = await getToolStatuses(["codex"], async (command, args) => {
-    commands.push([command, ...args].join(" "))
-    if (command === "gh" && args[0] === "--version") {
-      return { code: 0, stdout: "gh version 2.74.2\n", missing: false }
-    }
-    if (command === "codex" && args[0] === "--version") {
-      return { code: 0, stdout: "codex-cli 1.2.3\n", missing: false }
-    }
-    return { code: 0, stdout: "", missing: false }
-  })
-
-  assert.deepEqual(commands, [
-    "gh --version",
-    "codex --version",
-    "gh auth status",
-    "codex login status",
-  ])
-  assert.equal(statuses.claude, undefined)
-  assert.equal(statuses.codex?.authenticated, true)
-})
-
-test("getToolStatuses checks both agent CLIs when both are selected", async () => {
-  const commands: string[] = []
-
-  await getToolStatuses(["claude_code", "codex"], async (command, args) => {
+  await getToolStatuses(async (command, args) => {
     commands.push([command, ...args].join(" "))
     if (command === "gh" && args[0] === "--version") {
       return { code: 0, stdout: "gh version 2.74.2\n", missing: false }

@@ -12,9 +12,7 @@ import { realtimeRunStateStatusSchema } from "./realtime.js"
 
 export type { RealtimeRunStateStatus } from "./realtime.js"
 
-export const claimIssueInputSchema = z.object({
-  agent_providers: z.array(agentProviderSchema).min(1).default(["claude_code"]),
-})
+export const claimIssueInputSchema = z.object({}).passthrough()
 
 export type ClaimIssueInput = z.infer<typeof claimIssueInputSchema>
 

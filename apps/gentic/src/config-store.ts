@@ -9,12 +9,9 @@ import { dirname, join } from "node:path"
 
 import envPaths from "env-paths"
 
-import type { AgentProvider } from "./agents.js"
-
 export interface ConfigFile {
   GENTIC_API_KEY?: string
   GENTIC_API_URL?: string
-  AGENT_PROVIDERS?: AgentProvider[] | string
   GIT_REMOTE_BASE?: string
   WORKDIR?: string
   POLL_INTERVAL_MS?: number
@@ -40,6 +37,7 @@ export function readConfigFile(): ConfigFile {
 
 export function writeConfigFile(patch: Partial<ConfigFile>): void {
   const merged = { ...readConfigFile(), ...patch }
+  delete (merged as Record<string, unknown>).AGENT_PROVIDERS
   const filePath = configFilePath()
   const tmpPath = `${filePath}.tmp`
 

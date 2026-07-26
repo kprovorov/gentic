@@ -1,16 +1,11 @@
 import type { AgentProvider } from "./agents.js"
-import {
-  DEFAULT_AGENT_PROVIDERS,
-  formatAgentProviders,
-  parseAgentProviders,
-} from "./agents.js"
-import { setupSelectedAgentCLIs } from "./agent-cli-setup.js"
+import { agentProviders, formatAgentProviders } from "./agents.js"
+import { setupAgentCLIs } from "./agent-cli-setup.js"
 import type { AuthLoginPromptResult } from "./auth-login.js"
 import { runAuthLoginPrompt } from "./auth-login.js"
 import { startGenticService } from "./commands/service.js"
 import { getConfigInput } from "./config.js"
 import type { ConfigFile } from "./config-store.js"
-import { writeConfigFile } from "./config-store.js"
 import {
   detectHomebrew,
   detectLinuxPackageManager,
@@ -24,7 +19,7 @@ import {
   type ToolStatus,
   type ToolStatuses,
 } from "./tools.js"
-import { cancel, confirm, intro, isCancel, log, outro, select } from "./ui.js"
+import { cancel, confirm, intro, isCancel, log, outro } from "./ui.js"
 
 export type OnboardingRequirement =
   | "gentic-auth"
@@ -50,7 +45,7 @@ export interface OnboardingStatus {
 
 interface OnboardingStatusDeps {
   configInput?: Partial<ConfigFile>
-  getTools?: (agentProviders: AgentProvider[]) => Promise<ToolStatuses>
+  getTools?: () => Promise<ToolStatuses>
 }
 
 type OnboardingStepId = "auth" | "gh" | "agent" | "worker"
@@ -64,11 +59,9 @@ interface RunOnboardingDeps {
   getStatus?: () => Promise<OnboardingStatus>
   runAuthLogin?: () => Promise<AuthLoginPromptResult>
   confirm?: typeof confirm
-  select?: (options: AgentSelectOptions) => Promise<string | symbol>
   cancel?: typeof cancel
-  writeConfig?: typeof writeConfigFile
   ensureGithubCli?: typeof ensureGithubCliForOnboarding
-  setupAgentCLIs?: typeof setupSelectedAgentCLIs
+  setupAgentCLIs?: typeof setupAgentCLIs
   ensureAgentCli?: () => Promise<OnboardingStatus>
   startWorker?: typeof startGenticService
   ui?: {
@@ -78,12 +71,6 @@ interface RunOnboardingDeps {
     success: typeof log.success
     warn: typeof log.warn
   }
-}
-
-interface AgentSelectOptions {
-  message: string
-  initialValue: string
-  options: { value: string; label: string }[]
 }
 
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
@@ -116,31 +103,14 @@ interface AgentCliOnboardingDeps {
   exit?: (code: number) => never
 }
 
-const ALL_AGENT_PROVIDERS: AgentProvider[] = ["claude_code", "codex"]
 const GITHUB_REQUIRED_MESSAGE =
   "gh is required to run gentic. Install and authenticate GitHub CLI, then run onboarding again."
 const AGENT_REQUIRED_MESSAGE =
-  "at least one agent (claude or codex) must be authenticated to run gentic"
+  "both Claude Code and Codex must be installed and authenticated to run gentic"
 
 function maskApiKey(apiKey: string): string {
   const suffix = apiKey.slice(-4)
   return `${apiKey.slice(0, 3)}...${suffix}`
-}
-
-function configuredAgentProviders(
-  config: Partial<ConfigFile>
-): AgentProvider[] {
-  const value = config.AGENT_PROVIDERS
-  const raw =
-    typeof value === "string"
-      ? value.split(",").map((item) => item.trim())
-      : Array.isArray(value)
-        ? value
-      : ALL_AGENT_PROVIDERS
-  const selected = raw.filter((item): item is AgentProvider =>
-    ALL_AGENT_PROVIDERS.includes(item as AgentProvider)
-  )
-  return selected.length > 0 ? [...new Set(selected)] : DEFAULT_AGENT_PROVIDERS
 }
 
 function authStatus(config: Partial<ConfigFile>): OnboardingAuthStatus {
@@ -168,9 +138,10 @@ function authStatus(config: Partial<ConfigFile>): OnboardingAuthStatus {
 }
 
 function getAgentTools(tools: ToolStatuses): ToolStatus[] {
-  return [tools.claude, tools.codex].filter(
-    (tool): tool is ToolStatus => tool !== undefined
-  )
+  return [
+    tools.claude ?? { installed: false, authenticated: false, version: null },
+    tools.codex ?? { installed: false, authenticated: false, version: null },
+  ]
 }
 
 function unmetRequirements(
@@ -184,9 +155,9 @@ function unmetRequirements(
   else if (!tools.github.authenticated) unmet.push("github-cli-authenticated")
 
   const agentTools = getAgentTools(tools)
-  if (!agentTools.some((tool) => tool.installed)) {
+  if (agentTools.some((tool) => !tool.installed)) {
     unmet.push("agent-cli-installed")
-  } else if (!agentTools.some((tool) => tool.installed && tool.authenticated)) {
+  } else if (agentTools.some((tool) => !tool.authenticated)) {
     unmet.push("agent-cli-authenticated")
   }
 
@@ -197,15 +168,14 @@ export async function getOnboardingStatus(
   deps: OnboardingStatusDeps = {}
 ): Promise<OnboardingStatus> {
   const config = deps.configInput ?? getConfigInput()
-  const agentProviders = configuredAgentProviders(config)
-  const tools = await (deps.getTools ?? getToolStatuses)(agentProviders)
+  const tools = await (deps.getTools ?? getToolStatuses)()
   const auth = authStatus(config)
   const unmet = unmetRequirements(auth, tools)
 
   return {
     ready: unmet.length === 0,
     auth,
-    agentProviders,
+    agentProviders: [...agentProviders],
     tools,
     unmet,
   }
@@ -238,7 +208,7 @@ export function formatOnboardingUnmet(status: OnboardingStatus): string[] {
       .map(([name, tool]) => `${name} ${formatToolStatus(tool as ToolStatus)}`)
       .join(", ")
     lines.push(
-      `${formatAgentProviders(status.agentProviders)}: at least one selected agent CLI must be installed and authenticated (${agents})`
+      `${formatAgentProviders(status.agentProviders)}: all agent CLIs must be installed and authenticated (${agents})`
     )
   }
 
@@ -282,33 +252,13 @@ async function runGithubStep(
   await (deps.ensureGithubCli ?? ensureGithubCliForOnboarding)()
 }
 
-async function runAgentSelectStep(
+async function runAgentStep(
   status: OnboardingStatus,
-  deps: Pick<RunOnboardingDeps, "cancel" | "select" | "ui" | "writeConfig">
-): Promise<AgentProvider[] | "cancelled"> {
+  deps: Pick<RunOnboardingDeps, "setupAgentCLIs" | "ui">
+): Promise<boolean> {
   const ui = deps.ui
   ui?.info(formatStep(2, ONBOARDING_STEPS[2].label))
-
-  const selected = await (deps.select ?? select)({
-    message: "Which coding agent(s) will this worker run?",
-    initialValue: status.agentProviders.join(","),
-    options: [
-      { value: "claude_code", label: "Claude Code" },
-      { value: "codex", label: "Codex" },
-      { value: "claude_code,codex", label: "Claude Code and Codex" },
-    ],
-  })
-  if (isCancel(selected)) {
-    ;(deps.cancel ?? cancel)("Cancelled.")
-    return "cancelled"
-  }
-
-  const selectedAgentProviders = parseAgentProviders(selected)
-  ;(deps.writeConfig ?? writeConfigFile)({
-    AGENT_PROVIDERS: selectedAgentProviders,
-  })
-
-  return selectedAgentProviders
+  return (deps.setupAgentCLIs ?? setupAgentCLIs)(status.tools)
 }
 
 function reportAgentStep(
@@ -317,12 +267,10 @@ function reportAgentStep(
 ): void {
   const agentTools = getAgentTools(status.tools)
 
-  if (!agentTools.some((tool) => tool.installed)) {
-    ui?.warn("No selected agent CLI is installed.")
-  } else if (
-    !agentTools.some((tool) => tool.installed && tool.authenticated)
-  ) {
-    ui?.warn("No selected agent CLI is authenticated.")
+  if (agentTools.some((tool) => !tool.installed)) {
+    ui?.warn("At least one agent CLI is not installed.")
+  } else if (agentTools.some((tool) => !tool.authenticated)) {
+    ui?.warn("At least one agent CLI is not authenticated.")
   } else {
     ui?.success(
       `${formatAgentProviders(status.agentProviders)} has an authenticated CLI.`
@@ -345,7 +293,7 @@ function formatOnboardingSummary(status: OnboardingStatus): string[] {
   return [
     `Gentic auth: ${auth}`,
     `GitHub CLI: ${formatToolStatus(status.tools.github)}`,
-    `Agent CLI: ${agents || "no selected agent CLI"}`,
+    `Agent CLI: ${agents || "no agent CLI"}`,
   ]
 }
 
@@ -402,18 +350,10 @@ export async function runOnboarding(
   })
   status = await getStatus()
 
-  const selectedAgentProviders = await runAgentSelectStep(status, {
-    cancel: deps.cancel,
-    select: deps.select,
+  const completedAgentSetup = await runAgentStep(status, {
+    setupAgentCLIs: deps.setupAgentCLIs,
     ui,
-    writeConfig: deps.writeConfig,
   })
-  if (selectedAgentProviders === "cancelled") return
-
-  status = await getStatus()
-  const completedAgentSetup = await (
-    deps.setupAgentCLIs ?? setupSelectedAgentCLIs
-  )(selectedAgentProviders, status.tools)
   if (!completedAgentSetup) return
 
   status = await (deps.ensureAgentCli ??

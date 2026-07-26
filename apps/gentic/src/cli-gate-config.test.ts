@@ -9,7 +9,6 @@ import type { OnboardingStatus } from "./onboarding.js"
 const CONFIG_KEYS = [
   "GENTIC_API_KEY",
   "GENTIC_API_URL",
-  "AGENT_PROVIDERS",
 ] as const
 
 const configDir = mkdtempSync(join(tmpdir(), "gentic-gate-config-test-"))
@@ -48,6 +47,7 @@ async function gateStatus(): Promise<OnboardingStatus> {
     getTools: async () => ({
       github: { installed: true, authenticated: true, version: "2.74.2" },
       claude: { installed: true, authenticated: true, version: "1.0.0" },
+      codex: { installed: true, authenticated: true, version: "1.2.3" },
     }),
   })
 }

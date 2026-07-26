@@ -1,36 +1,15 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import {
-  setupSelectedAgentCLIs,
-  type AgentCliSetupDeps,
-} from "./agent-cli-setup.js"
+import { setupAgentCLIs, type AgentCliSetupDeps } from "./agent-cli-setup.js"
 
 const ready = { installed: true, authenticated: true, version: "1.0.0" }
 const missing = { installed: false, authenticated: false, version: null }
 
-test("skips codex setup when codex is not selected", async () => {
-  const deps = fakeDeps()
-
-  const completed = await setupSelectedAgentCLIs(
-    ["claude_code"],
-    {
-      github: ready,
-      claude: ready,
-    },
-    deps
-  )
-
-  assert.equal(completed, true)
-  assert.deepEqual(deps.prompts, [])
-  assert.deepEqual(deps.commands, [])
-})
-
 test("skips claude setup when claude is installed and authenticated", async () => {
   const deps = fakeDeps()
 
-  const completed = await setupSelectedAgentCLIs(
-    ["claude_code"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       claude: ready,
@@ -46,8 +25,7 @@ test("skips claude setup when claude is installed and authenticated", async () =
 test("installs claude with the official installer then runs auth login", async () => {
   const deps = fakeDeps()
 
-  const completed = await setupSelectedAgentCLIs(
-    ["claude_code"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       claude: missing,
@@ -72,8 +50,7 @@ test("installs claude with the official installer then runs auth login", async (
 test("runs claude auth login when installed but not authenticated", async () => {
   const deps = fakeDeps()
 
-  await setupSelectedAgentCLIs(
-    ["claude_code"],
+  await setupAgentCLIs(
     {
       github: ready,
       claude: { installed: true, authenticated: false, version: "1.0.0" },
@@ -92,8 +69,7 @@ test("runs claude auth login when installed but not authenticated", async () => 
 test("declining claude setup skips that agent without cancelling onboarding", async () => {
   const deps = fakeDeps({ answers: [false] })
 
-  const completed = await setupSelectedAgentCLIs(
-    ["claude_code", "codex"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       claude: missing,
@@ -110,8 +86,7 @@ test("declining claude setup skips that agent without cancelling onboarding", as
 test("skips codex setup when codex is installed and authenticated", async () => {
   const deps = fakeDeps()
 
-  const completed = await setupSelectedAgentCLIs(
-    ["codex"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       codex: ready,
@@ -127,8 +102,7 @@ test("skips codex setup when codex is installed and authenticated", async () => 
 test("installs codex with Homebrew on macOS then runs login", async () => {
   const deps = fakeDeps({ platform: "darwin" })
 
-  const completed = await setupSelectedAgentCLIs(
-    ["codex"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       codex: missing,
@@ -150,8 +124,7 @@ test("installs codex with Homebrew on macOS then runs login", async () => {
 test("installs codex with npm on Linux then runs login", async () => {
   const deps = fakeDeps({ platform: "linux" })
 
-  await setupSelectedAgentCLIs(
-    ["codex"],
+  await setupAgentCLIs(
     {
       github: ready,
       codex: missing,
@@ -168,8 +141,7 @@ test("installs codex with npm on Linux then runs login", async () => {
 test("runs codex login when installed but not authenticated", async () => {
   const deps = fakeDeps()
 
-  await setupSelectedAgentCLIs(
-    ["codex"],
+  await setupAgentCLIs(
     {
       github: ready,
       codex: { installed: true, authenticated: false, version: "1.0.0" },
@@ -187,8 +159,7 @@ test("returns false when the install prompt is cancelled", async () => {
   const cancelSymbol = Symbol("cancel")
   const deps = fakeDeps({ answers: [cancelSymbol], cancelSymbol })
 
-  const completed = await setupSelectedAgentCLIs(
-    ["codex"],
+  const completed = await setupAgentCLIs(
     {
       github: ready,
       codex: missing,
