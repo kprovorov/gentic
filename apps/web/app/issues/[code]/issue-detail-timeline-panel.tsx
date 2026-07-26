@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useUser } from "@clerk/nextjs"
 
 import type { IssuePullRequest } from "@/app/queries"
 import { cn } from "@gentic/ui/utils"
@@ -55,6 +56,9 @@ export function IssueDetailTimelinePanel({
   })
   const { onAgentProviderChange, isPending: isAgentProviderPending } =
     useIssueAgentProvider({ issueId })
+  const { user } = useUser()
+  const currentUserName =
+    user?.fullName ?? user?.primaryEmailAddress?.emailAddress
 
   const timelineItems = useMemo(
     () =>
@@ -87,6 +91,7 @@ export function IssueDetailTimelinePanel({
         items={timelineItems}
         issuePrompt={issuePrompt}
         attachments={attachments}
+        currentUserName={currentUserName}
       />
 
       <RealtimeConnectionNotice

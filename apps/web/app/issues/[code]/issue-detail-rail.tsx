@@ -34,7 +34,6 @@ import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import type { IssuePullRequest } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@gentic/ui/card"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -178,7 +177,7 @@ function IssueDetailPullRequests({
               href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
-              className="flex min-w-0 items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2 hover:bg-muted/70"
+              className="flex min-w-0 items-center gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border hover:bg-muted/40"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 {isMerged ? (
@@ -231,7 +230,7 @@ function IssueDetailRelationRow({
   }
 
   return (
-    <li className="flex items-center justify-between gap-3 rounded-2xl bg-muted/40 px-3 py-2">
+    <li className="flex items-center justify-between gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border">
       <Link
         href={relatedIssueHref}
         className="min-w-0 flex-1 truncate text-sm font-medium hover:text-primary"
@@ -421,7 +420,7 @@ function IssueDetailAttachmentRow({
   }
 
   return (
-    <li className="flex min-w-0 items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2">
+    <li className="flex min-w-0 items-center gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border">
       {attachment.thumbnailUrl ? (
         // Supabase signs this URL with Image Transformation options.
         // eslint-disable-next-line @next/next/no-img-element
@@ -532,6 +531,23 @@ function IssueDetailAttachments({
   )
 }
 
+function RailSection({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-b border-border/70 p-4 last:border-b-0">
+      <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+      </p>
+      {children}
+    </div>
+  )
+}
+
 export function IssueDetailRail({
   issueId,
   status,
@@ -548,52 +564,29 @@ export function IssueDetailRail({
   attachments: Attachment[]
 }) {
   return (
-    <aside className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-1">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <IssueDetailStatus issueId={issueId} status={status} />
-        </CardContent>
-      </Card>
+    <aside className="min-w-0 overflow-hidden rounded-3xl bg-muted/25 ring-1 ring-border/70">
+      <RailSection title="Status">
+        <IssueDetailStatus issueId={issueId} status={status} />
+      </RailSection>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Pull requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <IssueDetailPullRequests
-            pullRequests={pullRequests}
-            issueStatus={status}
-          />
-        </CardContent>
-      </Card>
+      <RailSection title="Pull requests">
+        <IssueDetailPullRequests
+          pullRequests={pullRequests}
+          issueStatus={status}
+        />
+      </RailSection>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Relations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <IssueDetailRelations
-            issueId={issueId}
-            relations={relations}
-            candidates={relationCandidates}
-          />
-        </CardContent>
-      </Card>
+      <RailSection title="Relations">
+        <IssueDetailRelations
+          issueId={issueId}
+          relations={relations}
+          candidates={relationCandidates}
+        />
+      </RailSection>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Attachments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <IssueDetailAttachments
-            issueId={issueId}
-            attachments={attachments}
-          />
-        </CardContent>
-      </Card>
+      <RailSection title="Attachments">
+        <IssueDetailAttachments issueId={issueId} attachments={attachments} />
+      </RailSection>
     </aside>
   )
 }
