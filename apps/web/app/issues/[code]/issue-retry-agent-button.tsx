@@ -11,21 +11,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import type { AgentProvider } from "@gentic/validators/issues"
 
 import { resetIssueAgent } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
 
 import {
+  agentProviderLabels,
+  agentProviderOptions,
+  confirmRetryWithAgent,
+} from "../agent-provider-options"
+import {
   ISSUE_RETRY_RESET_EVENT,
   type IssueRetryResetEventDetail,
 } from "./issue-retry-events"
-
-type AgentProvider = "claude_code" | "codex"
-
-const agentOptions: Array<{ value: AgentProvider; label: string }> = [
-  { value: "claude_code", label: "Claude Code" },
-  { value: "codex", label: "Codex" },
-]
 
 export function IssueRetryAgentButton({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
@@ -57,15 +56,7 @@ export function IssueRetryAgentButton({ issueId }: { issueId: string }) {
       return
     }
 
-    const agentLabel =
-      agentOptions.find((option) => option.value === agentProvider)?.label ??
-      "the selected agent"
-
-    if (
-      !window.confirm(
-        `Retry with ${agentLabel}? This deletes the conversation and starts a fresh run.`
-      )
-    ) {
+    if (!confirmRetryWithAgent(agentProviderLabels[agentProvider])) {
       return
     }
 
@@ -100,7 +91,7 @@ export function IssueRetryAgentButton({ issueId }: { issueId: string }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
-          {agentOptions
+          {agentProviderOptions
             .filter((option) => option.value !== "claude_code")
             .map((option) => (
               <DropdownMenuItem key={option.value} asChild>
