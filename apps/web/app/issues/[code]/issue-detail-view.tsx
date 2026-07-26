@@ -1,32 +1,16 @@
 import Link from "next/link"
 import {
-  IconAlertCircle,
-  IconAlertOctagon,
-  IconAlertTriangle,
   IconArrowLeft,
   IconBug,
   IconBulb,
   IconCalendar,
-  IconCircleCheck,
-  IconCircleDashed,
-  IconCircleX,
-  IconClock,
-  IconDownload,
   IconExternalLink,
-  IconEye,
   IconFileDescription,
-  IconFlask,
   IconFolder,
-  IconGitMerge,
   IconLock,
   IconMessage2,
-  IconMessageQuestion,
   IconPencil,
-  IconPlayerPause,
-  IconRocket,
-  IconShieldCheck,
   IconSparkles,
-  IconThumbUp,
 } from "@tabler/icons-react"
 
 import type { IssueDetailData } from "@/app/queries"
@@ -42,7 +26,6 @@ import {
   CardTitle,
 } from "@gentic/ui/card"
 import { cn } from "@gentic/ui/utils"
-import type { IssueStatus } from "@gentic/validators/issues"
 
 import { Attachments } from "./attachments"
 import { IssueChat } from "./issue-chat"
@@ -51,69 +34,7 @@ import { IssueRelations } from "./issue-relations"
 import { IssueRetryAgentButton } from "./issue-retry-agent-button"
 import { IssueSlugUrlSync } from "./issue-slug-url-sync"
 import { IssueStatusControls } from "./issue-status-controls"
-
-const statusLabels: Record<IssueStatus, string> = {
-  draft: "Draft",
-  todo: "To do",
-  queued: "Queued",
-  held: "On hold",
-  "in-progress": "In progress",
-  "waiting-for-input": "Waiting for input",
-  testing: "Testing",
-  "tests-failed": "Tests failed",
-  "ready-for-review": "Ready for review",
-  "changes-requested": "Changes requested",
-  approved: "Approved",
-  merged: "Merged",
-  deploying: "Deploying",
-  "deploy-failed": "Deploy failed",
-  validating: "Validating",
-  "run-failed": "Run failed",
-  completed: "Completed",
-  cancelled: "Cancelled",
-}
-
-const statusStyles: Record<IssueStatus, string> = {
-  draft: "bg-muted/60 text-muted-foreground",
-  todo: "bg-muted text-muted-foreground",
-  queued: "bg-primary/15 text-primary-foreground",
-  held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "in-progress": "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  "tests-failed": "bg-red-500/15 text-red-700 dark:text-red-300",
-  "ready-for-review": "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  "changes-requested": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  approved: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
-  merged: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-  deploying: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  "deploy-failed": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  validating: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
-  "run-failed": "bg-destructive/15 text-destructive",
-  completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  cancelled: "bg-muted text-muted-foreground",
-}
-
-const statusIcons = {
-  draft: IconPencil,
-  todo: IconCircleDashed,
-  queued: IconDownload,
-  held: IconPlayerPause,
-  "in-progress": IconClock,
-  "waiting-for-input": IconMessageQuestion,
-  testing: IconFlask,
-  "tests-failed": IconAlertTriangle,
-  "ready-for-review": IconEye,
-  "changes-requested": IconMessage2,
-  approved: IconThumbUp,
-  merged: IconGitMerge,
-  deploying: IconRocket,
-  "deploy-failed": IconAlertOctagon,
-  validating: IconShieldCheck,
-  "run-failed": IconAlertCircle,
-  completed: IconCircleCheck,
-  cancelled: IconCircleX,
-}
+import { statusIcons, statusLabels, statusStyles } from "./issue-status-meta"
 
 const agentProviderLabels: Record<
   IssueDetailData["issue"]["agent_provider"],

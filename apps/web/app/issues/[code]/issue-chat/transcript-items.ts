@@ -41,3 +41,7 @@ export function groupChatMessages(messages: ChatMessage[]): DisplayItem[] {
   flushToolGroup()
   return items
 }
+
+export function firstLine(value: string) {
+  return value.split(/\r?\n/, 1)[0].trim()
+}
