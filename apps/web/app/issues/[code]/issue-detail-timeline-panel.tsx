@@ -67,7 +67,7 @@ export function IssueDetailTimelinePanel({
   )
 
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="grid w-full min-w-0 gap-4">
       <div
         className="sr-only"
         role="status"
@@ -78,7 +78,7 @@ export function IssueDetailTimelinePanel({
       </div>
 
       {chat.usageLimitResetAt && chat.status === "held" ? (
-        <div className="inline-flex h-7 w-fit items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+        <div className="inline-flex h-7 max-w-full items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
           Resets {formatDateTime(chat.usageLimitResetAt)}
         </div>
       ) : null}

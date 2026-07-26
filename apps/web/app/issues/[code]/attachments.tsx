@@ -34,11 +34,11 @@ export function AttachmentPreviews({
   }
 
   return (
-    <div className="mt-2 grid gap-1.5">
+    <div className="mt-2 grid min-w-0 gap-1.5">
       {attachments.map((attachment) => (
         <div
           key={attachment.id}
-          className="flex max-w-full items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
+          className="flex max-w-full min-w-0 items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
         >
           {attachment.thumbnailUrl ? (
             // Supabase signs this URL with Image Transformation options.

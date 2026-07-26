@@ -61,7 +61,7 @@ export function IssueTimeline({
   }
 
   return (
-    <div className="grid">
+    <div className="grid min-w-0">
       {rows.map((row, index) => (
         <TimelineRow
           key={row.key}
@@ -167,7 +167,7 @@ function TimelineRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="relative flex items-start gap-3 pb-6 last:pb-0">
+    <div className="relative flex min-w-0 items-start gap-3 pb-6 last:pb-0">
       {!isLast ? (
         <span
           aria-hidden="true"
@@ -224,8 +224,8 @@ function MessageBody({ message }: { message: ChatMessage }) {
         : "secondary"
 
   return (
-    <Bubble align="start" variant={variant} className="max-w-full">
-      <BubbleContent className="whitespace-pre-wrap">
+    <Bubble align="start" variant={variant} className="w-full max-w-full">
+      <BubbleContent className="w-full whitespace-pre-wrap">
         <ChatMarkdown content={content} isStreaming={isStreaming} />
         {isStreaming ? <span className="ml-0.5 animate-pulse">▍</span> : null}
         <AttachmentPreviews attachments={message.attachments} />
@@ -258,7 +258,7 @@ function ThinkingContent({ message }: { message: ChatMessage }) {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 rounded-lg border border-dashed p-3 whitespace-pre-wrap text-muted-foreground">
+        <div className="mt-2 max-w-full overflow-x-auto rounded-lg border border-dashed p-3 whitespace-pre-wrap text-muted-foreground">
           {message.content || "Thinking..."}
         </div>
       </CollapsibleContent>
@@ -289,12 +289,12 @@ function ToolCallGroupContent({ messages }: { messages: ChatMessage[] }) {
       : `${messages.length} tool calls`
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
       <CollapsibleTrigger asChild>
         <button
           type="button"
           className={cn(
-            "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium",
+            "inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium",
             hasError
               ? "border-destructive/40 text-destructive"
               : "text-muted-foreground"
@@ -319,11 +319,11 @@ function ToolCallGroupContent({ messages }: { messages: ChatMessage[] }) {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 min-w-0 space-y-2">
           {messages.map((message) => (
             <pre
               key={message.clientKey ?? message.id}
-              className="max-h-48 overflow-auto rounded-lg border bg-muted/40 p-2 font-mono text-xs whitespace-pre-wrap break-words text-muted-foreground"
+              className="max-h-48 max-w-full overflow-auto rounded-lg border bg-muted/40 p-2 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground"
             >
               {message.content || "Tool call"}
             </pre>
@@ -344,7 +344,7 @@ function RequestContent({
   const [open, setOpen] = useState(true)
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
       <CollapsibleTrigger asChild>
         <button type="button" className="flex items-center gap-1.5 font-medium">
           Request
@@ -357,9 +357,13 @@ function RequestContent({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 grid gap-3">
-          <Bubble variant="secondary" align="start" className="max-w-full">
-            <BubbleContent className="whitespace-pre-wrap">
+        <div className="mt-2 grid min-w-0 gap-3">
+          <Bubble
+            variant="secondary"
+            align="start"
+            className="w-full max-w-full"
+          >
+            <BubbleContent className="w-full whitespace-pre-wrap">
               {prompt || "No prompt provided."}
             </BubbleContent>
           </Bubble>

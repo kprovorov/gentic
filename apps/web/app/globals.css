@@ -167,7 +167,7 @@
 
 @layer components {
   .chat-markdown {
-    @apply text-sm leading-6;
+    @apply min-w-0 text-sm leading-6;
   }
 
   .chat-markdown [data-streamdown="heading-1"] {
@@ -187,10 +187,10 @@
 
   .chat-markdown [data-streamdown="code-block"],
   .chat-markdown [data-streamdown="table-container"] {
-    @apply my-3;
+    @apply my-3 max-w-full overflow-x-auto;
   }
 
   .chat-markdown [data-streamdown="table-scroll"] {
-    @apply max-w-full;
+    @apply max-w-full overflow-x-auto;
   }
 }
