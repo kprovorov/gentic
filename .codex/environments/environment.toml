@@ -3,7 +3,7 @@ version = 1
 name = "Gentic"
 
 [setup]
-script = "pnpm i"
+script = "cp ${CODEX_SOURCE_TREE_PATH}/apps/web/.env ${CODEX_WORKTREE_PATH}/apps/web/.env && pnpm i"
 
 [[actions]]
 name = "Run"
