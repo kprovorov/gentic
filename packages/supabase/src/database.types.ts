@@ -121,6 +121,38 @@ export type Database = {
         }
         Relationships: []
       }
+      issue_events: {
+        Row: {
+          created_at: string
+          id: string
+          issue_id: string
+          payload: Json
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          issue_id: string
+          payload?: Json
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          issue_id?: string
+          payload?: Json
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_events_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_pull_requests: {
         Row: {
           created_at: string
