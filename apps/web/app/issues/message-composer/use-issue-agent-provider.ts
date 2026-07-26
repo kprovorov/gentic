@@ -13,9 +13,9 @@ import {
 
 // Wires MessageComposer's onAgentProviderChange to the two existing agent
 // endpoints: a plain field update before any run has started, or the same
-// destructive resetIssueAgent path IssueRetryAgentButton already uses once
-// a conversation exists. Kept separate from MessageComposer itself, which
-// stays issue-agnostic (see MessageComposer's prop contract).
+// destructive resetIssueAgent path once a conversation exists. Kept separate
+// from MessageComposer itself, which stays issue-agnostic (see
+// MessageComposer's prop contract).
 export function useIssueAgentProvider({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
 
