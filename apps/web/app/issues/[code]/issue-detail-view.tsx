@@ -31,7 +31,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         : []
 
   return (
-    <div className="bg-background px-4 py-8 md:px-8">
+    <div className="min-w-0 bg-background px-4 py-6 md:px-8 md:py-8">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={[
@@ -43,10 +43,10 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         ]}
       />
       <IssueSlugUrlSync key={issue.title ?? ""} issue={issue} />
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6">
         <IssueDetailHeader issue={issue} />
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
           <IssueDetailTimelinePanel
             issueId={issue.id}
             issueCreatedAt={issue.created_at}
@@ -61,7 +61,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             events={events}
           />
 
-          <div className="lg:sticky lg:top-6">
+          <div className="min-w-0 xl:sticky xl:top-6">
             <IssueDetailRail
               issueId={issue.id}
               status={issue.status}

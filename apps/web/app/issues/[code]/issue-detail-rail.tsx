@@ -168,17 +168,17 @@ function IssueDetailPullRequests({
   }
 
   return (
-    <ul className="grid gap-2">
+    <ul className="grid min-w-0 gap-2">
       {pullRequests.map((pullRequest) => {
         const { repo, number } = parsePullRequestUrl(pullRequest.url)
 
         return (
-          <li key={pullRequest.id}>
+          <li key={pullRequest.id} className="min-w-0">
             <Link
               href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2 hover:bg-muted/70"
+              className="flex min-w-0 items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2 hover:bg-muted/70"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 {isMerged ? (
@@ -421,7 +421,7 @@ function IssueDetailAttachmentRow({
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2">
+    <li className="flex min-w-0 items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2">
       {attachment.thumbnailUrl ? (
         // Supabase signs this URL with Image Transformation options.
         // eslint-disable-next-line @next/next/no-img-element
@@ -495,7 +495,7 @@ function IssueDetailAttachments({
       {attachments.length === 0 ? (
         <p className="text-sm text-muted-foreground">No files attached.</p>
       ) : (
-        <ul className="grid gap-2">
+        <ul className="grid min-w-0 gap-2">
           {attachments.map((attachment) => (
             <IssueDetailAttachmentRow
               key={attachment.id}
@@ -548,7 +548,7 @@ export function IssueDetailRail({
   attachments: Attachment[]
 }) {
   return (
-    <aside className="grid gap-4">
+    <aside className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-1">
       <Card size="sm">
         <CardHeader>
           <CardTitle>Status</CardTitle>

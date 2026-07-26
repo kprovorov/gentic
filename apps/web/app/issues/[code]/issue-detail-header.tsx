@@ -52,26 +52,35 @@ export function IssueDetailHeader({
   const { isPending, handleDelete } = useIssueDelete(issue.id)
 
   return (
-    <header className="flex flex-col gap-3 border-b pb-6">
-      <div className="flex items-center justify-between gap-3">
+    <header className="flex min-w-0 flex-col gap-3 border-b pb-6">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground"
+          className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground"
         >
-          <Link href="/issues" className="hover:text-foreground">
+          <Link href="/issues" className="shrink-0 hover:text-foreground">
             Issues
           </Link>
           {issue.code ? (
             <>
-              <span aria-hidden>/</span>
-              <span className="font-mono text-foreground">{issue.code}</span>
+              <span aria-hidden className="shrink-0">
+                /
+              </span>
+              <span className="min-w-0 truncate font-mono text-foreground">
+                {issue.code}
+              </span>
             </>
           ) : null}
         </nav>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Issue actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Issue actions"
+              className="shrink-0"
+            >
               <IconDotsVertical />
             </Button>
           </DropdownMenuTrigger>
@@ -97,13 +106,13 @@ export function IssueDetailHeader({
         </DropdownMenu>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
         <TypeIcon
           className={cn("size-7 shrink-0", issueTypeStyles[issue.type])}
         />
         <h1
           className={cn(
-            "text-3xl leading-tight md:text-4xl",
+            "max-w-full min-w-0 text-2xl leading-tight break-words md:text-4xl",
             !issue.title && "text-muted-foreground italic"
           )}
         >
@@ -116,10 +125,10 @@ export function IssueDetailHeader({
           href={`https://github.com/${issue.projects.repo}`}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <IconBrandGithub className="size-4" />
-          {issue.projects.repo}
+          <IconBrandGithub className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{issue.projects.repo}</span>
         </Link>
       ) : null}
     </header>

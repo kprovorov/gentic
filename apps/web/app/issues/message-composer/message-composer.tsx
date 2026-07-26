@@ -54,7 +54,10 @@ export function MessageComposer({
   agentPickerDisabled?: boolean
 }) {
   return (
-    <form onSubmit={onSubmit} className="flex items-end gap-2">
+    <form
+      onSubmit={onSubmit}
+      className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end"
+    >
       <div className="relative min-w-0 flex-1">
         {slashCommands.length > 0 ? (
           <SlashCommandMenu
@@ -89,7 +92,7 @@ export function MessageComposer({
           }
         />
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-col sm:items-end">
         <AgentProviderPicker
           agentProvider={agentProvider}
           hasMessages={hasMessages}
