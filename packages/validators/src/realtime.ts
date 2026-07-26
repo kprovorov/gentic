@@ -131,6 +131,16 @@ export const issuePullRequestSchema = z.object({
 
 export type IssuePullRequestContract = z.infer<typeof issuePullRequestSchema>
 
+export const issueEventSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+  type: z.string(),
+  payload: chatEventPayloadSchema,
+  created_at: z.string(),
+})
+
+export type IssueEventContract = z.infer<typeof issueEventSchema>
+
 export const deletedRowSchema = z.object({
   id: z.string().uuid(),
 })

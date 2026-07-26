@@ -233,6 +233,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           "issue_pull_requests",
           "issue_relations",
           "attachments",
+          "issue_events",
         ]}
       />
       <IssueSlugUrlSync key={issue.title ?? ""} issue={issue} />
