@@ -2,6 +2,7 @@ import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
+import { logIssueEvent } from "./events"
 import { getIssue } from "./queries"
 import { ISSUE_WITH_PROJECT_SELECT, type UserChatMessage } from "./shared"
 
@@ -75,6 +76,11 @@ export async function updateIssueStatus(
   } else {
     unwrap(await supabase.from("issues").update({ status }).eq("id", id))
   }
+
+  await logIssueEvent(supabase, id, "status_changed", {
+    from: current.status,
+    to: status,
+  })
 
   return getIssue(supabase, userId, id)
 }
@@ -226,25 +232,42 @@ export async function updateIssueStatusByPrUrl(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  if (pullRequest) {
-    return unwrap(
-      await supabase
+  const { data: current, error: fetchError } = await (pullRequest
+    ? supabase
         .from("issues")
-        .update({ status, updated_at: new Date().toISOString() })
+        .select("id,status")
         .eq("id", pullRequest.issue_id)
-        .select("id")
         .maybeSingle()
-    )
+    : supabase
+        .from("issues")
+        .select("id,status")
+        .eq("pr_url", prUrl)
+        .maybeSingle())
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!current) {
+    return null
   }
 
-  return unwrap(
+  const result = unwrap<{ id: string } | null>(
     await supabase
       .from("issues")
       .update({ status, updated_at: new Date().toISOString() })
-      .eq("pr_url", prUrl)
+      .eq("id", current.id)
       .select("id")
       .maybeSingle()
   )
+
+  if (result) {
+    await logIssueEvent(supabase, result.id, "status_changed", {
+      from: current.status,
+      to: status,
+    })
+  }
+
+  return result
 }
 
 // Called from the run-state route (trusted server code) right before it
@@ -288,40 +311,57 @@ export async function updateIssueStatusByPrUrlIfStatus(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  if (pullRequest) {
-    return unwrap(
-      await supabase
-        .from("issues")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", pullRequest.issue_id)
-        .eq("status", fromStatus)
-        .select("id")
-        .maybeSingle()
-    )
+  const result = unwrap<{ id: string } | null>(
+    pullRequest
+      ? await supabase
+          .from("issues")
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq("id", pullRequest.issue_id)
+          .eq("status", fromStatus)
+          .select("id")
+          .maybeSingle()
+      : await supabase
+          .from("issues")
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq("pr_url", prUrl)
+          .eq("status", fromStatus)
+          .select("id")
+          .maybeSingle()
+  )
+
+  if (result) {
+    await logIssueEvent(supabase, result.id, "status_changed", {
+      from: fromStatus,
+      to: status,
+    })
   }
 
-  return unwrap(
-    await supabase
-      .from("issues")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("pr_url", prUrl)
-      .eq("status", fromStatus)
-      .select("id")
-      .maybeSingle()
-  )
+  return result
 }
 
+// `ignoreDuplicates` makes this safe to call on every run-state update that
+// carries a `pr_url` (the worker resends it on each message), not just the
+// first. Only log `pr_opened` when the upsert actually inserted a row —
+// `.select()` on an ignored conflict returns no row — so repeat calls for an
+// already-tracked PR don't spam the timeline.
 export async function attachIssuePullRequest(
   supabase: Supabase,
   issueId: string,
   prUrl: string
 ) {
-  return unwrap(
+  const result = unwrap(
     await supabase
       .from("issue_pull_requests")
       .upsert(
         { issue_id: issueId, url: prUrl },
         { onConflict: "url", ignoreDuplicates: true }
       )
+      .select("id")
   )
+
+  if (result.length > 0) {
+    await logIssueEvent(supabase, issueId, "pr_opened", { pr_url: prUrl })
+  }
+
+  return result
 }
