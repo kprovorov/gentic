@@ -7,10 +7,10 @@ import { Button } from "@gentic/ui/button"
 
 import { deleteIssue } from "@/app/issues/actions"
 
-export function IssueDeleteButton({ issueId }: { issueId: string }) {
+export function useIssueDelete(issueId: string) {
   const [isPending, startTransition] = useTransition()
 
-  function handleClick() {
+  function handleDelete() {
     if (isPending) {
       return
     }
@@ -26,11 +26,17 @@ export function IssueDeleteButton({ issueId }: { issueId: string }) {
     })
   }
 
+  return { isPending, handleDelete }
+}
+
+export function IssueDeleteButton({ issueId }: { issueId: string }) {
+  const { isPending, handleDelete } = useIssueDelete(issueId)
+
   return (
     <Button
       type="button"
       variant="destructive"
-      onClick={handleClick}
+      onClick={handleDelete}
       disabled={isPending}
     >
       <IconTrash />
