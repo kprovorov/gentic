@@ -5,12 +5,9 @@ import {
   IconAlertCircle,
   IconCheck,
   IconChevronDown,
-  IconDownload,
   IconLoader2,
-  IconPaperclip,
   IconRefresh,
 } from "@tabler/icons-react"
-import { Streamdown } from "streamdown"
 
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import { Button } from "@gentic/ui/button"
@@ -33,9 +30,10 @@ import {
 import { cn } from "@gentic/ui/utils"
 import type { IssueStatus } from "@gentic/validators/issues"
 
-import type { Attachment } from "../attachments"
+import { AttachmentPreviews } from "../attachments"
+import { ChatMarkdown } from "./chat-markdown"
 import type { ChatMessage } from "./types"
-import { groupChatMessages } from "./transcript-items"
+import { firstLine, groupChatMessages } from "./transcript-items"
 
 export function IssueChatTranscript({
   messages,
@@ -202,7 +200,7 @@ function ChatMessageRow({
             {isStreaming ? (
               <span className="ml-0.5 animate-pulse">▍</span>
             ) : null}
-            <MessageAttachments attachments={message.attachments} />
+            <AttachmentPreviews attachments={message.attachments} />
           </BubbleContent>
         </Bubble>
         {deliveryLabel || message.pending === "failed" ? (
@@ -296,33 +294,6 @@ function ToolCallGroup({ messages }: { messages: ChatMessage[] }) {
   )
 }
 
-function firstLine(value: string) {
-  return value.split(/\r?\n/, 1)[0].trim()
-}
-
-function ChatMarkdown({
-  content,
-  isStreaming,
-}: {
-  content: string
-  isStreaming: boolean
-}) {
-  return (
-    <Streamdown
-      className="chat-markdown"
-      controls={{
-        code: { copy: true, download: false },
-        mermaid: false,
-        table: { copy: true, download: false, fullscreen: false },
-      }}
-      isAnimating={isStreaming}
-      mode={isStreaming ? "streaming" : "static"}
-    >
-      {content}
-    </Streamdown>
-  )
-}
-
 function getDeliveryLabel(
   message: ChatMessage,
   {
@@ -346,46 +317,4 @@ function getDeliveryLabel(
     return "Delivered. Agent received it and is processing."
   }
   return "Delivered"
-}
-
-function MessageAttachments({ attachments }: { attachments?: Attachment[] }) {
-  if (!attachments || attachments.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mt-2 grid gap-1.5">
-      {attachments.map((attachment) => (
-        <div
-          key={attachment.id}
-          className="flex max-w-full items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
-        >
-          {attachment.thumbnailUrl ? (
-            // Supabase signs this URL with Image Transformation options.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={attachment.thumbnailUrl}
-              alt=""
-              className="size-7 shrink-0 rounded border object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <IconPaperclip className="size-3.5 shrink-0 text-muted-foreground" />
-          )}
-          <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
-          {attachment.url ? (
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              download={attachment.fileName}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <IconDownload className="size-3.5" />
-            </a>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  )
 }

@@ -22,6 +22,54 @@ export type Attachment = {
   thumbnailUrl: string | null
 }
 
+// Read-only attachment list, reused wherever attachments are shown alongside
+// a message or request instead of being managed (uploaded/deleted).
+export function AttachmentPreviews({
+  attachments,
+}: {
+  attachments?: Attachment[]
+}) {
+  if (!attachments || attachments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 grid gap-1.5">
+      {attachments.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex max-w-full items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
+        >
+          {attachment.thumbnailUrl ? (
+            // Supabase signs this URL with Image Transformation options.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={attachment.thumbnailUrl}
+              alt=""
+              className="size-7 shrink-0 rounded border object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <IconPaperclip className="size-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
+          {attachment.url ? (
+            <a
+              href={attachment.url}
+              target="_blank"
+              rel="noreferrer"
+              download={attachment.fileName}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <IconDownload className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function formatSize(bytes: number | null): string {
   if (!bytes) {
     return ""

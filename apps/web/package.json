@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test \"app/**/*.test.ts\" \"tests/*.test.ts\" && NODE_ENV=development pnpm exec vitest run app/issues/issue-create-form.test.tsx app/issues/[code]/issue-chat.test.tsx app/issues/message-composer/agent-provider-picker.test.tsx app/issues/message-composer/message-composer.test.tsx app/issues/message-composer/use-issue-agent-provider.test.tsx",
+    "test": "node --import tsx --test \"app/**/*.test.ts\" \"tests/*.test.ts\" && NODE_ENV=development pnpm exec vitest run app/issues/issue-create-form.test.tsx app/issues/[code]/issue-chat.test.tsx app/issues/[code]/issue-timeline/issue-timeline.test.tsx app/issues/message-composer/agent-provider-picker.test.tsx app/issues/message-composer/message-composer.test.tsx app/issues/message-composer/use-issue-agent-provider.test.tsx",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
