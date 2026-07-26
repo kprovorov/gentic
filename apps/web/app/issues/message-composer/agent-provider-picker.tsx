@@ -3,7 +3,6 @@
 import { IconCheck, IconChevronDown } from "@tabler/icons-react"
 
 import { AgentProviderIcon } from "@/components/agent-provider-icon"
-import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,18 +62,16 @@ export function AgentProviderPicker({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="sm"
           disabled={disabled}
           aria-label="Choose agent"
-          className="gap-1.5 rounded-full"
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
         >
-          <AgentProviderIcon provider={agentProvider} className="size-4" />
+          <AgentProviderIcon provider={agentProvider} className="size-3.5" />
           {agentProviderLabels[agentProvider]}
-          <IconChevronDown className="size-3.5 text-muted-foreground" />
-        </Button>
+          <IconChevronDown className="size-3.5" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-44">
         {agentProviderOptions.map((option) => (

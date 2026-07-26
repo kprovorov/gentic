@@ -42,6 +42,15 @@ const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
   idea: "text-amber-700 dark:text-amber-300",
 }
 
+const issueTypeBadgeStyles: Record<IssueDetailData["issue"]["type"], string> =
+  {
+    issue: "bg-muted-foreground/14",
+    feature: "bg-violet-500/14",
+    bug: "bg-red-500/14",
+    feedback: "bg-sky-500/14",
+    idea: "bg-amber-500/14",
+  }
+
 export function IssueDetailHeader({
   issue,
 }: {
@@ -107,9 +116,16 @@ export function IssueDetailHeader({
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-        <TypeIcon
-          className={cn("size-7 shrink-0", issueTypeStyles[issue.type])}
-        />
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            issueTypeBadgeStyles[issue.type]
+          )}
+        >
+          <TypeIcon
+            className={cn("size-4.5", issueTypeStyles[issue.type])}
+          />
+        </span>
         <h1
           className={cn(
             "max-w-full min-w-0 text-2xl leading-tight break-words md:text-4xl",

@@ -40,21 +40,35 @@ type TimelineRowData = {
   key: string
   icon: React.ReactNode
   content: React.ReactNode
+  markerClassName?: string
+}
+
+const MARKER_TINTS = {
+  streaming: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  error: "bg-destructive/15 text-destructive",
+  success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  user: "bg-primary/20 text-primary",
 }
 
 export function IssueTimeline({
   items,
   issuePrompt,
   attachments,
+  currentUserName,
 }: {
   items: TimelineItem[]
   issuePrompt: string | null
   attachments: Attachment[]
+  currentUserName?: string | null
 }) {
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
-    return buildTimelineRows(displayItems, { issuePrompt, attachments })
-  }, [items, issuePrompt, attachments])
+    return buildTimelineRows(displayItems, {
+      issuePrompt,
+      attachments,
+      currentUserName,
+    })
+  }, [items, issuePrompt, attachments, currentUserName])
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -66,6 +80,7 @@ export function IssueTimeline({
         <TimelineRow
           key={row.key}
           icon={row.icon}
+          markerClassName={row.markerClassName}
           isLast={index === rows.length - 1}
         >
           {row.content}
@@ -80,16 +95,32 @@ function buildTimelineRows(
   {
     issuePrompt,
     attachments,
-  }: { issuePrompt: string | null; attachments: Attachment[] }
+    currentUserName,
+  }: {
+    issuePrompt: string | null
+    attachments: Attachment[]
+    currentUserName?: string | null
+  }
 ): TimelineRowData[] {
   const rows: TimelineRowData[] = []
 
   for (const displayItem of displayItems) {
     if (displayItem.kind === "tool-group") {
+      const hasError = displayItem.messages.some(
+        (message) => message.status === "error"
+      )
+      const hasStreaming = displayItem.messages.some(
+        (message) => message.status === "streaming"
+      )
       rows.push({
         key: displayItem.key,
         icon: <ToolGroupIcon messages={displayItem.messages} />,
         content: <ToolCallGroupContent messages={displayItem.messages} />,
+        markerClassName: hasStreaming
+          ? MARKER_TINTS.streaming
+          : hasError
+            ? MARKER_TINTS.error
+            : MARKER_TINTS.success,
       })
       continue
     }
@@ -98,8 +129,11 @@ function buildTimelineRows(
       const { message } = displayItem.item
       rows.push({
         key: displayItem.item.key,
-        icon: <MessageIcon message={message} />,
+        icon: (
+          <MessageIcon message={message} currentUserName={currentUserName} />
+        ),
         content: <MessageBody message={message} />,
+        markerClassName: messageMarkerClassName(message),
       })
       continue
     }
@@ -120,13 +154,20 @@ function buildTimelineRows(
           ),
         })
         break
-      case "status-milestone":
+      case "status-milestone": {
+        const milestoneStatus = item.to ?? item.from
+        const isKnownStatus =
+          milestoneStatus !== null && milestoneStatus in statusStyles
         rows.push({
           key: item.key,
           icon: <IconArrowRight />,
           content: <StatusMilestoneContent from={item.from} to={item.to} />,
+          markerClassName: isKnownStatus
+            ? statusStyles[milestoneStatus as IssueStatus]
+            : undefined,
         })
         break
+      }
       case "pr-opened":
         rows.push({
           key: item.key,
@@ -149,6 +190,7 @@ function buildTimelineRows(
               prUrl={item.prUrl}
             />
           ),
+          markerClassName: statusStyles.merged,
         })
         break
     }
@@ -159,32 +201,71 @@ function buildTimelineRows(
 
 function TimelineRow({
   icon,
+  markerClassName,
   isLast,
   children,
 }: {
   icon: React.ReactNode
+  markerClassName?: string
   isLast: boolean
   children: React.ReactNode
 }) {
   return (
-    <div className="relative flex min-w-0 items-start gap-3 pb-6 last:pb-0">
+    <div className="relative flex min-w-0 items-start gap-3 pb-5 last:pb-0">
       {!isLast ? (
         <span
           aria-hidden="true"
-          className="absolute top-8 bottom-[-1.5rem] left-4 w-px -translate-x-1/2 bg-border"
+          className="absolute top-7 bottom-[-1.25rem] left-3.5 w-px -translate-x-1/2 bg-border"
         />
       ) : null}
-      <MarkerIcon className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border bg-card text-muted-foreground [&_svg]:size-4">
+      <MarkerIcon
+        className={cn(
+          "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground [&_svg]:size-3.5",
+          markerClassName ?? "bg-muted"
+        )}
+      >
         {icon}
       </MarkerIcon>
-      <MarkerContent className="min-w-0 flex-1 pt-1.5 text-sm">
+      <MarkerContent className="min-w-0 flex-1 pt-1 text-[13px]">
         {children}
       </MarkerContent>
     </div>
   )
 }
 
-function MessageIcon({ message }: { message: ChatMessage }) {
+function messageMarkerClassName(message: ChatMessage): string | undefined {
+  if (message.role === "user") {
+    return MARKER_TINTS.user
+  }
+  if (message.role === "assistant" && message.status === "streaming") {
+    return MARKER_TINTS.streaming
+  }
+  if (message.status === "error") {
+    return MARKER_TINTS.error
+  }
+  return undefined
+}
+
+function getInitials(name: string | null | undefined): string | null {
+  if (!name) {
+    return null
+  }
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
+  return initials || null
+}
+
+function MessageIcon({
+  message,
+  currentUserName,
+}: {
+  message: ChatMessage
+  currentUserName?: string | null
+}) {
   if (message.kind === "thinking") {
     return <IconBulb />
   }
@@ -192,7 +273,14 @@ function MessageIcon({ message }: { message: ChatMessage }) {
     return <IconInfoCircle />
   }
   if (message.role === "user") {
+    const initials = getInitials(currentUserName)
+    if (initials) {
+      return <span className="text-[10px] font-semibold">{initials}</span>
+    }
     return <IconUserCircle />
+  }
+  if (message.status === "streaming") {
+    return <IconLoader2 className="animate-spin" />
   }
   return <IconSparkles />
 }

@@ -77,6 +77,14 @@ export function MessageComposer({
           disabled={disabled}
           className="min-w-0"
           textareaClassName="min-h-18 resize-none"
+          footerStart={
+            <AgentProviderPicker
+              agentProvider={agentProvider}
+              hasMessages={hasMessages}
+              disabled={disabled || agentPickerDisabled}
+              onAgentProviderChange={onAgentProviderChange}
+            />
+          }
           footerEnd={
             <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground max-sm:hidden">
               <kbd className="rounded border border-border/60 bg-background px-1 font-mono">
@@ -92,22 +100,15 @@ export function MessageComposer({
           }
         />
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-col sm:items-end">
-        <AgentProviderPicker
-          agentProvider={agentProvider}
-          hasMessages={hasMessages}
-          disabled={disabled || agentPickerDisabled}
-          onAgentProviderChange={onAgentProviderChange}
-        />
-        <Button
-          type="submit"
-          size="icon"
-          aria-label={disabled ? "Sending message" : "Send message to agent"}
-          disabled={disabled || !draft.trim() || invalidSlashCommand}
-        >
-          <IconSend />
-        </Button>
-      </div>
+      <Button
+        type="submit"
+        size="icon"
+        aria-label={disabled ? "Sending message" : "Send message to agent"}
+        disabled={disabled || !draft.trim() || invalidSlashCommand}
+        className="shrink-0"
+      >
+        <IconSend />
+      </Button>
     </form>
   )
 }
