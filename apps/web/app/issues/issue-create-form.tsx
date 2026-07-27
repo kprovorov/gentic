@@ -2,12 +2,22 @@
 
 import Link from "next/link"
 import { useRef, useState } from "react"
-import { IconDeviceFloppy, IconSend } from "@tabler/icons-react"
+import {
+  IconCheck,
+  IconChevronDown,
+  IconDeviceFloppy,
+  IconSend,
+} from "@tabler/icons-react"
 
 import { runIssue, saveIssueDraft } from "@/app/issues/actions"
 import type { ProjectOption } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
-import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@gentic/ui/dropdown-menu"
 import type { AgentProvider } from "@gentic/validators/issues"
 
 import { MessageComposer } from "./message-composer/message-composer"
@@ -25,17 +35,19 @@ export function IssueCreateForm({
   const [files, setFiles] = useState<File[]>([])
   const [agentProvider, setAgentProvider] =
     useState<AgentProvider>(defaultAgentProvider)
+  const [projectId, setProjectId] = useState("")
   const [projectError, setProjectError] = useState("")
-  const projectSelectRef = useRef<HTMLSelectElement>(null)
+  const projectTriggerRef = useRef<HTMLButtonElement>(null)
+  const selectedProject = projects.find((project) => project.id === projectId)
+  const projectLabelId = "issue-project-label"
   const projectErrorId = "issue-project-error"
   const requireProject = () => {
-    const projectSelect = projectSelectRef.current
-    if (!projectSelect || projectSelect.value) {
+    if (projectId) {
       return true
     }
 
     setProjectError("Select a project before running this issue.")
-    projectSelect.focus()
+    projectTriggerRef.current?.focus()
     return false
   }
 
@@ -73,37 +85,49 @@ export function IssueCreateForm({
       hasMessages={false}
       onAgentProviderChange={(provider) => setAgentProvider(provider)}
       onSubmit={() => {}}
-      onInvalidCapture={(event) => {
-        if (event.target === projectSelectRef.current) {
-          setProjectError("Select a project before running this issue.")
-        }
-      }}
       footerStart={
         <div className="flex min-w-0 flex-col gap-1">
-          <label className="sr-only" htmlFor="issue-project">
+          <label className="sr-only" id={projectLabelId}>
             Project
           </label>
-          <NativeSelect
-            ref={projectSelectRef}
-            name="project_id"
-            required
-            defaultValue=""
-            id="issue-project"
-            size="sm"
-            aria-invalid={projectError ? true : undefined}
-            aria-describedby={projectError ? projectErrorId : undefined}
-            className="max-w-full min-w-0 sm:w-56"
-            onChange={() => setProjectError("")}
-          >
-            <NativeSelectOption value="" disabled hidden>
-              Select project
-            </NativeSelectOption>
-            {projects.map((project) => (
-              <NativeSelectOption key={project.id} value={project.id}>
-                {project.name} ({project.repo})
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                ref={projectTriggerRef}
+                type="button"
+                aria-labelledby={projectLabelId}
+                aria-describedby={projectError ? projectErrorId : undefined}
+                data-invalid={projectError ? true : undefined}
+                className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
+              >
+                <span className="truncate">
+                  {selectedProject ? selectedProject.name : "Select project"}
+                </span>
+                <IconChevronDown className="size-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-56">
+              {projects.map((project) => (
+                <DropdownMenuItem
+                  key={project.id}
+                  onSelect={() => {
+                    setProjectId(project.id)
+                    setProjectError("")
+                  }}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{project.name}</span>
+                    <span className="block truncate text-xs font-normal text-muted-foreground">
+                      {project.repo}
+                    </span>
+                  </span>
+                  {project.id === projectId ? (
+                    <IconCheck className="ml-auto size-3.5" />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {projectError ? (
             <p id={projectErrorId} className="text-xs text-destructive">
               {projectError}
@@ -117,6 +141,11 @@ export function IssueCreateForm({
           formAction={saveIssueDraft}
           variant="ghost"
           size="sm"
+          onClick={(event) => {
+            if (!requireProject()) {
+              event.preventDefault()
+            }
+          }}
         >
           <IconDeviceFloppy />
           Save draft
@@ -140,6 +169,7 @@ export function IssueCreateForm({
         </Button>
       }
     >
+      <input type="hidden" name="project_id" value={projectId} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <label className="sr-only" htmlFor="issue-prompt">
         Prompt
