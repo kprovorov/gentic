@@ -16,35 +16,70 @@ import { AgentProviderPicker } from "./agent-provider-picker"
 // callers own all state (draft/files/agent) and pass callbacks in, so this
 // component never assumes an issue with history already exists.
 export function MessageComposer({
+  formRef,
+  action,
+  encType,
+  formId,
+  className,
+  fieldClassName,
+  textareaClassName,
+  id,
+  name,
+  required,
+  rows = 2,
   draft,
   draftFiles,
   disabled,
   placeholder = "Message the agent…",
+  submitDisabled,
+  submitAriaLabel,
+  showCommandHint = true,
   invalidSlashCommand = false,
   slashCommands = [],
   selectedSlashCommandIndex = 0,
+  children,
   onDraftChange,
   onFilesChange,
   onKeyDown,
   onSelectSlashCommand,
   onSubmit,
+  onInvalidCapture,
   agentProvider,
   hasMessages,
   onAgentProviderChange,
   agentPickerDisabled,
+  footerStart,
+  footerEnd,
+  submitButton,
 }: {
+  formRef?: React.Ref<HTMLFormElement>
+  action?: React.ComponentProps<"form">["action"]
+  encType?: React.ComponentProps<"form">["encType"]
+  formId?: string
+  className?: string
+  fieldClassName?: string
+  textareaClassName?: string
+  id?: string
+  name?: string
+  required?: boolean
+  rows?: number
   draft: string
   draftFiles: File[]
   disabled?: boolean
   placeholder?: string
+  submitDisabled?: boolean
+  submitAriaLabel?: string
+  showCommandHint?: boolean
   invalidSlashCommand?: boolean
   slashCommands?: SlashCommand[]
   selectedSlashCommandIndex?: number
+  children?: React.ReactNode
   onDraftChange: (value: string) => void
   onFilesChange: (files: File[]) => void
   onKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
   onSelectSlashCommand?: (command: SlashCommand) => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+  onInvalidCapture?: React.FormEventHandler<HTMLFormElement>
   agentProvider: AgentProvider
   hasMessages: boolean
   onAgentProviderChange: (
@@ -52,12 +87,24 @@ export function MessageComposer({
     info: { requiresReset: boolean }
   ) => void
   agentPickerDisabled?: boolean
+  footerStart?: React.ReactNode
+  footerEnd?: React.ReactNode
+  submitButton?: React.ReactNode
 }) {
+  const isSubmitDisabled =
+    submitDisabled ?? (disabled || !draft.trim() || invalidSlashCommand)
+
   return (
     <form
+      ref={formRef}
+      action={action}
+      encType={encType}
+      id={formId}
       onSubmit={onSubmit}
-      className="flex min-w-0 items-end gap-2.5"
+      onInvalidCapture={onInvalidCapture}
+      className={cn("flex min-w-0 items-end gap-2.5", className)}
     >
+      {children}
       <div className="relative min-w-0 flex-1">
         {slashCommands.length > 0 ? (
           <SlashCommandMenu
@@ -66,47 +113,61 @@ export function MessageComposer({
             onSelect={(command) => onSelectSlashCommand?.(command)}
           />
         ) : null}
-        <span className="pointer-events-none absolute top-2.5 right-3.5 z-10 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-sm:hidden">
-          <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
-            /
-          </kbd>
-          for commands
-          <span aria-hidden="true">·</span>
-          <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
-            ⌘↵
-          </kbd>
-          to send
-        </span>
+        {showCommandHint ? (
+          <span className="pointer-events-none absolute top-2.5 right-3.5 z-10 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-sm:hidden">
+            <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
+              /
+            </kbd>
+            for commands
+            <span aria-hidden="true">·</span>
+            <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
+              ⌘↵
+            </kbd>
+            to send
+          </span>
+        ) : null}
         <AttachmentPromptField
+          id={id}
+          name={name}
           value={draft}
           onChange={onDraftChange}
           files={draftFiles}
           onFilesChange={onFilesChange}
           onKeyDown={onKeyDown}
-          rows={2}
+          rows={rows}
           placeholder={placeholder}
+          required={required}
           disabled={disabled}
-          className="min-w-0"
-          textareaClassName="min-h-16 resize-none"
+          className={cn("min-w-0", fieldClassName)}
+          textareaClassName={cn("min-h-16 resize-none", textareaClassName)}
           footerStart={
-            <AgentProviderPicker
-              agentProvider={agentProvider}
-              hasMessages={hasMessages}
-              disabled={disabled || agentPickerDisabled}
-              onAgentProviderChange={onAgentProviderChange}
-            />
+            <>
+              <AgentProviderPicker
+                agentProvider={agentProvider}
+                hasMessages={hasMessages}
+                disabled={disabled || agentPickerDisabled}
+                onAgentProviderChange={onAgentProviderChange}
+              />
+              {footerStart}
+            </>
           }
+          footerEnd={footerEnd}
         />
       </div>
-      <Button
-        type="submit"
-        size="icon"
-        aria-label={disabled ? "Sending message" : "Send message to agent"}
-        disabled={disabled || !draft.trim() || invalidSlashCommand}
-        className="shrink-0"
-      >
-        <IconSend />
-      </Button>
+      {submitButton ?? (
+        <Button
+          type="submit"
+          size="icon"
+          aria-label={
+            submitAriaLabel ??
+            (disabled ? "Sending message" : "Send message to agent")
+          }
+          disabled={isSubmitDisabled}
+          className="shrink-0"
+        >
+          <IconSend />
+        </Button>
+      )}
     </form>
   )
 }
