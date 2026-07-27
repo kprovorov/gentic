@@ -221,6 +221,27 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          created_at: string
+          default_agent_provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_agent_provider?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_agent_provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       issues: {
         Row: {
           active_run_id: string | null
@@ -585,4 +606,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

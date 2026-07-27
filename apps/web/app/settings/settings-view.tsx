@@ -18,12 +18,17 @@ import {
   createProject,
   deleteProject,
   disconnectGithubIntegration,
+  updateDefaultAgent,
   updateProject,
 } from "@/app/settings/actions"
+import {
+  agentProviderLabels,
+  agentProviderOptions,
+} from "@/app/issues/agent-provider-options"
 import { fetchSettingsData } from "@/app/client-queries"
 import type { SettingsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
-import { BrandIcon } from "@/components/agent-provider-icon"
+import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -35,6 +40,7 @@ import {
 import { Checkbox } from "@gentic/ui/checkbox"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
+import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { Textarea } from "@gentic/ui/textarea"
 import { cn } from "@gentic/ui/utils"
 
@@ -61,6 +67,15 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
   const updateProjectMutation = useMutation({
     mutationFn: updateProject,
     onSuccess: invalidateProjects,
+  })
+  const updateDefaultAgentMutation = useMutation({
+    mutationFn: updateDefaultAgent,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.newIssue }),
+      ])
+    },
   })
   const deleteProjectMutation = useMutation({
     mutationFn: deleteProject,
@@ -117,6 +132,11 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
   function submitDisconnectGithub(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     disconnectGithubMutation.mutate()
+  }
+
+  function submitUpdateDefaultAgent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    updateDefaultAgentMutation.mutate(new FormData(event.currentTarget))
   }
 
   return (
@@ -194,6 +214,53 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Agent defaults</CardTitle>
+            <CardDescription>
+              Choose which coding agent is selected when you create a new issue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={submitUpdateDefaultAgent}
+              className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+            >
+              <div className="grid gap-2">
+                <Label htmlFor="default-agent-provider">Default agent</Label>
+                <NativeSelect
+                  id="default-agent-provider"
+                  name="default_agent_provider"
+                  defaultValue={data.defaultAgentProvider}
+                  className="w-full md:w-64"
+                >
+                  {agentProviderOptions.map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <AgentProviderIcon
+                    provider={data.defaultAgentProvider}
+                    className="size-4"
+                  />
+                  {agentProviderLabels[data.defaultAgentProvider]}
+                </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={updateDefaultAgentMutation.isPending}
+                >
+                  Save
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
 

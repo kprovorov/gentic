@@ -9,6 +9,7 @@
     "./github-integrations": "./src/github-integrations.ts",
     "./issues": "./src/issues.ts",
     "./projects": "./src/projects.ts",
+    "./user-settings": "./src/user-settings.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

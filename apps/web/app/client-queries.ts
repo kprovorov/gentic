@@ -3,7 +3,7 @@ import type {
   IssueDetailData,
   IssueEdit,
   IssuesData,
-  ProjectOption,
+  NewIssueData,
   SettingsData,
 } from "./queries"
 
@@ -70,7 +70,7 @@ export const fetchSettingsData = () =>
   getJson<SettingsData>("/api/app/settings")
 
 export const fetchNewIssueData = () =>
-  getJson<{ projects: ProjectOption[] }>("/api/app/issues/new")
+  getJson<NewIssueData>("/api/app/issues/new")
 
 export const fetchIssueDetailData = (id: string) =>
   getJson<IssueDetailData>(`/api/app/issues/${encodeURIComponent(id)}`)
