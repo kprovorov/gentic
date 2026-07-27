@@ -19,6 +19,21 @@ const projects = [
 ]
 
 describe("IssueCreateForm", () => {
+  it("stores the selected project from the dropdown", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+
+    expect(screen.getByDisplayValue(projects[0].id)).toHaveAttribute(
+      "name",
+      "project_id"
+    )
+    expect(screen.getByText("Gentic")).toBeVisible()
+  })
+
   it("highlights the project select when running without a selected project", async () => {
     const user = userEvent.setup()
 
@@ -30,9 +45,9 @@ describe("IssueCreateForm", () => {
     )
     await user.click(screen.getByRole("button", { name: "Run issue" }))
 
-    const projectSelect = screen.getByLabelText("Project")
+    const projectSelect = screen.getByRole("button", { name: "Project" })
 
-    expect(projectSelect).toHaveAttribute("aria-invalid", "true")
+    expect(projectSelect).toHaveAttribute("data-invalid", "true")
     expect(projectSelect).toHaveAccessibleDescription(
       "Select a project before running this issue."
     )
