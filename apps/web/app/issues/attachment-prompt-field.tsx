@@ -159,7 +159,7 @@ export function AttachmentPromptField({
         )}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 overflow-hidden border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3">
         <input
           ref={fileInputRef}
           type="file"
@@ -186,17 +186,19 @@ export function AttachmentPromptField({
             Drop files here or attach
           </span>
         ) : (
-          <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+          <ul className="order-last flex min-w-0 basis-full flex-wrap gap-1.5 sm:order-none sm:basis-auto sm:flex-1">
             {selectedFiles.map((file, index) => (
               <li
                 key={`${file.name}-${file.size}-${file.lastModified}`}
                 className={cn(
-                  "flex max-w-full items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs ring-1 ring-border",
+                  "flex max-w-full min-w-0 items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs ring-1 ring-border",
                   file.size > MAX_ATTACHMENT_BYTES && "text-destructive"
                 )}
               >
                 <IconPaperclip className="size-3 shrink-0" />
-                <span className="max-w-48 truncate">{file.name}</span>
+                <span className="min-w-0 flex-1 truncate sm:max-w-48">
+                  {file.name}
+                </span>
                 <span className="shrink-0 text-muted-foreground">
                   {formatSize(file.size)}
                 </span>
