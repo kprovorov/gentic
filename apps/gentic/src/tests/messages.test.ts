@@ -182,6 +182,35 @@ test("runTurn updates tool calls through real statuses with one stable id", asyn
   assert.match(channel.messages.at(-1)?.content ?? "", /package contents/)
 })
 
+test("runTurn surfaces terminal output from tool_call_update _meta", async () => {
+  const api = fakeApi()
+  const channel = fakeChannel()
+  const session = fakeSession([
+    {
+      sessionUpdate: "tool_call",
+      toolCallId: "tool-1",
+      title: "pnpm test",
+      kind: "execute",
+      status: "pending",
+      content: [{ type: "terminal", terminalId: "tool-1" }],
+    },
+    {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-1",
+      status: "failed",
+      content: [{ type: "terminal", terminalId: "tool-1" }],
+      _meta: { terminal_output: { terminal_id: "tool-1", data: "1 failing test" } },
+    },
+  ])
+
+  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+
+  const last = api.inserted.at(-1)?.message
+  assert.equal(last?.status, "error")
+  assert.match(last?.content ?? "", /1 failing test/)
+  assert.doesNotMatch(last?.content ?? "", /Terminal: tool-1/)
+})
+
 test("runTurn renders plan lifecycle events incrementally", async () => {
   const api = fakeApi()
   const channel = fakeChannel()

@@ -155,6 +155,12 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
       await ctx.request("initialize", {
         protocolVersion: PROTOCOL_VERSION,
         clientInfo: { name: "gentic", version: "0.0.1" },
+        // Ask for full terminal output snapshots (rather than the default
+        // incremental deltas) on each tool_call/tool_call_update's `_meta` so
+        // a polling worker like this one can just read the latest value
+        // instead of accumulating a stream. Both claude-agent-acp and
+        // codex-acp honor this same non-standard `_meta.terminal_output` key.
+        clientCapabilities: { _meta: { terminal_output: true } },
       })
 
       const session =
@@ -338,6 +344,7 @@ export async function runTurn(
       content?: ToolCallContent[]
       rawInput?: unknown
       rawOutput?: unknown
+      terminalOutput?: string
     }
   >()
 
@@ -417,6 +424,7 @@ export async function runTurn(
           content: update.content,
           rawInput: update.rawInput,
           rawOutput: update.rawOutput,
+          terminalOutput: terminalOutputFromMeta(update._meta),
         }
         toolCalls.set(update.toolCallId, tool)
         await publishToolCall(api, issueId, channel, runId, update.toolCallId, tool, nextSeq)
@@ -425,6 +433,7 @@ export async function runTurn(
         const previous = toolCalls.get(update.toolCallId) ?? {
           title: update.title ?? "Tool call",
         }
+        const terminalOutput = terminalOutputFromMeta(update._meta)
         const tool = {
           ...previous,
           ...(update.title !== undefined && update.title !== null
@@ -441,6 +450,7 @@ export async function runTurn(
             : {}),
           ...(update.rawInput !== undefined ? { rawInput: update.rawInput } : {}),
           ...(update.rawOutput !== undefined ? { rawOutput: update.rawOutput } : {}),
+          ...(terminalOutput !== undefined ? { terminalOutput } : {}),
         }
         toolCalls.set(update.toolCallId, tool)
         await publishToolCall(api, issueId, channel, runId, update.toolCallId, tool, nextSeq)
@@ -487,6 +497,7 @@ async function publishToolCall(
     content?: ToolCallContent[]
     rawInput?: unknown
     rawOutput?: unknown
+    terminalOutput?: string
   },
   nextSeq: (eventId: string) => number
 ): Promise<void> {
@@ -496,7 +507,13 @@ async function publishToolCall(
     id: stableMessageId([issueId, runId, eventId]),
     role: "assistant",
     kind: "tool",
-    content: formatToolCall(tool.title, status, tool.content, tool.rawOutput),
+    content: formatToolCall(
+      tool.title,
+      status,
+      tool.content,
+      tool.rawOutput,
+      tool.terminalOutput
+    ),
     status:
       status === "failed"
         ? "error"
@@ -524,6 +541,7 @@ async function publishToolCall(
       content: tool.content ?? [],
       rawInput: tool.rawInput ?? null,
       rawOutput: tool.rawOutput ?? null,
+      terminalOutput: tool.terminalOutput ?? null,
     },
   })
 }
@@ -720,11 +738,12 @@ function formatToolCall(
   title: string,
   status: ToolCallStatus,
   content?: ToolCallContent[],
-  rawOutput?: unknown
+  rawOutput?: unknown,
+  terminalOutput?: string
 ): string {
   const lines = [`${statusLabel(status)} ${title}`]
   const text = (content ?? [])
-    .map((item) => toolContentText(item))
+    .map((item) => toolContentText(item, terminalOutput))
     .filter(Boolean)
     .join("\n")
   if (text) {
@@ -733,6 +752,28 @@ function formatToolCall(
     lines.push(formatUnknown(rawOutput))
   }
   return lines.join("\n")
+}
+
+/**
+ * Reads the actual command output from a tool_call/tool_call_update's
+ * `_meta.terminal_output`, the non-standard channel both claude-agent-acp and
+ * codex-acp use to carry it once the client opts in during `initialize`
+ * (see the `terminal_output` clientCapabilities flag above). Without opting
+ * in, terminal-backed tool calls only ever surface a terminal id, not output.
+ */
+function terminalOutputFromMeta(
+  meta: Record<string, unknown> | null | undefined
+): string | undefined {
+  const entry = meta?.terminal_output
+  if (
+    entry &&
+    typeof entry === "object" &&
+    "data" in entry &&
+    typeof (entry as { data: unknown }).data === "string"
+  ) {
+    return (entry as { data: string }).data
+  }
+  return undefined
 }
 
 function statusLabel(status: ToolCallStatus): string {
@@ -748,7 +789,7 @@ function statusLabel(status: ToolCallStatus): string {
   }
 }
 
-function toolContentText(content: ToolCallContent): string {
+function toolContentText(content: ToolCallContent, terminalOutput?: string): string {
   if (content.type === "content") {
     return textOf(content.content)
   }
@@ -756,7 +797,7 @@ function toolContentText(content: ToolCallContent): string {
     return content.path ? `Diff: ${content.path}` : "Diff updated"
   }
   if (content.type === "terminal") {
-    return `Terminal: ${content.terminalId}`
+    return terminalOutput?.trim() ? terminalOutput : `Terminal: ${content.terminalId}`
   }
   return ""
 }

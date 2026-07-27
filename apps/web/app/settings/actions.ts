@@ -1,10 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { agentProviderSchema } from "@gentic/validators/issues"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
 import * as projectsService from "@gentic/services/projects"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
+import * as userSettingsService from "@gentic/services/user-settings"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getCheckbox, getString } from "../_lib/form-data"
@@ -74,4 +76,18 @@ export async function disconnectGithubIntegration() {
   await githubIntegrationsService.deleteGithubIntegration(supabase, userId)
 
   revalidatePath("/settings")
+}
+
+export async function updateDefaultAgent(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const defaultAgentProvider = agentProviderSchema.parse(
+    getString(formData, "default_agent_provider")
+  )
+
+  await userSettingsService.updateUserSettings(supabase, userId, {
+    default_agent_provider: defaultAgentProvider,
+  })
+
+  revalidatePath("/settings")
+  revalidatePath("/issues/new")
 }
