@@ -102,10 +102,7 @@ export function MessageComposer({
       id={formId}
       onSubmit={onSubmit}
       onInvalidCapture={onInvalidCapture}
-      className={cn(
-        "flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-end",
-        className
-      )}
+      className={cn("flex min-w-0 items-end gap-2.5", className)}
     >
       {children}
       <div className="relative min-w-0 flex-1">

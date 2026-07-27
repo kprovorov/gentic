@@ -103,6 +103,11 @@ function buildTimelineRows(
   }
 ): TimelineRowData[] {
   const rows: TimelineRowData[] = []
+  const originalRequestMessageKey = findOriginalRequestMessageKey(
+    displayItems,
+    issuePrompt
+  )
+  const shouldShowRequestPrompt = originalRequestMessageKey === null
 
   for (const displayItem of displayItems) {
     if (displayItem.kind === "tool-group") {
@@ -132,7 +137,14 @@ function buildTimelineRows(
         icon: (
           <MessageIcon message={message} currentUserName={currentUserName} />
         ),
-        content: <MessageBody message={message} />,
+        content: (
+          <MessageBody
+            message={message}
+            isOriginalRequest={
+              displayItem.item.key === originalRequestMessageKey
+            }
+          />
+        ),
         markerClassName: messageMarkerClassName(message),
       })
       continue
@@ -146,13 +158,18 @@ function buildTimelineRows(
           icon: <IconFilePlus />,
           content: "Issue created by you",
         })
-        rows.push({
-          key: "request",
-          icon: <IconFileText />,
-          content: (
-            <RequestContent prompt={issuePrompt} attachments={attachments} />
-          ),
-        })
+        if (shouldShowRequestPrompt || attachments.length > 0) {
+          rows.push({
+            key: "request",
+            icon: <IconFileText />,
+            content: (
+              <RequestContent
+                prompt={shouldShowRequestPrompt ? issuePrompt : null}
+                attachments={attachments}
+              />
+            ),
+          })
+        }
         break
       case "status-milestone": {
         const milestoneStatus = item.to ?? item.from
@@ -197,6 +214,35 @@ function buildTimelineRows(
   }
 
   return rows
+}
+
+function findOriginalRequestMessageKey(
+  displayItems: TimelineDisplayItem[],
+  issuePrompt: string | null
+): string | null {
+  const normalizedPrompt = normalizeRequestText(issuePrompt)
+  if (!normalizedPrompt) {
+    return null
+  }
+
+  const firstUserMessage = displayItems.find(
+    (displayItem) =>
+      displayItem.kind === "message" && displayItem.item.message.role === "user"
+  )
+
+  if (
+    firstUserMessage?.kind === "message" &&
+    normalizeRequestText(firstUserMessage.item.message.content) ===
+      normalizedPrompt
+  ) {
+    return firstUserMessage.item.key
+  }
+
+  return null
+}
+
+function normalizeRequestText(value: string | null | undefined): string {
+  return (value ?? "").trim()
 }
 
 function TimelineRow({
@@ -282,7 +328,13 @@ function MessageIcon({
   return <IconSparkles />
 }
 
-function MessageBody({ message }: { message: ChatMessage }) {
+function MessageBody({
+  message,
+  isOriginalRequest = false,
+}: {
+  message: ChatMessage
+  isOriginalRequest?: boolean
+}) {
   const isStreaming = message.status === "streaming"
   const content = message.content ?? ""
 
@@ -302,20 +354,23 @@ function MessageBody({ message }: { message: ChatMessage }) {
 
   const isUser = message.role === "user"
   const variant =
-    message.status === "error"
-      ? "destructive"
-      : isUser
-        ? "tinted"
-        : "secondary"
+    message.status === "error" ? "destructive" : isUser ? "tinted" : "secondary"
 
   return (
-    <Bubble align="start" variant={variant} className="w-full max-w-full">
-      <BubbleContent className="w-full whitespace-pre-wrap">
-        <ChatMarkdown content={content} isStreaming={isStreaming} />
-        {isStreaming ? <span className="ml-0.5 animate-pulse">▍</span> : null}
-        <AttachmentPreviews attachments={message.attachments} />
-      </BubbleContent>
-    </Bubble>
+    <div className="min-w-0">
+      {isOriginalRequest ? (
+        <div className="mb-2 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
+          Original request
+        </div>
+      ) : null}
+      <Bubble align="start" variant={variant} className="w-full max-w-full">
+        <BubbleContent className="w-full whitespace-pre-wrap">
+          <ChatMarkdown content={content} isStreaming={isStreaming} />
+          {isStreaming ? <span className="ml-0.5 animate-pulse">▍</span> : null}
+          <AttachmentPreviews attachments={message.attachments} />
+        </BubbleContent>
+      </Bubble>
+    </div>
   )
 }
 
@@ -356,7 +411,9 @@ function ThinkingContent({ message }: { message: ChatMessage }) {
 
 function ToolGroupIcon({ messages }: { messages: ChatMessage[] }) {
   const hasError = messages.some((message) => message.status === "error")
-  const hasStreaming = messages.some((message) => message.status === "streaming")
+  const hasStreaming = messages.some(
+    (message) => message.status === "streaming"
+  )
 
   if (hasStreaming) {
     return <IconLoader2 className="animate-spin" />
@@ -370,7 +427,9 @@ function ToolGroupIcon({ messages }: { messages: ChatMessage[] }) {
 function ToolCallGroupContent({ messages }: { messages: ChatMessage[] }) {
   const [open, setOpen] = useState(false)
   const hasError = messages.some((message) => message.status === "error")
-  const hasStreaming = messages.some((message) => message.status === "streaming")
+  const hasStreaming = messages.some(
+    (message) => message.status === "streaming"
+  )
   const summary =
     messages.length === 1
       ? firstLine(messages[0].content ?? "")
