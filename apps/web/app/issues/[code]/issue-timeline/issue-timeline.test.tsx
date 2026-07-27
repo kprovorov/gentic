@@ -97,6 +97,57 @@ describe("IssueTimeline", () => {
     ).not.toBeInTheDocument()
   })
 
+  it("uses the first matching user message as the original request", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "issue-created",
+            key: "issue-created",
+            timestamp: "2026-07-01T00:00:00.000Z",
+          },
+          messageItem({
+            id: "user-1",
+            role: "user",
+            content: "Fix the flaky test",
+          }),
+        ]}
+        issuePrompt="Fix the flaky test"
+        attachments={[]}
+      />
+    )
+
+    expect(screen.getByText("Original request")).toBeInTheDocument()
+    expect(screen.queryByText("Request")).not.toBeInTheDocument()
+    expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
+  })
+
+  it("keeps request attachments when the prompt is shown as the first user message", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "issue-created",
+            key: "issue-created",
+            timestamp: "2026-07-01T00:00:00.000Z",
+          },
+          messageItem({
+            id: "user-1",
+            role: "user",
+            content: "Fix the flaky test",
+          }),
+        ]}
+        issuePrompt="Fix the flaky test"
+        attachments={[attachment]}
+      />
+    )
+
+    expect(screen.getByText("Original request")).toBeInTheDocument()
+    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByText("screenshot.png")).toBeInTheDocument()
+    expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
+  })
+
   it("renders a status milestone with from and to badges", () => {
     render(
       <IssueTimeline
