@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
-const isProtectedRoute = createRouteMatcher(["/home(.*)"])
+const isProtectedRoute = createRouteMatcher(["/home(.*)", "/issues(.*)"])
 
 export const proxy = clerkMiddleware(async (auth, request) => {
   if (isProtectedRoute(request)) {
