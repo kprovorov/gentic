@@ -17,5 +17,7 @@ if ! {
   exit 1
 fi
 
+perl -0pi -e 's/\n+\z/\n/' "$TMP_FILE"
+
 mv "$TMP_FILE" "$OUT_FILE"
 trap - EXIT
