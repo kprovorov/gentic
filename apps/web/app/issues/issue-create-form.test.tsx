@@ -28,7 +28,7 @@ describe("IssueCreateForm", () => {
       screen.getByLabelText("Prompt"),
       "Fix the new issue form validation."
     )
-    await user.click(screen.getByRole("button", { name: /run with claude/i }))
+    await user.click(screen.getByRole("button", { name: "Run issue" }))
 
     const projectSelect = screen.getByLabelText("Project")
 
@@ -44,9 +44,7 @@ describe("IssueCreateForm", () => {
   it("preselects the configured default agent", () => {
     render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
 
-    expect(
-      screen.getByRole("button", { name: /run with codex/i })
-    ).toBeVisible()
+    expect(screen.getByText("Codex")).toBeVisible()
     expect(screen.getByDisplayValue("codex")).toHaveAttribute(
       "name",
       "agent_provider"

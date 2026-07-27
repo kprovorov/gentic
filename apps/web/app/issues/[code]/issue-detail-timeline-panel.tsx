@@ -5,6 +5,14 @@ import { useUser } from "@clerk/nextjs"
 
 import type { IssuePullRequest } from "@/app/queries"
 import { cn } from "@gentic/ui/utils"
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@gentic/ui/message-scroller"
 import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import type { IssueEventContract } from "@gentic/validators/realtime"
 
@@ -81,22 +89,31 @@ export function IssueDetailTimelinePanel({
         {chat.liveMessage}
       </div>
 
-      <div className="min-w-0 flex-1 px-6 pt-5 pb-2 xl:min-h-0 xl:overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-[840px] min-w-0 flex-col gap-4">
-          {chat.usageLimitResetAt && chat.status === "held" ? (
-            <div className="inline-flex h-7 max-w-full items-center gap-1 self-start rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
-              Resets {formatDateTime(chat.usageLimitResetAt)}
-            </div>
-          ) : null}
+      <MessageScrollerProvider>
+        <MessageScroller className="min-w-0 flex-1 xl:min-h-0">
+          <MessageScrollerViewport className="px-6 pt-5 pb-2">
+            <MessageScrollerContent className="mx-auto w-full max-w-[840px] gap-4">
+              {chat.usageLimitResetAt && chat.status === "held" ? (
+                <MessageScrollerItem>
+                  <div className="inline-flex h-7 max-w-full items-center gap-1 self-start rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+                    Resets {formatDateTime(chat.usageLimitResetAt)}
+                  </div>
+                </MessageScrollerItem>
+              ) : null}
 
-          <IssueTimeline
-            items={timelineItems}
-            issuePrompt={issuePrompt}
-            attachments={attachments}
-            currentUserName={currentUserName}
-          />
-        </div>
-      </div>
+              <MessageScrollerItem scrollAnchor>
+                <IssueTimeline
+                  items={timelineItems}
+                  issuePrompt={issuePrompt}
+                  attachments={attachments}
+                  currentUserName={currentUserName}
+                />
+              </MessageScrollerItem>
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton direction="end" className="bottom-3" />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
       <div className="flex-none border-t px-6 py-4">
         <div className="mx-auto flex w-full max-w-[840px] min-w-0 flex-col gap-2.5">
