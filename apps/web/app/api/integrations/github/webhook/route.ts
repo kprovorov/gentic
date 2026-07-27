@@ -348,12 +348,16 @@ async function resolveCompletedChecksForRef(
 
   for (const pullNumber of pullNumbers) {
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
-    await issuesService.updateIssueStatusByPrUrlIfStatus(
+    const result = await issuesService.updateIssueStatusByPrUrlIfStatus(
       supabase,
       prUrl,
       "testing",
       status
     )
+
+    if (result && status === "tests-failed") {
+      await issuesService.applyTestsFailed(supabase, result.id, prUrl)
+    }
   }
 }
 

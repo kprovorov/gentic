@@ -40,11 +40,13 @@ export {
   updateIssueStatusByPrUrlIfStatus,
 } from "./issues/workflow"
 export {
+  applyTestsFailed,
   applyChangesRequestedReview,
   type ChangesRequestedReview,
   type ChangesRequestedReviewComment,
   createIssueUserMessage,
   deleteIssueMessage,
+  formatTestsFailedMessage,
   requeueIssueForUserMessage,
   sendIssueMessage,
 } from "./issues/chat"
