@@ -110,6 +110,13 @@ export function formatChangesRequestedMessage(
   return lines.join("\n")
 }
 
+export function formatTestsFailedMessage(prUrl: string): string {
+  return [
+    `GitHub tests failed on ${prUrl}.`,
+    "Inspect the failing checks, push fixes to the same branch, and do not open a new pull request.",
+  ].join("\n")
+}
+
 // Called from the GitHub webhook route when a review comes back as "changes
 // requested". Feeds the review into the transcript and re-queues the run so
 // the same agent session can address it.
@@ -155,5 +162,34 @@ export async function applyChangesRequestedReview(
       })
       .eq("id", issue.id)
       .eq("status", "changes-requested")
+  )
+}
+
+// Called from the GitHub webhook route when CI fails after a PR run. The
+// status transition is guarded by the webhook handler, so this can safely
+// enqueue the follow-up prompt once per testing -> tests-failed transition.
+export async function applyTestsFailed(
+  supabase: Supabase,
+  issueId: string,
+  prUrl: string
+) {
+  unwrap(
+    await supabase.from("messages").insert({
+      issue_id: issueId,
+      role: "user",
+      content: formatTestsFailedMessage(prUrl),
+    })
+  )
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        status: "todo",
+        usage_limit_reset_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issueId)
+      .eq("status", "tests-failed")
   )
 }
