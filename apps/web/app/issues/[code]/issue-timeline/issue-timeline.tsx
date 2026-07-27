@@ -158,7 +158,7 @@ function buildTimelineRows(
           icon: <IconFilePlus />,
           content: "Issue created by you",
         })
-        if (shouldShowRequestPrompt || attachments.length > 0) {
+        if (shouldShowRequestPrompt) {
           rows.push({
             key: "request",
             icon: <IconFileText />,
@@ -221,19 +221,23 @@ function findOriginalRequestMessageKey(
   issuePrompt: string | null
 ): string | null {
   const normalizedPrompt = normalizeRequestText(issuePrompt)
-  if (!normalizedPrompt) {
-    return null
-  }
 
   const firstUserMessage = displayItems.find(
     (displayItem) =>
       displayItem.kind === "message" && displayItem.item.message.role === "user"
   )
 
+  if (firstUserMessage?.kind !== "message") {
+    return null
+  }
+
+  if (!normalizedPrompt) {
+    return firstUserMessage.item.key
+  }
+
   if (
-    firstUserMessage?.kind === "message" &&
     normalizeRequestText(firstUserMessage.item.message.content) ===
-      normalizedPrompt
+    normalizedPrompt
   ) {
     return firstUserMessage.item.key
   }
