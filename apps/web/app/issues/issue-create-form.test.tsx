@@ -28,7 +28,7 @@ describe("IssueCreateForm", () => {
       screen.getByLabelText("Prompt"),
       "Fix the new issue form validation."
     )
-    await user.click(screen.getByRole("button", { name: /run with claude/i }))
+    await user.click(screen.getByRole("button", { name: "Run issue" }))
 
     const projectSelect = screen.getByLabelText("Project")
 
