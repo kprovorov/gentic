@@ -122,7 +122,7 @@ describe("IssueTimeline", () => {
     expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
   })
 
-  it("keeps request attachments when the prompt is shown as the first user message", () => {
+  it("uses the first user message as the original request when the prompt is empty", () => {
     render(
       <IssueTimeline
         items={[
@@ -135,17 +135,38 @@ describe("IssueTimeline", () => {
             id: "user-1",
             role: "user",
             content: "Fix the flaky test",
+            attachments: [attachment],
           }),
         ]}
-        issuePrompt="Fix the flaky test"
+        issuePrompt={null}
         attachments={[attachment]}
       />
     )
 
     expect(screen.getByText("Original request")).toBeInTheDocument()
-    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.queryByText("Request")).not.toBeInTheDocument()
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
     expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
+  })
+
+  it("keeps request attachments when there is no user message yet", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "issue-created",
+            key: "issue-created",
+            timestamp: "2026-07-01T00:00:00.000Z",
+          },
+        ]}
+        issuePrompt={null}
+        attachments={[attachment]}
+      />
+    )
+
+    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByText("No prompt provided.")).toBeInTheDocument()
+    expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
 
   it("renders a status milestone with from and to badges", () => {
