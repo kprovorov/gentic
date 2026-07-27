@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import {
   IconAlertCircle,
   IconArrowRight,
-  IconBulb,
+  IconBrain,
   IconCheck,
   IconChevronDown,
   IconFilePlus,
@@ -211,22 +211,19 @@ function TimelineRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="relative flex min-w-0 items-start gap-3 pb-5 last:pb-0">
-      {!isLast ? (
-        <span
-          aria-hidden="true"
-          className="absolute top-7 bottom-[-1.25rem] left-3.5 w-px -translate-x-1/2 bg-border"
-        />
-      ) : null}
-      <MarkerIcon
-        className={cn(
-          "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground [&_svg]:size-3.5",
-          markerClassName ?? "bg-muted"
-        )}
-      >
-        {icon}
-      </MarkerIcon>
-      <MarkerContent className="min-w-0 flex-1 pt-1 text-[13px]">
+    <div className="flex min-w-0 items-stretch gap-3.5">
+      <div className="flex w-[22px] shrink-0 flex-col items-center">
+        <MarkerIcon
+          className={cn(
+            "flex size-[22px] shrink-0 items-center justify-center rounded-full text-muted-foreground [&_svg]:size-3",
+            markerClassName ?? "bg-muted"
+          )}
+        >
+          {icon}
+        </MarkerIcon>
+        {!isLast ? <div className="mt-1 w-px flex-1 bg-border" /> : null}
+      </div>
+      <MarkerContent className="min-w-0 flex-1 pb-[18px] text-[12.5px]">
         {children}
       </MarkerContent>
     </div>
@@ -267,7 +264,7 @@ function MessageIcon({
   currentUserName?: string | null
 }) {
   if (message.kind === "thinking") {
-    return <IconBulb />
+    return <IconBrain />
   }
   if (message.role === "system") {
     return <IconInfoCircle />
@@ -331,22 +328,25 @@ function ThinkingContent({ message }: { message: ChatMessage }) {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+          className="flex w-full items-center gap-1.5 text-[11px] font-semibold tracking-[.06em] text-muted-foreground uppercase"
         >
           {isStreaming ? (
             <IconLoader2 className="size-3.5 shrink-0 animate-spin" />
-          ) : null}
+          ) : (
+            <IconBrain className="size-3.5 shrink-0" />
+          )}
           Thinking
+          <span className="flex-1" />
           <IconChevronDown
             className={cn(
-              "size-3.5 shrink-0 transition-transform",
+              "size-3.5 shrink-0 normal-case transition-transform",
               open && "rotate-180"
             )}
           />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 max-w-full overflow-x-auto rounded-lg border border-dashed p-3 whitespace-pre-wrap text-muted-foreground">
+        <div className="mt-2 max-w-full overflow-x-auto rounded-lg border border-dashed p-3 text-[13px] whitespace-pre-wrap text-muted-foreground italic">
           {message.content || "Thinking..."}
         </div>
       </CollapsibleContent>
@@ -430,32 +430,47 @@ function RequestContent({
   attachments: Attachment[]
 }) {
   const [open, setOpen] = useState(true)
+  const hint = open
+    ? attachments.length > 0
+      ? `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`
+      : null
+    : firstLine(prompt ?? "")
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
       <CollapsibleTrigger asChild>
-        <button type="button" className="flex items-center gap-1.5 font-medium">
-          Request
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-center gap-2"
+        >
+          <span className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
+            Request
+          </span>
+          {hint ? (
+            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
+              {hint}
+            </span>
+          ) : (
+            <span className="flex-1" />
+          )}
           <IconChevronDown
             className={cn(
-              "size-3.5 shrink-0 transition-transform",
+              "size-3.5 shrink-0 text-muted-foreground transition-transform",
               open && "rotate-180"
             )}
           />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 grid min-w-0 gap-3">
-          <Bubble
-            variant="secondary"
-            align="start"
-            className="w-full max-w-full"
-          >
-            <BubbleContent className="w-full whitespace-pre-wrap">
-              {prompt || "No prompt provided."}
-            </BubbleContent>
-          </Bubble>
-          <AttachmentPreviews attachments={attachments} />
+        <div className="mt-2 min-w-0 rounded-[20px] bg-muted/40 p-4">
+          <p className="text-sm leading-6 whitespace-pre-wrap">
+            {prompt || "No prompt provided."}
+          </p>
+          {attachments.length > 0 ? (
+            <div className="mt-3.5 border-t pt-3">
+              <AttachmentPreviews attachments={attachments} />
+            </div>
+          ) : null}
         </div>
       </CollapsibleContent>
     </Collapsible>

@@ -31,7 +31,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         : []
 
   return (
-    <div className="min-w-0 bg-background px-4 py-6 md:px-8 md:py-8">
+    <div className="flex min-w-0 flex-col bg-background xl:h-[calc(100svh-3.5rem)] xl:overflow-hidden">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={[
@@ -43,35 +43,33 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         ]}
       />
       <IssueSlugUrlSync key={issue.title ?? ""} issue={issue} />
-      <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6">
-        <IssueDetailHeader issue={issue} />
+      <IssueDetailHeader issue={issue} />
 
-        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
-          <IssueDetailTimelinePanel
+      <div className="flex min-w-0 flex-1 flex-col border-t xl:min-h-0 xl:flex-row">
+        <IssueDetailTimelinePanel
+          issueId={issue.id}
+          issueCreatedAt={issue.created_at}
+          issuePrompt={issue.prompt}
+          agentProvider={issue.agent_provider}
+          initialMessages={messages}
+          initialStatus={issue.status}
+          initialUsageLimitResetAt={issue.usage_limit_reset_at}
+          initialPrUrl={issue.pr_url}
+          initialPullRequests={pullRequests}
+          attachments={attachments}
+          events={events}
+        />
+
+        <aside className="min-w-0 border-t bg-muted/25 xl:w-[19rem] xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+          <IssueDetailRail
             issueId={issue.id}
-            issueCreatedAt={issue.created_at}
-            issuePrompt={issue.prompt}
-            agentProvider={issue.agent_provider}
-            initialMessages={messages}
-            initialStatus={issue.status}
-            initialUsageLimitResetAt={issue.usage_limit_reset_at}
-            initialPrUrl={issue.pr_url}
-            initialPullRequests={pullRequests}
+            status={issue.status}
+            pullRequests={displayedPullRequests}
+            relations={relations}
+            relationCandidates={relationCandidates}
             attachments={attachments}
-            events={events}
           />
-
-          <div className="min-w-0 xl:sticky xl:top-6">
-            <IssueDetailRail
-              issueId={issue.id}
-              status={issue.status}
-              pullRequests={displayedPullRequests}
-              relations={relations}
-              relationCandidates={relationCandidates}
-              attachments={attachments}
-            />
-          </div>
-        </section>
+        </aside>
       </div>
     </div>
   )

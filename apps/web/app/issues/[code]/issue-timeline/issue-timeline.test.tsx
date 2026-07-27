@@ -83,14 +83,18 @@ describe("IssueTimeline", () => {
             timestamp: "2026-07-01T00:00:00.000Z",
           },
         ]}
-        issuePrompt="Fix the flaky test"
+        issuePrompt={"Fix the flaky test\nIt fails intermittently in CI."}
         attachments={[]}
       />
     )
 
-    expect(screen.getByText("Fix the flaky test")).toBeVisible()
+    expect(
+      screen.getByText("It fails intermittently in CI.", { exact: false })
+    ).toBeVisible()
     await user.click(screen.getByRole("button", { name: /Request/ }))
-    expect(screen.queryByText("Fix the flaky test")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("It fails intermittently in CI.", { exact: false })
+    ).not.toBeInTheDocument()
   })
 
   it("renders a status milestone with from and to badges", () => {

@@ -6,6 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconCheck,
   IconChevronDown,
+  IconCircleDashed,
+  IconClock,
   IconDownload,
   IconExternalLink,
   IconGitMerge,
@@ -28,7 +30,6 @@ import {
   statusIcons,
   statusLabels,
   statusOptions,
-  statusStyles,
 } from "@/app/issues/issues-columns"
 import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
@@ -112,16 +113,15 @@ function IssueDetailStatus({
           type="button"
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[status]}`}
-          className={cn(
-            "inline-flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            statusStyles[status]
-          )}
+          className="flex h-9 w-full items-center gap-2.5 rounded-2xl border border-border bg-background px-3 text-[13px] text-foreground transition-[color,box-shadow,background-color] hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30"
         >
-          <StatusIcon className="size-4 shrink-0" />
+          <StatusIcon
+            className={cn("size-[15px] shrink-0", statusIconStyles[status])}
+          />
           <span className="min-w-0 flex-1 truncate text-left">
             {statusLabels[status]}
           </span>
-          <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
+          <IconChevronDown className="size-[15px] shrink-0 opacity-65" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
@@ -162,12 +162,14 @@ function IssueDetailPullRequests({
 
   if (pullRequests.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No pull requests yet.</p>
+      <p className="text-[12.5px] text-muted-foreground">
+        No pull requests yet.
+      </p>
     )
   }
 
   return (
-    <ul className="grid min-w-0 gap-2">
+    <ul className="grid min-w-0 gap-1.5">
       {pullRequests.map((pullRequest) => {
         const { repo, number } = parsePullRequestUrl(pullRequest.url)
 
@@ -177,7 +179,7 @@ function IssueDetailPullRequests({
               href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
-              className="flex min-w-0 items-center gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border hover:bg-muted/40"
+              className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border hover:bg-muted/40"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 {isMerged ? (
@@ -187,8 +189,8 @@ function IssueDetailPullRequests({
                 )}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{repo}</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-[12.5px] font-medium">{repo}</p>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">
                   {number ? `#${number} · ` : ""}
                   {isMerged ? "merged" : "open"}
                 </p>
@@ -206,10 +208,14 @@ function IssueDetailRelationRow({
   issueId,
   relation,
   relatedIssue,
+  icon,
+  iconClassName,
 }: {
   issueId: string
   relation: IssueRelation
   relatedIssue: IssueRelationIssue
+  icon: typeof IconClock
+  iconClassName: string
 }) {
   const queryClient = useQueryClient()
   const relatedIssueHref = getIssueHref(relatedIssue) ?? "/issues"
@@ -229,11 +235,14 @@ function IssueDetailRelationRow({
     mutation.mutate(new FormData(event.currentTarget))
   }
 
+  const Icon = icon
+
   return (
-    <li className="flex items-center justify-between gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border">
+    <li className="flex items-center gap-2 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border">
+      <Icon className={cn("size-3.5 shrink-0", iconClassName)} />
       <Link
         href={relatedIssueHref}
-        className="min-w-0 flex-1 truncate text-sm font-medium hover:text-primary"
+        className="min-w-0 flex-1 truncate text-[12.5px] font-medium hover:text-primary"
       >
         {relatedIssue.title ?? "Generating title…"}
       </Link>
@@ -268,12 +277,14 @@ function IssueDetailRelationGroup({
     : Boolean(children)
 
   return (
-    <div className="grid gap-2">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <div className="grid gap-1.5">
+      <p className="text-[10.5px] font-semibold tracking-[.06em] text-muted-foreground/70 uppercase">
+        {label}
+      </p>
       {hasChildren ? (
-        <ul className="grid gap-2">{children}</ul>
+        <ul className="grid gap-1.5">{children}</ul>
       ) : (
-        <p className="text-sm text-muted-foreground">{empty}</p>
+        <p className="text-[12.5px] text-muted-foreground">{empty}</p>
       )}
     </div>
   )
@@ -314,7 +325,7 @@ function IssueDetailRelations({
   )
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-3">
       <IssueDetailRelationGroup label="Blocks" empty="Not blocking any issue.">
         {blocking.map((relation) => (
           <IssueDetailRelationRow
@@ -322,6 +333,8 @@ function IssueDetailRelations({
             issueId={issueId}
             relation={relation}
             relatedIssue={relation.target_issue}
+            icon={IconClock}
+            iconClassName="text-blue-700 dark:text-blue-300"
           />
         ))}
       </IssueDetailRelationGroup>
@@ -336,6 +349,8 @@ function IssueDetailRelations({
             issueId={issueId}
             relation={relation}
             relatedIssue={relation.source_issue}
+            icon={IconCircleDashed}
+            iconClassName="text-muted-foreground"
           />
         ))}
       </IssueDetailRelationGroup>
@@ -420,24 +435,26 @@ function IssueDetailAttachmentRow({
   }
 
   return (
-    <li className="flex min-w-0 items-center gap-3 rounded-2xl bg-background px-3 py-2 ring-1 ring-border">
+    <li className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-background py-1.5 pr-2 pl-1.5 ring-1 ring-border">
       {attachment.thumbnailUrl ? (
         // Supabase signs this URL with Image Transformation options.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={attachment.thumbnailUrl}
           alt=""
-          className="size-9 shrink-0 rounded-lg object-cover"
+          className="size-[34px] shrink-0 rounded-[9px] object-cover"
           loading="lazy"
         />
       ) : (
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-muted-foreground">
           <IconPaperclip className="size-4" />
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{attachment.fileName}</p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-[12.5px] font-medium">
+          {attachment.fileName}
+        </p>
+        <p className="truncate text-[11px] text-muted-foreground">
           {formatSize(attachment.sizeBytes)}
         </p>
       </div>
@@ -490,9 +507,11 @@ function IssueDetailAttachments({
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2.5">
       {attachments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No files attached.</p>
+        <p className="text-[12.5px] text-muted-foreground">
+          No files attached.
+        </p>
       ) : (
         <ul className="grid min-w-0 gap-2">
           {attachments.map((attachment) => (
@@ -539,8 +558,8 @@ function RailSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-b border-border/70 p-4 last:border-b-0">
-      <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+    <div className="px-[18px] py-4">
+      <p className="mb-2.5 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
         {title}
       </p>
       {children}
@@ -564,7 +583,7 @@ export function IssueDetailRail({
   attachments: Attachment[]
 }) {
   return (
-    <aside className="min-w-0 overflow-hidden rounded-3xl bg-muted/25 ring-1 ring-border/70">
+    <div className="min-w-0 divide-y divide-border/70">
       <RailSection title="Status">
         <IssueDetailStatus issueId={issueId} status={status} />
       </RailSection>
@@ -587,6 +606,6 @@ export function IssueDetailRail({
       <RailSection title="Attachments">
         <IssueDetailAttachments issueId={issueId} attachments={attachments} />
       </RailSection>
-    </aside>
+    </div>
   )
 }

@@ -4,7 +4,9 @@ import type React from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconDownload,
+  IconFileText,
   IconPaperclip,
+  IconPhoto,
   IconTrash,
   IconUpload,
 } from "@tabler/icons-react"
@@ -22,6 +24,24 @@ export type Attachment = {
   thumbnailUrl: string | null
 }
 
+function formatSize(bytes: number | null): string {
+  if (!bytes) {
+    return ""
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileExtension(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf(".")
+  return dotIndex === -1 ? "" : fileName.slice(dotIndex + 1).toUpperCase()
+}
+
 // Read-only attachment list, reused wherever attachments are shown alongside
 // a message or request instead of being managed (uploaded/deleted).
 export function AttachmentPreviews({
@@ -34,53 +54,62 @@ export function AttachmentPreviews({
   }
 
   return (
-    <div className="mt-2 grid min-w-0 gap-1.5">
-      {attachments.map((attachment) => (
-        <div
-          key={attachment.id}
-          className="flex max-w-full min-w-0 items-center gap-2 rounded-md border bg-background/70 px-2 py-1 text-xs"
-        >
-          {attachment.thumbnailUrl ? (
-            // Supabase signs this URL with Image Transformation options.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={attachment.thumbnailUrl}
-              alt=""
-              className="size-7 shrink-0 rounded border object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <IconPaperclip className="size-3.5 shrink-0 text-muted-foreground" />
-          )}
-          <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
-          {attachment.url ? (
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              download={attachment.fileName}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <IconDownload className="size-3.5" />
-            </a>
-          ) : null}
-        </div>
-      ))}
+    <div className="mt-2 flex max-w-full flex-wrap items-center gap-2">
+      {attachments.map((attachment) => {
+        const meta = [fileExtension(attachment.fileName), formatSize(attachment.sizeBytes)]
+          .filter(Boolean)
+          .join(" · ")
+
+        return (
+          <span
+            key={attachment.id}
+            className="flex max-w-full items-center gap-2.5 rounded-2xl bg-background p-1.5 text-xs ring-1 ring-border"
+          >
+            {attachment.thumbnailUrl ? (
+              // Supabase signs this URL with Image Transformation options.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={attachment.thumbnailUrl}
+                alt=""
+                className="size-[34px] shrink-0 rounded-[9px] object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-muted-foreground">
+                {/\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.fileName) ? (
+                  <IconPhoto className="size-4" />
+                ) : (
+                  <IconFileText className="size-4" />
+                )}
+              </span>
+            )}
+            <span className="grid min-w-0 pr-0.5 leading-[1.35]">
+              <span className="min-w-0 truncate font-medium">
+                {attachment.fileName}
+              </span>
+              {meta ? (
+                <span className="text-[11px] text-muted-foreground">
+                  {meta}
+                </span>
+              ) : null}
+            </span>
+            {attachment.url ? (
+              <Button asChild variant="ghost" size="icon-xs">
+                <a
+                  href={attachment.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={attachment.fileName}
+                >
+                  <IconDownload />
+                </a>
+              </Button>
+            ) : null}
+          </span>
+        )
+      })}
     </div>
   )
-}
-
-function formatSize(bytes: number | null): string {
-  if (!bytes) {
-    return ""
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function Attachments({
