@@ -3,6 +3,7 @@ import "server-only"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
+import * as userSettingsService from "@gentic/services/user-settings"
 import { ServiceError } from "@gentic/services/errors"
 import {
   agentProviderSchema,
@@ -158,9 +159,15 @@ export type IssuesData = HomeData
 export type SettingsData = {
   projects: SettingsProject[]
   githubIntegration: githubIntegrationsService.GithubIntegration | null
+  defaultAgentProvider: "claude_code" | "codex"
   githubAppConfigured: boolean
   githubRepositories: GithubRepositoryOption[]
   githubRepositoriesError: string | null
+}
+
+export type NewIssueData = {
+  projects: ProjectOption[]
+  defaultAgentProvider: "claude_code" | "codex"
 }
 
 export type IssueDetailData = {
@@ -289,9 +296,10 @@ export async function getSettingsData(
   context?: AuthenticatedContext
 ): Promise<SettingsData> {
   const { supabase, userId } = await resolveContext(context)
-  const [projects, githubIntegration] = await Promise.all([
+  const [projects, githubIntegration, userSettings] = await Promise.all([
     projectsService.listProjects(supabase, userId),
     githubIntegrationsService.getGithubIntegration(supabase, userId),
+    userSettingsService.getUserSettings(supabase, userId),
   ])
 
   let githubRepositories: GithubRepositoryOption[] = []
@@ -321,6 +329,7 @@ export async function getSettingsData(
       auto_respond_to_reviews: project.auto_respond_to_reviews,
     })),
     githubIntegration,
+    defaultAgentProvider: userSettings.default_agent_provider,
     githubAppConfigured: Boolean(process.env.GITHUB_APP_SLUG),
     githubRepositories,
     githubRepositoriesError,
@@ -329,9 +338,12 @@ export async function getSettingsData(
 
 export async function getNewIssueData(
   context?: AuthenticatedContext
-): Promise<{ projects: ProjectOption[] }> {
+): Promise<NewIssueData> {
   const { supabase, userId } = await resolveContext(context)
-  const projects = await projectsService.listProjects(supabase, userId)
+  const [projects, userSettings] = await Promise.all([
+    projectsService.listProjects(supabase, userId),
+    userSettingsService.getUserSettings(supabase, userId),
+  ])
 
   return {
     projects: projects.map((project) => ({
@@ -340,6 +352,7 @@ export async function getNewIssueData(
       repo: project.repo,
       key: project.key,
     })),
+    defaultAgentProvider: userSettings.default_agent_provider,
   }
 }
 

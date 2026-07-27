@@ -55,4 +55,14 @@ describe("IssueCreateForm", () => {
       screen.getByText("Select a project before running this issue.")
     ).toBeVisible()
   })
+
+  it("preselects the configured default agent", () => {
+    render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
+
+    expect(screen.getByText("Codex")).toBeVisible()
+    expect(screen.getByDisplayValue("codex")).toHaveAttribute(
+      "name",
+      "agent_provider"
+    )
+  })
 })

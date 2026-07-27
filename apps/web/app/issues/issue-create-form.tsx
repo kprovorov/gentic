@@ -24,15 +24,17 @@ import { MessageComposer } from "./message-composer/message-composer"
 
 export function IssueCreateForm({
   projects,
+  defaultAgentProvider = "claude_code",
   className,
 }: {
   projects: ProjectOption[]
+  defaultAgentProvider?: AgentProvider
   className?: string
 }) {
   const [prompt, setPrompt] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [agentProvider, setAgentProvider] =
-    useState<AgentProvider>("claude_code")
+    useState<AgentProvider>(defaultAgentProvider)
   const [projectId, setProjectId] = useState("")
   const [projectError, setProjectError] = useState("")
   const projectTriggerRef = useRef<HTMLButtonElement>(null)

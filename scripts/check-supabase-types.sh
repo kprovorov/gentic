@@ -16,4 +16,6 @@ if ! {
   exit 1
 fi
 
+perl -0pi -e 's/\n+\z/\n/' "$TMP_FILE"
+
 diff -u "$OUT_FILE" "$TMP_FILE"

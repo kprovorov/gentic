@@ -470,7 +470,12 @@ function ToolCallGroupContent({ messages }: { messages: ChatMessage[] }) {
           {messages.map((message) => (
             <pre
               key={message.clientKey ?? message.id}
-              className="max-h-48 max-w-full overflow-auto rounded-lg border bg-muted/40 p-2 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground"
+              className={cn(
+                "max-h-48 max-w-full overflow-auto rounded-lg border p-2 font-mono text-xs break-words whitespace-pre-wrap",
+                message.status === "error"
+                  ? "border-destructive/40 bg-destructive/5 text-destructive"
+                  : "bg-muted/40 text-muted-foreground"
+              )}
             >
               {message.content || "Tool call"}
             </pre>
