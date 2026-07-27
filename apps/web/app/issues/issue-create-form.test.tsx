@@ -19,7 +19,7 @@ const projects = [
 ]
 
 describe("IssueCreateForm", () => {
-  it("highlights the project select when running without a selected project", async () => {
+  it("highlights the project picker when running without a selected project", async () => {
     const user = userEvent.setup()
 
     render(<IssueCreateForm projects={projects} />)
@@ -30,14 +30,30 @@ describe("IssueCreateForm", () => {
     )
     await user.click(screen.getByRole("button", { name: "Run issue" }))
 
-    const projectSelect = screen.getByLabelText("Project")
+    const projectPicker = screen.getByLabelText("Project")
 
-    expect(projectSelect).toHaveAttribute("aria-invalid", "true")
-    expect(projectSelect).toHaveAccessibleDescription(
+    expect(projectPicker).toHaveAttribute("data-invalid", "true")
+    expect(projectPicker).toHaveAccessibleDescription(
       "Select a project before running this issue."
     )
     expect(
       screen.getByText("Select a project before running this issue.")
     ).toBeVisible()
+  })
+
+  it("stores the selected project in the issue form", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByLabelText("Project"))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+
+    expect(screen.getByLabelText("Project")).toHaveTextContent(
+      "Gentic (openai/gentic)"
+    )
+    expect(document.querySelector('input[name="project_id"]')).toHaveValue(
+      projects[0].id
+    )
   })
 })
