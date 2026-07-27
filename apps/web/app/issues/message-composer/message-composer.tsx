@@ -56,7 +56,7 @@ export function MessageComposer({
   return (
     <form
       onSubmit={onSubmit}
-      className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-end"
+      className="flex min-w-0 items-end gap-2.5"
     >
       <div className="relative min-w-0 flex-1">
         {slashCommands.length > 0 ? (
