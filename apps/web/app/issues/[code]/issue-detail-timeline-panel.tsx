@@ -1,9 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useUser } from "@clerk/nextjs"
+import { IconArrowDown } from "@tabler/icons-react"
 
 import type { IssuePullRequest } from "@/app/queries"
+import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 import {
   MessageScroller,
@@ -67,7 +69,6 @@ export function IssueDetailTimelinePanel({
   const { user } = useUser()
   const currentUserName =
     user?.fullName ?? user?.primaryEmailAddress?.emailAddress
-
   const timelineItems = useMemo(
     () =>
       buildIssueTimeline({
@@ -77,6 +78,11 @@ export function IssueDetailTimelinePanel({
       }),
     [issueCreatedAt, chat.displayedMessages, events]
   )
+  const {
+    anchorRef: mobileScrollAnchorRef,
+    isVisible: isMobileScrollButtonVisible,
+    scrollToAnchor: scrollToMobileAnchor,
+  } = useMobileTimelineScrollButton(timelineItems.length)
 
   return (
     <div className="flex min-w-0 flex-1 flex-col xl:min-h-0">
@@ -109,9 +115,30 @@ export function IssueDetailTimelinePanel({
                   currentUserName={currentUserName}
                 />
               </MessageScrollerItem>
+              <MessageScrollerItem className="h-px" aria-hidden="true">
+                <div ref={mobileScrollAnchorRef} />
+              </MessageScrollerItem>
             </MessageScrollerContent>
           </MessageScrollerViewport>
-          <MessageScrollerButton direction="end" className="bottom-3" />
+          <MessageScrollerButton
+            direction="end"
+            className="bottom-3 hidden xl:inline-flex"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className={cn(
+              "fixed bottom-5 left-1/2 z-30 -translate-x-1/2 border-border bg-background text-foreground shadow-md transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground xl:hidden",
+              isMobileScrollButtonVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none translate-y-full scale-95 opacity-0"
+            )}
+            onClick={scrollToMobileAnchor}
+            aria-label="Scroll to end"
+          >
+            <IconArrowDown />
+          </Button>
         </MessageScroller>
       </MessageScrollerProvider>
 
@@ -143,6 +170,53 @@ export function IssueDetailTimelinePanel({
       </div>
     </div>
   )
+}
+
+function useMobileTimelineScrollButton(itemCount: number) {
+  const anchorRef = useRef<HTMLDivElement | null>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  const updateVisibility = useCallback(() => {
+    const anchor = anchorRef.current
+    if (!anchor) {
+      setIsVisible(false)
+      return
+    }
+
+    const isMobileLayout = !window.matchMedia("(min-width: 1280px)").matches
+    if (!isMobileLayout) {
+      setIsVisible(false)
+      return
+    }
+
+    setIsVisible(anchor.getBoundingClientRect().top > window.innerHeight - 96)
+  }, [])
+
+  const requestVisibilityUpdate = useCallback(() => {
+    const frame = window.requestAnimationFrame(updateVisibility)
+    return () => window.cancelAnimationFrame(frame)
+  }, [updateVisibility])
+
+  useEffect(() => {
+    const cancelVisibilityUpdate = requestVisibilityUpdate()
+    window.addEventListener("scroll", updateVisibility, { passive: true })
+    window.addEventListener("resize", updateVisibility)
+    return () => {
+      cancelVisibilityUpdate()
+      window.removeEventListener("scroll", updateVisibility)
+      window.removeEventListener("resize", updateVisibility)
+    }
+  }, [requestVisibilityUpdate, updateVisibility])
+
+  useEffect(() => {
+    return requestVisibilityUpdate()
+  }, [itemCount, requestVisibilityUpdate])
+
+  const scrollToAnchor = useCallback(() => {
+    anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+  }, [])
+
+  return { anchorRef, isVisible, scrollToAnchor }
 }
 
 function RealtimeConnectionNotice({
