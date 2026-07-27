@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { IconFolder, IconHome, IconListDetails } from "@tabler/icons-react"
+import { IconFolder, IconListDetails } from "@tabler/icons-react"
 
 import {
   Sidebar,
@@ -19,7 +19,6 @@ import { NavMain } from "./nav-main"
 import { NavUser } from "./nav-user"
 
 const navMain = [
-  { title: "Home", href: "/home", icon: IconHome },
   { title: "Issues", href: "/issues", icon: IconListDetails },
   { title: "Projects", href: "/settings", icon: IconFolder },
 ]
@@ -38,7 +37,7 @@ export function AppSidebar({
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <Link href="/home" onClick={() => setOpenMobile(false)}>
+              <Link href="/issues" onClick={() => setOpenMobile(false)}>
                 <Logo className="size-5" />
                 <span className="font-heading text-base font-semibold">
                   Gentic

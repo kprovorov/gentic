@@ -148,8 +148,6 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         : null,
     ])
   })
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   redirect(getIssueHref(created) ?? "/issues")
 }
@@ -179,8 +177,6 @@ export async function updateIssue(formData: FormData) {
     agent_provider,
     type,
   })
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   revalidateIssuePath(issue)
   redirect(getIssueHref(issue) ?? "/issues")
@@ -191,8 +187,6 @@ export async function deleteIssue(formData: FormData) {
   const id = z.string().uuid().parse(getString(formData, "id"))
 
   await issuesService.deleteIssue(supabase, userId, id)
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   redirect("/issues")
 }
@@ -210,8 +204,6 @@ export async function resetIssueAgent(formData: FormData) {
     id,
     agentProvider
   )
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
 
@@ -224,8 +216,6 @@ export async function updateIssueStatus(formData: FormData) {
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.updateIssueStatus(supabase, userId, id, status)
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
 }
@@ -236,8 +226,6 @@ export async function bulkUpdateIssueStatus(formData: FormData) {
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.bulkUpdateIssueStatus(supabase, userId, ids, status)
-
-  revalidatePath("/home")
   revalidatePath("/issues")
 }
 
@@ -254,8 +242,6 @@ export async function bulkUpdateIssueAgentProvider(formData: FormData) {
     ids,
     agentProvider
   )
-
-  revalidatePath("/home")
   revalidatePath("/issues")
 }
 
@@ -264,8 +250,6 @@ export async function bulkDeleteIssues(formData: FormData) {
   const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
 
   await issuesService.bulkDeleteIssues(supabase, userId, ids)
-
-  revalidatePath("/home")
   revalidatePath("/issues")
 }
 
@@ -282,8 +266,6 @@ export async function updateIssueAgentProvider(formData: FormData) {
     id,
     agent_provider
   )
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
 }
@@ -304,8 +286,6 @@ export async function addIssueRelation(formData: FormData) {
     related_issue_id,
     direction
   )
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, issue_id)
 }
@@ -318,8 +298,6 @@ export async function deleteIssueRelation(formData: FormData) {
   })
 
   await issuesService.deleteIssueRelation(supabase, userId, id, issue_id)
-
-  revalidatePath("/home")
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, issue_id)
 }
