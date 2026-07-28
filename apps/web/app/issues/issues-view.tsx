@@ -30,6 +30,7 @@ import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
+import { Checkbox } from "@gentic/ui/checkbox"
 import { DataTable } from "@gentic/ui/data-table"
 import {
   DropdownMenu,
@@ -154,16 +155,32 @@ function IssueRow({
   issue,
   isBlocked,
   isBlocking,
+  isSelected,
+  onSelectedChange,
 }: {
   issue: HomeIssue
   isBlocked: boolean
   isBlocking: boolean
+  isSelected: boolean
+  onSelectedChange: (selected: boolean) => void
 }) {
   const TypeIcon = issueTypeIcons[issue.type]
   const issueHref = getIssueHref(issue) ?? "/issues"
 
   return (
-    <div className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem]">
+    <div
+      className={cn(
+        "grid grid-cols-[1rem_minmax(0,1fr)] gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[1rem_minmax(0,1fr)_minmax(10rem,14rem)_7rem]",
+        isSelected && "bg-primary/5"
+      )}
+    >
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={(value) => onSelectedChange(value === true)}
+        onClick={(event) => event.stopPropagation()}
+        aria-label={`Select ${issue.code ?? issue.title ?? "issue"}`}
+        className="mt-1"
+      />
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <IssueStatusMenu issue={issue} />
         <Link
@@ -216,7 +233,7 @@ function IssueRow({
           </span>
         ) : null}
       </div>
-      <div className="min-w-0 text-sm text-muted-foreground">
+      <div className="col-start-2 min-w-0 text-sm text-muted-foreground md:col-start-auto">
         <span className="block truncate">
           {issue.projects?.name ?? "Unknown project"}
         </span>
@@ -224,7 +241,7 @@ function IssueRow({
           <span className="block truncate text-xs">{issue.projects.repo}</span>
         ) : null}
       </div>
-      <div className="text-sm text-muted-foreground md:text-right">
+      <div className="col-start-2 text-sm text-muted-foreground md:col-start-auto md:text-right">
         {formatDate(issue.created_at)}
       </div>
     </div>
@@ -457,45 +474,71 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       ([statusA], [statusB]) => statusOrder[statusA] - statusOrder[statusB]
     )
   }, [pagedIssues])
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection]
+  )
+  const pagedIssueIds = useMemo(
+    () => pagedIssues.map((issue) => issue.id),
+    [pagedIssues]
+  )
+  const selectedPagedIssueCount = pagedIssueIds.filter(
+    (id) => rowSelection[id]
+  ).length
+  const allPagedIssuesSelected =
+    pagedIssueIds.length > 0 && selectedPagedIssueCount === pagedIssueIds.length
+  const pageSelectionChecked = allPagedIssuesSelected
+    ? true
+    : selectedPagedIssueCount > 0
+      ? "indeterminate"
+      : false
 
   function updateGlobalFilter(value: string) {
     setGlobalFilter(value)
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function toggleStatusFilter(status: HomeIssue["status"]) {
     setStatusFilter((current) => toggleInSet(current, status))
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function toggleTypeFilter(type: HomeIssue["type"]) {
     setTypeFilter((current) => toggleInSet(current, type))
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function toggleProjectFilter(projectId: string) {
     setProjectFilter((current) => toggleInSet(current, projectId))
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function updateBlockingFilter(value: BlockingFilter) {
     setBlockingFilter(value)
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function clearStatusFilter() {
     setStatusFilter(new Set())
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function clearTypeFilter() {
     setTypeFilter(new Set())
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function clearProjectFilter() {
     setProjectFilter(new Set())
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function clearFilters() {
@@ -505,6 +548,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setBlockingFilter("all")
     setProjectFilter(new Set())
     setPageIndex(0)
+    setRowSelection({})
   }
 
   function toggleStatus(status: HomeIssue["status"]) {
@@ -515,6 +559,36 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         next.delete(status)
       } else {
         next.add(status)
+      }
+
+      return next
+    })
+  }
+
+  function toggleIssueSelected(issueId: string, selected: boolean) {
+    setRowSelection((current) => {
+      const next = { ...current }
+
+      if (selected) {
+        next[issueId] = true
+      } else {
+        delete next[issueId]
+      }
+
+      return next
+    })
+  }
+
+  function togglePagedIssuesSelected(selected: boolean) {
+    setRowSelection((current) => {
+      const next = { ...current }
+
+      for (const id of pagedIssueIds) {
+        if (selected) {
+          next[id] = true
+        } else {
+          delete next[id]
+        }
       }
 
       return next
@@ -820,72 +894,99 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 No results.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-                {groupedIssues.map(([status, issues]) => {
-                  const StatusIcon = statusIcons[status]
-                  const isCollapsed = collapsedStatuses.has(status)
-                  const groupContentId = `issues-group-${status}`
+              <div className="grid gap-4">
+                {selectedIds.length > 0 ? (
+                  <BulkActionsToolbar
+                    selectedIds={selectedIds}
+                    onDone={() => setRowSelection({})}
+                  />
+                ) : null}
+                <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                  <div className="flex items-center gap-3 border-b bg-muted/35 px-4 py-3">
+                    <Checkbox
+                      checked={pageSelectionChecked}
+                      onCheckedChange={(value) =>
+                        togglePagedIssuesSelected(value === true)
+                      }
+                      aria-label="Select all visible issues"
+                    />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Select visible issues
+                    </span>
+                  </div>
+                  {groupedIssues.map(([status, issues]) => {
+                    const StatusIcon = statusIcons[status]
+                    const isCollapsed = collapsedStatuses.has(status)
+                    const groupContentId = `issues-group-${status}`
 
-                  return (
-                    <section key={status} className="border-b last:border-b-0">
-                      <button
-                        type="button"
-                        className="group flex w-full items-center gap-3 bg-muted/55 px-4 py-3 text-left transition-all duration-150 hover:bg-muted hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
-                        aria-expanded={!isCollapsed}
-                        aria-controls={groupContentId}
-                        onClick={() => toggleStatus(status)}
+                    return (
+                      <section
+                        key={status}
+                        className="border-b last:border-b-0"
                       >
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 group-hover:bg-background/80 group-hover:text-foreground">
-                          <IconChevronDown
+                        <button
+                          type="button"
+                          className="group flex w-full items-center gap-3 bg-muted/55 px-4 py-3 text-left transition-all duration-150 hover:bg-muted hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
+                          aria-expanded={!isCollapsed}
+                          aria-controls={groupContentId}
+                          onClick={() => toggleStatus(status)}
+                        >
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 group-hover:bg-background/80 group-hover:text-foreground">
+                            <IconChevronDown
+                              className={cn(
+                                "size-4 transition-transform duration-200 ease-out",
+                                isCollapsed && "-rotate-90"
+                              )}
+                            />
+                          </span>
+                          <StatusIcon
                             className={cn(
-                              "size-4 transition-transform duration-200 ease-out",
-                              isCollapsed && "-rotate-90"
+                              "size-4 shrink-0 transition-colors duration-150 group-hover:text-foreground",
+                              statusIconStyles[status]
                             )}
                           />
-                        </span>
-                        <StatusIcon
+                          <span
+                            className={cn(
+                              "text-sm font-semibold transition-colors duration-150 group-hover:text-foreground",
+                              statusIconStyles[status]
+                            )}
+                          >
+                            {statusLabels[status]}
+                          </span>
+                          <span className="rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors duration-150 group-hover:text-foreground">
+                            {statusCounts.get(status) ?? issues.length}
+                          </span>
+                        </button>
+                        <div
+                          id={groupContentId}
                           className={cn(
-                            "size-4 shrink-0 transition-colors duration-150 group-hover:text-foreground",
-                            statusIconStyles[status]
+                            "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+                            isCollapsed
+                              ? "grid-rows-[0fr] opacity-0"
+                              : "grid-rows-[1fr] opacity-100"
                           )}
-                        />
-                        <span
-                          className={cn(
-                            "text-sm font-semibold transition-colors duration-150 group-hover:text-foreground",
-                            statusIconStyles[status]
-                          )}
+                          aria-hidden={isCollapsed}
+                          inert={isCollapsed ? true : undefined}
                         >
-                          {statusLabels[status]}
-                        </span>
-                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors duration-150 group-hover:text-foreground">
-                          {statusCounts.get(status) ?? issues.length}
-                        </span>
-                      </button>
-                      <div
-                        id={groupContentId}
-                        className={cn(
-                          "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
-                          isCollapsed
-                            ? "grid-rows-[0fr] opacity-0"
-                            : "grid-rows-[1fr] opacity-100"
-                        )}
-                        aria-hidden={isCollapsed}
-                        inert={isCollapsed ? true : undefined}
-                      >
-                        <div className="min-h-0 divide-y overflow-hidden">
-                          {issues.map((issue) => (
-                            <IssueRow
-                              key={issue.id}
-                              issue={issue}
-                              isBlocked={blockedIssueIds.has(issue.id)}
-                              isBlocking={blockingIssueIds.has(issue.id)}
-                            />
-                          ))}
+                          <div className="min-h-0 divide-y overflow-hidden">
+                            {issues.map((issue) => (
+                              <IssueRow
+                                key={issue.id}
+                                issue={issue}
+                                isBlocked={blockedIssueIds.has(issue.id)}
+                                isBlocking={blockingIssueIds.has(issue.id)}
+                                isSelected={rowSelection[issue.id] === true}
+                                onSelectedChange={(selected) =>
+                                  toggleIssueSelected(issue.id, selected)
+                                }
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </section>
-                  )
-                })}
+                      </section>
+                    )
+                  })}
+                </div>
               </div>
             )}
             {view === "list" ? (
@@ -898,7 +999,10 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
+                    onClick={() => {
+                      setPageIndex(Math.max(0, safePageIndex - 1))
+                      setRowSelection({})
+                    }}
                     disabled={safePageIndex === 0}
                   >
                     Previous
@@ -906,9 +1010,10 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
                       setPageIndex(Math.min(pageCount - 1, safePageIndex + 1))
-                    }
+                      setRowSelection({})
+                    }}
                     disabled={safePageIndex >= pageCount - 1}
                   >
                     Next
