@@ -244,7 +244,13 @@ function SortableHeader({
   )
 }
 
-export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
+export function IssueStatusMenu({
+  issue,
+  showLabel = false,
+}: {
+  issue: HomeIssue
+  showLabel?: boolean
+}) {
   const queryClient = useQueryClient()
   const StatusIcon = statusIcons[issue.status]
   const mutation = useMutation({
@@ -323,12 +329,18 @@ export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
-            "inline-flex size-7 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex h-7 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            showLabel ? "gap-1.5 px-2.5 text-xs font-medium" : "w-7",
             statusStyles[issue.status]
           )}
           onClick={(event) => event.stopPropagation()}
         >
           <StatusIcon className="size-3.5 shrink-0" />
+          {showLabel ? (
+            <span className="whitespace-nowrap">
+              {statusLabels[issue.status]}
+            </span>
+          ) : null}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -471,7 +483,7 @@ export function getIssuesColumns(
       header: ({ column }) => <SortableHeader label="Status" column={column} />,
       sortingFn: (rowA, rowB) =>
         statusOrder[rowA.original.status] - statusOrder[rowB.original.status],
-      cell: ({ row }) => <IssueStatusMenu issue={row.original} />,
+      cell: ({ row }) => <IssueStatusMenu issue={row.original} showLabel />,
     },
     {
       id: "blocked",
