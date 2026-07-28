@@ -17,6 +17,11 @@ allowBuilds:
   cpu-features: false
   esbuild: true
 
+fetchRetries: 5
+fetchRetryMintimeout: 20000
+fetchRetryMaxtimeout: 120000
+fetchTimeout: 300000
+
 minimumReleaseAgeExclude:
   - '@agentclientprotocol/claude-agent-acp@0.55.0 || 0.59.0'
   - '@clerk/mcp-tools@0.6.0'
