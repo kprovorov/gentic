@@ -35,6 +35,7 @@ export function IssueCreateForm({
   const [files, setFiles] = useState<File[]>([])
   const [agentProvider, setAgentProvider] =
     useState<AgentProvider>(defaultAgentProvider)
+  const [issueModel, setIssueModel] = useState<string | null>(null)
   const [projectId, setProjectId] = useState("")
   const [projectError, setProjectError] = useState("")
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
@@ -82,8 +83,13 @@ export function IssueCreateForm({
       submitAriaLabel="Run issue"
       submitDisabled={!prompt.trim()}
       agentProvider={agentProvider}
+      issueModel={issueModel}
       hasMessages={false}
-      onAgentProviderChange={(provider) => setAgentProvider(provider)}
+      onAgentProviderChange={(provider) => {
+        setAgentProvider(provider)
+        setIssueModel(null)
+      }}
+      onIssueModelChange={(model) => setIssueModel(model)}
       onSubmit={() => {}}
       footerStart={
         <div className="flex min-w-0 flex-col gap-1">
@@ -171,6 +177,7 @@ export function IssueCreateForm({
     >
       <input type="hidden" name="project_id" value={projectId} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
+      <input type="hidden" name="issue_model" value={issueModel ?? ""} />
       <label className="sr-only" htmlFor="issue-prompt">
         Prompt
       </label>

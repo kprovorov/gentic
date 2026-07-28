@@ -51,6 +51,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           issueCreatedAt={issue.created_at}
           issuePrompt={issue.prompt}
           agentProvider={issue.agent_provider}
+          issueModel={issue.issue_model}
           initialMessages={messages}
           initialStatus={issue.status}
           initialUsageLimitResetAt={issue.usage_limit_reset_at}

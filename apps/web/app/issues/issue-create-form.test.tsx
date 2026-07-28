@@ -65,4 +65,19 @@ describe("IssueCreateForm", () => {
       "agent_provider"
     )
   })
+
+  it("stores the selected model from the selected agent", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
+
+    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
+
+    expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+    expect(screen.getByDisplayValue("gpt-5.6-sol")).toHaveAttribute(
+      "name",
+      "issue_model"
+    )
+  })
 })

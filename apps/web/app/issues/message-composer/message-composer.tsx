@@ -10,6 +10,7 @@ import type { AgentProvider } from "@gentic/validators/issues"
 
 import type { SlashCommand } from "../[code]/issue-chat/slash-commands"
 import { AttachmentPromptField } from "../attachment-prompt-field"
+import { AgentModelPicker } from "./agent-model-picker"
 import { AgentProviderPicker } from "./agent-provider-picker"
 
 // Reusable across an existing issue's chat and a "new issue" composer:
@@ -45,9 +46,12 @@ export function MessageComposer({
   onSubmit,
   onInvalidCapture,
   agentProvider,
+  issueModel,
   hasMessages,
   onAgentProviderChange,
+  onIssueModelChange,
   agentPickerDisabled,
+  modelPickerDisabled,
   footerStart,
   footerEnd,
   submitButton,
@@ -81,12 +85,18 @@ export function MessageComposer({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   onInvalidCapture?: React.FormEventHandler<HTMLFormElement>
   agentProvider: AgentProvider
+  issueModel: string | null
   hasMessages: boolean
   onAgentProviderChange: (
     provider: AgentProvider,
     info: { requiresReset: boolean }
   ) => void
+  onIssueModelChange: (
+    issueModel: string | null,
+    info: { requiresReset: boolean }
+  ) => void
   agentPickerDisabled?: boolean
+  modelPickerDisabled?: boolean
   footerStart?: React.ReactNode
   footerEnd?: React.ReactNode
   submitButton?: React.ReactNode
@@ -147,6 +157,13 @@ export function MessageComposer({
                 hasMessages={hasMessages}
                 disabled={disabled || agentPickerDisabled}
                 onAgentProviderChange={onAgentProviderChange}
+              />
+              <AgentModelPicker
+                agentProvider={agentProvider}
+                issueModel={issueModel}
+                hasMessages={hasMessages}
+                disabled={disabled || modelPickerDisabled}
+                onIssueModelChange={onIssueModelChange}
               />
               {footerStart}
             </>

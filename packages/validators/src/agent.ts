@@ -7,7 +7,7 @@ import {
   chatMessageKindSchema,
   chatMessageStatusSchema,
 } from "./chat-events.js"
-import { agentProviderSchema } from "./issues.js"
+import { agentProviderSchema, issueModelSchema } from "./issues.js"
 import { realtimeRunStateStatusSchema } from "./realtime.js"
 
 export type { RealtimeRunStateStatus } from "./realtime.js"
@@ -20,6 +20,7 @@ export const claimedIssueSchema = z.object({
   id: z.string().uuid(),
   activeRunId: z.string().uuid(),
   agentProvider: agentProviderSchema,
+  issueModel: issueModelSchema,
   repo: z.string(),
   setupScript: z.string().nullable(),
   sessionId: z.string().nullable(),

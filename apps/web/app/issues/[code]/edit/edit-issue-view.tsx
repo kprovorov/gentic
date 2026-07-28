@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { IconArrowLeft, IconDeviceFloppy } from "@tabler/icons-react"
 
@@ -10,6 +11,10 @@ import { getIssueHref } from "@/app/issues/urls"
 import type { IssueEdit } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
+import {
+  agentModelOptions,
+  type AgentProvider,
+} from "@gentic/validators/issues"
 import {
   Card,
   CardContent,
@@ -35,6 +40,10 @@ export function EditIssueView({
     staleTime: queryStaleTimes.formOptions,
   })
   const issueHref = getIssueHref(issue) ?? "/issues"
+  const [agentProvider, setAgentProvider] = useState<AgentProvider>(
+    issue.agent_provider
+  )
+  const [issueModel, setIssueModel] = useState<string | null>(issue.issue_model)
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -111,14 +120,41 @@ export function EditIssueView({
                 <NativeSelect
                   name="agent_provider"
                   required
-                  defaultValue={issue.agent_provider}
+                  value={agentProvider}
                   id="issue-agent-provider"
                   className="w-full"
+                  onChange={(event) => {
+                    const nextProvider = event.target.value as AgentProvider
+                    setAgentProvider(nextProvider)
+                    setIssueModel(null)
+                  }}
                 >
                   <NativeSelectOption value="claude_code">
                     Claude Code
                   </NativeSelectOption>
                   <NativeSelectOption value="codex">Codex</NativeSelectOption>
+                </NativeSelect>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="issue-model">Model</Label>
+                <NativeSelect
+                  name="issue_model"
+                  value={issueModel ?? ""}
+                  id="issue-model"
+                  className="w-full"
+                  onChange={(event) =>
+                    setIssueModel(event.target.value || null)
+                  }
+                >
+                  <NativeSelectOption value="">
+                    Default model
+                  </NativeSelectOption>
+                  {agentModelOptions[agentProvider].map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
               </div>
 
