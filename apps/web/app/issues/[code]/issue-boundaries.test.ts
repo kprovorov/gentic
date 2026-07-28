@@ -77,3 +77,11 @@ test("the issue prompt is only serialized into the timeline island", () => {
   assert.doesNotMatch(header, /issuePrompt/)
   assert.doesNotMatch(rail, /issuePrompt/)
 })
+
+test("the timeline scroller keeps an internal viewport on mobile", () => {
+  const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
+
+  assert.match(timelinePanel, /h-\[calc\(100svh-10rem\)\]/)
+  assert.match(timelinePanel, /xl:h-auto/)
+  assert.match(timelinePanel, /<MessageScroller className="min-w-0 flex-1">/)
+})

@@ -79,7 +79,7 @@ export function IssueDetailTimelinePanel({
   )
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col xl:min-h-0">
+    <div className="flex h-[calc(100svh-10rem)] min-h-96 min-w-0 flex-1 flex-col xl:h-auto xl:min-h-0">
       <div
         className="sr-only"
         role="status"
@@ -90,7 +90,7 @@ export function IssueDetailTimelinePanel({
       </div>
 
       <MessageScrollerProvider>
-        <MessageScroller className="min-w-0 flex-1 xl:min-h-0">
+        <MessageScroller className="min-w-0 flex-1">
           <MessageScrollerViewport className="px-6 pt-5 pb-2">
             <MessageScrollerContent className="mx-auto w-full max-w-[840px] gap-4">
               {chat.usageLimitResetAt && chat.status === "held" ? (
