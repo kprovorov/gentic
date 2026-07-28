@@ -93,6 +93,32 @@ test("interleaves messages and events in chronological order regardless of input
   )
 })
 
+test("uses structured chat event timestamps for message timeline placement", () => {
+  const timeline = buildIssueTimeline({
+    issue,
+    messages: [
+      message({
+        id: "msg-event-time",
+        created_at: "2026-07-01T00:30:00.000Z",
+        event_ts: "2026-07-01T00:05:00.000Z",
+      }),
+    ],
+    events: [
+      event({
+        id: "evt-status",
+        created_at: "2026-07-01T00:10:00.000Z",
+      }),
+    ],
+  })
+
+  assert.deepEqual(kinds(timeline), [
+    "issue-created",
+    "message",
+    "status-milestone",
+  ])
+  assert.equal(timeline[1].timestamp, "2026-07-01T00:05:00.000Z")
+})
+
 test("maps status_changed events to status-milestone items with from/to", () => {
   const [, item] = buildIssueTimeline({
     issue,

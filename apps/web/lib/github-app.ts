@@ -23,15 +23,17 @@ function signAppJwt(): string {
   const privateKey = process.env.GITHUB_APP_PRIVATE_KEY
 
   if (!appId || !privateKey) {
-    throw new Error(
-      "GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY are not configured"
-    )
+    throw new Error("GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY are not configured")
   }
 
   const now = Math.floor(Date.now() / 1000)
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
   const payload = base64url(
-    JSON.stringify({ iat: now - 60, exp: now + APP_JWT_TTL_SECONDS, iss: appId })
+    JSON.stringify({
+      iat: now - 60,
+      exp: now + APP_JWT_TTL_SECONDS,
+      iss: appId,
+    })
   )
   const signingInput = `${header}.${payload}`
 
@@ -143,9 +145,7 @@ export async function fetchInstallationRepositories(
     page += 1
   }
 
-  return repositories.toSorted((a, b) =>
-    a.full_name.localeCompare(b.full_name)
-  )
+  return repositories.toSorted((a, b) => a.full_name.localeCompare(b.full_name))
 }
 
 export async function fetchPullRequestReviewComments(
@@ -214,6 +214,65 @@ export async function fetchPullRequestHeadSha(
   const data = (await response.json()) as { head: { sha: string } }
 
   return data.head.sha
+}
+
+export type GithubPullRequestState =
+  "draft" | "open" | "merged" | "closed" | "queued" | "unknown"
+
+type RawPullRequestState = {
+  state: string
+  draft?: boolean | null
+  merged?: boolean | null
+  merged_at?: string | null
+  mergeable_state?: string | null
+}
+
+export function resolvePullRequestState(
+  pullRequest: RawPullRequestState
+): GithubPullRequestState {
+  if (pullRequest.merged || pullRequest.merged_at) {
+    return "merged"
+  }
+  if (pullRequest.draft) {
+    return "draft"
+  }
+  if (pullRequest.mergeable_state === "queued") {
+    return "queued"
+  }
+  if (pullRequest.state === "open") {
+    return "open"
+  }
+  if (pullRequest.state === "closed") {
+    return "closed"
+  }
+
+  return "unknown"
+}
+
+export async function fetchPullRequestState(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<GithubPullRequestState> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch pull request (${response.status})`)
+  }
+
+  return resolvePullRequestState((await response.json()) as RawPullRequestState)
 }
 
 // The check_suite webhook payload's own `pull_requests` array is only

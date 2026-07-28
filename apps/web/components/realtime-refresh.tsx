@@ -6,7 +6,12 @@ import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 
-import { getRealtimeRefreshMode } from "./realtime-refresh-mode"
+import {
+  getRealtimeRefreshMode,
+  realtimeFallbackRefreshMs,
+  shouldUseRealtimeFallback,
+  type RealtimeSubscribeStatus,
+} from "./realtime-refresh-mode"
 
 /**
  * Subscribes to Postgres changes on the given tables (already scoped by RLS
@@ -37,7 +42,10 @@ export function RealtimeRefresh({
   })
 
   useEffect(() => {
+    let cancelled = false
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null
+    let subscribeStatus: RealtimeSubscribeStatus | null = null
     function scheduleRefresh() {
       if (refreshTimer) {
         clearTimeout(refreshTimer)
@@ -52,21 +60,94 @@ export function RealtimeRefresh({
       }, 150)
     }
 
-    let channel = supabase.channel(channelName)
-    for (const table of tableKey.split(",")) {
-      channel = channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        scheduleRefresh
-      )
+    function updateFallbackPolling() {
+      if (shouldUseRealtimeFallback(subscribeStatus)) {
+        if (!fallbackTimer) {
+          fallbackTimer = setInterval(
+            scheduleRefresh,
+            realtimeFallbackRefreshMs
+          )
+        }
+        return
+      }
+
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer)
+        fallbackTimer = null
+      }
     }
-    channel.subscribe()
+
+    function reconcile() {
+      scheduleRefresh()
+    }
+
+    async function join() {
+      await supabase.realtime.setAuth()
+      if (cancelled) {
+        return null
+      }
+
+      let channel = supabase.channel(channelName)
+      for (const table of tableKey.split(",")) {
+        channel = channel.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table },
+          scheduleRefresh
+        )
+      }
+      channel.subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED" ||
+          status === "CHANNEL_ERROR"
+        ) {
+          subscribeStatus = status
+          updateFallbackPolling()
+        }
+
+        if (status === "SUBSCRIBED") {
+          reconcile()
+        } else if (
+          status === "TIMED_OUT" ||
+          status === "CLOSED" ||
+          status === "CHANNEL_ERROR"
+        ) {
+          scheduleRefresh()
+        }
+      })
+
+      return channel
+    }
+
+    const channelPromise = join().catch(() => {
+      subscribeStatus = "CHANNEL_ERROR"
+      scheduleRefresh()
+      updateFallbackPolling()
+      return null
+    })
+
+    window.addEventListener("focus", reconcile)
+    window.addEventListener("online", reconcile)
+    document.addEventListener("visibilitychange", reconcile)
+    updateFallbackPolling()
 
     return () => {
+      cancelled = true
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
-      void supabase.removeChannel(channel)
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer)
+      }
+      window.removeEventListener("focus", reconcile)
+      window.removeEventListener("online", reconcile)
+      document.removeEventListener("visibilitychange", reconcile)
+      void channelPromise.then((channel) => {
+        if (channel) {
+          void supabase.removeChannel(channel)
+        }
+      })
     }
   }, [supabase, router, queryClient, channelName, tableKey])
 

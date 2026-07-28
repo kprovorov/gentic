@@ -122,6 +122,30 @@ describe("IssueTimeline", () => {
     expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
   })
 
+  it("renders the current user's avatar for user messages when available", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "user-1",
+            role: "user",
+            content: "Fix the flaky test",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://img.clerk.com/avatar.png"
+    )
+    expect(screen.queryByText("KE")).not.toBeInTheDocument()
+  })
+
   it("uses the first user message as the original request when the prompt is empty", () => {
     render(
       <IssueTimeline
@@ -264,6 +288,36 @@ describe("IssueTimeline", () => {
 
     expect(screen.getByText("Please fix this")).toBeInTheDocument()
     expect(screen.getByText("On it")).toBeInTheDocument()
+  })
+
+  it("renders timestamps for messages and activity events", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "status-milestone",
+            key: "evt-1",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            from: "todo",
+            to: "in-progress",
+          },
+          messageItem({
+            id: "assistant-1",
+            content: "On it",
+            created_at: "2026-07-01T00:05:00.000Z",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+      />
+    )
+
+    expect(
+      container.querySelector('time[datetime="2026-07-01T00:00:00.000Z"]')
+    ).toBeInTheDocument()
+    expect(
+      container.querySelector('time[datetime="2026-07-01T00:05:00.000Z"]')
+    ).toBeInTheDocument()
   })
 
   it("renders pr-opened and pr-merged nodes with links", () => {

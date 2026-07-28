@@ -25,6 +25,7 @@ export {
   setIssueType,
   startIssueFromDraft,
   updateIssue,
+  updateIssueTitle,
 } from "./issues/mutations"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { slugifyIssueTitle } from "./issues/slug"

@@ -43,7 +43,7 @@ function messageToTimelineItem(message: ChatMessage): TimelineItem {
   return {
     kind: "message",
     key: message.clientKey ?? message.id,
-    timestamp: message.created_at,
+    timestamp: message.event_ts ?? message.created_at,
     message,
   }
 }

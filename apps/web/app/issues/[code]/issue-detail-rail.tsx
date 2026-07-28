@@ -16,6 +16,8 @@ import {
   IconExternalLink,
   IconGitMerge,
   IconGitPullRequest,
+  IconGitPullRequestClosed,
+  IconGitPullRequestDraft,
   IconLink,
   IconPlus,
   IconTrash,
@@ -61,6 +63,46 @@ function parsePullRequestUrl(url: string) {
 
   return { repo: "Pull request", number: null }
 }
+
+const pullRequestStateMeta = {
+  draft: {
+    label: "draft",
+    icon: IconGitPullRequestDraft,
+    className: "bg-muted text-muted-foreground",
+  },
+  open: {
+    label: "open",
+    icon: IconGitPullRequest,
+    className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  },
+  merged: {
+    label: "merged",
+    icon: IconGitMerge,
+    className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  },
+  closed: {
+    label: "closed",
+    icon: IconGitPullRequestClosed,
+    className: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  },
+  queued: {
+    label: "queued",
+    icon: IconClock,
+    className: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  },
+  unknown: {
+    label: "status unavailable",
+    icon: IconCircleDashed,
+    className: "bg-muted text-muted-foreground",
+  },
+} satisfies Record<
+  NonNullable<IssuePullRequest["state"]>,
+  {
+    label: string
+    icon: typeof IconClock
+    className: string
+  }
+>
 
 function IssueDetailStatus({
   issueId,
@@ -144,10 +186,6 @@ function IssueDetailPullRequests({
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
 }) {
-  // Individual PR state isn't tracked -- only the URL is stored -- so this
-  // treats every PR as merged once the issue itself reaches "merged".
-  const isMerged = issueStatus === "merged"
-
   if (pullRequests.length === 0) {
     return (
       <p className="text-[12.5px] text-muted-foreground">
@@ -160,6 +198,10 @@ function IssueDetailPullRequests({
     <ul className="grid min-w-0 gap-1.5">
       {pullRequests.map((pullRequest) => {
         const { repo, number } = parsePullRequestUrl(pullRequest.url)
+        const fallbackState = issueStatus === "merged" ? "merged" : "unknown"
+        const stateMeta =
+          pullRequestStateMeta[pullRequest.state ?? fallbackState]
+        const StateIcon = stateMeta.icon
 
         return (
           <li key={pullRequest.id} className="min-w-0">
@@ -169,18 +211,19 @@ function IssueDetailPullRequests({
               rel="noreferrer"
               className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border hover:bg-muted/40"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                {isMerged ? (
-                  <IconGitMerge className="size-4" />
-                ) : (
-                  <IconGitPullRequest className="size-4" />
+              <span
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-full",
+                  stateMeta.className
                 )}
+              >
+                <StateIcon className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12.5px] font-medium">{repo}</p>
                 <p className="truncate font-mono text-[11px] text-muted-foreground">
                   {number ? `#${number} · ` : ""}
-                  {isMerged ? "merged" : "open"}
+                  {stateMeta.label}
                 </p>
               </div>
               <IconExternalLink className="size-4 shrink-0 text-muted-foreground" />

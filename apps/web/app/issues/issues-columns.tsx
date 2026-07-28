@@ -12,7 +12,6 @@ import {
   IconBug,
   IconBulb,
   IconCheck,
-  IconChevronDown,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
@@ -324,14 +323,12 @@ export function IssueStatusMenu({ issue }: { issue: HomeIssue }) {
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
-            "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex size-7 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
             statusStyles[issue.status]
           )}
           onClick={(event) => event.stopPropagation()}
         >
           <StatusIcon className="size-3.5 shrink-0" />
-          <span className="truncate">{statusLabels[issue.status]}</span>
-          <IconChevronDown className="size-3 shrink-0 opacity-70" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
