@@ -182,6 +182,20 @@ export async function updateIssue(formData: FormData) {
   redirect(getIssueHref(issue) ?? "/issues")
 }
 
+export async function updateIssueTitle(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, title } = updateIssueSchema.pick({ id: true, title: true }).parse({
+    id: getString(formData, "id"),
+    title: getString(formData, "title"),
+  })
+
+  const issue = await issuesService.updateIssueTitle(supabase, userId, id, title)
+  revalidatePath("/issues")
+  revalidateIssuePath(issue)
+
+  return issue
+}
+
 export async function deleteIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const id = z.string().uuid().parse(getString(formData, "id"))
