@@ -70,8 +70,9 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     agent_provider: getString(formData, "agent_provider") || "claude_code",
   })
 
-  // Save the issue with no title right away rather than blocking on the AI
-  // Gateway calls — title and final type are generated after
+  // Save the issue with no title and the placeholder "issue" type right away
+  // rather than blocking on the AI Gateway calls — title and final type are
+  // generated after
   // the response is sent (via `after`), so they still complete even if the
   // user closes the tab, and the service-role client is used since there's
   // no request-scoped session by then. `issues` is realtime-enabled, so both
@@ -79,7 +80,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   const created = await issuesService.createIssue(
     supabase,
     userId,
-    createIssueSchema.parse({ ...fields, status: "draft", type: "feature" })
+    createIssueSchema.parse({ ...fields, status: "draft" })
   )
 
   let message: { id: string; created_at: string } | null = null
