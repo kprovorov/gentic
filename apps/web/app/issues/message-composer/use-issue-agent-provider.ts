@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { resetIssueAgent, updateIssueAgentProvider } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
-import type { AgentProvider } from "@gentic/validators/issues"
+import type { AgentProvider, IssueModel } from "@gentic/validators/issues"
 
 import {
   ISSUE_RETRY_RESET_EVENT,
@@ -16,7 +16,13 @@ import {
 // destructive resetIssueAgent path once a conversation exists. Kept separate
 // from MessageComposer itself, which stays issue-agnostic (see
 // MessageComposer's prop contract).
-export function useIssueAgentProvider({ issueId }: { issueId: string }) {
+export function useIssueAgentProvider({
+  issueId,
+  agentProvider,
+}: {
+  issueId: string
+  agentProvider: AgentProvider
+}) {
   const queryClient = useQueryClient()
 
   const resetMutation = useMutation({
@@ -64,6 +70,28 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
     const formData = new FormData()
     formData.set("id", issueId)
     formData.set("agent_provider", provider)
+    formData.set("issue_model", "")
+
+    if (requiresReset) {
+      resetMutation.mutate(formData)
+      return
+    }
+
+    updateMutation.mutate(formData)
+  }
+
+  function onIssueModelChange(
+    issueModel: IssueModel,
+    { requiresReset }: { requiresReset: boolean }
+  ) {
+    if (resetMutation.isPending || updateMutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issueId)
+    formData.set("agent_provider", agentProvider)
+    formData.set("issue_model", issueModel ?? "")
 
     if (requiresReset) {
       resetMutation.mutate(formData)
@@ -75,6 +103,7 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
 
   return {
     onAgentProviderChange,
+    onIssueModelChange,
     isPending: resetMutation.isPending || updateMutation.isPending,
   }
 }

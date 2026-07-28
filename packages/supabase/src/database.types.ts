@@ -227,6 +227,7 @@ export type Database = {
           agent_provider: string
           created_at: string
           id: string
+          issue_model: string | null
           number: number
           pr_url: string | null
           project_id: string
@@ -246,6 +247,7 @@ export type Database = {
           agent_provider?: string
           created_at?: string
           id?: string
+          issue_model?: string | null
           number: number
           pr_url?: string | null
           project_id: string
@@ -265,6 +267,7 @@ export type Database = {
           agent_provider?: string
           created_at?: string
           id?: string
+          issue_model?: string | null
           number?: number
           pr_url?: string | null
           project_id?: string
@@ -459,10 +462,19 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: number
       }
-      reset_issue_run: {
-        Args: { p_agent_provider: string; p_issue_id: string }
-        Returns: undefined
-      }
+      reset_issue_run:
+        | {
+            Args: { p_agent_provider: string; p_issue_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_agent_provider: string
+              p_issue_id: string
+              p_issue_model?: string
+            }
+            Returns: undefined
+          }
       send_issue_user_message: {
         Args: { p_content: string; p_issue_id: string }
         Returns: {

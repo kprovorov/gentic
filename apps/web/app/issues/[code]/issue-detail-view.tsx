@@ -42,7 +42,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           "issue_events",
         ]}
       />
-      <IssueSlugUrlSync key={issue.title ?? ""} issue={issue} />
+      <IssueSlugUrlSync issue={issue} />
       <IssueDetailHeader issue={issue} />
 
       <div className="flex min-w-0 flex-1 flex-col border-t xl:min-h-0 xl:flex-row">
@@ -51,6 +51,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           issueCreatedAt={issue.created_at}
           issuePrompt={issue.prompt}
           agentProvider={issue.agent_provider}
+          issueModel={issue.issue_model}
           initialMessages={messages}
           initialStatus={issue.status}
           initialUsageLimitResetAt={issue.usage_limit_reset_at}

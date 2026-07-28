@@ -18,7 +18,10 @@ type IssueTitleRow = {
 }
 
 export function IssueSlugUrlSync({ issue }: { issue: IssueSlugUrlSyncIssue }) {
-  const [title, setTitle] = useState(issue.title)
+  const [realtimeTitle, setRealtimeTitle] = useState<
+    string | null | undefined
+  >()
+  const title = realtimeTitle === undefined ? issue.title : realtimeTitle
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -59,7 +62,7 @@ export function IssueSlugUrlSync({ issue }: { issue: IssueSlugUrlSyncIssue }) {
           if (!next) {
             return
           }
-          setTitle(next.title)
+          setRealtimeTitle(next.title)
         }
       )
       .subscribe()

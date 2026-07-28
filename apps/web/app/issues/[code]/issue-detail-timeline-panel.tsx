@@ -33,6 +33,7 @@ export function IssueDetailTimelinePanel({
   issueCreatedAt,
   issuePrompt,
   agentProvider,
+  issueModel,
   initialMessages,
   initialStatus,
   initialUsageLimitResetAt,
@@ -45,6 +46,7 @@ export function IssueDetailTimelinePanel({
   issueCreatedAt: string
   issuePrompt: string | null
   agentProvider: AgentProvider
+  issueModel: string | null
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
@@ -62,8 +64,11 @@ export function IssueDetailTimelinePanel({
     initialPrUrl,
     initialPullRequests,
   })
-  const { onAgentProviderChange, isPending: isAgentProviderPending } =
-    useIssueAgentProvider({ issueId })
+  const {
+    onAgentProviderChange,
+    onIssueModelChange,
+    isPending: isAgentProviderPending,
+  } = useIssueAgentProvider({ issueId, agentProvider })
   const { user } = useUser()
   const currentUserName =
     user?.fullName ?? user?.primaryEmailAddress?.emailAddress
@@ -137,9 +142,12 @@ export function IssueDetailTimelinePanel({
             onSelectSlashCommand={chat.selectSlashCommand}
             onSubmit={chat.handleSubmit}
             agentProvider={agentProvider}
+            issueModel={issueModel}
             hasMessages={chat.displayedMessages.length > 0}
             onAgentProviderChange={onAgentProviderChange}
+            onIssueModelChange={onIssueModelChange}
             agentPickerDisabled={isAgentProviderPending}
+            modelPickerDisabled={isAgentProviderPending}
           />
         </div>
       </div>

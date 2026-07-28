@@ -12,6 +12,8 @@ import {
   agentProviderSchema,
   createIssueSchema,
   deleteIssueRelationSchema,
+  isIssueModelForAgent,
+  issueModelSchema,
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
@@ -67,7 +69,9 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     project_id: getString(formData, "project_id"),
     prompt: getString(formData, "prompt"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
+    issue_model: getIssueModel(formData),
   })
+  validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
   // Save the issue with no title and the default "issue" type right away
   // rather than blocking on the AI Gateway calls — both are generated after
@@ -112,11 +116,11 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         }
       )
     }
-    await issuesService.deleteIssue(supabase, userId, created.id).catch(
-      (cleanupError) => {
+    await issuesService
+      .deleteIssue(supabase, userId, created.id)
+      .catch((cleanupError) => {
         console.error(`Failed to clean up issue ${created.id}:`, cleanupError)
-      }
-    )
+      })
     throw error
   }
 
@@ -125,7 +129,10 @@ async function createIssue(status: IssueStatus, formData: FormData) {
 
     const [title, type] = await Promise.all([
       generateIssueTitle(fields.prompt).catch((error) => {
-        console.error(`Failed to generate title for issue ${created.id}:`, error)
+        console.error(
+          `Failed to generate title for issue ${created.id}:`,
+          error
+        )
         return fields.prompt.slice(0, 60)
       }),
       generateIssueType(fields.prompt).catch((error) => {
@@ -162,19 +169,23 @@ export async function runIssue(formData: FormData) {
 
 export async function updateIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title, prompt, agent_provider, type } = updateIssueSchema.parse({
-    id: getString(formData, "id"),
-    title: getString(formData, "title"),
-    prompt: getString(formData, "prompt") || undefined,
-    agent_provider: getString(formData, "agent_provider") || "claude_code",
-    type: getString(formData, "type") || "feature",
-  })
+  const { id, title, prompt, agent_provider, issue_model, type } =
+    updateIssueSchema.parse({
+      id: getString(formData, "id"),
+      title: getString(formData, "title"),
+      prompt: getString(formData, "prompt") || undefined,
+      agent_provider: getString(formData, "agent_provider") || "claude_code",
+      issue_model: getIssueModel(formData),
+      type: getString(formData, "type") || "feature",
+    })
+  validateIssueModelForAgent(agent_provider, issue_model)
 
   const issue = await issuesService.updateIssue(supabase, userId, id, {
     id,
     title,
     prompt,
     agent_provider,
+    issue_model,
     type,
   })
   revalidatePath("/issues")
@@ -184,12 +195,19 @@ export async function updateIssue(formData: FormData) {
 
 export async function updateIssueTitle(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title } = updateIssueSchema.pick({ id: true, title: true }).parse({
-    id: getString(formData, "id"),
-    title: getString(formData, "title"),
-  })
+  const { id, title } = updateIssueSchema
+    .pick({ id: true, title: true })
+    .parse({
+      id: getString(formData, "id"),
+      title: getString(formData, "title"),
+    })
 
-  const issue = await issuesService.updateIssueTitle(supabase, userId, id, title)
+  const issue = await issuesService.updateIssueTitle(
+    supabase,
+    userId,
+    id,
+    title
+  )
   revalidatePath("/issues")
   revalidateIssuePath(issue)
 
@@ -211,12 +229,15 @@ export async function resetIssueAgent(formData: FormData) {
   const agentProvider = agentProviderSchema.parse(
     getString(formData, "agent_provider") || "claude_code"
   )
+  const issueModel = getIssueModel(formData)
+  validateIssueModelForAgent(agentProvider, issueModel)
 
   const message = await issuesService.resetIssueAgent(
     supabase,
     userId,
     id,
-    agentProvider
+    agentProvider,
+    issueModel
   )
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
@@ -269,16 +290,20 @@ export async function bulkDeleteIssues(formData: FormData) {
 
 export async function updateIssueAgentProvider(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, agent_provider } = updateIssueAgentProviderSchema.parse({
-    id: getString(formData, "id"),
-    agent_provider: getString(formData, "agent_provider"),
-  })
+  const { id, agent_provider, issue_model } =
+    updateIssueAgentProviderSchema.parse({
+      id: getString(formData, "id"),
+      agent_provider: getString(formData, "agent_provider"),
+      issue_model: getIssueModel(formData),
+    })
+  validateIssueModelForAgent(agent_provider, issue_model)
 
   await issuesService.updateIssueAgentProvider(
     supabase,
     userId,
     id,
-    agent_provider
+    agent_provider,
+    issue_model
   )
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
@@ -400,6 +425,19 @@ function getAttachmentFiles(formData: FormData) {
 
 function validateAttachmentFiles(files: File[]) {
   validateAttachmentBatch(files)
+}
+
+function getIssueModel(formData: FormData) {
+  return issueModelSchema.parse(getString(formData, "issue_model") || null)
+}
+
+function validateIssueModelForAgent(
+  agentProvider: z.infer<typeof agentProviderSchema>,
+  issueModel: z.infer<typeof issueModelSchema>
+) {
+  if (!isIssueModelForAgent(agentProvider, issueModel)) {
+    throw new Error("Selected model is not available for the selected agent")
+  }
 }
 
 async function uploadIssueAttachments(

@@ -420,6 +420,7 @@ function claimedIssue(id: string): ClaimedIssue {
     id,
     activeRunId: `${id}-run`,
     agentProvider: "codex",
+    issueModel: null,
     repo: "acme/repo",
     setupScript: null,
     sessionId: null,

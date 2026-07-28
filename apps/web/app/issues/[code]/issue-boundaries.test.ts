@@ -50,7 +50,7 @@ test("issue detail interactive sections are explicit client islands", () => {
   assert.match(detailView, /<IssueDetailRail\n\s+issueId=\{issue\.id\}/)
   assert.match(
     detailView,
-    /<IssueSlugUrlSync key=\{issue\.title \?\? ""\} issue=\{issue\} \/>/
+    /<IssueSlugUrlSync issue=\{issue\} \/>/
   )
 })
 

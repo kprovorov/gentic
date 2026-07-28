@@ -66,6 +66,7 @@ const issueEditSchema = z.object({
   title: z.string().nullable(),
   prompt: z.string().nullable(),
   agent_provider: agentProviderSchema,
+  issue_model: z.string().nullable(),
   type: issueTypeSchema,
   projects: projectOptionSchema.nullable(),
 })
@@ -76,6 +77,7 @@ const issueDetailSchema = z.object({
   title: z.string().nullable(),
   prompt: z.string().nullable(),
   agent_provider: agentProviderSchema,
+  issue_model: z.string().nullable(),
   type: issueTypeSchema,
   status: issueStatusSchema,
   usage_limit_reset_at: z.string().nullable(),
@@ -126,6 +128,7 @@ export type IssueDetail = {
   title: string | null
   prompt: string | null
   agent_provider: "claude_code" | "codex"
+  issue_model: string | null
   type: IssueType
   status: IssueStatus
   usage_limit_reset_at: string | null
@@ -150,6 +153,7 @@ export type IssueEdit = Pick<
   | "title"
   | "prompt"
   | "agent_provider"
+  | "issue_model"
   | "type"
   | "projects"
 >
@@ -279,6 +283,7 @@ function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     title: issue.title,
     prompt: issue.prompt,
     agent_provider: issue.agent_provider,
+    issue_model: issue.issue_model,
     type: issue.type,
     status: issue.status,
     usage_limit_reset_at: issue.usage_limit_reset_at,
@@ -298,6 +303,7 @@ function toIssueEdit(issue: IssueEditRow): IssueEdit {
     title: issue.title,
     prompt: issue.prompt,
     agent_provider: issue.agent_provider,
+    issue_model: issue.issue_model,
     type: issue.type,
     projects: toProjectOption(issue.projects),
   }
@@ -420,7 +426,7 @@ export async function getIssueEditData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,prompt,agent_provider,type,projects(id,name,repo,key)"
+      "id,number,title,prompt,agent_provider,issue_model,type,projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()

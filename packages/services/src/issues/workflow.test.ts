@@ -400,21 +400,21 @@ test("updateIssueStatusByPrUrlIfStatus logs a status_changed event when the guar
   )
 })
 
-test("updateIssueStatusByPrUrlIfStatus moves ready for review issues back to testing", async () => {
+test("updateIssueStatusByPrUrlIfStatus accepts multiple guarded source statuses", async () => {
   const db = new EventLogDb()
   db.issues.push(
     issueRow({
-      id: "issue-8",
+      id: "issue-9",
       status: "ready-for-review",
-      pr_url: "https://github.com/acme/widget/pull/8",
+      pr_url: "https://github.com/acme/widget/pull/9",
     })
   )
   const supabase = new EventLogSupabase(db)
 
   await updateIssueStatusByPrUrlIfStatus(
     supabase as never,
-    "https://github.com/acme/widget/pull/8",
-    "ready-for-review",
+    "https://github.com/acme/widget/pull/9",
+    ["ready-for-review", "tests-failed"],
     "testing"
   )
 
@@ -440,6 +440,27 @@ test("updateIssueStatusByPrUrlIfStatus logs nothing when the issue has moved pas
     "https://github.com/acme/widget/pull/6",
     "testing",
     "ready-for-review"
+  )
+
+  assert.deepEqual(db.issue_events, [])
+})
+
+test("updateIssueStatusByPrUrlIfStatus logs nothing when no guarded source status matches", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-10",
+      status: "changes-requested",
+      pr_url: "https://github.com/acme/widget/pull/10",
+    })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await updateIssueStatusByPrUrlIfStatus(
+    supabase as never,
+    "https://github.com/acme/widget/pull/10",
+    ["ready-for-review", "tests-failed"],
+    "testing"
   )
 
   assert.deepEqual(db.issue_events, [])

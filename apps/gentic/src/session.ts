@@ -31,6 +31,7 @@ import {
 import type { IssueRealtimeChannel } from "./realtime.js"
 
 export type AgentProvider = "claude_code" | "codex"
+export type IssueModel = string | null
 
 /** How to launch one ACP agent's child process. */
 interface AgentEntry {
@@ -78,7 +79,6 @@ function resolveAgentEntry(
 // with its work committed and proposed for review, without relying on each
 // issue's own instructions to say so.
 const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. The pull request must be ready for review; do not create it as a draft. Title the pull request following the Conventional Commits spec: prefix it with a type such as \`feat:\`, \`fix:\`, \`chore:\`, \`docs:\`, \`refactor:\`, \`test:\`, \`perf:\`, \`build:\`, or \`ci:\` (for example, \`feat: add issue assignment API\`), so it produces a clean squash-merge commit message for CI/CD. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
-const DO_NOT_OPEN_NEW_PR_INSTRUCTIONS = "Do not open a new pull request."
 
 export function issueRunInstructions(
   existingPrUrl?: string | null,
@@ -86,7 +86,7 @@ export function issueRunInstructions(
 ): string {
   if (existingPrUrl) {
     if (existingPrCheckedOut) {
-      return `This follow-up run already has an existing open pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. ${DO_NOT_OPEN_NEW_PR_INSTRUCTIONS} Skip committing and pushing only if you made no changes.`
+      return `This follow-up run already has an existing open pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. Skip committing and pushing only if you made no changes.`
     }
 
     return `This follow-up run has a previous pull request recorded: ${existingPrUrl}. Before deciding how to publish changes, inspect that pull request with the \`gh\` CLI. If it is still open and its branch exists, check out that branch, commit your changes with a descriptive commit message, and push to that same branch. If the pull request is merged or closed, or if its branch was deleted and cannot be checked out, create a new branch from the repository's default branch, commit your changes there, and open a new ready-for-review pull request using the \`gh\` CLI. Title any new pull request following the Conventional Commits spec. Skip committing, pushing, and opening a pull request only if you made no changes.`
@@ -107,6 +107,7 @@ export interface RunSessionInput {
   issueId: string
   channel: IssueRealtimeChannel
   agentProvider: AgentProvider
+  issueModel: IssueModel
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
   /**
@@ -134,7 +135,7 @@ export interface RunSessionInput {
  * into the issue transcript. Resolves once `nextPrompt` returns `null`.
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
-  const agent = getAgentProviderConfig(input.agentProvider)
+  const agent = getAgentProviderConfig(input)
   const child = spawn(agent.entry.command, agent.entry.args, {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "inherit"],
@@ -213,7 +214,10 @@ interface AgentProviderConfig {
   newSession: (input: RunSessionInput) => NewSessionRequest
 }
 
-function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
+function getAgentProviderConfig(
+  input: Pick<RunSessionInput, "agentProvider" | "issueModel">
+): AgentProviderConfig {
+  const provider = input.agentProvider
   if (provider === "codex") {
     const entry = resolveAgentEntry(
       "codex-acp",
@@ -223,7 +227,11 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       provider,
       entry,
       env: {
-        INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        INITIAL_AGENT_MODE:
+          process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        ...(input.issueModel
+          ? { CODEX_CONFIG: mergeCodexConfigModel(input.issueModel) }
+          : {}),
         // codex-acp resolves its bundled @openai/codex fallback via
         // require.resolve when CODEX_PATH is unset, which — like our own
         // CLAUDE_AGENT_ENTRY resolution — breaks under bun-compile (no
@@ -270,6 +278,7 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       _meta: {
         claudeCode: {
           options: {
+            ...(input.issueModel ? { model: input.issueModel } : {}),
             systemPrompt: {
               type: "preset",
               preset: "claude_code",
@@ -284,6 +293,17 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       },
     }),
   }
+}
+
+function mergeCodexConfigModel(issueModel: string): string {
+  const config = process.env.CODEX_CONFIG
+    ? JSON.parse(process.env.CODEX_CONFIG)
+    : {}
+
+  return JSON.stringify({
+    ...config,
+    model: issueModel,
+  })
 }
 
 function prependInstructions(

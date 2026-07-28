@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { getWorkflowRunPullNumbers } from "../app/api/integrations/github/webhook/route"
+import {
+  getWorkflowRunPullNumbers,
+  isPendingCheckAction,
+} from "../app/api/integrations/github/webhook/route"
 
 test("getWorkflowRunPullNumbers reads pull request numbers from workflow_run payloads", () => {
   assert.deepEqual(
@@ -24,4 +27,16 @@ test("getWorkflowRunPullNumbers tolerates workflow_run payloads without pull req
     }),
     []
   )
+})
+
+test("isPendingCheckAction recognizes GitHub rerun webhook actions", () => {
+  assert.equal(isPendingCheckAction("check_suite", "rerequested"), true)
+  assert.equal(isPendingCheckAction("check_run", "rerequested"), true)
+  assert.equal(isPendingCheckAction("workflow_run", "requested"), true)
+})
+
+test("isPendingCheckAction rejects completed and unrelated webhook actions", () => {
+  assert.equal(isPendingCheckAction("check_suite", "completed"), false)
+  assert.equal(isPendingCheckAction("check_run", "created"), false)
+  assert.equal(isPendingCheckAction("workflow_run", "completed"), false)
 })

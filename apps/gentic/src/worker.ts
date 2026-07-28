@@ -206,6 +206,7 @@ export async function processIssue(
       issueId: issue.id,
       channel,
       agentProvider: issue.agentProvider,
+      issueModel: issue.issueModel,
       cwd: dir,
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,

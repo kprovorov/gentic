@@ -191,17 +191,21 @@ async function handlePullRequestEvent(
 }
 
 // A commit can have several check suites (GitHub Actions plus any other CI
-// apps), each delivering its own `check_suite` webhook as it starts and
-// completes.
-// Re-fetch the full set for the head SHA so we only resolve `testing` once
-// every suite is done, rather than acting on the first one to finish. Active
-// suites can move `ready-for-review` issues back to `testing` when CI is
-// re-run, while completed suites only apply when the issue is still `testing`
-// so late CI results don't override review or merge states.
+// apps), each delivering its own webhook as it starts and completes.
+// Pending events move reviewable PRs back to `testing`; completed events
+// re-fetch the full set for the head SHA so we only resolve `testing` once
+// every suite is done, rather than acting on the first one to finish.
 async function handleCheckSuiteEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckSuitePayload
 ) {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("check_suite", payload.action)
+  ) {
+    return
+  }
+
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -210,14 +214,18 @@ async function handleCheckSuiteEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.check_suite.head_sha,
-    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number),
-    payload.check_suite.status !== "completed"
+    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number)
   )
 }
 
@@ -225,6 +233,13 @@ async function handleCheckRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckRunPayload
 ) {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("check_run", payload.action)
+  ) {
+    return
+  }
+
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -233,14 +248,18 @@ async function handleCheckRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.check_run.head_sha,
-    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number),
-    payload.check_run.status !== "completed"
+    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number)
   )
 }
 
@@ -248,6 +267,13 @@ async function handleWorkflowRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: WorkflowRunPayload
 ) {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("workflow_run", payload.action)
+  ) {
+    return
+  }
+
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -256,14 +282,18 @@ async function handleWorkflowRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.workflow_run.head_sha,
-    getWorkflowRunPullNumbers(payload),
-    payload.action !== "completed"
+    getWorkflowRunPullNumbers(payload)
   )
 }
 
@@ -277,57 +307,37 @@ export function getWorkflowRunPullNumbers(
   )
 }
 
-async function resolveChecksForRef(
+export function isPendingCheckAction(
+  event: "check_suite" | "check_run" | "workflow_run",
+  action: string
+): boolean {
+  if (event === "workflow_run") {
+    return action === "requested"
+  }
+
+  return action === "rerequested"
+}
+
+async function resolveCompletedChecksForRef(
   supabase: ReturnType<typeof createServiceClient>,
   installationId: string,
   owner: string,
   repo: string,
   headSha: string,
-  fallbackPullNumbers: number[] = [],
-  checksAreActive = false
+  fallbackPullNumbers: number[] = []
 ) {
-  // The payload's own `check_suite.pull_requests` is only populated when the
-  // PR was already open at the moment the check suite was created. The
-  // worker pushes commits (creating the check suite) before opening the PR,
-  // so that array is unreliable here — resolve PRs from the commit SHA via
-  // the API instead.
-  let pullNumbers: number[]
-  try {
-    pullNumbers = await fetchPullRequestNumbersForCommit(
-      installationId,
-      owner,
-      repo,
-      headSha
-    )
-  } catch (error) {
-    console.error(
-      "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
-      error
-    )
-    pullNumbers = fallbackPullNumbers
-  }
-
-  if (pullNumbers.length === 0) {
-    pullNumbers = fallbackPullNumbers
-  }
+  const pullNumbers = await resolvePullNumbersForRef(
+    installationId,
+    owner,
+    repo,
+    headSha,
+    fallbackPullNumbers
+  )
 
   if (pullNumbers.length === 0) {
     console.error(
-      "[github-webhook] could not resolve pull requests for checks, skipping"
+      "[github-webhook] could not resolve pull requests for completed checks, skipping"
     )
-    return
-  }
-
-  if (checksAreActive) {
-    for (const pullNumber of pullNumbers) {
-      const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
-      await issuesService.updateIssueStatusByPrUrlIfStatus(
-        supabase,
-        prUrl,
-        "ready-for-review",
-        "testing"
-      )
-    }
     return
   }
 
@@ -350,15 +360,6 @@ async function resolveChecksForRef(
   const status = resolveCheckSuiteStatus(suites)
 
   if (status === "testing") {
-    for (const pullNumber of pullNumbers) {
-      const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
-      await issuesService.updateIssueStatusByPrUrlIfStatus(
-        supabase,
-        prUrl,
-        "ready-for-review",
-        status
-      )
-    }
     return
   }
 
@@ -374,6 +375,64 @@ async function resolveChecksForRef(
     if (result && status === "tests-failed") {
       await issuesService.applyTestsFailed(supabase, result.id, prUrl)
     }
+  }
+}
+
+async function resolvePullNumbersForRef(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  fallbackPullNumbers: number[] = []
+) {
+  // The payload's own `check_suite.pull_requests` is only populated when the
+  // PR was already open at the moment the check suite was created. The
+  // worker pushes commits (creating the check suite) before opening the PR,
+  // so that array is unreliable here — resolve PRs from the commit SHA via
+  // the API instead.
+  let pullNumbers: number[]
+  try {
+    pullNumbers = await fetchPullRequestNumbersForCommit(
+      installationId,
+      owner,
+      repo,
+      headSha
+    )
+  } catch (error) {
+    console.error(
+      "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
+      error
+    )
+    pullNumbers = fallbackPullNumbers
+  }
+
+  return pullNumbers.length > 0 ? pullNumbers : fallbackPullNumbers
+}
+
+async function markPendingChecksForRef(
+  supabase: ReturnType<typeof createServiceClient>,
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  fallbackPullNumbers: number[] = []
+) {
+  const pullNumbers = await resolvePullNumbersForRef(
+    installationId,
+    owner,
+    repo,
+    headSha,
+    fallbackPullNumbers
+  )
+
+  for (const pullNumber of pullNumbers) {
+    const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
+    await issuesService.updateIssueStatusByPrUrlIfStatus(
+      supabase,
+      prUrl,
+      ["ready-for-review", "tests-failed"],
+      "testing"
+    )
   }
 }
 

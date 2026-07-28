@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { IssueCreateForm } from "./issue-create-form"
 
@@ -19,6 +19,63 @@ const projects = [
 ]
 
 describe("IssueCreateForm", () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it("restores the saved prompt from browser storage", async () => {
+    window.localStorage.setItem(
+      "gentic:issue-create-draft:v1",
+      "Keep this issue draft after refresh."
+    )
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Prompt")).toHaveValue(
+        "Keep this issue draft after refresh."
+      )
+    })
+  })
+
+  it("stores prompt changes in browser storage", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await user.type(
+      screen.getByLabelText("Prompt"),
+      "Persist this issue draft."
+    )
+
+    expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
+      "Persist this issue draft."
+    )
+  })
+
+  it("clears the saved prompt when submitting with a selected project", async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(
+      "gentic:issue-create-draft:v1",
+      "Persist until submit."
+    )
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Prompt")).toHaveValue(
+        "Persist until submit."
+      )
+    })
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Run issue" }))
+
+    expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
+      null
+    )
+  })
+
   it("stores the selected project from the dropdown", async () => {
     const user = userEvent.setup()
 
@@ -63,6 +120,21 @@ describe("IssueCreateForm", () => {
     expect(screen.getByDisplayValue("codex")).toHaveAttribute(
       "name",
       "agent_provider"
+    )
+  })
+
+  it("stores the selected model from the selected agent", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
+
+    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
+
+    expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+    expect(screen.getByDisplayValue("gpt-5.6-sol")).toHaveAttribute(
+      "name",
+      "issue_model"
     )
   })
 })
