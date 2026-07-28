@@ -400,6 +400,30 @@ test("updateIssueStatusByPrUrlIfStatus logs a status_changed event when the guar
   )
 })
 
+test("updateIssueStatusByPrUrlIfStatus moves ready for review issues back to testing", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-8",
+      status: "ready-for-review",
+      pr_url: "https://github.com/acme/widget/pull/8",
+    })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await updateIssueStatusByPrUrlIfStatus(
+    supabase as never,
+    "https://github.com/acme/widget/pull/8",
+    "ready-for-review",
+    "testing"
+  )
+
+  assert.deepEqual(
+    db.issue_events.map((event) => event.payload),
+    [{ from: "ready-for-review", to: "testing" }]
+  )
+})
+
 test("updateIssueStatusByPrUrlIfStatus logs nothing when the issue has moved past fromStatus", async () => {
   const db = new EventLogDb()
   db.issues.push(

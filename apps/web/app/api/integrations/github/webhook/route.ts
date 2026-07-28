@@ -191,19 +191,17 @@ async function handlePullRequestEvent(
 }
 
 // A commit can have several check suites (GitHub Actions plus any other CI
-// apps), each delivering its own `check_suite` webhook as it completes.
+// apps), each delivering its own `check_suite` webhook as it starts and
+// completes.
 // Re-fetch the full set for the head SHA so we only resolve `testing` once
-// every suite is done, rather than acting on the first one to finish. Only
-// applies when the issue is still `testing` — if the user has since merged,
-// requested changes, etc., a late CI result shouldn't override that.
+// every suite is done, rather than acting on the first one to finish. Active
+// suites can move `ready-for-review` issues back to `testing` when CI is
+// re-run, while completed suites only apply when the issue is still `testing`
+// so late CI results don't override review or merge states.
 async function handleCheckSuiteEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckSuitePayload
 ) {
-  if (payload.action !== "completed") {
-    return
-  }
-
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -212,13 +210,14 @@ async function handleCheckSuiteEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  await resolveChecksForRef(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.check_suite.head_sha,
-    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number)
+    payload.check_suite.pull_requests?.map((pullRequest) => pullRequest.number),
+    payload.check_suite.status !== "completed"
   )
 }
 
@@ -226,10 +225,6 @@ async function handleCheckRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckRunPayload
 ) {
-  if (payload.action !== "completed") {
-    return
-  }
-
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -238,13 +233,14 @@ async function handleCheckRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  await resolveChecksForRef(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.check_run.head_sha,
-    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number)
+    payload.check_run.pull_requests?.map((pullRequest) => pullRequest.number),
+    payload.check_run.status !== "completed"
   )
 }
 
@@ -252,10 +248,6 @@ async function handleWorkflowRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: WorkflowRunPayload
 ) {
-  if (payload.action !== "completed") {
-    return
-  }
-
   const installationId = payload.installation?.id
   if (!installationId) {
     return
@@ -264,13 +256,14 @@ async function handleWorkflowRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  await resolveChecksForRef(
     supabase,
     String(installationId),
     owner,
     repo,
     payload.workflow_run.head_sha,
-    getWorkflowRunPullNumbers(payload)
+    getWorkflowRunPullNumbers(payload),
+    payload.action !== "completed"
   )
 }
 
@@ -284,13 +277,14 @@ export function getWorkflowRunPullNumbers(
   )
 }
 
-async function resolveCompletedChecksForRef(
+async function resolveChecksForRef(
   supabase: ReturnType<typeof createServiceClient>,
   installationId: string,
   owner: string,
   repo: string,
   headSha: string,
-  fallbackPullNumbers: number[] = []
+  fallbackPullNumbers: number[] = [],
+  checksAreActive = false
 ) {
   // The payload's own `check_suite.pull_requests` is only populated when the
   // PR was already open at the moment the check suite was created. The
@@ -319,8 +313,21 @@ async function resolveCompletedChecksForRef(
 
   if (pullNumbers.length === 0) {
     console.error(
-      "[github-webhook] could not resolve pull requests for completed checks, skipping"
+      "[github-webhook] could not resolve pull requests for checks, skipping"
     )
+    return
+  }
+
+  if (checksAreActive) {
+    for (const pullNumber of pullNumbers) {
+      const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
+      await issuesService.updateIssueStatusByPrUrlIfStatus(
+        supabase,
+        prUrl,
+        "ready-for-review",
+        "testing"
+      )
+    }
     return
   }
 
@@ -343,6 +350,15 @@ async function resolveCompletedChecksForRef(
   const status = resolveCheckSuiteStatus(suites)
 
   if (status === "testing") {
+    for (const pullNumber of pullNumbers) {
+      const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
+      await issuesService.updateIssueStatusByPrUrlIfStatus(
+        supabase,
+        prUrl,
+        "ready-for-review",
+        status
+      )
+    }
     return
   }
 
