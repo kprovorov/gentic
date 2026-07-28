@@ -191,11 +191,10 @@ async function handlePullRequestEvent(
 }
 
 // A commit can have several check suites (GitHub Actions plus any other CI
-// apps), each delivering its own `check_suite` webhook as it completes.
-// Re-fetch the full set for the head SHA so we only resolve `testing` once
-// every suite is done, rather than acting on the first one to finish. Only
-// applies when the issue is still `testing` — if the user has since merged,
-// requested changes, etc., a late CI result shouldn't override that.
+// apps), each delivering its own webhook as it starts and completes.
+// Pending events move reviewable PRs back to `testing`; completed events
+// re-fetch the full set for the head SHA so we only resolve `testing` once
+// every suite is done, rather than acting on the first one to finish.
 async function handleCheckSuiteEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckSuitePayload

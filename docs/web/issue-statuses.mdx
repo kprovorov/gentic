@@ -49,8 +49,8 @@ These statuses cover the period between the agent opening a pull request and the
 
 | Status | Description |
 |---|---|
-| `testing` | Reserved for a workflow that is running automated tests against the changes. Gentic's worker does not set this automatically. |
-| `tests-failed` | Reserved for a workflow reporting failed tests. Gentic's worker does not set this automatically. |
+| `testing` | Automated tests are running against the pull request. GitHub check webhooks can set this when checks start or are re-run. |
+| `tests-failed` | Automated tests failed for the pull request. GitHub check webhooks can set this when completed checks fail. |
 | `ready-for-review` | The agent has opened a pull request and it is ready for human review on GitHub. |
 | `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. Send the agent a message describing what to fix, or push changes yourself. |
 | `approved` | A reviewer submitted an **Approve** review on GitHub. The pull request is ready to merge. |
@@ -83,16 +83,19 @@ If you have configured the [GitHub integration](/web/github-integration) with a 
 | `pull_request.closed` | `merged: true` | `merged` |
 | `pull_request.closed` | `merged: false` | `cancelled` |
 | `pull_request.reopened` | — | `ready-for-review` |
+| `check_run` | at least one suite is still running | `testing` |
 | `check_run.completed` | all suites completed and any suite failed | `tests-failed` |
 | `check_run.completed` | all suites completed and no suite failed | `ready-for-review` |
+| `check_suite` | at least one suite is still running | `testing` |
 | `check_suite.completed` | all suites completed and any suite failed | `tests-failed` |
 | `check_suite.completed` | all suites completed and no suite failed | `ready-for-review` |
+| `workflow_run` | at least one suite is still running | `testing` |
 | `workflow_run.completed` | all suites completed and any suite failed | `tests-failed` |
 | `workflow_run.completed` | all suites completed and no suite failed | `ready-for-review` |
 | `pull_request_review.submitted` | `review.state: approved` | `approved` |
 | `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
 
-Gentic matches pull request and review events to a stored pull-request URL on the issue. For check events, Gentic resolves the pull request from the check's commit SHA and only updates issues that are still in `testing`, so late CI results do not overwrite review or merge statuses. Comment-only reviews and other event types are ignored.
+Gentic matches pull request and review events to a stored pull-request URL on the issue. For check events, Gentic resolves the pull request from the check's commit SHA. Active checks can move `ready-for-review` issues back to `testing`, and completed checks only update issues still in `testing`, so late CI results do not overwrite review or merge statuses. Comment-only reviews and other event types are ignored.
 
 To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests**, **Pull request reviews**, **Check runs**, and **Check suites** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
 
