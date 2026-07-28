@@ -85,7 +85,7 @@ export function issueRunInstructions(
 ): string {
   if (existingPrUrl) {
     if (existingPrCheckedOut) {
-      return `This follow-up run already has an existing open pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. Do not open a new pull request. Skip committing and pushing only if you made no changes.`
+      return `This follow-up run already has an existing open pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. Skip committing and pushing only if you made no changes.`
     }
 
     return `This follow-up run has a previous pull request recorded: ${existingPrUrl}. Before deciding how to publish changes, inspect that pull request with the \`gh\` CLI. If it is still open and its branch exists, check out that branch, commit your changes with a descriptive commit message, and push to that same branch. If the pull request is merged or closed, or if its branch was deleted and cannot be checked out, create a new branch from the repository's default branch, commit your changes there, and open a new ready-for-review pull request using the \`gh\` CLI. Title any new pull request following the Conventional Commits spec. Skip committing, pushing, and opening a pull request only if you made no changes.`
