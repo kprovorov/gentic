@@ -67,7 +67,6 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             pullRequests={displayedPullRequests}
             relations={relations}
             relationCandidates={relationCandidates}
-            attachments={attachments}
           />
         </aside>
       </div>
