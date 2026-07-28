@@ -378,7 +378,7 @@ test("issue run instructions update an existing pull request on follow-up", () =
 
   assert.match(instructions, /existing open pull request/)
   assert.match(instructions, /same branch/)
-  assert.match(instructions, /Do not open a new pull request/)
+  assert.doesNotMatch(instructions, /Do not open a new pull request/)
   assert.doesNotMatch(instructions, /open a pull request against/)
 })
 
