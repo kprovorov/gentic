@@ -190,8 +190,6 @@ export async function updateIssueTitle(formData: FormData) {
   })
 
   const issue = await issuesService.updateIssueTitle(supabase, userId, id, title)
-  revalidatePath("/issues")
-  revalidateIssuePath(issue)
 
   return issue
 }

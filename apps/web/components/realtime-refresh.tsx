@@ -6,7 +6,17 @@ import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 
-import { getRealtimeRefreshMode } from "./realtime-refresh-mode"
+import {
+  consumeSuppressedRealtimeTable,
+  getRealtimeRefreshMode,
+  markSuppressedRealtimeTable,
+  SUPPRESS_NEXT_REALTIME_REFRESH_EVENT,
+  type SuppressNextRealtimeRefreshDetail,
+} from "./realtime-refresh-mode"
+
+type RealtimePayload = {
+  table: string
+}
 
 /**
  * Subscribes to Postgres changes on the given tables (already scoped by RLS
@@ -27,6 +37,7 @@ export function RealtimeRefresh({
   const router = useRouter()
   const queryClient = useQueryClient()
   const tableKey = tables.join(",")
+  const suppressedTablesRef = useRef(new Map<string, number>())
   // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
   // a new array reference every render. Read the latest value through a ref
   // so the effect below doesn't tear down and resubscribe the channel (and
@@ -38,7 +49,13 @@ export function RealtimeRefresh({
 
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
-    function scheduleRefresh() {
+    function scheduleRefresh(payload: RealtimePayload) {
+      if (
+        consumeSuppressedRealtimeTable(suppressedTablesRef.current, payload.table)
+      ) {
+        return
+      }
+
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
@@ -69,6 +86,31 @@ export function RealtimeRefresh({
       void supabase.removeChannel(channel)
     }
   }, [supabase, router, queryClient, channelName, tableKey])
+
+  useEffect(() => {
+    function suppressNextRefresh(event: Event) {
+      const detail = (event as CustomEvent<SuppressNextRealtimeRefreshDetail>)
+        .detail
+
+      if (!detail?.table) {
+        return
+      }
+
+      markSuppressedRealtimeTable(suppressedTablesRef.current, detail)
+    }
+
+    window.addEventListener(
+      SUPPRESS_NEXT_REALTIME_REFRESH_EVENT,
+      suppressNextRefresh
+    )
+
+    return () => {
+      window.removeEventListener(
+        SUPPRESS_NEXT_REALTIME_REFRESH_EVENT,
+        suppressNextRefresh
+      )
+    }
+  }, [])
 
   return null
 }

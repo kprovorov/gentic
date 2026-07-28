@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
+import { SUPPRESS_NEXT_REALTIME_REFRESH_EVENT } from "@/components/realtime-refresh-mode"
 
 import { useIssueDelete } from "./issue-delete-button"
 
@@ -118,6 +119,11 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
     const formData = new FormData()
     formData.set("id", issue.id)
     formData.set("title", nextTitle)
+    window.dispatchEvent(
+      new CustomEvent(SUPPRESS_NEXT_REALTIME_REFRESH_EVENT, {
+        detail: { table: "issues" },
+      })
+    )
     mutation.mutate(formData)
   }
 
