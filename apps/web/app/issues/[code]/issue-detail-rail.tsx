@@ -209,7 +209,7 @@ function IssueDetailPullRequests({
               href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
-              className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border hover:bg-muted/40"
+              className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-1.5 ring-1 ring-border hover:bg-muted/40"
             >
               <span
                 className={cn(
@@ -219,9 +219,11 @@ function IssueDetailPullRequests({
               >
                 <StateIcon className="size-4" />
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] font-medium">{repo}</p>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="truncate text-[12.5px] leading-none font-medium">
+                  {repo}
+                </p>
+                <p className="truncate font-mono text-[11px] leading-none text-muted-foreground">
                   {number ? `#${number} · ` : ""}
                   {stateMeta.label}
                 </p>
