@@ -38,6 +38,7 @@ import { groupTimelineItems, type TimelineDisplayItem } from "./timeline-items"
 
 type TimelineRowData = {
   key: string
+  timestamp: string
   icon: React.ReactNode
   content: React.ReactNode
   markerClassName?: string
@@ -80,6 +81,7 @@ export function IssueTimeline({
         <TimelineRow
           key={row.key}
           icon={row.icon}
+          timestamp={row.timestamp}
           markerClassName={row.markerClassName}
           isLast={index === rows.length - 1}
         >
@@ -119,6 +121,7 @@ function buildTimelineRows(
       )
       rows.push({
         key: displayItem.key,
+        timestamp: displayItem.timestamp,
         icon: <ToolGroupIcon messages={displayItem.messages} />,
         content: <ToolCallGroupContent messages={displayItem.messages} />,
         markerClassName: hasStreaming
@@ -134,6 +137,7 @@ function buildTimelineRows(
       const { message } = displayItem.item
       rows.push({
         key: displayItem.item.key,
+        timestamp: displayItem.item.timestamp,
         icon: (
           <MessageIcon message={message} currentUserName={currentUserName} />
         ),
@@ -155,12 +159,14 @@ function buildTimelineRows(
       case "issue-created":
         rows.push({
           key: item.key,
+          timestamp: item.timestamp,
           icon: <IconFilePlus />,
           content: "Issue created by you",
         })
         if (shouldShowRequestPrompt) {
           rows.push({
             key: "request",
+            timestamp: item.timestamp,
             icon: <IconFileText />,
             content: (
               <RequestContent
@@ -177,6 +183,7 @@ function buildTimelineRows(
           milestoneStatus !== null && milestoneStatus in statusStyles
         rows.push({
           key: item.key,
+          timestamp: item.timestamp,
           icon: <IconArrowRight />,
           content: <StatusMilestoneContent from={item.from} to={item.to} />,
           markerClassName: isKnownStatus
@@ -188,6 +195,7 @@ function buildTimelineRows(
       case "pr-opened":
         rows.push({
           key: item.key,
+          timestamp: item.timestamp,
           icon: <IconGitPullRequest />,
           content: (
             <PullRequestContent
@@ -200,6 +208,7 @@ function buildTimelineRows(
       case "pr-merged":
         rows.push({
           key: item.key,
+          timestamp: item.timestamp,
           icon: <IconGitMerge />,
           content: (
             <PullRequestContent
@@ -251,15 +260,19 @@ function normalizeRequestText(value: string | null | undefined): string {
 
 function TimelineRow({
   icon,
+  timestamp,
   markerClassName,
   isLast,
   children,
 }: {
   icon: React.ReactNode
+  timestamp: string
   markerClassName?: string
   isLast: boolean
   children: React.ReactNode
 }) {
+  const formattedTimestamp = formatTimelineTimestamp(timestamp)
+
   return (
     <div className="flex min-w-0 items-stretch gap-3.5">
       <div className="flex w-[22px] shrink-0 flex-col items-center">
@@ -274,10 +287,35 @@ function TimelineRow({
         {!isLast ? <div className="mt-1 w-px flex-1 bg-border" /> : null}
       </div>
       <MarkerContent className="min-w-0 flex-1 pb-[18px] text-[12.5px]">
-        {children}
+        <div className="flex min-w-0 flex-col gap-1.5">
+          {formattedTimestamp ? (
+            <time
+              dateTime={timestamp}
+              title={timestamp}
+              className="text-[11px] leading-none font-medium text-muted-foreground"
+            >
+              {formattedTimestamp}
+            </time>
+          ) : null}
+          {children}
+        </div>
       </MarkerContent>
     </div>
   )
+}
+
+function formatTimelineTimestamp(value: string): string | null {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)
 }
 
 function messageMarkerClassName(message: ChatMessage): string | undefined {

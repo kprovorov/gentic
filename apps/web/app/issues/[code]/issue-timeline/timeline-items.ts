@@ -5,7 +5,12 @@ import type { TimelineItem } from "./build-timeline"
 export type TimelineDisplayItem =
   | { kind: "item"; item: Exclude<TimelineItem, { kind: "message" }> }
   | { kind: "message"; item: Extract<TimelineItem, { kind: "message" }> }
-  | { kind: "tool-group"; key: string; messages: ChatMessage[] }
+  | {
+      kind: "tool-group"
+      key: string
+      timestamp: string
+      messages: ChatMessage[]
+    }
 
 // Groups consecutive tool-call chat messages into a single pill, mirroring
 // `groupChatMessages` in `issue-chat/transcript-items.ts`, but operating over
@@ -21,6 +26,7 @@ export function groupTimelineItems(items: TimelineItem[]): TimelineDisplayItem[]
     displayItems.push({
       kind: "tool-group",
       key: toolGroup[0].clientKey ?? toolGroup[0].id,
+      timestamp: toolGroup[0].event_ts ?? toolGroup[0].created_at,
       messages: toolGroup,
     })
     toolGroup = []
