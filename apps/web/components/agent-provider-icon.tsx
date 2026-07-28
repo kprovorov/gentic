@@ -22,8 +22,6 @@ type AgentProviderIconProps = Omit<SvgIconProps, "name" | "provider"> & {
 }
 
 export function BrandIcon({ name, tone = "brand", ...props }: BrandIconProps) {
-  const variant = tone === "brand" ? "color" : "mono"
-
   if (name === "anthropic") {
     return <Anthropic variant="mono" aria-hidden="true" {...props} />
   }
