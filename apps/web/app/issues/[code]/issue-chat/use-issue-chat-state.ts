@@ -32,6 +32,10 @@ import {
 } from "./event-mapping"
 import { mergePullRequest } from "./pull-requests"
 import {
+  createOptimisticAttachments,
+  isLocalThumbnailUrl,
+} from "./optimistic-attachments"
+import {
   filterSlashCommands,
   slashCommandName,
   slashCommandQuery,
@@ -84,6 +88,34 @@ export function useIssueChatState({
   const announcedAssistantMessageRef = useRef<string | null>(null)
   const connectionStatusRef =
     useRef<RealtimeConnectionStatus>(connectionStatus)
+  const localThumbnailUrlsRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    const visibleThumbnailUrls = new Set(
+      displayedMessages.flatMap((message) =>
+        (message.attachments ?? [])
+          .map((attachment) => attachment.thumbnailUrl)
+          .filter(isLocalThumbnailUrl)
+      )
+    )
+
+    for (const url of localThumbnailUrlsRef.current) {
+      if (!visibleThumbnailUrls.has(url)) {
+        URL.revokeObjectURL(url)
+        localThumbnailUrlsRef.current.delete(url)
+      }
+    }
+  }, [displayedMessages])
+
+  useEffect(() => {
+    const localThumbnailUrls = localThumbnailUrlsRef.current
+    return () => {
+      for (const url of localThumbnailUrls) {
+        URL.revokeObjectURL(url)
+      }
+      localThumbnailUrls.clear()
+    }
+  }, [])
 
   function setRealtimeConnectionStatus(
     nextStatus: RealtimeConnectionStatus,
@@ -120,15 +152,9 @@ export function useIssueChatState({
           created_at: new Date().toISOString(),
           retryContent: content,
           retryFiles: files,
-          attachments: files
-            .filter((file) => file.size > 0)
-            .map((file) => ({
-              id: `optimistic-${crypto.randomUUID()}`,
-              fileName: file.name,
-              sizeBytes: file.size,
-              url: null,
-              thumbnailUrl: null,
-            })),
+          attachments: createOptimisticAttachments(files, (url) => {
+            localThumbnailUrlsRef.current.add(url)
+          }),
         },
       })
       setLiveMessage("Sending message.")

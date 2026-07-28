@@ -56,11 +56,13 @@ export function IssueTimeline({
   issuePrompt,
   attachments,
   currentUserName,
+  currentUserImageUrl,
 }: {
   items: TimelineItem[]
   issuePrompt: string | null
   attachments: Attachment[]
   currentUserName?: string | null
+  currentUserImageUrl?: string | null
 }) {
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
@@ -68,8 +70,9 @@ export function IssueTimeline({
       issuePrompt,
       attachments,
       currentUserName,
+      currentUserImageUrl,
     })
-  }, [items, issuePrompt, attachments, currentUserName])
+  }, [items, issuePrompt, attachments, currentUserName, currentUserImageUrl])
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -98,10 +101,12 @@ function buildTimelineRows(
     issuePrompt,
     attachments,
     currentUserName,
+    currentUserImageUrl,
   }: {
     issuePrompt: string | null
     attachments: Attachment[]
     currentUserName?: string | null
+    currentUserImageUrl?: string | null
   }
 ): TimelineRowData[] {
   const rows: TimelineRowData[] = []
@@ -139,7 +144,11 @@ function buildTimelineRows(
         key: displayItem.item.key,
         timestamp: displayItem.item.timestamp,
         icon: (
-          <MessageIcon message={message} currentUserName={currentUserName} />
+          <MessageIcon
+            message={message}
+            currentUserName={currentUserName}
+            currentUserImageUrl={currentUserImageUrl}
+          />
         ),
         content: (
           <MessageBody
@@ -347,9 +356,11 @@ function getInitials(name: string | null | undefined): string | null {
 function MessageIcon({
   message,
   currentUserName,
+  currentUserImageUrl,
 }: {
   message: ChatMessage
   currentUserName?: string | null
+  currentUserImageUrl?: string | null
 }) {
   if (message.kind === "thinking") {
     return <IconBrain />
@@ -358,6 +369,16 @@ function MessageIcon({
     return <IconInfoCircle />
   }
   if (message.role === "user") {
+    if (currentUserImageUrl) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element -- external Clerk-hosted avatar, not a project asset
+        <img
+          src={currentUserImageUrl}
+          alt=""
+          className="size-full rounded-full object-cover"
+        />
+      )
+    }
     const initials = getInitials(currentUserName)
     if (initials) {
       return <span className="text-[10px] font-semibold">{initials}</span>

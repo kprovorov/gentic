@@ -21,7 +21,11 @@ import { z } from "zod"
 import { getAuthenticatedContext } from "./_lib/auth-context"
 import type { Attachment } from "./issues/[code]/attachments"
 import type { ChatMessage } from "./issues/[code]/issue-chat-state"
-import { fetchInstallationRepositories } from "@/lib/github-app"
+import {
+  fetchInstallationRepositories,
+  fetchPullRequestState,
+  type GithubPullRequestState,
+} from "@/lib/github-app"
 
 const ATTACHMENTS_BUCKET = "attachments"
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
@@ -132,7 +136,9 @@ export type IssueDetail = {
   projects: ProjectOption | null
 }
 
-export type IssuePullRequest = issuesService.IssuePullRequest
+export type IssuePullRequest = issuesService.IssuePullRequest & {
+  state?: GithubPullRequestState
+}
 
 export type IssueEvent = z.infer<typeof issueEventSchema>
 
@@ -213,6 +219,56 @@ function toProjectOption(project: ProjectOption | null) {
         key: project.key,
       }
     : null
+}
+
+function parseGithubPullRequestUrl(url: string) {
+  try {
+    const [, owner, repo, resource, number] = new URL(url).pathname.split("/")
+    if (owner && repo && resource === "pull" && number) {
+      const pullNumber = Number.parseInt(number, 10)
+      if (Number.isInteger(pullNumber) && pullNumber > 0) {
+        return { owner, repo, pullNumber }
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+async function attachPullRequestStates(
+  pullRequests: issuesService.IssuePullRequest[],
+  installationId: string | null | undefined
+): Promise<IssuePullRequest[]> {
+  if (!installationId || pullRequests.length === 0) {
+    return pullRequests
+  }
+
+  return Promise.all(
+    pullRequests.map(async (pullRequest) => {
+      const parsed = parseGithubPullRequestUrl(pullRequest.url)
+      if (!parsed) {
+        return pullRequest
+      }
+
+      try {
+        const state = await fetchPullRequestState(
+          installationId,
+          parsed.owner,
+          parsed.repo,
+          parsed.pullNumber
+        )
+        return { ...pullRequest, state }
+      } catch (error) {
+        console.error(
+          "[issue-detail] failed to fetch pull request state:",
+          error
+        )
+        return pullRequest
+      }
+    })
+  )
 }
 
 function toIssueDetail(issue: IssueDetailRow): IssueDetail {
@@ -454,7 +510,9 @@ async function getScopedIssueById(
 ) {
   try {
     return toIssueDetail(
-      issueDetailSchema.parse(await issuesService.getIssue(supabase, userId, id))
+      issueDetailSchema.parse(
+        await issuesService.getIssue(supabase, userId, id)
+      )
     )
   } catch (error) {
     if (error instanceof ServiceError && error.code === "not_found") {
@@ -478,6 +536,7 @@ async function getIssueDetailDataForIssue(
     pullRequests,
     relations,
     relationCandidates,
+    githubIntegration,
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -501,6 +560,7 @@ async function getIssueDetailDataForIssue(
     issuesService.listIssuePullRequests(supabase, userId, id),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
+    githubIntegrationsService.getGithubIntegration(supabase, userId),
   ])
 
   if (messagesError) {
@@ -545,7 +605,10 @@ async function getIssueDetailDataForIssue(
     issue: parsedIssue,
     messages: messagesWithAttachments,
     attachments,
-    pullRequests,
+    pullRequests: await attachPullRequestStates(
+      pullRequests,
+      githubIntegration?.installation_id
+    ),
     relations,
     relationCandidates,
     events,

@@ -63,6 +63,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         <aside className="min-w-0 border-t bg-muted/25 xl:w-[19rem] xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
           <IssueDetailRail
             issueId={issue.id}
+            issueCode={issue.code}
             status={issue.status}
             pullRequests={displayedPullRequests}
             relations={relations}

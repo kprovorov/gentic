@@ -122,6 +122,30 @@ describe("IssueTimeline", () => {
     expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
   })
 
+  it("renders the current user's avatar for user messages when available", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "user-1",
+            role: "user",
+            content: "Fix the flaky test",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://img.clerk.com/avatar.png"
+    )
+    expect(screen.queryByText("KE")).not.toBeInTheDocument()
+  })
+
   it("uses the first user message as the original request when the prompt is empty", () => {
     render(
       <IssueTimeline

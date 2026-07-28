@@ -2,7 +2,12 @@
 
 import Link from "next/link"
 import type React from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useId, useMemo, useState } from "react"
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationResult,
+} from "@tanstack/react-query"
 import {
   IconCheck,
   IconChevronDown,
@@ -11,9 +16,13 @@ import {
   IconExternalLink,
   IconGitMerge,
   IconGitPullRequest,
+  IconGitPullRequestClosed,
+  IconGitPullRequestDraft,
   IconLink,
+  IconPlus,
   IconTrash,
 } from "@tabler/icons-react"
+import { Dialog as DialogPrimitive } from "radix-ui"
 
 import {
   addIssueRelation,
@@ -36,6 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
@@ -53,6 +63,46 @@ function parsePullRequestUrl(url: string) {
 
   return { repo: "Pull request", number: null }
 }
+
+const pullRequestStateMeta = {
+  draft: {
+    label: "draft",
+    icon: IconGitPullRequestDraft,
+    className: "bg-muted text-muted-foreground",
+  },
+  open: {
+    label: "open",
+    icon: IconGitPullRequest,
+    className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  },
+  merged: {
+    label: "merged",
+    icon: IconGitMerge,
+    className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  },
+  closed: {
+    label: "closed",
+    icon: IconGitPullRequestClosed,
+    className: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  },
+  queued: {
+    label: "queued",
+    icon: IconClock,
+    className: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  },
+  unknown: {
+    label: "status unavailable",
+    icon: IconCircleDashed,
+    className: "bg-muted text-muted-foreground",
+  },
+} satisfies Record<
+  NonNullable<IssuePullRequest["state"]>,
+  {
+    label: string
+    icon: typeof IconClock
+    className: string
+  }
+>
 
 function IssueDetailStatus({
   issueId,
@@ -136,10 +186,6 @@ function IssueDetailPullRequests({
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
 }) {
-  // Individual PR state isn't tracked -- only the URL is stored -- so this
-  // treats every PR as merged once the issue itself reaches "merged".
-  const isMerged = issueStatus === "merged"
-
   if (pullRequests.length === 0) {
     return (
       <p className="text-[12.5px] text-muted-foreground">
@@ -152,6 +198,10 @@ function IssueDetailPullRequests({
     <ul className="grid min-w-0 gap-1.5">
       {pullRequests.map((pullRequest) => {
         const { repo, number } = parsePullRequestUrl(pullRequest.url)
+        const fallbackState = issueStatus === "merged" ? "merged" : "unknown"
+        const stateMeta =
+          pullRequestStateMeta[pullRequest.state ?? fallbackState]
+        const StateIcon = stateMeta.icon
 
         return (
           <li key={pullRequest.id} className="min-w-0">
@@ -161,18 +211,19 @@ function IssueDetailPullRequests({
               rel="noreferrer"
               className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border hover:bg-muted/40"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                {isMerged ? (
-                  <IconGitMerge className="size-4" />
-                ) : (
-                  <IconGitPullRequest className="size-4" />
+              <span
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-full",
+                  stateMeta.className
                 )}
+              >
+                <StateIcon className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12.5px] font-medium">{repo}</p>
                 <p className="truncate font-mono text-[11px] text-muted-foreground">
                   {number ? `#${number} · ` : ""}
-                  {isMerged ? "merged" : "open"}
+                  {stateMeta.label}
                 </p>
               </div>
               <IconExternalLink className="size-4 shrink-0 text-muted-foreground" />
@@ -270,33 +321,272 @@ function IssueDetailRelationGroup({
   )
 }
 
-function IssueDetailRelations({
+function getRelationIssueCode(issue: IssueRelationIssue) {
+  return issue.projects?.key ? `${issue.projects.key}-${issue.number}` : null
+}
+
+function getRelationIssueTitle(issue: IssueRelationIssue) {
+  return issue.title ?? "Generating title..."
+}
+
+function getRelationIssueSearchText(issue: IssueRelationIssue) {
+  return [
+    issue.title,
+    issue.status,
+    issue.number,
+    issue.projects?.key,
+    getRelationIssueCode(issue),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+}
+
+function getRelationIssueStatusLabel(issue: IssueRelationIssue) {
+  return statusLabels[issue.status as IssueStatus] ?? issue.status
+}
+
+function IssueRelationDialog({
   issueId,
-  relations,
+  issueCode,
   candidates,
+  mutation,
 }: {
   issueId: string
-  relations: IssueRelation[]
+  issueCode: string | null
   candidates: IssueRelationIssue[]
+  mutation: UseMutationResult<void, Error, FormData, unknown>
 }) {
-  const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: addIssueRelation,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
-      ])
-    },
-  })
+  const directionId = useId()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [selectedIssueId, setSelectedIssueId] = useState("")
+  const [direction, setDirection] = useState<"blocking" | "blocked_by">(
+    "blocking"
+  )
+  const issueLabel = issueCode ?? "this issue"
+  const placeholder =
+    direction === "blocking"
+      ? `Search for issue to mark as blocked by ${issueLabel}...`
+      : `Search for issue blocking ${issueLabel}...`
+  const actionLabel =
+    direction === "blocking" ? "Mark as blocking" : "Mark as blocked by"
+
+  const selectedIssue = candidates.find(
+    (candidate) => candidate.id === selectedIssueId
+  )
+  const filteredCandidates = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+      return candidates.slice(0, 8)
+    }
+
+    return candidates
+      .filter((candidate) =>
+        getRelationIssueSearchText(candidate).includes(normalizedQuery)
+      )
+      .slice(0, 8)
+  }, [candidates, query])
+
+  function resetDialog() {
+    setQuery("")
+    setSelectedIssueId("")
+    setDirection("blocking")
+  }
 
   function handleAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    mutation.mutate(new FormData(event.currentTarget))
-    event.currentTarget.reset()
+
+    if (!selectedIssueId) {
+      return
+    }
+
+    mutation.mutate(new FormData(event.currentTarget), {
+      onSuccess: () => {
+        resetDialog()
+        setOpen(false)
+      },
+    })
   }
 
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (!nextOpen) {
+          resetDialog()
+        }
+      }}
+    >
+      <DialogPrimitive.Trigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Add relation"
+        >
+          <IconPlus />
+        </Button>
+      </DialogPrimitive.Trigger>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 grid w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[1.4rem] bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:ring-foreground/10">
+          <DialogPrimitive.Title className="sr-only">
+            Add relation
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            Search for an existing issue and choose how it relates.
+          </DialogPrimitive.Description>
+
+          <form onSubmit={handleAdd} className="grid min-h-[28rem]">
+            <input type="hidden" name="issue_id" value={issueId} />
+            <input
+              type="hidden"
+              name="related_issue_id"
+              value={selectedIssueId}
+            />
+            <input type="hidden" name="direction" value={direction} />
+
+            <Input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setSelectedIssueId("")
+              }}
+              placeholder={placeholder}
+              className="h-16 rounded-none border-0 bg-transparent px-9 text-lg placeholder:text-muted-foreground/70 focus-visible:ring-0 md:text-lg"
+              autoComplete="off"
+              autoFocus
+            />
+
+            <div className="grid content-start gap-3 px-3 pb-5">
+              <p className="px-6 pt-2 text-sm font-medium text-muted-foreground">
+                Recent
+              </p>
+              <div className="max-h-[18rem] overflow-y-auto">
+                {filteredCandidates.length > 0 ? (
+                  <ul className="grid gap-1">
+                    {filteredCandidates.map((candidate) => {
+                      const issueCode = getRelationIssueCode(candidate)
+                      const isSelected = candidate.id === selectedIssueId
+
+                      return (
+                        <li key={candidate.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedIssueId(candidate.id)
+                              setQuery(getRelationIssueTitle(candidate))
+                            }}
+                            aria-pressed={isSelected}
+                            className={cn(
+                              "flex h-14 w-full min-w-0 items-center gap-3 rounded-xl px-6 text-left text-base transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                              isSelected && "bg-muted"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex size-5 shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/60 text-primary-foreground",
+                                isSelected && "border-primary bg-primary"
+                              )}
+                              aria-hidden="true"
+                            >
+                              {isSelected ? (
+                                <IconCheck className="size-3.5" />
+                              ) : null}
+                            </span>
+                            <span className="min-w-0 flex items-baseline gap-3">
+                              {issueCode ? (
+                                <span className="shrink-0 font-medium text-muted-foreground">
+                                  {issueCode}
+                                </span>
+                              ) : null}
+                              <span className="truncate font-medium">
+                                {getRelationIssueTitle(candidate)}
+                              </span>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {getRelationIssueStatusLabel(candidate)}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="px-6 py-8 text-sm text-muted-foreground">
+                    No matching issues.
+                  </p>
+                )}
+              </div>
+
+              {candidates.length === 0 ? (
+                <p className="px-6 text-sm text-muted-foreground">
+                  Create another issue before adding relations.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-auto flex items-center justify-between gap-3 border-t px-6 py-3">
+              <NativeSelect
+                id={directionId}
+                value={direction}
+                onChange={(event) =>
+                  setDirection(
+                    event.target.value === "blocked_by"
+                      ? "blocked_by"
+                      : "blocking"
+                  )
+                }
+                aria-label="Relation direction"
+                className="w-48"
+                size="sm"
+              >
+                <NativeSelectOption value="blocking">
+                  Mark as blocking
+                </NativeSelectOption>
+                <NativeSelectOption value="blocked_by">
+                  Mark as blocked by
+                </NativeSelectOption>
+              </NativeSelect>
+
+              <div className="flex items-center gap-2">
+                <DialogPrimitive.Close asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={mutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </DialogPrimitive.Close>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={!selectedIssue || mutation.isPending}
+                >
+                  <IconLink />
+                  {actionLabel}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  )
+}
+
+function IssueDetailRelations({
+  issueId,
+  relations,
+}: {
+  issueId: string
+  relations: IssueRelation[]
+}) {
   const blocking = relations.filter(
     (relation) => relation.source_issue_id === issueId
   )
@@ -334,69 +624,27 @@ function IssueDetailRelations({
           />
         ))}
       </IssueDetailRelationGroup>
-
-      <form onSubmit={handleAdd} className="grid gap-2 border-t pt-4">
-        <input type="hidden" name="issue_id" value={issueId} />
-        <NativeSelect
-          name="related_issue_id"
-          disabled={candidates.length === 0}
-          required
-          aria-label="Related issue"
-          className="w-full min-w-0"
-        >
-          <NativeSelectOption value="" disabled>
-            Select issue
-          </NativeSelectOption>
-          {candidates.map((candidate) => (
-            <NativeSelectOption key={candidate.id} value={candidate.id}>
-              {candidate.title ?? "Generating title…"}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <div className="flex gap-2">
-          <NativeSelect
-            name="direction"
-            disabled={candidates.length === 0}
-            defaultValue="blocking"
-            aria-label="Relation direction"
-            className="flex-1"
-          >
-            <NativeSelectOption value="blocking">Blocks</NativeSelectOption>
-            <NativeSelectOption value="blocked_by">
-              Blocked by
-            </NativeSelectOption>
-          </NativeSelect>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={candidates.length === 0 || mutation.isPending}
-          >
-            <IconLink />
-            Add
-          </Button>
-        </div>
-        {candidates.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Create another issue before adding relations.
-          </p>
-        ) : null}
-      </form>
     </div>
   )
 }
 
 function RailSection({
   title,
+  action,
   children,
 }: {
   title: string
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="px-[18px] py-4">
-      <p className="mb-2.5 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
-        {title}
-      </p>
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
+          {title}
+        </p>
+        {action}
+      </div>
       {children}
     </div>
   )
@@ -404,17 +652,31 @@ function RailSection({
 
 export function IssueDetailRail({
   issueId,
+  issueCode,
   status,
   pullRequests,
   relations,
   relationCandidates,
 }: {
   issueId: string
+  issueCode: string | null
   status: IssueStatus
   pullRequests: IssuePullRequest[]
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
 }) {
+  const queryClient = useQueryClient()
+  const addRelationMutation = useMutation({
+    mutationFn: addIssueRelation,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+  })
+
   return (
     <div className="min-w-0 divide-y divide-border/70">
       <RailSection title="Status">
@@ -428,12 +690,18 @@ export function IssueDetailRail({
         />
       </RailSection>
 
-      <RailSection title="Relations">
-        <IssueDetailRelations
-          issueId={issueId}
-          relations={relations}
-          candidates={relationCandidates}
-        />
+      <RailSection
+        title="Relations"
+        action={
+          <IssueRelationDialog
+            issueId={issueId}
+            issueCode={issueCode}
+            candidates={relationCandidates}
+            mutation={addRelationMutation}
+          />
+        }
+      >
+        <IssueDetailRelations issueId={issueId} relations={relations} />
       </RailSection>
     </div>
   )
