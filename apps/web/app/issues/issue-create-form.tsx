@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   IconCheck,
   IconChevronDown,
@@ -22,6 +22,28 @@ import type { AgentProvider } from "@gentic/validators/issues"
 
 import { MessageComposer } from "./message-composer/message-composer"
 
+const ISSUE_CREATE_DRAFT_STORAGE_KEY = "gentic:issue-create-draft:v1"
+
+function loadStoredIssueDraft() {
+  try {
+    return window.localStorage.getItem(ISSUE_CREATE_DRAFT_STORAGE_KEY) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+function storeIssueDraft(prompt: string) {
+  try {
+    if (prompt) {
+      window.localStorage.setItem(ISSUE_CREATE_DRAFT_STORAGE_KEY, prompt)
+    } else {
+      window.localStorage.removeItem(ISSUE_CREATE_DRAFT_STORAGE_KEY)
+    }
+  } catch {
+    return
+  }
+}
+
 export function IssueCreateForm({
   projects,
   defaultAgentProvider = "claude_code",
@@ -41,6 +63,29 @@ export function IssueCreateForm({
   const selectedProject = projects.find((project) => project.id === projectId)
   const projectLabelId = "issue-project-label"
   const projectErrorId = "issue-project-error"
+  useEffect(() => {
+    const storedPrompt = loadStoredIssueDraft()
+
+    if (!storedPrompt) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPrompt(storedPrompt)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [])
+
+  const updatePrompt = (value: string) => {
+    setPrompt(value)
+    storeIssueDraft(value)
+  }
+
+  const clearStoredPrompt = () => {
+    storeIssueDraft("")
+  }
+
   const requireProject = () => {
     if (projectId) {
       return true
@@ -73,7 +118,7 @@ export function IssueCreateForm({
       name="prompt"
       draft={prompt}
       draftFiles={files}
-      onDraftChange={setPrompt}
+      onDraftChange={updatePrompt}
       onFilesChange={setFiles}
       rows={3}
       placeholder="Describe what you want built, fixed, or investigated."
@@ -144,7 +189,9 @@ export function IssueCreateForm({
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
+              return
             }
+            clearStoredPrompt()
           }}
         >
           <IconDeviceFloppy />
@@ -162,7 +209,9 @@ export function IssueCreateForm({
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
+              return
             }
+            clearStoredPrompt()
           }}
         >
           <IconSend />
