@@ -256,6 +256,7 @@ export async function updateIssueStatusByPrUrl(
       .from("issues")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", current.id)
+      .eq("status", current.status)
       .select("id")
       .maybeSingle()
   )
@@ -292,13 +293,14 @@ export async function getIssueRepo(
 }
 
 // Like `updateIssueStatusByPrUrl`, but only applies when the issue is
-// currently in `fromStatus`. Used by the `check_suite` webhook handler so a
-// CI result doesn't clobber a status the issue has since moved past (e.g. the
-// user already requested changes or merged the PR before CI finished).
+// currently in one of the allowed source statuses. Used by the check webhook
+// handlers so CI events don't clobber a status the issue has since moved past
+// (e.g. the user already requested changes or merged the PR before CI
+// finished).
 export async function updateIssueStatusByPrUrlIfStatus(
   supabase: Supabase,
   prUrl: string,
-  fromStatus: IssueStatus,
+  fromStatus: IssueStatus | readonly IssueStatus[],
   status: IssueStatus
 ) {
   const { data: pullRequest, error: pullRequestError } = await supabase
@@ -311,27 +313,42 @@ export async function updateIssueStatusByPrUrlIfStatus(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
+  const { data: current, error: fetchError } = await (pullRequest
+    ? supabase
+        .from("issues")
+        .select("id,status")
+        .eq("id", pullRequest.issue_id)
+        .maybeSingle()
+    : supabase
+        .from("issues")
+        .select("id,status")
+        .eq("pr_url", prUrl)
+        .maybeSingle())
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!current) {
+    return null
+  }
+
+  const fromStatuses = Array.isArray(fromStatus) ? fromStatus : [fromStatus]
+  if (!fromStatuses.includes(current.status)) {
+    return null
+  }
+
   const result = unwrap<{ id: string } | null>(
-    pullRequest
-      ? await supabase
-          .from("issues")
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq("id", pullRequest.issue_id)
-          .eq("status", fromStatus)
-          .select("id")
-          .maybeSingle()
-      : await supabase
-          .from("issues")
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq("pr_url", prUrl)
-          .eq("status", fromStatus)
-          .select("id")
-          .maybeSingle()
+    await supabase
+      .from("issues")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", current.id)
+      .select("id")
+      .maybeSingle()
   )
 
   if (result) {
     await logIssueEvent(supabase, result.id, "status_changed", {
-      from: fromStatus,
+      from: current.status,
       to: status,
     })
   }
