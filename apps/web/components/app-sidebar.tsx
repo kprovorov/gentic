@@ -20,7 +20,7 @@ import { NavUser } from "./nav-user"
 
 const navMain = [
   { title: "Issues", href: "/issues", icon: IconListDetails },
-  { title: "Projects", href: "/settings", icon: IconFolder },
+  { title: "Settings", href: "/settings", icon: IconFolder },
 ]
 
 export function AppSidebar({

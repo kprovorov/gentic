@@ -5,7 +5,7 @@ import { getSettingsData } from "@/app/queries"
 import { SettingsView } from "./settings-view"
 
 export const metadata: Metadata = {
-  title: "Projects",
+  title: "Settings",
   description: "Configure the repositories Gentic can assign coding agents to.",
 }
 
