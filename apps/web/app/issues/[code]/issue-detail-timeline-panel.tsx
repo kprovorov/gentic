@@ -67,6 +67,7 @@ export function IssueDetailTimelinePanel({
   const { user } = useUser()
   const currentUserName =
     user?.fullName ?? user?.primaryEmailAddress?.emailAddress
+  const currentUserImageUrl = user?.imageUrl || null
 
   const timelineItems = useMemo(
     () =>
@@ -107,6 +108,7 @@ export function IssueDetailTimelinePanel({
                   issuePrompt={issuePrompt}
                   attachments={attachments}
                   currentUserName={currentUserName}
+                  currentUserImageUrl={currentUserImageUrl}
                 />
               </MessageScrollerItem>
             </MessageScrollerContent>
