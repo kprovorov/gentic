@@ -30,6 +30,7 @@ import { createServiceClient } from "@gentic/supabase/service"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
+import { formatGeneratedIssueTitle } from "./title-format"
 import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
 import { getIssueHref } from "./urls"
@@ -133,7 +134,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
           `Failed to generate title for issue ${created.id}:`,
           error
         )
-        return fields.prompt.slice(0, 60)
+        return formatGeneratedIssueTitle(fields.prompt)
       }),
       generateIssueType(fields.prompt).catch((error) => {
         console.error(`Failed to generate type for issue ${created.id}:`, error)
