@@ -78,6 +78,8 @@ const blockingFilterOptions = [
   "blocking",
   "non-blocking",
 ] as const
+const activeFilterCountBadgeStyles =
+  "ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-medium text-foreground"
 
 const blockingFilterBadgeStyles: Partial<Record<BlockingFilter, string>> = {
   blocked: blockingBadgeStyles.blocked,
@@ -597,7 +599,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <Button variant="outline" size="sm">
                       Status
                       {statusFilter.size > 0 ? (
-                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                        <span className={activeFilterCountBadgeStyles}>
                           {statusFilter.size}
                         </span>
                       ) : null}
@@ -648,7 +650,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <Button variant="outline" size="sm">
                       Type
                       {typeFilter.size > 0 ? (
-                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                        <span className={activeFilterCountBadgeStyles}>
                           {typeFilter.size}
                         </span>
                       ) : null}
@@ -746,7 +748,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <Button variant="outline" size="sm">
                       Project
                       {projectFilter.size > 0 ? (
-                        <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                        <span className={activeFilterCountBadgeStyles}>
                           {projectFilter.size}
                         </span>
                       ) : null}
