@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useUser } from "@clerk/nextjs"
 
 import type { IssuePullRequest } from "@/app/queries"
@@ -12,6 +12,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@gentic/ui/message-scroller"
 import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
 import type { IssueEventContract } from "@gentic/validators/realtime"
@@ -96,6 +97,10 @@ export function IssueDetailTimelinePanel({
       </div>
 
       <MessageScrollerProvider>
+        <ScrollToSubmittedMessage
+          messageCount={chat.displayedMessages.length}
+          sendTick={chat.sendTick}
+        />
         <MessageScroller className="min-w-0 flex-1">
           <MessageScrollerViewport className="px-6 pt-5 pb-2">
             <MessageScrollerContent className="mx-auto w-full max-w-[840px] gap-4">
@@ -153,6 +158,42 @@ export function IssueDetailTimelinePanel({
       </div>
     </div>
   )
+}
+
+function ScrollToSubmittedMessage({
+  messageCount,
+  sendTick,
+}: {
+  messageCount: number
+  sendTick: number
+}) {
+  const { scrollToEnd } = useMessageScroller()
+  const pendingSendTickRef = useRef(0)
+
+  useEffect(() => {
+    if (sendTick === 0) {
+      return
+    }
+
+    pendingSendTickRef.current = sendTick
+  }, [sendTick])
+
+  useEffect(() => {
+    if (pendingSendTickRef.current === 0) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      pendingSendTickRef.current = 0
+      scrollToEnd({ behavior: "smooth" })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+    }
+  }, [messageCount, scrollToEnd, sendTick])
+
+  return null
 }
 
 function RealtimeConnectionNotice({
