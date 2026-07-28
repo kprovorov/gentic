@@ -32,6 +32,7 @@ import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
 import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
+import { fallbackIssueType } from "./type-parser"
 import { getIssueHref } from "./urls"
 
 const ATTACHMENTS_BUCKET = "attachments"
@@ -73,8 +74,9 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   })
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
-  // Save the issue with no title and the default "issue" type right away
-  // rather than blocking on the AI Gateway calls — both are generated after
+  // Save the issue with no title and the placeholder "issue" type right away
+  // rather than blocking on the AI Gateway calls — title and final type are
+  // generated after
   // the response is sent (via `after`), so they still complete even if the
   // user closes the tab, and the service-role client is used since there's
   // no request-scoped session by then. `issues` is realtime-enabled, so both
@@ -137,22 +139,20 @@ async function createIssue(status: IssueStatus, formData: FormData) {
       }),
       generateIssueType(fields.prompt).catch((error) => {
         console.error(`Failed to generate type for issue ${created.id}:`, error)
-        return null
+        return fallbackIssueType(fields.prompt)
       }),
     ])
 
     await Promise.all([
       issuesService.setIssueTitle(serviceClient, created.id, title),
-      type
-        ? issuesService
-            .setIssueType(serviceClient, created.id, type)
-            .catch((error) => {
-              console.error(
-                `Failed to persist type for issue ${created.id}:`,
-                error
-              )
-            })
-        : null,
+      issuesService
+        .setIssueType(serviceClient, created.id, type)
+        .catch((error) => {
+          console.error(
+            `Failed to persist type for issue ${created.id}:`,
+            error
+          )
+        }),
     ])
   })
   revalidatePath("/issues")
