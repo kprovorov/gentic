@@ -20,7 +20,7 @@ If the command is running in an interactive terminal and any required setup is m
 For CI, containers, or other non-interactive environments, bypass the prompts by providing the required settings up front:
 
 ```bash
-GENTIC_API_URL=https://gentic.chat/api/v1 \
+GENTIC_API_URL=https://app.gentic.chat/api/v1 \
 GENTIC_API_KEY=<your-key> \
 gentic run
 ```
@@ -28,7 +28,7 @@ gentic run
 You can also write credentials to the config file non-interactively before starting the worker:
 
 ```bash
-gentic auth login --api-url https://gentic.chat/api/v1 --api-key <your-key>
+gentic auth login --api-url https://app.gentic.chat/api/v1 --api-key <your-key>
 gentic run
 ```
 
@@ -56,7 +56,7 @@ gentic auth login
 For scripted or CI environments where you cannot interact with a prompt, pass both flags directly:
 
 ```bash
-gentic auth login --api-url https://gentic.chat/api/v1 --api-key <your-key>
+gentic auth login --api-url https://app.gentic.chat/api/v1 --api-key <your-key>
 ```
 
 <Warning>
@@ -93,7 +93,7 @@ Environment variables give you fine-grained control over every configuration val
 
 ```bash
 # .env
-GENTIC_API_URL=https://gentic.chat/api/v1
+GENTIC_API_URL=https://app.gentic.chat/api/v1
 GENTIC_API_KEY=your_api_key_here
 ```
 
@@ -102,10 +102,10 @@ The full list of supported variables is below.
 ### Required
 
 <ParamField body="GENTIC_API_URL" type="string" required>
-  The Gentic API endpoint. Use `https://gentic.chat/api/v1` for the hosted service, or `http://localhost:3000/api/v1` when developing against a local web app instance.
+  The Gentic API endpoint. Use `https://app.gentic.chat/api/v1` for the hosted service, or `http://localhost:3000/api/v1` when developing against a local web app instance.
 
 ```bash
-GENTIC_API_URL=https://gentic.chat/api/v1
+GENTIC_API_URL=https://app.gentic.chat/api/v1
 ```
 
 </ParamField>

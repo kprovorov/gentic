@@ -2,7 +2,7 @@ import { getConfigInput } from "./config.js"
 import { writeConfigFile } from "./config-store.js"
 import { cancel, isCancel, log, password, text } from "./ui.js"
 
-export const DEFAULT_API_URL = "https://gentic.chat/api/v1"
+export const DEFAULT_API_URL = "https://app.gentic.chat/api/v1"
 
 export interface AuthLoginPromptResult {
   cancelled: boolean
