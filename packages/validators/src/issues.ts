@@ -27,6 +27,39 @@ export const agentProviderSchema = z.enum(["claude_code", "codex"])
 
 export type AgentProvider = z.infer<typeof agentProviderSchema>
 
+export const issueModelSchema = z.string().trim().min(1).max(100).nullable()
+
+export type IssueModel = z.infer<typeof issueModelSchema>
+
+export const agentModelOptions = {
+  claude_code: [
+    { value: "claude-opus-5", label: "Claude Opus 5" },
+    { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
+    { value: "claude-fable-5", label: "Claude Fable 5" },
+  ],
+  codex: [
+    { value: "gpt-5.6", label: "GPT-5.6" },
+    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+  ],
+} as const satisfies Record<
+  AgentProvider,
+  Array<{ value: string; label: string }>
+>
+
+export function isIssueModelForAgent(
+  agentProvider: AgentProvider,
+  issueModel: string | null
+): boolean {
+  return (
+    issueModel === null ||
+    agentModelOptions[agentProvider].some(
+      (option) => option.value === issueModel
+    )
+  )
+}
+
 // "issue" is a placeholder used before the background classifier (see
 // apps/web/app/issues/type.ts) determines the real type — it is not a type
 // callers should pick deliberately.
@@ -49,6 +82,7 @@ export const createIssueSchema = z.object({
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
   agent_provider: agentProviderSchema.default("claude_code"),
+  issue_model: issueModelSchema.default(null),
   // Omitted by the web app's create-issue form the same way: the type is
   // classified in the background after the issue is saved, so it defaults
   // to the "issue" placeholder until then.
@@ -62,6 +96,7 @@ export const updateIssueSchema = z.object({
   title: z.string().trim().min(1).max(160),
   prompt: z.string().trim().optional(),
   agent_provider: agentProviderSchema,
+  issue_model: issueModelSchema,
   type: issueTypeSchema,
 })
 
@@ -77,6 +112,7 @@ export type UpdateIssueStatusValues = z.infer<typeof updateIssueStatusSchema>
 export const updateIssueAgentProviderSchema = z.object({
   id: z.string().uuid(),
   agent_provider: agentProviderSchema,
+  issue_model: issueModelSchema.default(null),
 })
 
 export type UpdateIssueAgentProviderValues = z.infer<

@@ -31,6 +31,7 @@ import {
 import type { IssueRealtimeChannel } from "./realtime.js"
 
 export type AgentProvider = "claude_code" | "codex"
+export type IssueModel = string | null
 
 /** How to launch one ACP agent's child process. */
 interface AgentEntry {
@@ -107,6 +108,7 @@ export interface RunSessionInput {
   issueId: string
   channel: IssueRealtimeChannel
   agentProvider: AgentProvider
+  issueModel: IssueModel
   /** Absolute path to the cloned repo the agent works in. */
   cwd: string
   /**
@@ -134,7 +136,7 @@ export interface RunSessionInput {
  * into the issue transcript. Resolves once `nextPrompt` returns `null`.
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
-  const agent = getAgentProviderConfig(input.agentProvider)
+  const agent = getAgentProviderConfig(input)
   const child = spawn(agent.entry.command, agent.entry.args, {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "inherit"],
@@ -213,7 +215,10 @@ interface AgentProviderConfig {
   newSession: (input: RunSessionInput) => NewSessionRequest
 }
 
-function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
+function getAgentProviderConfig(
+  input: Pick<RunSessionInput, "agentProvider" | "issueModel">
+): AgentProviderConfig {
+  const provider = input.agentProvider
   if (provider === "codex") {
     const entry = resolveAgentEntry(
       "codex-acp",
@@ -223,7 +228,11 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       provider,
       entry,
       env: {
-        INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        INITIAL_AGENT_MODE:
+          process.env.INITIAL_AGENT_MODE ?? "agent-full-access",
+        ...(input.issueModel
+          ? { CODEX_CONFIG: mergeCodexConfigModel(input.issueModel) }
+          : {}),
         // codex-acp resolves its bundled @openai/codex fallback via
         // require.resolve when CODEX_PATH is unset, which — like our own
         // CLAUDE_AGENT_ENTRY resolution — breaks under bun-compile (no
@@ -270,6 +279,7 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       _meta: {
         claudeCode: {
           options: {
+            ...(input.issueModel ? { model: input.issueModel } : {}),
             systemPrompt: {
               type: "preset",
               preset: "claude_code",
@@ -284,6 +294,17 @@ function getAgentProviderConfig(provider: AgentProvider): AgentProviderConfig {
       },
     }),
   }
+}
+
+function mergeCodexConfigModel(issueModel: string): string {
+  const config = process.env.CODEX_CONFIG
+    ? JSON.parse(process.env.CODEX_CONFIG)
+    : {}
+
+  return JSON.stringify({
+    ...config,
+    model: issueModel,
+  })
 }
 
 function prependInstructions(

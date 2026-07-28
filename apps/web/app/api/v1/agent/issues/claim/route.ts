@@ -12,7 +12,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, status, agent_provider, session_id, pr_url, prompt, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, status, agent_provider, issue_model, session_id, pr_url, prompt, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 export async function POST(request: Request) {
   try {
@@ -26,10 +26,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function claimNextQueuedIssue(
-  supabase: Supabase,
-  userId: string
-) {
+async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
@@ -91,6 +88,7 @@ async function claimNextQueuedIssue(
     id,
     activeRunId,
     agentProvider: candidate.agent_provider,
+    issueModel: candidate.issue_model,
     repo: candidate.projects.repo,
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,

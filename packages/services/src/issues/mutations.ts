@@ -36,6 +36,7 @@ export async function createIssue(
       prompt: input.prompt ?? null,
       status: input.status === "todo" ? "draft" : input.status,
       agent_provider: input.agent_provider,
+      issue_model: input.issue_model,
       type: input.type,
     })
     .select(ISSUE_WITH_PROJECT_SELECT)
@@ -100,7 +101,7 @@ export async function updateIssue(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider, projects!inner(user_id)")
+    .select("agent_provider, issue_model, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -118,8 +119,10 @@ export async function updateIssue(
       title: input.title,
       prompt: input.prompt ?? null,
       agent_provider: input.agent_provider,
+      issue_model: input.issue_model,
       type: input.type,
-      ...(current.agent_provider !== input.agent_provider
+      ...(current.agent_provider !== input.agent_provider ||
+      current.issue_model !== input.issue_model
         ? { session_id: null }
         : {}),
       updated_at: new Date().toISOString(),

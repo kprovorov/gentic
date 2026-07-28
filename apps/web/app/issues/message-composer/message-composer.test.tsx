@@ -15,8 +15,10 @@ function renderComposer(
     onFilesChange: vi.fn(),
     onSubmit: vi.fn((event) => event.preventDefault()),
     agentProvider: "claude_code",
+    issueModel: null,
     hasMessages: false,
     onAgentProviderChange: vi.fn(),
+    onIssueModelChange: vi.fn(),
     ...overrides,
   }
   render(<MessageComposer {...props} />)
@@ -58,6 +60,14 @@ describe("MessageComposer", () => {
     expect(
       screen.getByRole("button", { name: "Choose agent" })
     ).toHaveTextContent("Codex")
+  })
+
+  it("shows the active model in the picker trigger", () => {
+    renderComposer({ issueModel: "claude-sonnet-5" })
+
+    expect(
+      screen.getByRole("button", { name: "Choose model" })
+    ).toHaveTextContent("Claude Sonnet 5")
   })
 
   it("renders matching slash commands and selects them on click", async () => {

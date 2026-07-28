@@ -23,7 +23,10 @@ vi.mock("@/app/query-keys", () => ({
 import { useIssueAgentProvider } from "./use-issue-agent-provider"
 
 function TestHarness({ issueId }: { issueId: string }) {
-  const { onAgentProviderChange } = useIssueAgentProvider({ issueId })
+  const { onAgentProviderChange, onIssueModelChange } = useIssueAgentProvider({
+    issueId,
+    agentProvider: "codex",
+  })
 
   return (
     <div>
@@ -38,6 +41,22 @@ function TestHarness({ issueId }: { issueId: string }) {
         onClick={() => onAgentProviderChange("codex", { requiresReset: true })}
       >
         set-with-reset
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onIssueModelChange("gpt-5.6-sol", { requiresReset: false })
+        }
+      >
+        set-model-only
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onIssueModelChange("gpt-5.6-sol", { requiresReset: true })
+        }
+      >
+        set-model-with-reset
       </button>
     </div>
   )
@@ -74,6 +93,7 @@ describe("useIssueAgentProvider", () => {
     const formData = updateIssueAgentProviderMock.mock.calls[0][0] as FormData
     expect(formData.get("id")).toBe("11111111-1111-4111-8111-111111111111")
     expect(formData.get("agent_provider")).toBe("codex")
+    expect(formData.get("issue_model")).toBe("")
   })
 
   it("calls resetIssueAgent (the same destructive path as retry) when a reset is required", async () => {
@@ -91,5 +111,39 @@ describe("useIssueAgentProvider", () => {
     const formData = resetIssueAgentMock.mock.calls[0][0] as FormData
     expect(formData.get("id")).toBe("11111111-1111-4111-8111-111111111111")
     expect(formData.get("agent_provider")).toBe("codex")
+    expect(formData.get("issue_model")).toBe("")
+  })
+
+  it("updates the issue model without reset when no reset is required", async () => {
+    const user = userEvent.setup()
+    updateIssueAgentProviderMock.mockResolvedValue(undefined)
+    renderHarness()
+
+    await user.click(screen.getByRole("button", { name: "set-model-only" }))
+
+    expect(updateIssueAgentProviderMock).toHaveBeenCalledTimes(1)
+    expect(resetIssueAgentMock).not.toHaveBeenCalled()
+    const formData = updateIssueAgentProviderMock.mock.calls[0][0] as FormData
+    expect(formData.get("agent_provider")).toBe("codex")
+    expect(formData.get("issue_model")).toBe("gpt-5.6-sol")
+  })
+
+  it("resets the issue when changing model after messages exist", async () => {
+    const user = userEvent.setup()
+    resetIssueAgentMock.mockResolvedValue({
+      id: "22222222-2222-4222-8222-222222222222",
+      created_at: "2026-07-14T00:00:00.000Z",
+    })
+    renderHarness()
+
+    await user.click(
+      screen.getByRole("button", { name: "set-model-with-reset" })
+    )
+
+    expect(resetIssueAgentMock).toHaveBeenCalledTimes(1)
+    expect(updateIssueAgentProviderMock).not.toHaveBeenCalled()
+    const formData = resetIssueAgentMock.mock.calls[0][0] as FormData
+    expect(formData.get("agent_provider")).toBe("codex")
+    expect(formData.get("issue_model")).toBe("gpt-5.6-sol")
   })
 })

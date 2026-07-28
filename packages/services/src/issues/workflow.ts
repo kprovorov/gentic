@@ -1,4 +1,8 @@
-import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
+import type {
+  AgentProvider,
+  IssueModel,
+  IssueStatus,
+} from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
@@ -10,7 +14,8 @@ export async function resetIssueAgent(
   supabase: Supabase,
   userId: string,
   id: string,
-  agentProvider: AgentProvider
+  agentProvider: AgentProvider,
+  issueModel: IssueModel
 ): Promise<UserChatMessage> {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
@@ -30,6 +35,7 @@ export async function resetIssueAgent(
     await supabase.rpc("reset_issue_run", {
       p_issue_id: id,
       p_agent_provider: agentProvider,
+      p_issue_model: issueModel,
     })
   )
 
@@ -139,7 +145,8 @@ export async function updateIssueAgentProvider(
   supabase: Supabase,
   userId: string,
   id: string,
-  agentProvider: AgentProvider
+  agentProvider: AgentProvider,
+  issueModel: IssueModel
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
@@ -165,6 +172,7 @@ export async function updateIssueAgentProvider(
     .from("issues")
     .update({
       agent_provider: agentProvider,
+      issue_model: issueModel,
       session_id: null,
       updated_at: new Date().toISOString(),
     })
@@ -206,6 +214,7 @@ export async function bulkUpdateIssueAgentProvider(
       .from("issues")
       .update({
         agent_provider: agentProvider,
+        issue_model: null,
         session_id: null,
         updated_at: new Date().toISOString(),
       })
