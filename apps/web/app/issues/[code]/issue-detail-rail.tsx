@@ -8,22 +8,17 @@ import {
   IconChevronDown,
   IconCircleDashed,
   IconClock,
-  IconDownload,
   IconExternalLink,
   IconGitMerge,
   IconGitPullRequest,
   IconLink,
-  IconPaperclip,
   IconTrash,
-  IconUpload,
 } from "@tabler/icons-react"
 
 import {
   addIssueRelation,
-  deleteAttachment,
   deleteIssueRelation,
   updateIssueStatus,
-  uploadAttachments,
 } from "@/app/issues/actions"
 import {
   statusIconStyles,
@@ -45,21 +40,6 @@ import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
-
-import type { Attachment } from "./attachments"
-
-function formatSize(bytes: number | null): string {
-  if (!bytes) {
-    return ""
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 function parsePullRequestUrl(url: string) {
   try {
@@ -405,151 +385,6 @@ function IssueDetailRelations({
   )
 }
 
-function IssueDetailAttachmentRow({
-  issueId,
-  attachment,
-}: {
-  issueId: string
-  attachment: Attachment
-}) {
-  const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: deleteAttachment,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
-    },
-  })
-
-  function handleDelete() {
-    if (mutation.isPending) {
-      return
-    }
-    if (!window.confirm(`Delete "${attachment.fileName}"?`)) {
-      return
-    }
-
-    const formData = new FormData()
-    formData.set("id", attachment.id)
-    formData.set("issue_id", issueId)
-    mutation.mutate(formData)
-  }
-
-  return (
-    <li className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-background py-1.5 pr-2 pl-1.5 ring-1 ring-border">
-      {attachment.thumbnailUrl ? (
-        // Supabase signs this URL with Image Transformation options.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={attachment.thumbnailUrl}
-          alt=""
-          className="size-[34px] shrink-0 rounded-[9px] object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-muted-foreground">
-          <IconPaperclip className="size-4" />
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[12.5px] font-medium">
-          {attachment.fileName}
-        </p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {formatSize(attachment.sizeBytes)}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        {attachment.url ? (
-          <Button asChild variant="ghost" size="icon-xs">
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              download={attachment.fileName}
-            >
-              <IconDownload />
-            </a>
-          </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={handleDelete}
-          disabled={mutation.isPending}
-        >
-          <IconTrash />
-        </Button>
-      </div>
-    </li>
-  )
-}
-
-function IssueDetailAttachments({
-  issueId,
-  attachments,
-}: {
-  issueId: string
-  attachments: Attachment[]
-}) {
-  const queryClient = useQueryClient()
-  const uploadMutation = useMutation({
-    mutationFn: uploadAttachments,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
-    },
-  })
-
-  function handleUpload(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    uploadMutation.mutate(new FormData(event.currentTarget))
-    event.currentTarget.reset()
-  }
-
-  return (
-    <div className="grid gap-2.5">
-      {attachments.length === 0 ? (
-        <p className="text-[12.5px] text-muted-foreground">
-          No files attached.
-        </p>
-      ) : (
-        <ul className="grid min-w-0 gap-2">
-          {attachments.map((attachment) => (
-            <IssueDetailAttachmentRow
-              key={attachment.id}
-              issueId={issueId}
-              attachment={attachment}
-            />
-          ))}
-        </ul>
-      )}
-
-      <form
-        onSubmit={handleUpload}
-        encType="multipart/form-data"
-        className="flex flex-wrap items-center gap-2 border-t pt-3"
-      >
-        <input type="hidden" name="issue_id" value={issueId} />
-        <input
-          type="file"
-          name="files"
-          multiple
-          className="min-w-0 text-xs text-muted-foreground file:mr-2 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
-        />
-        <Button
-          type="submit"
-          variant="outline"
-          size="sm"
-          disabled={uploadMutation.isPending}
-        >
-          <IconUpload />
-          Upload
-        </Button>
-      </form>
-    </div>
-  )
-}
-
 function RailSection({
   title,
   children,
@@ -573,14 +408,12 @@ export function IssueDetailRail({
   pullRequests,
   relations,
   relationCandidates,
-  attachments,
 }: {
   issueId: string
   status: IssueStatus
   pullRequests: IssuePullRequest[]
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
-  attachments: Attachment[]
 }) {
   return (
     <div className="min-w-0 divide-y divide-border/70">
@@ -601,10 +434,6 @@ export function IssueDetailRail({
           relations={relations}
           candidates={relationCandidates}
         />
-      </RailSection>
-
-      <RailSection title="Attachments">
-        <IssueDetailAttachments issueId={issueId} attachments={attachments} />
       </RailSection>
     </div>
   )
