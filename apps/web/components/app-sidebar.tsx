@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { IconFolder, IconListDetails } from "@tabler/icons-react"
+import { IconListDetails, IconSettings } from "@tabler/icons-react"
 
 import {
   Sidebar,
@@ -20,7 +20,7 @@ import { NavUser } from "./nav-user"
 
 const navMain = [
   { title: "Issues", href: "/issues", icon: IconListDetails },
-  { title: "Settings", href: "/settings", icon: IconFolder },
+  { title: "Settings", href: "/settings", icon: IconSettings },
 ]
 
 export function AppSidebar({
