@@ -30,6 +30,7 @@ import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
 import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
+import { fallbackIssueType } from "./type-parser"
 import { getIssueHref } from "./urls"
 
 const ATTACHMENTS_BUCKET = "attachments"
@@ -69,8 +70,8 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     agent_provider: getString(formData, "agent_provider") || "claude_code",
   })
 
-  // Save the issue with no title and the default "issue" type right away
-  // rather than blocking on the AI Gateway calls — both are generated after
+  // Save the issue with no title right away rather than blocking on the AI
+  // Gateway calls — title and final type are generated after
   // the response is sent (via `after`), so they still complete even if the
   // user closes the tab, and the service-role client is used since there's
   // no request-scoped session by then. `issues` is realtime-enabled, so both
@@ -78,7 +79,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   const created = await issuesService.createIssue(
     supabase,
     userId,
-    createIssueSchema.parse({ ...fields, status: "draft" })
+    createIssueSchema.parse({ ...fields, status: "draft", type: "feature" })
   )
 
   let message: { id: string; created_at: string } | null = null
@@ -112,11 +113,11 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         }
       )
     }
-    await issuesService.deleteIssue(supabase, userId, created.id).catch(
-      (cleanupError) => {
+    await issuesService
+      .deleteIssue(supabase, userId, created.id)
+      .catch((cleanupError) => {
         console.error(`Failed to clean up issue ${created.id}:`, cleanupError)
-      }
-    )
+      })
     throw error
   }
 
@@ -125,27 +126,28 @@ async function createIssue(status: IssueStatus, formData: FormData) {
 
     const [title, type] = await Promise.all([
       generateIssueTitle(fields.prompt).catch((error) => {
-        console.error(`Failed to generate title for issue ${created.id}:`, error)
+        console.error(
+          `Failed to generate title for issue ${created.id}:`,
+          error
+        )
         return fields.prompt.slice(0, 60)
       }),
       generateIssueType(fields.prompt).catch((error) => {
         console.error(`Failed to generate type for issue ${created.id}:`, error)
-        return null
+        return fallbackIssueType(fields.prompt)
       }),
     ])
 
     await Promise.all([
       issuesService.setIssueTitle(serviceClient, created.id, title),
-      type
-        ? issuesService
-            .setIssueType(serviceClient, created.id, type)
-            .catch((error) => {
-              console.error(
-                `Failed to persist type for issue ${created.id}:`,
-                error
-              )
-            })
-        : null,
+      issuesService
+        .setIssueType(serviceClient, created.id, type)
+        .catch((error) => {
+          console.error(
+            `Failed to persist type for issue ${created.id}:`,
+            error
+          )
+        }),
     ])
   })
   revalidatePath("/issues")
@@ -184,12 +186,19 @@ export async function updateIssue(formData: FormData) {
 
 export async function updateIssueTitle(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title } = updateIssueSchema.pick({ id: true, title: true }).parse({
-    id: getString(formData, "id"),
-    title: getString(formData, "title"),
-  })
+  const { id, title } = updateIssueSchema
+    .pick({ id: true, title: true })
+    .parse({
+      id: getString(formData, "id"),
+      title: getString(formData, "title"),
+    })
 
-  const issue = await issuesService.updateIssueTitle(supabase, userId, id, title)
+  const issue = await issuesService.updateIssueTitle(
+    supabase,
+    userId,
+    id,
+    title
+  )
   revalidatePath("/issues")
   revalidateIssuePath(issue)
 
