@@ -49,8 +49,10 @@ const fontMono = Geist_Mono({
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode
+  modal: React.ReactNode
 }>) {
   return (
     <ClerkProvider>
@@ -76,6 +78,7 @@ export default function RootLayout({
                       <SiteHeader />
                       {children}
                     </SidebarInset>
+                    {modal}
                   </SidebarProvider>
                 </Show>
                 <Show when="signed-out">
