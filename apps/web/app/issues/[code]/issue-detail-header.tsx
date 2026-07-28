@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import {
-  IconBrandGithub,
   IconBug,
   IconBulb,
   IconDotsVertical,
@@ -23,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
+import { BrandIcon } from "@/components/agent-provider-icon"
 
 import { useIssueDelete } from "./issue-delete-button"
 
@@ -89,7 +89,7 @@ export function IssueDetailHeader({
               rel="noreferrer"
               className="mt-2 inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
-              <IconBrandGithub className="size-3.5 shrink-0" />
+              <BrandIcon name="github" className="size-3.5 shrink-0" />
               <span className="min-w-0 truncate font-mono">
                 {issue.projects.repo}
               </span>
