@@ -1,11 +1,9 @@
 import "server-only"
 
-import { gateway, generateText } from "ai"
+import { Output, gateway, generateText } from "ai"
 
 import {
-  ISSUE_CLASSIFICATION_TYPES,
-  fallbackIssueType,
-  parseGeneratedIssueType,
+  issueClassificationSchema,
   type GeneratedIssueType,
 } from "./type-parser"
 
@@ -14,17 +12,19 @@ const ISSUE_TYPE_MODEL = process.env.ISSUE_TYPE_MODEL ?? "openai/gpt-4.1-mini"
 export async function generateIssueType(
   prompt: string
 ): Promise<GeneratedIssueType> {
-  const { text } = await generateText({
+  const { output } = await generateText({
     model: gateway(ISSUE_TYPE_MODEL),
-    system: `Classify issue tracker prompts into exactly one type: ${ISSUE_CLASSIFICATION_TYPES.join(", ")}. Reply with that single word only, no punctuation and no explanation.`,
+    output: Output.object({
+      schema: issueClassificationSchema,
+      name: "issue_classification",
+      description: "Classifies an issue tracker prompt as a feature or bug.",
+    }),
+    system:
+      "Classify issue tracker prompts as either feature work or bug fixes.",
     prompt: `Classify this issue prompt:\n\n${prompt}`,
-    maxOutputTokens: 20,
+    maxOutputTokens: 40,
     temperature: 0,
   })
 
-  // Models don't reliably stick to "return only the type" — strip anything
-  // but letters and match the first known type mentioned anywhere in the
-  // response, the same tolerant approach `generateIssueTitle` uses for
-  // stray quotes/punctuation.
-  return parseGeneratedIssueType(text) ?? fallbackIssueType(prompt)
+  return output.type
 }

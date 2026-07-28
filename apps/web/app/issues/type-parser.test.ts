@@ -1,18 +1,23 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { fallbackIssueType, parseGeneratedIssueType } from "./type-parser"
+import {
+  fallbackIssueType,
+  issueClassificationSchema,
+} from "./type-parser"
 
-test("parseGeneratedIssueType accepts feature or bug from model text", () => {
-  assert.equal(parseGeneratedIssueType("feature"), "feature")
-  assert.equal(parseGeneratedIssueType("Bug."), "bug")
-  assert.equal(parseGeneratedIssueType("This is a bug."), "bug")
+test("issueClassificationSchema accepts feature or bug", () => {
+  assert.equal(
+    issueClassificationSchema.parse({ type: "feature" }).type,
+    "feature"
+  )
+  assert.equal(issueClassificationSchema.parse({ type: "bug" }).type, "bug")
 })
 
-test("parseGeneratedIssueType rejects placeholder and retired types", () => {
-  assert.equal(parseGeneratedIssueType("issue"), null)
-  assert.equal(parseGeneratedIssueType("idea"), null)
-  assert.equal(parseGeneratedIssueType("feedback"), null)
+test("issueClassificationSchema rejects placeholder and retired types", () => {
+  assert.throws(() => issueClassificationSchema.parse({ type: "issue" }))
+  assert.throws(() => issueClassificationSchema.parse({ type: "idea" }))
+  assert.throws(() => issueClassificationSchema.parse({ type: "feedback" }))
 })
 
 test("fallbackIssueType never returns the issue placeholder", () => {

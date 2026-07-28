@@ -1,16 +1,12 @@
+import { z } from "zod"
+
 export const ISSUE_CLASSIFICATION_TYPES = ["feature", "bug"] as const
 
 export type GeneratedIssueType = (typeof ISSUE_CLASSIFICATION_TYPES)[number]
 
-export function parseGeneratedIssueType(
-  text: string
-): GeneratedIssueType | null {
-  const words: string[] = text.toLowerCase().match(/[a-z]+/g) ?? []
-  return (
-    ISSUE_CLASSIFICATION_TYPES.find((candidate) => words.includes(candidate)) ??
-    null
-  )
-}
+export const issueClassificationSchema = z.object({
+  type: z.enum(ISSUE_CLASSIFICATION_TYPES),
+})
 
 export function fallbackIssueType(prompt: string): GeneratedIssueType {
   const bugPattern =
