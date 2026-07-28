@@ -68,8 +68,22 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
   const queryClient = useQueryClient()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [title, setTitle] = useState(issue.title ?? "")
-  const [lastSavedTitle, setLastSavedTitle] = useState(issue.title ?? "")
+  const serverTitle = issue.title ?? ""
+  const [titleState, setTitleState] = useState(() => ({
+    draft: serverTitle,
+    saved: serverTitle,
+    server: serverTitle,
+  }))
+  let currentTitleState = titleState
+  if (!isEditing && titleState.server !== serverTitle) {
+    currentTitleState = {
+      draft: serverTitle,
+      saved: serverTitle,
+      server: serverTitle,
+    }
+    setTitleState(currentTitleState)
+  }
+  const savedTitle = currentTitleState.saved
 
   useLayoutEffect(() => {
     if (!isEditing) {
@@ -85,7 +99,12 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
   const mutation = useMutation({
     mutationFn: updateIssueTitle,
     onSuccess: async (updatedIssue) => {
-      setLastSavedTitle(updatedIssue.title ?? "")
+      const nextTitle = updatedIssue.title ?? ""
+      setTitleState((state) => ({
+        ...state,
+        draft: nextTitle,
+        saved: nextTitle,
+      }))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.issue(issue.id) }),
         queryClient.invalidateQueries({
@@ -96,45 +115,50 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
       ])
     },
     onError: () => {
-      setTitle(lastSavedTitle)
+      setTitleState((state) => ({ ...state, draft: state.saved }))
     },
   })
 
   function finishEditing() {
     setIsEditing(false)
 
-    const nextTitle = title.trim()
+    const nextTitle = currentTitleState.draft.trim()
     if (!nextTitle) {
-      setTitle(lastSavedTitle)
+      setTitleState((state) => ({ ...state, draft: state.saved }))
       return
     }
 
-    if (nextTitle === lastSavedTitle || mutation.isPending) {
-      setTitle(nextTitle)
+    if (nextTitle === savedTitle || mutation.isPending) {
+      setTitleState((state) => ({ ...state, draft: nextTitle }))
       return
     }
 
-    setTitle(nextTitle)
+    setTitleState((state) => ({ ...state, draft: nextTitle }))
     const formData = new FormData()
     formData.set("id", issue.id)
     formData.set("title", nextTitle)
     mutation.mutate(formData)
   }
 
-  const displayTitle = title || "Generating title..."
+  const displayTitle = isEditing
+    ? currentTitleState.draft || "Generating title..."
+    : savedTitle || "Generating title..."
 
   if (isEditing) {
     return (
       <textarea
         ref={textareaRef}
-        value={title}
+        value={currentTitleState.draft}
         aria-label="Issue title"
         rows={1}
         maxLength={160}
         disabled={mutation.isPending}
         onBlur={finishEditing}
         onChange={(event) => {
-          setTitle(event.target.value)
+          setTitleState((state) => ({
+            ...state,
+            draft: event.target.value,
+          }))
           resizeTitleTextarea(event.currentTarget)
         }}
         onKeyDown={(event) => {
@@ -146,13 +170,13 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
 
           if (event.key === "Escape") {
             event.preventDefault()
-            setTitle(lastSavedTitle)
+            setTitleState((state) => ({ ...state, draft: state.saved }))
             setIsEditing(false)
           }
         }}
         className={cn(
           "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
-          !title && "text-muted-foreground italic"
+          !currentTitleState.draft && "text-muted-foreground italic"
         )}
       />
     )
@@ -162,10 +186,13 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
     <button
       type="button"
       disabled={mutation.isPending}
-      onClick={() => setIsEditing(true)}
+      onClick={() => {
+        setTitleState((state) => ({ ...state, draft: state.saved }))
+        setIsEditing(true)
+      }}
       className={cn(
         "block w-full cursor-text border-0 bg-transparent p-0 text-left text-2xl leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-default disabled:opacity-70",
-        !title && "text-muted-foreground italic"
+        !displayTitle && "text-muted-foreground italic"
       )}
     >
       {displayTitle}
@@ -196,7 +223,7 @@ export function IssueDetailHeader({
 
         <div className="min-w-0 flex-1">
           <h1>
-            <EditableIssueTitle key={issue.title ?? ""} issue={issue} />
+            <EditableIssueTitle issue={issue} />
           </h1>
 
           {issue.projects ? (
