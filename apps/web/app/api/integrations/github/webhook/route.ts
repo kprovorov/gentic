@@ -200,7 +200,10 @@ async function handleCheckSuiteEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckSuitePayload
 ) {
-  if (payload.action !== "completed") {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("check_suite", payload.action)
+  ) {
     return
   }
 
@@ -212,7 +215,12 @@ async function handleCheckSuiteEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
@@ -226,7 +234,10 @@ async function handleCheckRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: CheckRunPayload
 ) {
-  if (payload.action !== "completed") {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("check_run", payload.action)
+  ) {
     return
   }
 
@@ -238,7 +249,12 @@ async function handleCheckRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
@@ -252,7 +268,10 @@ async function handleWorkflowRunEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: WorkflowRunPayload
 ) {
-  if (payload.action !== "completed") {
+  if (
+    payload.action !== "completed" &&
+    !isPendingCheckAction("workflow_run", payload.action)
+  ) {
     return
   }
 
@@ -264,7 +283,12 @@ async function handleWorkflowRunEvent(
   const owner = payload.repository.owner.login
   const repo = payload.repository.name
 
-  await resolveCompletedChecksForRef(
+  const resolveChecks =
+    payload.action === "completed"
+      ? resolveCompletedChecksForRef
+      : markPendingChecksForRef
+
+  await resolveChecks(
     supabase,
     String(installationId),
     owner,
@@ -284,6 +308,17 @@ export function getWorkflowRunPullNumbers(
   )
 }
 
+export function isPendingCheckAction(
+  event: "check_suite" | "check_run" | "workflow_run",
+  action: string
+): boolean {
+  if (event === "workflow_run") {
+    return action === "requested"
+  }
+
+  return action === "rerequested"
+}
+
 async function resolveCompletedChecksForRef(
   supabase: ReturnType<typeof createServiceClient>,
   installationId: string,
@@ -292,30 +327,13 @@ async function resolveCompletedChecksForRef(
   headSha: string,
   fallbackPullNumbers: number[] = []
 ) {
-  // The payload's own `check_suite.pull_requests` is only populated when the
-  // PR was already open at the moment the check suite was created. The
-  // worker pushes commits (creating the check suite) before opening the PR,
-  // so that array is unreliable here — resolve PRs from the commit SHA via
-  // the API instead.
-  let pullNumbers: number[]
-  try {
-    pullNumbers = await fetchPullRequestNumbersForCommit(
-      installationId,
-      owner,
-      repo,
-      headSha
-    )
-  } catch (error) {
-    console.error(
-      "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
-      error
-    )
-    pullNumbers = fallbackPullNumbers
-  }
-
-  if (pullNumbers.length === 0) {
-    pullNumbers = fallbackPullNumbers
-  }
+  const pullNumbers = await resolvePullNumbersForRef(
+    installationId,
+    owner,
+    repo,
+    headSha,
+    fallbackPullNumbers
+  )
 
   if (pullNumbers.length === 0) {
     console.error(
@@ -358,6 +376,64 @@ async function resolveCompletedChecksForRef(
     if (result && status === "tests-failed") {
       await issuesService.applyTestsFailed(supabase, result.id, prUrl)
     }
+  }
+}
+
+async function resolvePullNumbersForRef(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  fallbackPullNumbers: number[] = []
+) {
+  // The payload's own `check_suite.pull_requests` is only populated when the
+  // PR was already open at the moment the check suite was created. The
+  // worker pushes commits (creating the check suite) before opening the PR,
+  // so that array is unreliable here — resolve PRs from the commit SHA via
+  // the API instead.
+  let pullNumbers: number[]
+  try {
+    pullNumbers = await fetchPullRequestNumbersForCommit(
+      installationId,
+      owner,
+      repo,
+      headSha
+    )
+  } catch (error) {
+    console.error(
+      "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
+      error
+    )
+    pullNumbers = fallbackPullNumbers
+  }
+
+  return pullNumbers.length > 0 ? pullNumbers : fallbackPullNumbers
+}
+
+async function markPendingChecksForRef(
+  supabase: ReturnType<typeof createServiceClient>,
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  fallbackPullNumbers: number[] = []
+) {
+  const pullNumbers = await resolvePullNumbersForRef(
+    installationId,
+    owner,
+    repo,
+    headSha,
+    fallbackPullNumbers
+  )
+
+  for (const pullNumber of pullNumbers) {
+    const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
+    await issuesService.updateIssueStatusByPrUrlIfStatus(
+      supabase,
+      prUrl,
+      ["ready-for-review", "tests-failed"],
+      "testing"
+    )
   }
 }
 
