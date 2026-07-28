@@ -11,13 +11,13 @@ Gentic exposes a Model Context Protocol (MCP) server that makes your entire proj
 Point your MCP client at the following URL:
 
 ```
-https://gentic.chat/mcp
+https://app.gentic.chat/mcp
 ```
 
 This single endpoint supports all 12 Gentic tools, covering account inspection, project management, and the full issue lifecycle.
 
 <Note>
-  The MCP server uses **OAuth 2.0** for authentication. The first time your client connects, it will redirect you to gentic.chat so you can authorize access with your Gentic account. No API keys or manual token setup is required.
+  The MCP server uses **OAuth 2.0** for authentication. The first time your client connects, it will redirect you to app.gentic.chat so you can authorize access with your Gentic account. No API keys or manual token setup is required.
 </Note>
 
 ## Connect Claude Desktop
@@ -28,7 +28,7 @@ Claude Desktop reads MCP server configuration from a JSON file. Add the `gentic`
 {
   "mcpServers": {
     "gentic": {
-      "url": "https://gentic.chat/mcp"
+      "url": "https://app.gentic.chat/mcp"
     }
   }
 }
@@ -38,7 +38,7 @@ After saving the file and restarting Claude Desktop, Claude will prompt you to a
 
 ## Connect other MCP clients
 
-Any MCP-compatible client that accepts a server URL — including Cursor, Continue, and custom MCP hosts — can connect using the same endpoint. Consult your client's documentation for where to add a new MCP server entry, then supply `https://gentic.chat/mcp` as the URL.
+Any MCP-compatible client that accepts a server URL — including Cursor, Continue, and custom MCP hosts — can connect using the same endpoint. Consult your client's documentation for where to add a new MCP server entry, then supply `https://app.gentic.chat/mcp` as the URL.
 
 ## What you can do after connecting
 

@@ -37,7 +37,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   gentic auth login
   ```
 
-  Supply your `GENTIC_API_URL` (e.g. `https://gentic.chat/api/v1`) and your `GENTIC_API_KEY` when prompted.
+  Supply your `GENTIC_API_URL` (e.g. `https://app.gentic.chat/api/v1`) and your `GENTIC_API_KEY` when prompted.
 
   **Step 3 — Restart the worker:**
 
@@ -169,7 +169,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   ```bash
   GENTIC_API_KEY=<your-api-key>
-  GENTIC_API_URL=https://gentic.chat/api/v1
+  GENTIC_API_URL=https://app.gentic.chat/api/v1
   ```
 
   Verify them with `gentic auth status`. If they are missing, run `gentic auth login` to save them.
@@ -179,7 +179,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   The worker does not bind to a port, but it does make outbound HTTPS requests to `GENTIC_API_URL`. Ensure the worker machine can reach that URL from the command line:
 
   ```bash
-  curl -I https://gentic.chat/api/v1
+  curl -I https://app.gentic.chat/api/v1
   ```
 </Accordion>
 
