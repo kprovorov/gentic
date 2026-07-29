@@ -631,7 +631,7 @@ export type Database = {
         }
         Returns: {
           failed_count: number
-          locked_until: string | null
+          locked_until: string
         }[]
       }
       reset_issue_run:
