@@ -1082,6 +1082,15 @@ test("requestAutomaticPrPublish inserts the request and a visible gentic user me
   assert.equal(db.messages[0]?.role, "user")
   assert.equal(db.messages[0]?.author_type, "gentic")
   assert.equal(db.messages[0]?.generated_action, "create_pr")
+  assert.match(
+    String(db.messages[0]?.content),
+    /`acme-1-fix-the-thing` branch/
+  )
+  assert.match(String(db.messages[0]?.content), /never create an empty commit/i)
+  assert.match(
+    String(db.messages[0]?.content),
+    /summary section and a test plan section/i
+  )
 })
 
 test("requestAutomaticPrPublish rejects a stale or superseded run", async () => {

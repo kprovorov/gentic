@@ -1,10 +1,10 @@
 ---
 title: "Gentic: AI Coding Agent Management Platform Overview"
 sidebarTitle: "Introduction"
-description: "Gentic lets your team create coding issues, assign them to Claude Code or Codex, and automatically receive pull requests from the AI agent's work."
+description: "Gentic lets your team create coding issues, assign them to Claude Code or Codex, and optionally publish the AI agent's work as pull requests."
 ---
 
-Gentic is a platform for managing AI coding agents. Instead of context-switching into a terminal or IDE to prompt an AI tool, your whole team works from a shared web app where they write issues, track progress, and review pull requests — all in one place. You write the requirements; Gentic's agent worker picks them up, runs Claude Code or Codex against your real codebase, and delivers a pull request for you to review.
+Gentic is a platform for managing AI coding agents. Instead of context-switching into a terminal or IDE to prompt an AI tool, your whole team works from a shared web app where they write issues, track progress, and review pull requests — all in one place. You write the requirements; Gentic's agent worker picks them up, runs Claude Code or Codex against your real codebase, and can publish the resulting changes as a pull request for you to review.
 
 ## How Gentic is structured
 
@@ -53,7 +53,7 @@ Gentic currently supports two AI coding agents. Choose one when you run an issue
 
 ## Architecture overview
 
-When you move an issue from **Draft** to **Todo**, Gentic queues it for the worker. Your deployed agent worker polls the Gentic API every few seconds, claims the next queued issue, clones the project's GitHub repository into a fresh working directory, and runs the chosen agent through the Agent Client Protocol (ACP). The agent writes code and opens a pull request, and the issue status updates in real time in your web app. The worker never exposes a public endpoint — it is a private outbound polling process that you run in a trusted environment.
+When you move an issue from **Draft** to **Todo**, Gentic queues it for the worker. Your deployed agent worker polls the Gentic API every few seconds, claims the next queued issue, clones the project's GitHub repository into a fresh working directory, and runs the chosen agent through the Agent Client Protocol (ACP). The issue status updates in real time. When **Create PR automatically** is enabled, a successful changed turn receives a visible publishing follow-up in the same session. The worker never exposes a public endpoint — it is a private outbound polling process that you run in a trusted environment.
 
 <Note>
   Because the agent worker runs in your own environment, it has access to your source code and Git credentials. Run it on a server or VM you control, and treat your `GENTIC_WORKER_CREDENTIAL` as a secret.
