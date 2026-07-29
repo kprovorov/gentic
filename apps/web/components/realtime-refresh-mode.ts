@@ -8,6 +8,7 @@ export type RealtimeSubscribeStatus =
   | "CHANNEL_ERROR"
 
 export const realtimeFallbackRefreshMs = 10_000
+const routeRefreshDeferredPathnames = new Set(["/issues/new"])
 
 export function getRealtimeRefreshMode(
   queryKey: QueryKey | undefined
@@ -19,4 +20,8 @@ export function shouldUseRealtimeFallback(
   status: RealtimeSubscribeStatus | null
 ) {
   return status !== "SUBSCRIBED"
+}
+
+export function shouldDeferRouteRefresh(pathname: string | null | undefined) {
+  return pathname ? routeRefreshDeferredPathnames.has(pathname) : false
 }
