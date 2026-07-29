@@ -290,17 +290,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "issues_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "issues_active_worker_id_fkey"
             columns: ["active_worker_id"]
             isOneToOne: false
             referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -477,7 +477,7 @@ export type Database = {
           gentic_version: string | null
           id: string
           last_seen_at: string | null
-          normalized_name: string
+          normalized_name: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
@@ -495,7 +495,7 @@ export type Database = {
           gentic_version?: string | null
           id?: string
           last_seen_at?: string | null
-          normalized_name?: never
+          normalized_name?: string | null
           os?: string | null
           process_started_at?: string | null
           provider_capabilities?: Json
@@ -513,7 +513,7 @@ export type Database = {
           gentic_version?: string | null
           id?: string
           last_seen_at?: string | null
-          normalized_name?: never
+          normalized_name?: string | null
           os?: string | null
           process_started_at?: string | null
           provider_capabilities?: Json
