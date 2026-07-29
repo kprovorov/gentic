@@ -421,6 +421,8 @@ function claimedIssue(id: string): ClaimedIssue {
   return {
     id,
     activeRunId: `${id}-run`,
+    code: `TEST-${id}`,
+    title: null,
     agentProvider: "codex",
     issueModel: null,
     repo: "acme/repo",
