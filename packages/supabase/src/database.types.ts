@@ -230,6 +230,7 @@ export type Database = {
           issue_model: string | null
           number: number
           pr_url: string | null
+          priority: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           prompt: string | null
           run_error: string | null
@@ -250,6 +251,7 @@ export type Database = {
           issue_model?: string | null
           number: number
           pr_url?: string | null
+          priority?: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           prompt?: string | null
           run_error?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           issue_model?: string | null
           number?: number
           pr_url?: string | null
+          priority?: Database["public"]["Enums"]["issue_priority"]
           project_id?: string
           prompt?: string | null
           run_error?: string | null
@@ -488,7 +491,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      issue_priority: "low" | "medium" | "high" | "urgent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -615,6 +618,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      issue_priority: ["low", "medium", "high", "urgent"],
+    },
   },
 } as const
