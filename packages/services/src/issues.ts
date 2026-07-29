@@ -32,10 +32,12 @@ export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
   bulkUpdateIssueAgentProvider,
+  bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
   resetIssueAgent,
   updateIssueAgentProvider,
+  updateIssuePriority,
   updateIssueStatus,
   updateIssueStatusByPrUrl,
   updateIssueStatusByPrUrlIfStatus,

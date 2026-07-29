@@ -3,11 +3,14 @@ import { test } from "node:test"
 
 import {
   attachIssuePullRequest,
+  bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
+  updateIssuePriority,
   updateIssueStatus,
   updateIssueStatusByPrUrl,
   updateIssueStatusByPrUrlIfStatus,
 } from "./workflow"
+import { createIssue, updateIssue } from "./mutations"
 
 type IssueRecord = { id: string; status: string }
 
@@ -119,18 +122,23 @@ test("bulkUpdateIssueStatus directly updates all issues for non-start statuses",
 // in-memory `issues` / `issue_pull_requests` / `issue_events` rows rather
 // than a bespoke mock per test.
 type Row = Record<string, unknown>
-type TableName = "issues" | "issue_pull_requests" | "issue_events"
+type TableName = "issues" | "issue_pull_requests" | "issue_events" | "projects"
+type Filter =
+  | { type: "eq"; column: string; value: unknown }
+  | { type: "in"; column: string; values: unknown[] }
 
 class EventLogDb {
   issues: Row[] = []
   issue_pull_requests: Row[] = []
   issue_events: Row[] = []
+  projects: Row[] = []
+  nextIssueNumber = 1
 }
 
 class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
-  private filters: Array<[string, unknown]> = []
+  private filters: Filter[] = []
   private op: "select" | "update" | "insert" | "upsert" = "select"
-  private payload: Row | null = null
+  private payload: Row | Row[] | null = null
   private upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {}
   private wantsSingle = false
   private wantsSelectAfterWrite = false
@@ -148,7 +156,12 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
   }
 
   eq(col: string, val: unknown) {
-    this.filters.push([col, val])
+    this.filters.push({ type: "eq", column: col, value: val })
+    return this
+  }
+
+  in(col: string, vals: unknown[]) {
+    this.filters.push({ type: "in", column: col, values: vals })
     return this
   }
 
@@ -158,7 +171,7 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this
   }
 
-  insert(values: Row) {
+  insert(values: Row | Row[]) {
     this.op = "insert"
     this.payload = values
     return this
@@ -179,6 +192,11 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this
   }
 
+  single() {
+    this.wantsSingle = true
+    return this
+  }
+
   then<TResult1 = { data: unknown; error: null }, TResult2 = never>(
     onfulfilled?:
       | ((value: {
@@ -191,14 +209,46 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this.execute().then(onfulfilled, onrejected)
   }
 
+  private valueFor(row: Row, col: string): unknown {
+    let value: unknown = row
+    for (const part of col.split(".")) {
+      value = (value as Row | undefined)?.[part]
+    }
+    return value
+  }
+
   private matches(row: Row): boolean {
-    return this.filters.every(([col, val]) => {
-      let value: unknown = row
-      for (const part of col.split(".")) {
-        value = (value as Row | undefined)?.[part]
+    return this.filters.every((filter) => {
+      const value = this.valueFor(row, filter.column)
+      if (filter.type === "in") {
+        return filter.values.includes(value)
       }
-      return value === val
+      if (filter.column === "projects.user_id" && value === undefined) {
+        const project = this.db.projects.find(
+          (projectRow) => projectRow.id === row.project_id
+        )
+        return project?.user_id === filter.value
+      }
+      return value === filter.value
     })
+  }
+
+  private selected(row: Row | undefined): Row | null {
+    if (!row) {
+      return null
+    }
+    if (this.table !== "issues" || row.projects) {
+      return { ...row }
+    }
+    const project = this.db.projects.find(
+      (projectRow) => projectRow.id === row.project_id
+    )
+    return project ? { ...row, projects: { ...project } } : { ...row }
+  }
+
+  private payloadRows(): Row[] {
+    const values = Array.isArray(this.payload) ? this.payload : [this.payload]
+    return values.filter((value): value is Row => Boolean(value))
   }
 
   private rows(): Row[] {
@@ -213,7 +263,7 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
       // before an update).
       const matched = this.rows()
         .filter((row) => this.matches(row))
-        .map((row) => ({ ...row }))
+        .map((row) => this.selected(row))
       return {
         data: this.wantsSingle ? (matched[0] ?? null) : matched,
         error: null,
@@ -222,36 +272,45 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
 
     if (this.op === "update") {
       const matched = this.rows().filter((row) => this.matches(row))
-      matched.forEach((row) => Object.assign(row, this.payload))
+      matched.forEach((row) => Object.assign(row, this.payload as Row))
       if (!this.wantsSelectAfterWrite) {
         return { data: null, error: null }
       }
       return {
-        data: this.wantsSingle ? (matched[0] ?? null) : matched,
+        data: this.wantsSingle
+          ? this.selected(matched[0])
+          : matched.map((row) => this.selected(row)),
         error: null,
       }
     }
 
     if (this.op === "insert") {
-      const row: Row = {
-        id: `${this.table}-${this.rows().length + 1}`,
-        created_at: new Date().toISOString(),
-        ...this.payload,
+      const inserted = this.payloadRows().map((payload) => {
+        const row: Row = {
+          id: `${this.table}-${this.rows().length + 1}`,
+          created_at: new Date().toISOString(),
+          ...payload,
+        }
+        this.rows().push(row)
+        return this.selected(row)
+      })
+      return {
+        data: this.wantsSingle ? (inserted[0] ?? null) : inserted,
+        error: null,
       }
-      this.rows().push(row)
-      return { data: null, error: null }
     }
 
     // upsert
+    const payload = this.payloadRows()[0]
     const conflictCol = this.upsertOpts.onConflict ?? "id"
     const existing = this.rows().find(
-      (row) => row[conflictCol] === this.payload?.[conflictCol]
+      (row) => row[conflictCol] === payload?.[conflictCol]
     )
     if (existing) {
       if (this.upsertOpts.ignoreDuplicates) {
         return { data: this.wantsSelectAfterWrite ? [] : null, error: null }
       }
-      Object.assign(existing, this.payload)
+      Object.assign(existing, payload)
       return {
         data: this.wantsSelectAfterWrite ? [existing] : null,
         error: null,
@@ -260,7 +319,7 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
     const row: Row = {
       id: `${this.table}-${this.rows().length + 1}`,
       created_at: new Date().toISOString(),
-      ...this.payload,
+      ...payload,
     }
     this.rows().push(row)
     return { data: this.wantsSelectAfterWrite ? [row] : null, error: null }
@@ -273,15 +332,254 @@ class EventLogSupabase {
   from(table: TableName) {
     return new EventLogQuery(table, this.db)
   }
+
+  rpc(name: string) {
+    if (name === "next_issue_number_for_project") {
+      return Promise.resolve({ data: this.db.nextIssueNumber++, error: null })
+    }
+    return Promise.resolve({ data: null, error: null })
+  }
 }
 
 function issueRow(overrides: Row): Row {
   return {
+    agent_provider: "claude_code",
+    issue_model: null,
+    number: 1,
+    priority: "medium",
     prompt: null,
+    project_id: "project-1",
     projects: { user_id: "user-1" },
+    status: "todo",
+    type: "issue",
     ...overrides,
   }
 }
+
+test("createIssue persists the requested priority", async () => {
+  const db = new EventLogDb()
+  db.projects.push({ id: "project-1", name: "Project", user_id: "user-1" })
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await createIssue(supabase as never, "user-1", {
+    project_id: "project-1",
+    title: "Prioritized issue",
+    prompt: "Do the thing",
+    status: "draft",
+    priority: "urgent",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+  })) as unknown as Row
+
+  assert.equal(issue.priority, "urgent")
+  assert.equal(db.issues[0]?.priority, "urgent")
+})
+
+test("updateIssue persists priority and logs priority_changed payload", async () => {
+  const db = new EventLogDb()
+  db.issues.push(issueRow({ id: "issue-full", priority: "low" }))
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssue(
+    supabase as never,
+    "user-1",
+    "issue-full",
+    {
+      id: "issue-full",
+      title: "Updated",
+      prompt: "Updated prompt",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "high",
+    }
+  )) as unknown as Row
+
+  assert.equal(issue.priority, "high")
+  assert.equal(db.issues[0]?.priority, "high")
+  assert.deepEqual(
+    db.issue_events.map((event) => ({
+      issue_id: event.issue_id,
+      type: event.type,
+      payload: event.payload,
+    })),
+    [
+      {
+        issue_id: "issue-full",
+        type: "priority_changed",
+        payload: { from: "low", to: "high" },
+      },
+    ]
+  )
+})
+
+test("updateIssue does not log priority_changed when priority is unchanged", async () => {
+  const db = new EventLogDb()
+  db.issues.push(issueRow({ id: "issue-full-noop", priority: "medium" }))
+  const supabase = new EventLogSupabase(db)
+
+  await updateIssue(supabase as never, "user-1", "issue-full-noop", {
+    id: "issue-full-noop",
+    title: "Updated",
+    prompt: "Updated prompt",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "bug",
+    priority: "medium",
+  })
+
+  assert.deepEqual(db.issue_events, [])
+})
+
+test("updateIssuePriority updates one owned issue and logs from/to payload", async () => {
+  const db = new EventLogDb()
+  db.issues.push(issueRow({ id: "issue-priority", priority: "low" }))
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssuePriority(
+    supabase as never,
+    "user-1",
+    "issue-priority",
+    "urgent"
+  )) as unknown as Row
+
+  assert.equal(issue.priority, "urgent")
+  assert.equal(db.issues[0]?.priority, "urgent")
+  assert.deepEqual(
+    db.issue_events.map((event) => ({
+      issue_id: event.issue_id,
+      type: event.type,
+      payload: event.payload,
+    })),
+    [
+      {
+        issue_id: "issue-priority",
+        type: "priority_changed",
+        payload: { from: "low", to: "urgent" },
+      },
+    ]
+  )
+})
+
+test("updateIssuePriority is a no-op when priority is unchanged", async () => {
+  const db = new EventLogDb()
+  db.issues.push(issueRow({ id: "issue-priority-noop", priority: "medium" }))
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssuePriority(
+    supabase as never,
+    "user-1",
+    "issue-priority-noop",
+    "medium"
+  )) as unknown as Row
+
+  assert.equal(issue.priority, "medium")
+  assert.deepEqual(db.issue_events, [])
+})
+
+test("bulkUpdateIssuePriority logs correct events for each changed issue", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({ id: "issue-low", priority: "low" }),
+    issueRow({ id: "issue-medium", priority: "medium" }),
+    issueRow({ id: "issue-high", priority: "high" })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await bulkUpdateIssuePriority(
+    supabase as never,
+    "user-1",
+    ["issue-low", "issue-medium", "issue-high", "issue-low"],
+    "high"
+  )
+
+  assert.deepEqual(
+    db.issues.map((issue) => [issue.id, issue.priority]),
+    [
+      ["issue-low", "high"],
+      ["issue-medium", "high"],
+      ["issue-high", "high"],
+    ]
+  )
+  assert.deepEqual(
+    db.issue_events.map((event) => ({
+      issue_id: event.issue_id,
+      type: event.type,
+      payload: event.payload,
+    })),
+    [
+      {
+        issue_id: "issue-low",
+        type: "priority_changed",
+        payload: { from: "low", to: "high" },
+      },
+      {
+        issue_id: "issue-medium",
+        type: "priority_changed",
+        payload: { from: "medium", to: "high" },
+      },
+    ]
+  )
+})
+
+test("bulkUpdateIssuePriority is a no-op when every priority is unchanged", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({ id: "issue-high-1", priority: "high" }),
+    issueRow({ id: "issue-high-2", priority: "high" })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await bulkUpdateIssuePriority(
+    supabase as never,
+    "user-1",
+    ["issue-high-1", "issue-high-2"],
+    "high"
+  )
+
+  assert.deepEqual(db.issue_events, [])
+})
+
+test("priority updates preserve ownership not_found convention", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "other-user-issue",
+      priority: "low",
+      projects: { user_id: "user-2" },
+    }),
+    issueRow({ id: "owned-issue", priority: "low" })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await assert.rejects(
+    updateIssuePriority(
+      supabase as never,
+      "user-1",
+      "other-user-issue",
+      "urgent"
+    ),
+    { name: "ServiceError", code: "not_found", message: "Issue not found" }
+  )
+  await assert.rejects(
+    bulkUpdateIssuePriority(
+      supabase as never,
+      "user-1",
+      ["owned-issue", "other-user-issue"],
+      "urgent"
+    ),
+    { name: "ServiceError", code: "not_found", message: "Issue not found" }
+  )
+  assert.deepEqual(
+    db.issues.map((issue) => [issue.id, issue.priority]),
+    [
+      ["other-user-issue", "low"],
+      ["owned-issue", "low"],
+    ]
+  )
+  assert.deepEqual(db.issue_events, [])
+})
 
 test("updateIssueStatus logs a status_changed event with from/to", async () => {
   const db = new EventLogDb()

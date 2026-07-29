@@ -3,7 +3,11 @@ import type { Json } from "@gentic/supabase/types"
 import { unwrap } from "../errors"
 import type { Supabase } from "../types"
 
-export type IssueEventType = "status_changed" | "pr_opened" | "pr_merged"
+export type IssueEventType =
+  | "status_changed"
+  | "priority_changed"
+  | "pr_opened"
+  | "pr_merged"
 
 export async function logIssueEvent(
   supabase: Supabase,
