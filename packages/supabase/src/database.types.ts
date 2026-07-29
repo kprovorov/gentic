@@ -622,6 +622,18 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: number
       }
+      record_worker_enrollment_exchange_failure: {
+        Args: {
+          p_max_failures: number
+          p_now: string
+          p_rate_limit_key: string
+          p_window_ms: number
+        }
+        Returns: {
+          failed_count: number
+          locked_until: string | null
+        }[]
+      }
       reset_issue_run:
         | {
             Args: { p_agent_provider: string; p_issue_id: string }

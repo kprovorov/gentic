@@ -4,7 +4,10 @@ import test from "node:test"
 import { ServiceError } from "@gentic/services/errors"
 
 import { createWorkerEnrollmentCodeHandler } from "../app/api/app/workers/enrollment-code/route"
-import { createWorkerExchangeHandler } from "../app/api/v1/workers/exchange/route"
+import {
+  createWorkerExchangeHandler,
+  rateLimitKeyFromRequest,
+} from "../app/api/v1/workers/exchange/route"
 
 test("worker enrollment code route requires an authenticated user", async () => {
   const handler = createWorkerEnrollmentCodeHandler({
@@ -45,6 +48,22 @@ test("worker enrollment code route creates a single-use code for the authenticat
   })
 })
 
+test("worker enrollment code route maps service validation errors", async () => {
+  const handler = createWorkerEnrollmentCodeHandler({
+    getContext: async () => ({ supabase: {}, userId: "user_1" }) as never,
+    createCode: async () => {
+      throw new ServiceError("validation", "Worker enrollment code already exists")
+    },
+  })
+
+  const response = await handler()
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), {
+    error: "Worker enrollment code already exists",
+  })
+})
+
 test("worker exchange route returns the raw credential on successful exchange", async () => {
   const supabase = {}
   let capturedRateLimitKey: string | undefined
@@ -72,6 +91,7 @@ test("worker exchange route returns the raw credential on successful exchange", 
       headers: {
         "content-type": "application/json",
         "x-forwarded-for": "198.51.100.7, 10.0.0.1",
+        "x-vercel-forwarded-for": "203.0.113.7",
         "user-agent": "gentic-test",
       },
       body: JSON.stringify({ code: "gtce_connection-code" }),
@@ -79,7 +99,7 @@ test("worker exchange route returns the raw credential on successful exchange", 
   )
 
   assert.equal(response.status, 200)
-  assert.equal(capturedRateLimitKey, "198.51.100.7:gentic-test")
+  assert.equal(capturedRateLimitKey, "203.0.113.7")
   assert.deepEqual(await response.json(), {
     worker: {
       id: "worker-1",
@@ -88,6 +108,21 @@ test("worker exchange route returns the raw credential on successful exchange", 
     },
     credential: "gtwc_worker-credential",
   })
+})
+
+test("worker exchange route falls back to the right-most forwarded-for hop", () => {
+  assert.equal(
+    rateLimitKeyFromRequest(
+      new Request("http://localhost/api/v1/workers/exchange", {
+        headers: {
+          "x-forwarded-for": "198.51.100.7, 10.0.0.1",
+          "x-real-ip": "192.0.2.5",
+          "user-agent": "gentic-test",
+        },
+      })
+    ),
+    "10.0.0.1"
+  )
 })
 
 test("worker exchange route keeps failures non-enumerable", async () => {
@@ -106,6 +141,27 @@ test("worker exchange route keeps failures non-enumerable", async () => {
   )
 
   assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), {
+    error: "Invalid enrollment code",
+  })
+})
+
+test("worker exchange route maps lockouts to non-enumerable rate limits", async () => {
+  const handler = createWorkerExchangeHandler({
+    createSupabase: () => ({}) as never,
+    exchange: async () => {
+      throw new ServiceError("rate_limited", "Invalid enrollment code")
+    },
+  })
+
+  const response = await handler(
+    new Request("http://localhost/api/v1/workers/exchange", {
+      method: "POST",
+      body: JSON.stringify({ code: "gtce_locked" }),
+    })
+  )
+
+  assert.equal(response.status, 429)
   assert.deepEqual(await response.json(), {
     error: "Invalid enrollment code",
   })

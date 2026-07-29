@@ -64,6 +64,10 @@ class FakeSupabase {
   }
 
   rpc(name: string, args: Record<string, unknown>) {
+    if (name === "record_worker_enrollment_exchange_failure") {
+      return this.recordExchangeFailure(args)
+    }
+
     assert.equal(name, "consume_worker_enrollment_code")
     const nowValue = String(args.p_now)
     const code = this.db.worker_enrollment_codes.find(
@@ -110,6 +114,51 @@ class FakeSupabase {
     })
     this.db.workers.push(row)
     return new FakeRpcQuery(row)
+  }
+
+  private recordExchangeFailure(args: Record<string, unknown>) {
+    const rateLimitKey = String(args.p_rate_limit_key)
+    const nowValue = String(args.p_now)
+    const nowMs = new Date(nowValue).getTime()
+    const maxFailures = Number(args.p_max_failures)
+    const windowMs = Number(args.p_window_ms)
+    const existing = this.db.worker_enrollment_exchange_failures.find(
+      (row) => row.rate_limit_key === rateLimitKey
+    )
+
+    if (!existing) {
+      const row = {
+        rate_limit_key: rateLimitKey,
+        failed_count: 1,
+        window_started_at: nowValue,
+        locked_until:
+          maxFailures <= 1
+            ? new Date(nowMs + windowMs).toISOString()
+            : null,
+        updated_at: nowValue,
+      }
+      this.db.worker_enrollment_exchange_failures.push(row)
+      return new FakeRpcQuery(row)
+    }
+
+    const windowExpired =
+      nowMs - new Date(String(existing.window_started_at)).getTime() >=
+      windowMs
+    const failedCount = windowExpired
+      ? 1
+      : Number(existing.failed_count) + 1
+
+    existing.failed_count = failedCount
+    existing.window_started_at = windowExpired
+      ? nowValue
+      : existing.window_started_at
+    existing.locked_until =
+      failedCount >= maxFailures
+        ? new Date(nowMs + windowMs).toISOString()
+        : null
+    existing.updated_at = nowValue
+
+    return new FakeRpcQuery(existing)
   }
 }
 
@@ -636,7 +685,7 @@ test("exchange rejects expired codes and rate-limits repeated failures", async (
       },
       { now, rateLimitKey: "203.0.113.30:test" }
     ),
-    (error) => error instanceof ServiceError && error.code === "validation"
+    (error) => error instanceof ServiceError && error.code === "rate_limited"
   )
 })
 

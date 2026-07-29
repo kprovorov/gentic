@@ -1,3 +1,4 @@
+import { ServiceError } from "@gentic/services/errors"
 import { createWorkerEnrollmentCode } from "@gentic/services/workers"
 
 import { getOptionalAuthenticatedContext } from "@/app/_lib/auth-context"
@@ -22,11 +23,18 @@ export function createWorkerEnrollmentCodeHandler(deps: {
       )
     }
 
-    const code = await deps.createCode(
-      context.supabase,
-      context.userId
-    )
+    try {
+      const code = await deps.createCode(context.supabase, context.userId)
 
-    return Response.json(code)
+      return Response.json(code)
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        return Response.json(
+          { error: error.message },
+          { status: error.code === "validation" ? 400 : 500 }
+        )
+      }
+      throw error
+    }
   }
 }

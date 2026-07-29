@@ -7,7 +7,11 @@ import {
   chatMessageKindSchema,
   chatMessageStatusSchema,
 } from "./chat-events.js"
-import { issueStatusSchema, type IssueStatus } from "./issues.js"
+import {
+  issuePrioritySchema,
+  issueStatusSchema,
+  type IssueStatus,
+} from "./issues.js"
 
 // Event names for the private `issue:{id}` Realtime Broadcast channel. See
 // docs/realtime-transport.md for the full protocol.
@@ -131,13 +135,33 @@ export const issuePullRequestSchema = z.object({
 
 export type IssuePullRequestContract = z.infer<typeof issuePullRequestSchema>
 
-export const issueEventSchema = z.object({
+export const issuePriorityChangedPayloadSchema = z.object({
+  from: issuePrioritySchema,
+  to: issuePrioritySchema,
+})
+
+const knownIssueEventTypeSchema = z.enum(["priority_changed"])
+
+const priorityChangedIssueEventSchema = z.object({
   id: z.string().uuid(),
   issue_id: z.string().uuid(),
-  type: z.string(),
+  type: z.literal("priority_changed"),
+  payload: issuePriorityChangedPayloadSchema,
+  created_at: z.string(),
+})
+
+const genericIssueEventSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+  type: z.string().refine((type) => !knownIssueEventTypeSchema.safeParse(type).success),
   payload: chatEventPayloadSchema,
   created_at: z.string(),
 })
+
+export const issueEventSchema = z.union([
+  priorityChangedIssueEventSchema,
+  genericIssueEventSchema,
+])
 
 export type IssueEventContract = z.infer<typeof issueEventSchema>
 

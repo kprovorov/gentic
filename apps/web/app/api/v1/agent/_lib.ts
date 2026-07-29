@@ -57,6 +57,7 @@ export async function getAgentContext(request: Request): Promise<{
 const SERVICE_ERROR_STATUS: Record<ServiceError["code"], number> = {
   not_found: 404,
   validation: 400,
+  rate_limited: 429,
   forbidden: 403,
   internal: 500,
 }

@@ -102,7 +102,8 @@ gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <
 masked) and `gentic auth logout` clears them (`--yes`/`-y` to skip the
 confirmation prompt). The hosted API currently has no read-only authenticated
 endpoint, so `login` saves the credential without a live validation call; an
-incorrect key surfaces as a failure on the worker's first poll instead.
+incorrect worker credential surfaces as a failure on the worker's first poll
+instead.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through

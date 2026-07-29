@@ -12,6 +12,13 @@ export type TimelineItem =
       from: string | null
       to: string | null
     }
+  | {
+      kind: "priority-milestone"
+      key: string
+      timestamp: string
+      from: string | null
+      to: string | null
+    }
   | { kind: "pr-opened"; key: string; timestamp: string; prUrl: string | null }
   | { kind: "pr-merged"; key: string; timestamp: string; prUrl: string | null }
 
@@ -66,6 +73,14 @@ function eventToTimelineItem(event: IssueEventContract): TimelineItem {
         key,
         timestamp,
         prUrl: readStringField(event.payload, "pr_url"),
+      }
+    case "priority_changed":
+      return {
+        kind: "priority-milestone",
+        key,
+        timestamp,
+        from: readStringField(event.payload, "from"),
+        to: readStringField(event.payload, "to"),
       }
     // `status_changed` is the default for any unrecognized future event
     // type too, so the timeline degrades gracefully instead of dropping it.

@@ -135,6 +135,27 @@ test("maps status_changed events to status-milestone items with from/to", () => 
   })
 })
 
+test("maps priority_changed events to priority-milestone items with from/to", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "priority_changed",
+        payload: { from: "medium", to: "urgent" },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "priority-milestone",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    from: "medium",
+    to: "urgent",
+  })
+})
+
 test("maps pr_opened events to pr-opened items carrying the PR url", () => {
   const [, item] = buildIssueTimeline({
     issue,

@@ -25,36 +25,67 @@ create table public.worker_enrollment_exchange_failures (
 
 alter table public.worker_enrollment_exchange_failures enable row level security;
 
-grant insert (
-  rate_limit_key,
-  failed_count,
-  window_started_at,
-  locked_until,
-  updated_at
-) on public.worker_enrollment_exchange_failures to authenticated;
-
-grant select (
-  rate_limit_key,
-  failed_count,
-  window_started_at,
-  locked_until,
-  updated_at
-) on public.worker_enrollment_exchange_failures to authenticated;
-
-grant update (
-  failed_count,
-  window_started_at,
-  locked_until,
-  updated_at
-) on public.worker_enrollment_exchange_failures to authenticated;
-
-grant delete on public.worker_enrollment_exchange_failures to authenticated;
-
-create policy "Users cannot read exchange failures through RLS"
-  on public.worker_enrollment_exchange_failures
-  for select
-  to authenticated
-  using (false);
+create or replace function public.record_worker_enrollment_exchange_failure(
+  p_rate_limit_key text,
+  p_now timestamptz,
+  p_max_failures integer,
+  p_window_ms integer
+)
+returns table (
+  failed_count integer,
+  locked_until timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.worker_enrollment_exchange_failures (
+    rate_limit_key,
+    failed_count,
+    window_started_at,
+    locked_until,
+    updated_at
+  ) values (
+    p_rate_limit_key,
+    1,
+    p_now,
+    case
+      when p_max_failures <= 1
+        then p_now + make_interval(secs => p_window_ms / 1000.0)
+      else null
+    end,
+    p_now
+  )
+  on conflict (rate_limit_key) do update
+    set failed_count = case
+          when p_now - worker_enrollment_exchange_failures.window_started_at >=
+            make_interval(secs => p_window_ms / 1000.0)
+            then 1
+          else worker_enrollment_exchange_failures.failed_count + 1
+        end,
+        window_started_at = case
+          when p_now - worker_enrollment_exchange_failures.window_started_at >=
+            make_interval(secs => p_window_ms / 1000.0)
+            then p_now
+          else worker_enrollment_exchange_failures.window_started_at
+        end,
+        locked_until = case
+          when (
+            case
+              when p_now - worker_enrollment_exchange_failures.window_started_at >=
+                make_interval(secs => p_window_ms / 1000.0)
+                then 1
+              else worker_enrollment_exchange_failures.failed_count + 1
+            end
+          ) >= p_max_failures
+            then p_now + make_interval(secs => p_window_ms / 1000.0)
+          else null
+        end,
+        updated_at = p_now
+  returning
+    worker_enrollment_exchange_failures.failed_count,
+    worker_enrollment_exchange_failures.locked_until;
+$$;
 
 create or replace function public.consume_worker_enrollment_code(
   p_code_hash text,
@@ -75,6 +106,8 @@ set search_path = public
 as $$
 declare
   v_code public.worker_enrollment_codes%rowtype;
+  v_conflict_constraint text;
+  v_display_name_limit integer := 80;
   v_base_name text := btrim(regexp_replace(p_display_name, '[[:space:]]+', ' ', 'g'));
   v_candidate_name text;
   v_suffix integer := 1;
@@ -96,7 +129,11 @@ begin
     if v_suffix = 1 then
       v_candidate_name := v_base_name;
     else
-      v_candidate_name := left(v_base_name, greatest(1, 77 - length(v_suffix::text))) || ' ' || v_suffix::text;
+      v_candidate_name :=
+        left(
+          v_base_name,
+          greatest(1, v_display_name_limit - 1 - length(v_suffix::text))
+        ) || ' ' || v_suffix::text;
     end if;
 
     begin
@@ -129,7 +166,12 @@ begin
       return v_worker;
     exception
       when unique_violation then
-        if v_suffix >= 1000 then
+        get stacked diagnostics v_conflict_constraint = constraint_name;
+        if
+          v_conflict_constraint is distinct from
+            'workers_user_normalized_name_unique' or
+          v_suffix >= 1000
+        then
           raise;
         end if;
         v_suffix := v_suffix + 1;
@@ -137,6 +179,19 @@ begin
   end loop;
 end;
 $$;
+
+revoke execute on function public.consume_worker_enrollment_code(
+  text,
+  text,
+  text,
+  text,
+  text,
+  text,
+  integer,
+  jsonb,
+  timestamptz,
+  timestamptz
+) from public, authenticated;
 
 grant execute on function public.consume_worker_enrollment_code(
   text,
@@ -149,4 +204,18 @@ grant execute on function public.consume_worker_enrollment_code(
   jsonb,
   timestamptz,
   timestamptz
-) to authenticated;
+) to service_role;
+
+revoke execute on function public.record_worker_enrollment_exchange_failure(
+  text,
+  timestamptz,
+  integer,
+  integer
+) from public, authenticated;
+
+grant execute on function public.record_worker_enrollment_exchange_failure(
+  text,
+  timestamptz,
+  integer,
+  integer
+) to service_role;

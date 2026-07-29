@@ -1,7 +1,4 @@
-import {
-  createHash,
-  randomBytes,
-} from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 
 import type { Json, Tables, Updates } from "@gentic/supabase/types"
 import {
@@ -496,15 +493,11 @@ async function ensureEnrollmentExchangeAllowed(
     return
   }
 
-  if (data.locked_until && new Date(data.locked_until).getTime() > now.getTime()) {
-    throw new ServiceError("validation", "Invalid enrollment code")
-  }
-
   if (
-    now.getTime() - new Date(data.window_started_at).getTime() >=
-    WORKER_ENROLLMENT_FAILURE_WINDOW_MS
+    data.locked_until &&
+    new Date(data.locked_until).getTime() > now.getTime()
   ) {
-    await clearEnrollmentExchangeFailures(supabase, rateLimitKey)
+    throw new ServiceError("rate_limited", "Invalid enrollment code")
   }
 }
 
@@ -513,47 +506,18 @@ async function recordEnrollmentExchangeFailure(
   rateLimitKey: string,
   now: Date
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from("worker_enrollment_exchange_failures")
-    .select("failed_count,window_started_at")
-    .eq("rate_limit_key", rateLimitKey)
-    .maybeSingle()
-    .returns<{
-      failed_count: number
-      window_started_at: string
-    } | null>()
+  const { error } = await supabase.rpc(
+    "record_worker_enrollment_exchange_failure",
+    {
+      p_rate_limit_key: rateLimitKey,
+      p_now: now.toISOString(),
+      p_max_failures: WORKER_ENROLLMENT_MAX_FAILURES,
+      p_window_ms: WORKER_ENROLLMENT_FAILURE_WINDOW_MS,
+    } as never
+  )
 
   if (error) {
     throw new ServiceError("internal", error.message)
-  }
-
-  const windowExpired =
-    !data ||
-    now.getTime() - new Date(data.window_started_at).getTime() >=
-      WORKER_ENROLLMENT_FAILURE_WINDOW_MS
-  const failedCount = windowExpired ? 1 : data.failed_count + 1
-  const lockedUntil =
-    failedCount >= WORKER_ENROLLMENT_MAX_FAILURES
-      ? new Date(
-          now.getTime() + WORKER_ENROLLMENT_FAILURE_WINDOW_MS
-        ).toISOString()
-      : null
-
-  const { error: upsertError } = await supabase
-    .from("worker_enrollment_exchange_failures")
-    .upsert(
-      {
-        rate_limit_key: rateLimitKey,
-        failed_count: failedCount,
-        window_started_at: windowExpired ? now.toISOString() : data.window_started_at,
-        locked_until: lockedUntil,
-        updated_at: now.toISOString(),
-      },
-      { onConflict: "rate_limit_key" }
-    )
-
-  if (upsertError) {
-    throw new ServiceError("internal", upsertError.message)
   }
 }
 

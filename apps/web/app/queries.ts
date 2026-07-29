@@ -6,19 +6,24 @@ import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
 import { ServiceError } from "@gentic/services/errors"
 import {
-  agentProviderSchema,
-  issueStatusSchema,
-  issueTypeSchema,
-  type IssueStatus,
-  type IssueType,
-} from "@gentic/validators/issues"
-import {
   chatMessageSchema,
   issueEventSchema,
 } from "@gentic/validators/realtime"
 import { z } from "zod"
 
 import { getAuthenticatedContext } from "./_lib/auth-context"
+import {
+  homeIssueSchema,
+  issueDetailSchema,
+  issueEditSchema,
+  toHomeIssue,
+  toIssueDetail,
+  toIssueEdit,
+  type HomeIssue,
+  type IssueDetail,
+  type IssueEdit,
+  type ProjectOption,
+} from "./query-contracts"
 import type { Attachment } from "./issues/[code]/attachments"
 import type { ChatMessage } from "./issues/[code]/issue-chat-state"
 import {
@@ -43,73 +48,7 @@ type AttachmentRow = {
   deleted_at: string | null
 }
 
-const projectOptionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  repo: z.string(),
-  key: z.string(),
-})
-
-const homeIssueSchema = z.object({
-  id: z.string(),
-  number: z.number().int().positive(),
-  title: z.string().nullable(),
-  status: issueStatusSchema,
-  type: issueTypeSchema,
-  created_at: z.string(),
-  projects: projectOptionSchema.nullable(),
-})
-
-const issueEditSchema = z.object({
-  id: z.string(),
-  number: z.number().int().positive(),
-  title: z.string().nullable(),
-  prompt: z.string().nullable(),
-  agent_provider: agentProviderSchema,
-  issue_model: z.string().nullable(),
-  type: issueTypeSchema,
-  projects: projectOptionSchema.nullable(),
-})
-
-const issueDetailSchema = z.object({
-  id: z.string(),
-  number: z.number().int().positive(),
-  title: z.string().nullable(),
-  prompt: z.string().nullable(),
-  agent_provider: agentProviderSchema,
-  issue_model: z.string().nullable(),
-  type: issueTypeSchema,
-  status: issueStatusSchema,
-  usage_limit_reset_at: z.string().nullable(),
-  run_started_at: z.string().nullable(),
-  pr_url: z.string().nullable(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  projects: projectOptionSchema.nullable(),
-})
-
-export type HomeIssue = {
-  id: string
-  code: string | null
-  number: number
-  title: string | null
-  status: IssueStatus
-  type: IssueType
-  created_at: string
-  projects: {
-    id: string
-    name: string
-    repo: string
-    key: string
-  } | null
-}
-
-export type ProjectOption = {
-  id: string
-  name: string
-  repo: string
-  key: string
-}
+export type { HomeIssue, IssueDetail, IssueEdit, ProjectOption }
 
 export type SettingsProject = ProjectOption & {
   setup_script: string | null
@@ -121,42 +60,11 @@ export type GithubRepositoryOption = {
   private: boolean
 }
 
-export type IssueDetail = {
-  id: string
-  code: string | null
-  number: number
-  title: string | null
-  prompt: string | null
-  agent_provider: "claude_code" | "codex"
-  issue_model: string | null
-  type: IssueType
-  status: IssueStatus
-  usage_limit_reset_at: string | null
-  run_started_at: string | null
-  pr_url: string | null
-  created_at: string
-  updated_at: string
-  projects: ProjectOption | null
-}
-
 export type IssuePullRequest = issuesService.IssuePullRequest & {
   state?: GithubPullRequestState
 }
 
 export type IssueEvent = z.infer<typeof issueEventSchema>
-
-export type IssueEdit = Pick<
-  IssueDetail,
-  | "id"
-  | "code"
-  | "number"
-  | "title"
-  | "prompt"
-  | "agent_provider"
-  | "issue_model"
-  | "type"
-  | "projects"
->
 
 export type HomeData = {
   issues: HomeIssue[]
@@ -191,8 +99,6 @@ export type IssueDetailData = {
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
-type IssueDetailRow = z.infer<typeof issueDetailSchema>
-type IssueEditRow = z.infer<typeof issueEditSchema>
 
 export class QueryNotFoundError extends Error {
   constructor(message = "Not found") {
@@ -203,26 +109,6 @@ export class QueryNotFoundError extends Error {
 
 async function resolveContext(context?: AuthenticatedContext) {
   return context ?? getAuthenticatedContext()
-}
-
-function getDisplayIssueCode(issue: {
-  number: number
-  projects: { key: string } | null
-}) {
-  return issue.projects
-    ? issuesService.getIssueCode(issue.projects.key, issue.number)
-    : null
-}
-
-function toProjectOption(project: ProjectOption | null) {
-  return project
-    ? {
-        id: project.id,
-        name: project.name,
-        repo: project.repo,
-        key: project.key,
-      }
-    : null
 }
 
 function parseGithubPullRequestUrl(url: string) {
@@ -275,47 +161,15 @@ async function attachPullRequestStates(
   )
 }
 
-function toIssueDetail(issue: IssueDetailRow): IssueDetail {
-  return {
-    id: issue.id,
-    code: getDisplayIssueCode(issue),
-    number: issue.number,
-    title: issue.title,
-    prompt: issue.prompt,
-    agent_provider: issue.agent_provider,
-    issue_model: issue.issue_model,
-    type: issue.type,
-    status: issue.status,
-    usage_limit_reset_at: issue.usage_limit_reset_at,
-    run_started_at: issue.run_started_at,
-    pr_url: issue.pr_url,
-    created_at: issue.created_at,
-    updated_at: issue.updated_at,
-    projects: toProjectOption(issue.projects),
-  }
-}
-
-function toIssueEdit(issue: IssueEditRow): IssueEdit {
-  return {
-    id: issue.id,
-    code: getDisplayIssueCode(issue),
-    number: issue.number,
-    title: issue.title,
-    prompt: issue.prompt,
-    agent_provider: issue.agent_provider,
-    issue_model: issue.issue_model,
-    type: issue.type,
-    projects: toProjectOption(issue.projects),
-  }
-}
-
 export async function getHomeData(
   context?: AuthenticatedContext
 ): Promise<HomeData> {
   const { supabase } = await resolveContext(context)
   const { data: issues, error } = await supabase
     .from("issues")
-    .select("id,title,status,type,number,created_at,projects(id,name,repo,key)")
+    .select(
+      "id,title,status,type,priority,number,created_at,projects(id,name,repo,key)"
+    )
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -325,16 +179,7 @@ export async function getHomeData(
   const parsedIssues = z
     .array(homeIssueSchema)
     .parse(issues)
-    .map((issue) => ({
-      id: issue.id,
-      code: getDisplayIssueCode(issue),
-      number: issue.number,
-      title: issue.title,
-      status: issue.status,
-      type: issue.type,
-      created_at: issue.created_at,
-      projects: toProjectOption(issue.projects),
-    }))
+    .map(toHomeIssue)
   const issueIds = parsedIssues.map((issue) => issue.id)
   const [blockedIssueIds, blockingIssueIds] = await Promise.all([
     issuesService.listBlockedIssueIds(supabase, issueIds),
@@ -426,7 +271,7 @@ export async function getIssueEditData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,prompt,agent_provider,issue_model,type,projects(id,name,repo,key)"
+      "id,number,title,prompt,agent_provider,issue_model,type,priority,projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()

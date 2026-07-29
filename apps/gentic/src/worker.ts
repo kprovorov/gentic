@@ -76,9 +76,9 @@ export async function runWorker(): Promise<void> {
 
     let issue: ClaimedIssue | null = null
     try {
-      // Atomically claims the oldest todo issue by flipping it to `queued`.
-      // The conditional update (`status = 'todo'`) makes the claim safe
-      // if more than one worker is polling.
+      // Atomically claims the highest-priority eligible issue by flipping it
+      // to `queued`. The conditional update keeps the claim safe if more
+      // than one worker is polling or a held issue becomes ineligible.
       issue = await api.claimNextQueuedIssue()
     } catch (error) {
       logError("failed to poll for queued issues:", describe(error))
