@@ -83,6 +83,16 @@ export type ChangesRequestedReview = {
   comments: ChangesRequestedReviewComment[]
 }
 
+export type PullRequestComment = {
+  id: number
+  commenterLogin: string
+  body: string
+  htmlUrl: string | null
+  path?: string | null
+  line?: number | null
+  diffHunk?: string | null
+}
+
 export function formatChangesRequestedMessage(
   prUrl: string,
   review: ChangesRequestedReview
@@ -106,6 +116,31 @@ export function formatChangesRequestedMessage(
       comment.body
     )
   }
+
+  return lines.join("\n")
+}
+
+export function formatPullRequestCommentMessage(
+  prUrl: string,
+  comment: PullRequestComment
+): string {
+  const location = comment.path
+    ? ` on ${comment.path}:${comment.line ?? "?"}`
+    : ""
+  const lines = [
+    `@${comment.commenterLogin} commented${location} on ${prUrl}.`,
+    "Push fixes to the same branch if this comment requests a code change — do not open a new pull request.",
+  ]
+
+  if (comment.htmlUrl) {
+    lines.push("", comment.htmlUrl)
+  }
+
+  if (comment.diffHunk) {
+    lines.push("", "```diff", comment.diffHunk, "```")
+  }
+
+  lines.push("", comment.body)
 
   return lines.join("\n")
 }
@@ -162,6 +197,55 @@ export async function applyChangesRequestedReview(
       })
       .eq("id", issue.id)
       .eq("status", "changes-requested")
+  )
+}
+
+// Called from the GitHub webhook route when a PR conversation comment or
+// standalone inline review comment is created. Feeds the comment into the
+// transcript and re-queues ended runs so the agent can react to PR feedback
+// that was not submitted as a "changes requested" review.
+export async function applyPullRequestComment(
+  supabase: Supabase,
+  prUrl: string,
+  comment: PullRequestComment
+) {
+  const { data: issue, error } = await supabase
+    .from("issues")
+    .select("id, projects!inner(auto_respond_to_reviews)")
+    .eq("pr_url", prUrl)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!issue || !issue.projects.auto_respond_to_reviews) {
+    return
+  }
+
+  const { error: insertError } = await supabase.from("messages").insert({
+    issue_id: issue.id,
+    role: "user",
+    content: formatPullRequestCommentMessage(prUrl, comment),
+    github_comment_id: comment.id,
+  })
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return
+    }
+    throw new ServiceError("internal", insertError.message)
+  }
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        status: "todo",
+        usage_limit_reset_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issue.id)
+      .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
 }
 
