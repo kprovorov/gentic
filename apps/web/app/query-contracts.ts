@@ -4,6 +4,7 @@ import {
   issuePrioritySchema,
   issueStatusSchema,
   issueTypeSchema,
+  hasAttachedIssuePullRequest,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
@@ -190,8 +191,7 @@ export function toIssueEdit(issue: IssueEditRow): IssueEdit {
     type: issue.type,
     priority: issue.priority,
     create_pr_automatically: issue.create_pr_automatically,
-    has_attached_pull_request:
-      Boolean(issue.pr_url) || (issue.issue_pull_requests?.length ?? 0) > 0,
+    has_attached_pull_request: hasAttachedIssuePullRequest(issue),
     projects: toProjectOption(issue.projects),
   }
 }

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(26);
 
 SELECT has_column(
   'public',
@@ -231,6 +231,66 @@ SELECT is(
   ),
   false,
   'request attempts do not consume the issue opt-in value'
+);
+
+UPDATE public.issues
+   SET create_pr_automatically = true
+ WHERE id = '20000000-0000-4000-8000-000000000101';
+
+INSERT INTO public.issue_pull_requests (
+  issue_id,
+  url
+) VALUES (
+  '20000000-0000-4000-8000-000000000101',
+  'https://github.com/gentic/alpha/pull/1'
+);
+
+UPDATE public.issues
+   SET create_pr_automatically = false
+ WHERE id = '20000000-0000-4000-8000-000000000101';
+
+SELECT is(
+  (
+    SELECT create_pr_automatically
+      FROM public.issues
+     WHERE id = '20000000-0000-4000-8000-000000000101'
+  ),
+  true,
+  'attached pull request rows preserve the issue automatic PR preference'
+);
+
+INSERT INTO public.issues (
+  id,
+  project_id,
+  title,
+  prompt,
+  status,
+  number,
+  create_pr_automatically,
+  pr_url
+) VALUES (
+  '20000000-0000-4000-8000-000000000102',
+  '10000000-0000-4000-8000-000000000101',
+  'Legacy PR issue',
+  'Prompt',
+  'draft',
+  2,
+  true,
+  'https://github.com/gentic/beta/pull/1'
+);
+
+UPDATE public.issues
+   SET create_pr_automatically = false
+ WHERE id = '20000000-0000-4000-8000-000000000102';
+
+SELECT is(
+  (
+    SELECT create_pr_automatically
+      FROM public.issues
+     WHERE id = '20000000-0000-4000-8000-000000000102'
+  ),
+  true,
+  'legacy pr_url preserves the issue automatic PR preference'
 );
 
 SELECT throws_ok(

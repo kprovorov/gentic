@@ -16,6 +16,8 @@ export function AutomaticPrPreferenceField({
   disabled = false,
   className,
 }: {
+  // This is read only on mount. Callers showing refreshed persisted data should
+  // change this component's key when the default value changes.
   defaultChecked: boolean
   disabled?: boolean
   className?: string

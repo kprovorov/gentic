@@ -3,6 +3,7 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
+import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
@@ -105,7 +106,7 @@ export async function updateIssue(
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select(
-      "agent_provider, issue_model, priority, pr_url, projects!inner(user_id)"
+      "agent_provider, issue_model, priority, pr_url, issue_pull_requests(id), projects!inner(user_id)"
     )
     .eq("id", id)
     .eq("projects.user_id", userId)
@@ -118,15 +119,7 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  const { data: attachedPullRequests, error: pullRequestsError } =
-    await supabase.from("issue_pull_requests").select("id").eq("issue_id", id)
-
-  if (pullRequestsError) {
-    throw new ServiceError("internal", pullRequestsError.message)
-  }
-
-  const hasAttachedPullRequest =
-    Boolean(current.pr_url) || (attachedPullRequests?.length ?? 0) > 0
+  const hasAttachedPullRequest = hasAttachedIssuePullRequest(current)
 
   const { data: issue, error: updateError } = await supabase
     .from("issues")

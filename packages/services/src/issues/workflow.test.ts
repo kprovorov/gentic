@@ -237,13 +237,20 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
     if (!row) {
       return null
     }
-    if (this.table !== "issues" || row.projects) {
+    if (this.table !== "issues") {
       return { ...row }
     }
-    const project = this.db.projects.find(
-      (projectRow) => projectRow.id === row.project_id
-    )
-    return project ? { ...row, projects: { ...project } } : { ...row }
+    const project =
+      row.projects ??
+      this.db.projects.find((projectRow) => projectRow.id === row.project_id)
+    const issuePullRequests = this.db.issue_pull_requests
+      .filter((pullRequest) => pullRequest.issue_id === row.id)
+      .map((pullRequest) => ({ id: pullRequest.id }))
+    return {
+      ...row,
+      ...(project ? { projects: { ...(project as Row) } } : {}),
+      issue_pull_requests: issuePullRequests,
+    }
   }
 
   private payloadRows(): Row[] {

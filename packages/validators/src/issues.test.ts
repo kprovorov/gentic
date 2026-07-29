@@ -4,6 +4,7 @@ import { test } from "node:test"
 import {
   createIssueSchema,
   defaultIssuePriority,
+  hasAttachedIssuePullRequest,
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
@@ -66,6 +67,29 @@ test("updateIssueSchema preserves explicit automatic PR edits", () => {
   })
 
   assert.equal(updateValues.create_pr_automatically, false)
+})
+
+test("hasAttachedIssuePullRequest detects legacy and tracked PRs", () => {
+  assert.equal(
+    hasAttachedIssuePullRequest({
+      pr_url: null,
+      issue_pull_requests: [],
+    }),
+    false
+  )
+  assert.equal(
+    hasAttachedIssuePullRequest({
+      pr_url: "https://github.com/acme/widget/pull/1",
+    }),
+    true
+  )
+  assert.equal(
+    hasAttachedIssuePullRequest({
+      pr_url: null,
+      issue_pull_requests: [{ id: "pull-request-1" }],
+    }),
+    true
+  )
 })
 
 test("issue priority contract exposes reusable metadata in priority order", () => {
