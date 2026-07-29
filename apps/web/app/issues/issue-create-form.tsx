@@ -192,6 +192,7 @@ export function IssueCreateForm({
           formAction={saveIssueDraft}
           variant="ghost"
           size="sm"
+          className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
