@@ -11,16 +11,15 @@ export const workerSetupStateSchema = z.enum([
 export type WorkerSetupState = z.infer<typeof workerSetupStateSchema>
 
 export const workerLifecycleStateSchema = z.enum([
-  "enrolling",
+  "setup-incomplete",
   "online",
   "offline",
   "banned",
-  "setup_failed",
 ])
 
 export type WorkerLifecycleState = z.infer<typeof workerLifecycleStateSchema>
 
-export const workerDisplayNameSchema = z.string().trim().min(1).max(120)
+export const workerDisplayNameSchema = z.string().trim().min(1).max(80)
 
 export const workerNormalizedNameSchema = workerDisplayNameSchema.transform(
   (value) => value.replace(/\s+/g, " ").toLowerCase()

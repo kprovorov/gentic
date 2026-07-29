@@ -10,7 +10,8 @@
     "./issues": "./src/issues.ts",
     "./projects": "./src/projects.ts",
     "./user-settings": "./src/user-settings.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./workers": "./src/workers.ts"
   },
   "scripts": {
     "lint": "eslint .",
