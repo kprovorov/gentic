@@ -5,6 +5,7 @@ import type {
   IssuesData,
   NewIssueData,
   SettingsData,
+  SettingsWorkersData,
 } from "./queries"
 
 type ApiErrorBody = {
@@ -68,6 +69,9 @@ export const fetchIssuesData = () => getJson<IssuesData>("/api/app/issues")
 
 export const fetchSettingsData = () =>
   getJson<SettingsData>("/api/app/settings")
+
+export const fetchSettingsWorkersData = () =>
+  getJson<SettingsWorkersData>("/api/app/settings/workers")
 
 export const fetchNewIssueData = () =>
   getJson<NewIssueData>("/api/app/issues/new")

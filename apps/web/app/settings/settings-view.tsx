@@ -25,7 +25,10 @@ import {
   agentProviderLabels,
   agentProviderOptions,
 } from "@/app/issues/agent-provider-options"
-import { fetchSettingsData } from "@/app/client-queries"
+import {
+  fetchSettingsData,
+  fetchSettingsWorkersData,
+} from "@/app/client-queries"
 import type { SettingsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
@@ -54,9 +57,15 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
     initialData,
     staleTime: queryStaleTimes.settings,
   })
+  const workersQuery = useQuery({
+    queryKey: queryKeys.settingsWorkers,
+    queryFn: fetchSettingsWorkersData,
+    refetchInterval: queryStaleTimes.settingsWorkersPoll,
+  })
   const invalidateProjects = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.settings }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.settingsWorkers }),
       queryClient.invalidateQueries({ queryKey: queryKeys.newIssue }),
     ])
   }
@@ -84,7 +93,10 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
   const disconnectGithubMutation = useMutation({
     mutationFn: disconnectGithubIntegration,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.settings })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.settingsWorkers }),
+      ])
     },
   })
   const {
@@ -145,6 +157,15 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
         <header className="flex flex-col gap-2 border-b pb-6">
           <p className="text-sm font-medium text-muted-foreground">Settings</p>
           <h1 className="text-3xl">Workspace</h1>
+          {workersQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading worker status...
+            </p>
+          ) : workersQuery.isError ? (
+            <p className="text-sm text-destructive">
+              Unable to load worker status.
+            </p>
+          ) : null}
         </header>
 
         <Card>

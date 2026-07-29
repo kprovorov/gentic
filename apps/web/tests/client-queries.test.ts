@@ -5,7 +5,9 @@ import {
   ApiQueryError,
   fetchHomeData,
   fetchIssueDetailData,
+  fetchSettingsWorkersData,
 } from "../app/client-queries"
+import { queryKeys, queryStaleTimes } from "../app/query-keys"
 
 test("client query fetches use typed API routes", async () => {
   const calls: string[] = []
@@ -29,6 +31,7 @@ test("client query fetches use typed API routes", async () => {
       blockingIssueIds: [],
     })
     await fetchIssueDetailData("issue id/with slash")
+    await fetchSettingsWorkersData()
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -36,7 +39,13 @@ test("client query fetches use typed API routes", async () => {
   assert.deepEqual(calls, [
     "/api/app/home",
     "/api/app/issues/issue%20id%2Fwith%20slash",
+    "/api/app/settings/workers",
   ])
+})
+
+test("settings worker query has a stable key and 15 second polling interval", () => {
+  assert.deepEqual(queryKeys.settingsWorkers, ["settings", "workers"])
+  assert.equal(queryStaleTimes.settingsWorkersPoll, 15_000)
 })
 
 test("client query fetches surface API error status and code", async () => {
