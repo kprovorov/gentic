@@ -74,6 +74,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     prompt: getString(formData, "prompt"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getIssueModel(formData),
+    priority: getString(formData, "priority") || undefined,
   })
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
@@ -267,9 +268,16 @@ export async function updateIssuePriority(formData: FormData) {
     priority: getString(formData, "priority"),
   })
 
-  await issuesService.updateIssuePriority(supabase, userId, id, priority)
+  const issue = await issuesService.updateIssuePriority(
+    supabase,
+    userId,
+    id,
+    priority
+  )
   revalidatePath("/issues")
-  await revalidateIssuePathById(supabase, userId, id)
+  revalidateIssuePath(issue)
+
+  return issue
 }
 
 export async function bulkUpdateIssueStatus(formData: FormData) {
