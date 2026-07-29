@@ -6,10 +6,13 @@ import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
 import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
 import {
+  captureRepoBaseline,
   checkoutPullRequest,
   cloneRepo,
   getPullRequestUrl,
+  hasChangesSinceBaseline,
   hasLocalCheckout,
+  type RepoBaseline,
   runSetupScript,
 } from "./git.js"
 import { logError, logInfo } from "./log.js"
@@ -25,6 +28,8 @@ export interface ProcessIssueDeps {
   checkoutPullRequest: typeof checkoutPullRequest
   hasLocalCheckout: typeof hasLocalCheckout
   runSetupScript: typeof runSetupScript
+  captureRepoBaseline: typeof captureRepoBaseline
+  hasChangesSinceBaseline: typeof hasChangesSinceBaseline
   setRunState: typeof setRunState
   buildAttachmentBlocks: typeof buildAttachmentBlocks
   runAgentSession: typeof runAgentSession
@@ -37,6 +42,8 @@ const defaultProcessIssueDeps: ProcessIssueDeps = {
   checkoutPullRequest,
   hasLocalCheckout,
   runSetupScript,
+  captureRepoBaseline,
+  hasChangesSinceBaseline,
   setRunState,
   buildAttachmentBlocks,
   runAgentSession,
@@ -116,7 +123,10 @@ export async function processIssue(
   api: AgentApi,
   config: Config,
   issue: ClaimedIssue,
-  deps: ProcessIssueDeps = defaultProcessIssueDeps
+  deps: ProcessIssueDeps = defaultProcessIssueDeps,
+  state: { automaticPrAttemptedRunIds: Set<string> } = {
+    automaticPrAttemptedRunIds: new Set(),
+  }
 ): Promise<void> {
   const dir = join(config.WORKDIR, issue.id)
   // Sibling of the repo clone, not inside it, so downloaded attachments can
@@ -199,6 +209,8 @@ export async function processIssue(
       await deps.runSetupScript({ script: issue.setupScript, dir })
     }
 
+    const baseline = await deps.captureRepoBaseline(dir)
+
     await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
 
     await deps.runAgentSession({
@@ -221,7 +233,40 @@ export async function processIssue(
       nextPrompt: promptSource.nextPrompt,
     })
 
-    const prUrl = await deps.getPullRequestUrl(dir)
+    const turnResult = await recordCompletedTurnState({
+      api,
+      deps,
+      issue,
+      dir,
+      baseline,
+    })
+    const prUrl = turnResult.prUrl
+
+    if (
+      await shouldContinueWithAutomaticPrPublish({
+        api,
+        channel,
+        issue,
+        turnResult,
+        attemptedRunIds: state.automaticPrAttemptedRunIds,
+      })
+    ) {
+      await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
+      await processIssue(
+        api,
+        config,
+        {
+          ...issue,
+          sessionId: currentSessionId,
+          prUrl: null,
+          hasUnpublishedAgentChanges: true,
+        },
+        deps,
+        state
+      )
+      return
+    }
+
     const { finished, status: finishedStatus } = await api.finishRun(issue.id, {
       active_run_id: issue.activeRunId,
       status: prUrl ? "ready-for-review" : "waiting-for-input",
@@ -240,8 +285,10 @@ export async function processIssue(
           ...issue,
           sessionId: currentSessionId,
           prUrl,
+          hasUnpublishedAgentChanges: turnResult.hasUnpublishedAgentChanges,
         },
-        deps
+        deps,
+        state
       )
       return
     }
@@ -291,6 +338,71 @@ export async function processIssue(
         logError("failed to close realtime channel:", describe(closeError))
       })
     }
+  }
+}
+
+type CompletedTurnState = {
+  prUrl: string | null
+  hasPublishableChanges: boolean
+  hasUnpublishedAgentChanges: boolean
+}
+
+async function recordCompletedTurnState(input: {
+  api: AgentApi
+  deps: Pick<ProcessIssueDeps, "getPullRequestUrl" | "hasChangesSinceBaseline">
+  issue: ClaimedIssue
+  dir: string
+  baseline: RepoBaseline
+}): Promise<CompletedTurnState> {
+  const prUrl = (await input.deps.getPullRequestUrl(input.dir)) ?? input.issue.prUrl
+  const hasPublishableChanges = await input.deps.hasChangesSinceBaseline(
+    input.dir,
+    input.baseline
+  )
+  const hasUnpublishedAgentChanges = !prUrl && hasPublishableChanges
+
+  await input.api.recordUnpublishedAgentChanges(input.issue.id, {
+    active_run_id: input.issue.activeRunId,
+    has_unpublished_agent_changes: hasUnpublishedAgentChanges,
+  })
+
+  return {
+    prUrl,
+    hasPublishableChanges,
+    hasUnpublishedAgentChanges,
+  }
+}
+
+async function shouldContinueWithAutomaticPrPublish(input: {
+  api: AgentApi
+  channel: IssueRealtimeChannel | null
+  issue: ClaimedIssue
+  turnResult: CompletedTurnState
+  attemptedRunIds: Set<string>
+}): Promise<boolean> {
+  if (
+    !input.turnResult.hasUnpublishedAgentChanges ||
+    !input.issue.createPrAutomatically ||
+    input.issue.prUrl ||
+    input.attemptedRunIds.has(input.issue.activeRunId)
+  ) {
+    return false
+  }
+
+  input.attemptedRunIds.add(input.issue.activeRunId)
+
+  try {
+    const result = await input.api.requestAutomaticPrPublish(
+      input.issue.id,
+      input.issue.activeRunId
+    )
+    return result.created
+  } catch (error) {
+    logError(
+      `issue ${input.issue.id} automatic pull request request failed:`,
+      describe(error)
+    )
+    return false
   }
 }
 

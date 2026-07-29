@@ -94,6 +94,23 @@ describe("repo baseline helpers", () => {
     assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
   })
 
+  test("hasChangesSinceBaseline ignores dirty files present at baseline", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "setup-output.txt"), "created by setup\n")
+    const baseline = await captureRepoBaseline(dir)
+
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), false)
+  })
+
+  test("hasChangesSinceBaseline detects changes to dirty files after baseline", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "setup-output.txt"), "created by setup\n")
+    const baseline = await captureRepoBaseline(dir)
+    writeFileSync(join(dir, "setup-output.txt"), "changed by agent\n")
+
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
+  })
+
   test("hasChangesSinceBaseline is true once a new commit lands", async () => {
     initRepoWithCommit()
     const baseline = await captureRepoBaseline(dir)

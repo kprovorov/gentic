@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { mkdir, rm } from "node:fs/promises"
+import { mkdir, readFile, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { spawnInteractive } from "./installers.js"
@@ -79,6 +80,7 @@ export async function getPullRequestUrl(dir: string): Promise<string | null> {
 /** Snapshot of a repo's commit history, taken once repository setup has finished. */
 export interface RepoBaseline {
   headSha: string
+  worktreeFingerprint: string
 }
 
 /**
@@ -90,7 +92,8 @@ export interface RepoBaseline {
  */
 export async function captureRepoBaseline(dir: string): Promise<RepoBaseline> {
   const headSha = await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
-  return { headSha: headSha.trim() }
+  const worktreeFingerprint = await captureWorktreeFingerprint(dir)
+  return { headSha: headSha.trim(), worktreeFingerprint }
 }
 
 /**
@@ -122,10 +125,43 @@ export async function hasChangesSinceBaseline(
   dir: string,
   baseline: RepoBaseline
 ): Promise<boolean> {
-  if (await hasUncommittedChanges(dir)) {
+  const worktreeFingerprint = await captureWorktreeFingerprint(dir)
+  if (worktreeFingerprint !== baseline.worktreeFingerprint) {
     return true
   }
   return hasNewCommitsSince(dir, baseline)
+}
+
+async function captureWorktreeFingerprint(dir: string): Promise<string> {
+  const [status, unstagedDiff, stagedDiff, untrackedFilesOutput] =
+    await Promise.all([
+      runCapture("git", ["status", "--porcelain=v1", "-z"], { cwd: dir }),
+      runCapture("git", ["diff", "--binary"], { cwd: dir }),
+      runCapture("git", ["diff", "--cached", "--binary"], { cwd: dir }),
+      runCapture("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+        cwd: dir,
+      }),
+    ])
+  const hash = createHash("sha256")
+  hash.update(status)
+  hash.update("\0")
+  hash.update(unstagedDiff)
+  hash.update("\0")
+  hash.update(stagedDiff)
+  hash.update("\0")
+
+  const untrackedFiles = untrackedFilesOutput
+    .split("\0")
+    .filter((file) => file.length > 0)
+    .sort()
+  for (const file of untrackedFiles) {
+    hash.update(file)
+    hash.update("\0")
+    hash.update(await readFile(join(dir, file)))
+    hash.update("\0")
+  }
+
+  return hash.digest("hex")
 }
 
 function run(
