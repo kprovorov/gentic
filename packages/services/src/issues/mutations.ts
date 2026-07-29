@@ -35,6 +35,7 @@ export async function createIssue(
       title: input.title ?? null,
       prompt: input.prompt ?? null,
       status: input.status === "todo" ? "draft" : input.status,
+      priority: input.priority,
       agent_provider: input.agent_provider,
       issue_model: input.issue_model,
       type: input.type,
@@ -121,6 +122,7 @@ export async function updateIssue(
       agent_provider: input.agent_provider,
       issue_model: input.issue_model,
       type: input.type,
+      priority: input.priority,
       ...(current.agent_provider !== input.agent_provider ||
       current.issue_model !== input.issue_model
         ? { session_id: null }

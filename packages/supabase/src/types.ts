@@ -13,3 +13,5 @@ export type Inserts<
 export type Updates<
   TableName extends keyof Database["public"]["Tables"],
 > = Database["public"]["Tables"][TableName]["Update"]
+
+export type IssuePriority = Database["public"]["Enums"]["issue_priority"]

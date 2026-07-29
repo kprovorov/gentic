@@ -402,6 +402,9 @@ importers:
 
   packages/validators:
     dependencies:
+      '@gentic/supabase':
+        specifier: workspace:*
+        version: link:../supabase
       zod:
         specifier: 4.4.3
         version: 4.4.3
