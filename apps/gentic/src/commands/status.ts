@@ -1,16 +1,25 @@
 import type { Command } from "commander"
 
 import { agentProviders, formatAgentProviders } from "../agents.js"
+import { configFilePath } from "../config-store.js"
 import { getServiceBackend } from "../service/index.js"
-import type { ServiceScope, ServiceStatus } from "../service/index.js"
+import type { ServiceBackend, ServiceScope, ServiceStatus } from "../service/index.js"
 import { formatToolStatus, getToolStatuses } from "../tools.js"
 import type { ToolStatus, ToolStatuses } from "../tools.js"
 import { log, note } from "../ui.js"
 import { getAuthState } from "./auth.js"
+import type { AuthState } from "./auth.js"
 
 interface StatusOptions {
   system?: boolean
   json?: boolean
+}
+
+interface StatusDependencies {
+  getAuthState?: () => AuthState
+  getToolStatuses?: () => Promise<ToolStatuses>
+  getServiceBackend?: (opts: { scope?: ServiceScope }) => ServiceBackend
+  configFilePath?: () => string
 }
 
 function describe(error: unknown): string {
@@ -96,16 +105,27 @@ export function registerStatusCommand(program: Command): void {
     })
 }
 
-async function status(opts: StatusOptions): Promise<void> {
-  const auth = getAuthState()
-  const tools = await getToolStatuses()
+export async function status(
+  opts: StatusOptions,
+  deps: StatusDependencies = {}
+): Promise<void> {
+  const auth = (deps.getAuthState ?? getAuthState)()
+  const tools = await (deps.getToolStatuses ?? getToolStatuses)()
+  const configFile = (deps.configFilePath ?? configFilePath)()
 
   if (!auth.authenticated) {
     if (opts.json) {
-      console.log(JSON.stringify({ worker: "not-connected", tools: toolsJson(tools) }))
+      console.log(
+        JSON.stringify({
+          worker: "not-connected",
+          configFile,
+          tools: toolsJson(tools),
+        })
+      )
       return
     }
     log.warn('Worker: not connected - run "gentic worker connect <code>"')
+    note(`Config: ${configFile}`, "Configuration")
     note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
@@ -116,7 +136,7 @@ async function status(opts: StatusOptions): Promise<void> {
   let serviceStatus: ServiceStatus = { state: "not-installed" }
   let bootEnabled = false
   try {
-    const backend = getServiceBackend({ scope })
+    const backend = (deps.getServiceBackend ?? getServiceBackend)({ scope })
     backendName = backend.name
     ;[serviceStatus, bootEnabled] = await Promise.all([
       backend.status(),
@@ -132,6 +152,7 @@ async function status(opts: StatusOptions): Promise<void> {
           apiUrl: auth.apiUrl,
           maskedWorkerCredential: auth.maskedWorkerCredential,
           setupState: auth.setupState,
+          configFile,
           agents: agentProviders,
           serviceError: describe(error),
           tools: toolsJson(tools),
@@ -158,6 +179,7 @@ async function status(opts: StatusOptions): Promise<void> {
         apiUrl: auth.apiUrl,
         maskedWorkerCredential: auth.maskedWorkerCredential,
         setupState: auth.setupState,
+        configFile,
         agents: agentProviders,
         service: serviceStatus.state,
         serviceBackend: backendName,
@@ -179,6 +201,7 @@ async function status(opts: StatusOptions): Promise<void> {
   note(
     [
       `Auth:     configured (worker credential: ${auth.maskedWorkerCredential}, url: ${auth.apiUrl})`,
+      `Config:   ${configFile}`,
       `Worker:   ${auth.workerId ?? "unknown"} (${auth.setupState ?? "ready"})`,
       `Agents:   ${formatAgentProviders([...agentProviders])}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
