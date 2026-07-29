@@ -6,6 +6,7 @@ import { IconChevronDown, IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { AgentProviderIcon } from "@/components/agent-provider-icon"
+import type { IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import {
   AlertDialog,
@@ -26,14 +27,23 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import type { AgentProvider, IssueStatus } from "@gentic/validators/issues"
+import {
+  issuePriorityLabels,
+  issuePriorityOptions,
+  type AgentProvider,
+  type IssuePriority,
+  type IssueStatus,
+} from "@gentic/validators/issues"
 
 import {
   bulkDeleteIssues,
   bulkUpdateIssueAgentProvider,
+  bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
 } from "./actions"
 import {
+  priorityIconStyles,
+  priorityIcons,
   statusIconStyles,
   statusIcons,
   statusLabels,
@@ -55,6 +65,26 @@ const agentOptions: {
 
 function pluralize(count: number, noun: string) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`
+}
+
+function updateSelectedIssuesInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  selectedIds: string[],
+  updater: (issue: IssuesData["issues"][number]) => IssuesData["issues"][number]
+) {
+  const selectedIdSet = new Set(selectedIds)
+  const updateData = (current: IssuesData | undefined) =>
+    current
+      ? {
+          ...current,
+          issues: current.issues.map((issue) =>
+            selectedIdSet.has(issue.id) ? updater(issue) : issue
+          ),
+        }
+      : current
+
+  queryClient.setQueryData(queryKeys.issues, updateData)
+  queryClient.setQueryData(queryKeys.home, updateData)
 }
 
 export function BulkActionsToolbar({
@@ -94,6 +124,57 @@ export function BulkActionsToolbar({
     },
   })
 
+  const priorityMutation = useMutation({
+    mutationFn: bulkUpdateIssuePriority,
+    onMutate: async (formData) => {
+      const priority = formData.get("priority")
+
+      if (typeof priority !== "string") {
+        return
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+      ])
+
+      const previousIssues = queryClient.getQueryData<IssuesData>(
+        queryKeys.issues
+      )
+      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+
+      updateSelectedIssuesInCaches(queryClient, selectedIds, (issue) => ({
+        ...issue,
+        priority: priority as IssuePriority,
+      }))
+
+      return { previousHome, previousIssues }
+    },
+    onSuccess: async (_data, formData) => {
+      const priority = formData.get("priority")
+      await invalidateQueries()
+      onDone()
+      toast.success(
+        `Updated ${pluralize(count, "issue")} to ${
+          typeof priority === "string"
+            ? issuePriorityLabels[priority as IssuePriority]
+            : "new priority"
+        } priority`
+      )
+    },
+    onError: (_error, _formData, context) => {
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+
+      toast.error(`Failed to update priority for ${pluralize(count, "issue")}`)
+    },
+  })
+
   const agentMutation = useMutation({
     mutationFn: bulkUpdateIssueAgentProvider,
     onSuccess: async (_data, formData) => {
@@ -128,6 +209,7 @@ export function BulkActionsToolbar({
 
   const isPending =
     statusMutation.isPending ||
+    priorityMutation.isPending ||
     agentMutation.isPending ||
     deleteMutation.isPending
 
@@ -142,6 +224,19 @@ export function BulkActionsToolbar({
     }
     formData.set("status", status)
     statusMutation.mutate(formData)
+  }
+
+  function setPriority(priority: IssuePriority) {
+    if (count === 0 || priorityMutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    for (const id of selectedIds) {
+      formData.append("id", id)
+    }
+    formData.set("priority", priority)
+    priorityMutation.mutate(formData)
   }
 
   function setAgentProvider(agentProvider: AgentProvider) {
@@ -202,6 +297,38 @@ export function BulkActionsToolbar({
                 >
                   <OptionIcon
                     className={cn("size-4", statusIconStyles[option.value])}
+                  />
+                  <span className="min-w-0 flex-1 truncate">
+                    {option.label}
+                  </span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" disabled={isPending}>
+              Set priority
+              <IconChevronDown className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-52 rounded-lg bg-popover before:hidden"
+          >
+            {issuePriorityOptions.map((option) => {
+              const OptionIcon = priorityIcons[option.value]
+
+              return (
+                <DropdownMenuItem
+                  key={option.value}
+                  disabled={priorityMutation.isPending}
+                  onSelect={() => setPriority(option.value)}
+                  className="gap-3"
+                >
+                  <OptionIcon
+                    className={cn("size-4", priorityIconStyles[option.value])}
                   />
                   <span className="min-w-0 flex-1 truncate">
                     {option.label}

@@ -5,8 +5,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   IconAlertCircle,
-  IconAlertOctagon,
   IconAlertTriangle,
+  IconAlertOctagon,
   IconArrowBarToRight,
   IconArrowsSort,
   IconBug,
@@ -24,12 +24,15 @@ import {
   IconLock,
   IconMessage2,
   IconMessageQuestion,
+  IconMinus,
   IconPencil,
   IconPlayerPause,
   IconRocket,
   IconShieldCheck,
   IconSparkles,
   IconThumbUp,
+  IconTrendingDown,
+  IconTrendingUp,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -45,9 +48,17 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import type { IssueStatus, IssueType } from "@gentic/validators/issues"
+import {
+  issuePriorityLabels,
+  issuePriorityOptions,
+  issuePriorityOrder,
+  issuePriorityStyles,
+  type IssuePriority,
+  type IssueStatus,
+  type IssueType,
+} from "@gentic/validators/issues"
 
-import { updateIssueStatus } from "./actions"
+import { updateIssuePriority, updateIssueStatus } from "./actions"
 
 export const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
@@ -212,6 +223,20 @@ export const issueTypeOptions: { value: IssueType; label: string }[] = [
   { value: "idea", label: issueTypeLabels.idea },
 ]
 
+export const priorityIconStyles: Record<IssuePriority, string> = {
+  low: "text-gray-600 dark:text-gray-300",
+  medium: "text-blue-600 dark:text-blue-300",
+  high: "text-amber-600 dark:text-amber-300",
+  urgent: "text-red-600 dark:text-red-300",
+}
+
+export const priorityIcons = {
+  low: IconTrendingDown,
+  medium: IconMinus,
+  high: IconTrendingUp,
+  urgent: IconAlertTriangle,
+} satisfies Record<IssuePriority, typeof IconAlertTriangle>
+
 export function formatDate(value: string) {
   const date = new Date(value)
   const now = new Date()
@@ -371,6 +396,142 @@ export function IssueStatusMenu({
   )
 }
 
+function updateIssueInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  issueId: string,
+  updater: (issue: HomeIssue) => HomeIssue
+) {
+  const updateData = (current: IssuesData | undefined) =>
+    current
+      ? {
+          ...current,
+          issues: current.issues.map((currentIssue) =>
+            currentIssue.id === issueId ? updater(currentIssue) : currentIssue
+          ),
+        }
+      : current
+
+  queryClient.setQueryData(queryKeys.issues, updateData)
+  queryClient.setQueryData(queryKeys.home, updateData)
+}
+
+export function IssuePriorityMenu({
+  issue,
+  showLabel = false,
+}: {
+  issue: HomeIssue
+  showLabel?: boolean
+}) {
+  const queryClient = useQueryClient()
+  const PriorityIcon = priorityIcons[issue.priority]
+  const mutation = useMutation({
+    mutationFn: updateIssuePriority,
+    onMutate: async (formData) => {
+      const nextPriority = formData.get("priority")
+
+      if (typeof nextPriority !== "string") {
+        return
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+      ])
+
+      const previousIssues = queryClient.getQueryData<IssuesData>(
+        queryKeys.issues
+      )
+      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+
+      updateIssueInCaches(queryClient, issue.id, (currentIssue) => ({
+        ...currentIssue,
+        priority: nextPriority as HomeIssue["priority"],
+      }))
+
+      return { previousHome, previousIssues }
+    },
+    onError: (_error, _formData, context) => {
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+
+      toast.error("Failed to update issue priority")
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+  })
+
+  function selectPriority(nextPriority: HomeIssue["priority"]) {
+    if (nextPriority === issue.priority || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issue.id)
+    formData.set("priority", nextPriority)
+    mutation.mutate(formData)
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          aria-label={`Change priority from ${
+            issuePriorityLabels[issue.priority]
+          }`}
+          className={cn(
+            "inline-flex h-7 items-center justify-center rounded-full border transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            showLabel ? "gap-1.5 px-2.5 text-xs font-medium" : "w-7",
+            issuePriorityStyles[issue.priority]
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <PriorityIcon className="size-3.5 shrink-0" />
+          {showLabel ? (
+            <span className="whitespace-nowrap">
+              {issuePriorityLabels[issue.priority]}
+            </span>
+          ) : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-52 rounded-lg bg-popover before:hidden"
+      >
+        {issuePriorityOptions.map((option) => {
+          const OptionIcon = priorityIcons[option.value]
+          const isSelected = option.value === issue.priority
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              disabled={mutation.isPending}
+              onSelect={() => selectPriority(option.value)}
+              className="gap-3"
+            >
+              <OptionIcon
+                className={cn("size-4", priorityIconStyles[option.value])}
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {isSelected ? <IconCheck className="size-4" /> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,
   blockingIssueIds: Set<string>
@@ -484,6 +645,16 @@ export function getIssuesColumns(
       sortingFn: (rowA, rowB) =>
         statusOrder[rowA.original.status] - statusOrder[rowB.original.status],
       cell: ({ row }) => <IssueStatusMenu issue={row.original} showLabel />,
+    },
+    {
+      accessorKey: "priority",
+      header: ({ column }) => (
+        <SortableHeader label="Priority" column={column} />
+      ),
+      sortingFn: (rowA, rowB) =>
+        issuePriorityOrder[rowA.original.priority] -
+        issuePriorityOrder[rowB.original.priority],
+      cell: ({ row }) => <IssuePriorityMenu issue={row.original} showLabel />,
     },
     {
       id: "blocked",

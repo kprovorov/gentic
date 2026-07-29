@@ -44,17 +44,25 @@ import {
 import { Input } from "@gentic/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { cn } from "@gentic/ui/utils"
+import {
+  issuePriorityLabels,
+  issuePriorityOptions,
+  issuePriorityOrder,
+} from "@gentic/validators/issues"
 
 import { BulkActionsToolbar } from "./bulk-actions-toolbar"
 import {
   blockingBadgeStyles,
   formatDate,
   getIssuesColumns,
+  IssuePriorityMenu,
   IssueStatusMenu,
   issueTypeIcons,
   issueTypeLabels,
   issueTypeOptions,
   issueTypeStyles,
+  priorityIconStyles,
+  priorityIcons,
   statusIconStyles,
   statusIcons,
   statusLabels,
@@ -64,11 +72,7 @@ import {
 
 type IssuesViewMode = "list" | "table"
 type BlockingFilter =
-  | "all"
-  | "blocked"
-  | "non-blocked"
-  | "blocking"
-  | "non-blocking"
+  "all" | "blocked" | "non-blocked" | "blocking" | "non-blocking"
 
 const pageSize = 20
 
@@ -159,6 +163,13 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
     return statusDelta
   }
 
+  const priorityDelta =
+    issuePriorityOrder[issueB.priority] - issuePriorityOrder[issueA.priority]
+
+  if (priorityDelta !== 0) {
+    return priorityDelta
+  }
+
   return (
     new Date(issueB.created_at).getTime() -
     new Date(issueA.created_at).getTime()
@@ -184,7 +195,7 @@ function IssueRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[1rem_minmax(0,1fr)] gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[1rem_minmax(0,1fr)_minmax(10rem,14rem)_7rem]",
+        "grid grid-cols-[1rem_minmax(0,1fr)] gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[1rem_minmax(0,1fr)_minmax(8rem,11rem)_minmax(10rem,14rem)_7rem]",
         isSelected && "bg-primary/5"
       )}
     >
@@ -247,6 +258,9 @@ function IssueRow({
           </span>
         ) : null}
       </div>
+      <div className="col-start-2 min-w-0 md:col-start-auto">
+        <IssuePriorityMenu issue={issue} showLabel />
+      </div>
       <div className="col-start-2 min-w-0 text-sm text-muted-foreground md:col-start-auto">
         <span className="block truncate">
           {issue.projects?.name ?? "Unknown project"}
@@ -282,6 +296,8 @@ function IssuesTableView({
     [blockedIssueIds, blockingIssueIds]
   )
   const [sorting, setSorting] = useState<SortingState>([
+    { id: "status", desc: false },
+    { id: "priority", desc: true },
     { id: "created_at", desc: true },
   ])
   const [pagination, setPagination] = useState<PaginationState>({
@@ -390,6 +406,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [typeFilter, setTypeFilter] = useState<Set<HomeIssue["type"]>>(
     () => new Set()
   )
+  const [priorityFilter, setPriorityFilter] = useState<
+    Set<HomeIssue["priority"]>
+  >(() => new Set())
   const [blockingFilter, setBlockingFilter] = useState<BlockingFilter>("all")
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
@@ -398,6 +417,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     globalFilter.length > 0 ||
     statusFilter.size > 0 ||
     typeFilter.size > 0 ||
+    priorityFilter.size > 0 ||
     blockingFilter !== "all" ||
     projectFilter.size > 0
   const availableProjects = useMemo(() => {
@@ -424,6 +444,10 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
           (issue) => statusFilter.size === 0 || statusFilter.has(issue.status)
         )
         .filter((issue) => typeFilter.size === 0 || typeFilter.has(issue.type))
+        .filter(
+          (issue) =>
+            priorityFilter.size === 0 || priorityFilter.has(issue.priority)
+        )
         .filter((issue) =>
           matchesBlockingFilter(
             issue,
@@ -443,6 +467,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       globalFilter,
       statusFilter,
       typeFilter,
+      priorityFilter,
       blockingFilter,
       blockedIssueIds,
       blockingIssueIds,
@@ -453,6 +478,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     globalFilter,
     Array.from(statusFilter).sort().join(","),
     Array.from(typeFilter).sort().join(","),
+    Array.from(priorityFilter).sort().join(","),
     blockingFilter,
     Array.from(projectFilter).sort().join(","),
   ].join("|")
@@ -525,6 +551,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setRowSelection({})
   }
 
+  function togglePriorityFilter(priority: HomeIssue["priority"]) {
+    setPriorityFilter((current) => toggleInSet(current, priority))
+    setPageIndex(0)
+    setRowSelection({})
+  }
+
   function toggleProjectFilter(projectId: string) {
     setProjectFilter((current) => toggleInSet(current, projectId))
     setPageIndex(0)
@@ -549,6 +581,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setRowSelection({})
   }
 
+  function clearPriorityFilter() {
+    setPriorityFilter(new Set())
+    setPageIndex(0)
+    setRowSelection({})
+  }
+
   function clearProjectFilter() {
     setProjectFilter(new Set())
     setPageIndex(0)
@@ -559,6 +597,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setGlobalFilter("")
     setStatusFilter(new Set())
     setTypeFilter(new Set())
+    setPriorityFilter(new Set())
     setBlockingFilter("all")
     setProjectFilter(new Set())
     setPageIndex(0)
@@ -734,6 +773,57 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
+                      Priority
+                      {priorityFilter.size > 0 ? (
+                        <span className={activeFilterCountBadgeStyles}>
+                          {priorityFilter.size}
+                        </span>
+                      ) : null}
+                      <IconChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-52 rounded-lg bg-popover before:hidden"
+                  >
+                    {priorityFilter.size > 0 ? (
+                      <>
+                        <DropdownMenuItem onSelect={clearPriorityFilter}>
+                          Clear filter
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {issuePriorityOptions.map((option) => {
+                      const OptionIcon = priorityIcons[option.value]
+
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={option.value}
+                          checked={priorityFilter.has(option.value)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() =>
+                            togglePriorityFilter(option.value)
+                          }
+                          className="gap-3"
+                        >
+                          <OptionIcon
+                            className={cn(
+                              "size-4",
+                              priorityIconStyles[option.value]
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {issuePriorityLabels[option.value]}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
                       Type
                       {typeFilter.size > 0 ? (
                         <span className={activeFilterCountBadgeStyles}>
@@ -804,9 +894,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                             ? IconLock
                             : option === "non-blocked"
                               ? IconLockOpen
-                            : option === "non-blocking"
-                              ? IconX
-                              : IconArrowBarToRight
+                              : option === "non-blocking"
+                                ? IconX
+                                : IconArrowBarToRight
 
                       return (
                         <DropdownMenuCheckboxItem
