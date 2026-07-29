@@ -638,6 +638,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           normalized_name: string | null
+          offline_since_at: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
@@ -759,6 +760,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           normalized_name: string | null
+          offline_since_at: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
@@ -824,6 +826,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           normalized_name: string | null
+          offline_since_at: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
