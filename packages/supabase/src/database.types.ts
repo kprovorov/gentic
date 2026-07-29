@@ -569,6 +569,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           normalized_name: string | null
+          offline_since_at: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
@@ -588,6 +589,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           normalized_name?: string | null
+          offline_since_at?: string | null
           os?: string | null
           process_started_at?: string | null
           provider_capabilities?: Json
@@ -607,6 +609,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           normalized_name?: string | null
+          offline_since_at?: string | null
           os?: string | null
           process_started_at?: string | null
           provider_capabilities?: Json
@@ -646,6 +649,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           normalized_name: string | null
+          offline_since_at: string | null
           os: string | null
           process_started_at: string | null
           provider_capabilities: Json
@@ -686,6 +690,10 @@ export type Database = {
       }
       next_issue_number_for_project: {
         Args: { p_project_id: string }
+        Returns: number
+      }
+      reconcile_offline_worker_runs: {
+        Args: { p_now?: string }
         Returns: number
       }
       record_worker_enrollment_exchange_failure: {
