@@ -170,7 +170,7 @@ export async function runIssue(formData: FormData) {
 
 export async function updateIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title, prompt, agent_provider, issue_model, type } =
+  const { id, title, prompt, agent_provider, issue_model, type, priority } =
     updateIssueSchema.parse({
       id: getString(formData, "id"),
       title: getString(formData, "title"),
@@ -178,6 +178,7 @@ export async function updateIssue(formData: FormData) {
       agent_provider: getString(formData, "agent_provider") || "claude_code",
       issue_model: getIssueModel(formData),
       type: getString(formData, "type") || "feature",
+      priority: getString(formData, "priority") || undefined,
     })
   validateIssueModelForAgent(agent_provider, issue_model)
 
@@ -188,6 +189,7 @@ export async function updateIssue(formData: FormData) {
     agent_provider,
     issue_model,
     type,
+    priority,
   })
   revalidatePath("/issues")
   revalidateIssuePath(issue)

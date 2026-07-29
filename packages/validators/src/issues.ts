@@ -1,3 +1,4 @@
+import type { IssuePriority as SupabaseIssuePriority } from "@gentic/supabase/types"
 import { z } from "zod"
 
 export const issueStatusSchema = z.enum([
@@ -22,6 +23,55 @@ export const issueStatusSchema = z.enum([
 ])
 
 export type IssueStatus = z.infer<typeof issueStatusSchema>
+
+export type IssuePriority = SupabaseIssuePriority
+
+const issuePriorityValues = [
+  "low",
+  "medium",
+  "high",
+  "urgent",
+] as const satisfies readonly [IssuePriority, ...IssuePriority[]]
+
+export const issuePrioritySchema = z.enum(issuePriorityValues)
+
+export const defaultIssuePriority = "medium" as const satisfies IssuePriority
+
+export const issuePriorityLabels = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent",
+} as const satisfies Record<IssuePriority, string>
+
+export const issuePriorityOrder = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  urgent: 3,
+} as const satisfies Record<IssuePriority, number>
+
+export const issuePriorityIcons = {
+  low: "down",
+  medium: "minus",
+  high: "up",
+  urgent: "alert",
+} as const satisfies Record<IssuePriority, "alert" | "down" | "minus" | "up">
+
+export const issuePriorityStyles = {
+  low: "border-gray-200 bg-gray-50 text-gray-700",
+  medium: "border-blue-200 bg-blue-50 text-blue-700",
+  high: "border-amber-200 bg-amber-50 text-amber-700",
+  urgent: "border-red-200 bg-red-50 text-red-700",
+} as const satisfies Record<IssuePriority, string>
+
+export const issuePriorityOptions = issuePriorityValues.map((value) => ({
+  value,
+  label: issuePriorityLabels[value],
+  order: issuePriorityOrder[value],
+  icon: issuePriorityIcons[value],
+  className: issuePriorityStyles[value],
+}))
 
 export const agentProviderSchema = z.enum(["claude_code", "codex"])
 
@@ -81,6 +131,7 @@ export const createIssueSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
+  priority: issuePrioritySchema.default(defaultIssuePriority),
   agent_provider: agentProviderSchema.default("claude_code"),
   issue_model: issueModelSchema.default(null),
   // Omitted by the web app's create-issue form the same way: the type is
@@ -98,6 +149,7 @@ export const updateIssueSchema = z.object({
   agent_provider: agentProviderSchema,
   issue_model: issueModelSchema,
   type: issueTypeSchema,
+  priority: issuePrioritySchema.default(defaultIssuePriority),
 })
 
 export type UpdateIssueValues = z.infer<typeof updateIssueSchema>
@@ -108,6 +160,15 @@ export const updateIssueStatusSchema = z.object({
 })
 
 export type UpdateIssueStatusValues = z.infer<typeof updateIssueStatusSchema>
+
+export const updateIssuePrioritySchema = z.object({
+  id: z.string().uuid(),
+  priority: issuePrioritySchema,
+})
+
+export type UpdateIssuePriorityValues = z.infer<
+  typeof updateIssuePrioritySchema
+>
 
 export const updateIssueAgentProviderSchema = z.object({
   id: z.string().uuid(),

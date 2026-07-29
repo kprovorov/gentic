@@ -3,6 +3,7 @@ import {
   agentProviderSchema,
   createIssueSchema,
   deleteIssueRelationSchema,
+  issuePrioritySchema,
   issueRelationDirectionSchema,
   issueStatusSchema,
   issueTypeSchema,
@@ -316,6 +317,10 @@ const mcpHandler = createMcpHandler(
             .optional()
             .default("draft")
             .describe("Initial issue status. Defaults to draft."),
+          priority: issuePrioritySchema
+            .optional()
+            .default("medium")
+            .describe("Issue priority. Defaults to medium."),
           agent_provider: agentProviderSchema
             .optional()
             .default("claude_code")
@@ -337,6 +342,7 @@ const mcpHandler = createMcpHandler(
             title: string
             prompt?: string
             status?: z.infer<typeof issueStatusSchema>
+            priority?: z.infer<typeof issuePrioritySchema>
             agent_provider?: z.infer<typeof agentProviderSchema>
             type?: z.infer<typeof issueTypeSchema>
           }
@@ -347,6 +353,7 @@ const mcpHandler = createMcpHandler(
             createIssueSchema.parse({
               ...input,
               status: input.status ?? "draft",
+              priority: input.priority ?? "medium",
               agent_provider: input.agent_provider ?? "claude_code",
               type: input.type ?? "feature",
             })
@@ -378,6 +385,7 @@ const mcpHandler = createMcpHandler(
           agent_provider: agentProviderSchema.describe(
             "Coding agent to run for this issue."
           ),
+          priority: issuePrioritySchema.describe("Issue priority."),
           type: issueTypeSchema.describe(
             "Issue type: feature, bug, feedback, or idea."
           ),
@@ -392,6 +400,7 @@ const mcpHandler = createMcpHandler(
             title: string
             prompt?: string
             agent_provider: z.infer<typeof agentProviderSchema>
+            priority: z.infer<typeof issuePrioritySchema>
             type: z.infer<typeof issueTypeSchema>
           }
         ) => {
