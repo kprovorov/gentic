@@ -36,10 +36,13 @@ export {
 } from "./issues/publish"
 export {
   attachIssuePullRequest,
+  type AutomaticPrPublishResult,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
+  recordUnpublishedAgentChanges,
+  requestAutomaticPrPublish,
   resetIssueAgent,
   updateIssueAgentProvider,
   updateIssuePriority,
@@ -55,6 +58,7 @@ export {
   type ChangesRequestedReviewComment,
   type PullRequestComment,
   createIssueUserMessage,
+  createManualFirstPrPublishMessage,
   deleteIssueMessage,
   formatPullRequestCommentMessage,
   formatTestsFailedMessage,

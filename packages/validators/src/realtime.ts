@@ -33,6 +33,7 @@ export const realtimeMessageStatusSchema = chatMessageStatusSchema
 
 export function requireGenticGeneratedMessageAction<
   T extends {
+    role?: "user" | "assistant" | "system"
     author_type?: "user" | "agent" | "gentic"
     generated_action?: "create_pr" | null
   },
@@ -40,6 +41,7 @@ export function requireGenticGeneratedMessageAction<
   return (
     value.generated_action === undefined ||
     value.generated_action === null ||
+    (value.role === "user" && value.author_type === "user") ||
     value.author_type === "gentic"
   )
 }

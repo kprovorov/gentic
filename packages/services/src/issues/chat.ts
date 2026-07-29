@@ -1,11 +1,22 @@
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { ensureIssueOwned } from "./ownership"
+import {
+  formatPublishingRequest,
+  generateFirstPublishBranchName,
+} from "./publish"
 
 export const GENTIC_AUTHORED_USER_MESSAGE = {
   role: "user",
   author_type: "gentic",
 } as const
+
+const manualCreatePrFinishedStatuses = new Set([
+  "waiting-for-input",
+  "tests-failed",
+  "ready-for-review",
+  "run-failed",
+])
 
 export async function sendIssueMessage(
   supabase: Supabase,
@@ -41,6 +52,141 @@ export async function createIssueUserMessage(
       .select("id, created_at")
       .single<{ id: string; created_at: string }>()
   )
+}
+
+export async function createManualFirstPrPublishMessage(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data: issue, error } = await supabase
+    .from("issues")
+    .select(
+      "id, number, title, status, active_run_id, has_unpublished_agent_changes, pr_url, projects!inner(key)"
+    )
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!issue) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+  if (!manualCreatePrFinishedStatuses.has(issue.status)) {
+    throw new ServiceError("validation", "Agent is not idle after finishing")
+  }
+  if (!issue.active_run_id) {
+    throw new ServiceError("validation", "Issue has no finished agent run")
+  }
+  if (!issue.has_unpublished_agent_changes) {
+    throw new ServiceError(
+      "validation",
+      "Issue has no unpublished agent changes"
+    )
+  }
+  if (issue.pr_url) {
+    throw new ServiceError("validation", "Issue already has a pull request")
+  }
+
+  const pullRequests = unwrap(
+    await supabase
+      .from("issue_pull_requests")
+      .select("id")
+      .eq("issue_id", issueId)
+      .limit(1)
+  )
+  if (pullRequests.length > 0) {
+    throw new ServiceError("validation", "Issue already has a pull request")
+  }
+
+  const automaticRequests = unwrap(
+    await supabase
+      .from("issue_automatic_pr_requests")
+      .select("id")
+      .eq("issue_id", issueId)
+      .eq("run_id", issue.active_run_id)
+      .in("status", ["pending", "claimed"])
+      .limit(1)
+  )
+  if (automaticRequests.length > 0) {
+    throw new ServiceError("validation", "Automatic PR publishing is running")
+  }
+
+  const branchName = generateFirstPublishBranchName({
+    projectKey: issue.projects.key,
+    issueNumber: issue.number,
+    issueTitle: issue.title,
+  })
+  const content = formatPublishingRequest({ branchName })
+  const existingManualRequest = await getManualFirstPrPublishMessage(
+    supabase,
+    issueId
+  )
+
+  if (existingManualRequest) {
+    return { ...existingManualRequest, content, created: false }
+  }
+
+  const insertResult = await supabase
+    .from("messages")
+    .insert({
+      issue_id: issueId,
+      role: "user",
+      kind: "text",
+      content,
+      author_type: "user",
+      generated_action: "create_pr",
+    })
+    .select("id, created_at")
+    .single<{ id: string; created_at: string }>()
+
+  if (insertResult.error) {
+    if ("code" in insertResult.error && insertResult.error.code === "23505") {
+      const duplicate = await getManualFirstPrPublishMessage(supabase, issueId)
+      if (duplicate) {
+        return { ...duplicate, content, created: false }
+      }
+    }
+    throw new ServiceError("internal", insertResult.error.message)
+  }
+
+  const message = insertResult.data
+
+  try {
+    await requeueIssueForUserMessage(supabase, issueId)
+  } catch (error) {
+    await deleteIssueMessage(supabase, issueId, message.id).catch(
+      (cleanupError) => {
+        console.error(
+          `Failed to clean up manual create PR message ${message.id}:`,
+          cleanupError
+        )
+      }
+    )
+    throw error
+  }
+
+  return { ...message, content, created: true }
+}
+
+async function getManualFirstPrPublishMessage(
+  supabase: Supabase,
+  issueId: string
+) {
+  return unwrap(
+    await supabase
+      .from("messages")
+      .select("id, created_at")
+      .eq("issue_id", issueId)
+      .eq("role", "user")
+      .eq("author_type", "user")
+      .eq("generated_action", "create_pr")
+      .order("created_at", { ascending: false })
+      .limit(1)
+  )[0]
 }
 
 export async function deleteIssueMessage(

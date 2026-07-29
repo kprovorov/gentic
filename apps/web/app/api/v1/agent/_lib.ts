@@ -6,6 +6,8 @@ import {
   ackMessagesInputSchema,
   finishRunFieldsSchema,
   insertMessageInputShape,
+  recordUnpublishedChangesInputSchema,
+  requestAutomaticPrPublishInputSchema,
   requireGenticGeneratedActionAuthor,
   runStateFieldsSchema,
 } from "@gentic/validators/agent"
@@ -42,6 +44,10 @@ export const insertMessageSchema = z
     message: "Generated actions must be Gentic-authored",
     path: ["author_type"],
   })
+
+export const unpublishedChangesSchema = recordUnpublishedChangesInputSchema
+export const automaticPrPublishRequestSchema =
+  requestAutomaticPrPublishInputSchema
 
 export async function getAgentContext(request: Request): Promise<{
   userId: string

@@ -23,6 +23,10 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
       return []
     },
     async ackUserMessages() {},
+    async recordUnpublishedAgentChanges() {},
+    async requestAutomaticPrPublish() {
+      throw new Error("not implemented")
+    },
     async fetchAttachments(_issueId: string, messageId: string) {
       return byMessageId[messageId] ?? []
     },

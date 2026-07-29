@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, test } from "node:test"
@@ -91,6 +97,31 @@ describe("repo baseline helpers", () => {
     initRepoWithCommit()
     const baseline = await captureRepoBaseline(dir)
     writeFileSync(join(dir, "untracked.txt"), "new\n")
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
+  })
+
+  test("hasChangesSinceBaseline ignores dirty files present at baseline", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "setup-output.txt"), "created by setup\n")
+    const baseline = await captureRepoBaseline(dir)
+
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), false)
+  })
+
+  test("hasChangesSinceBaseline detects changes to dirty files after baseline", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "setup-output.txt"), "created by setup\n")
+    const baseline = await captureRepoBaseline(dir)
+    writeFileSync(join(dir, "setup-output.txt"), "changed by agent\n")
+
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
+  })
+
+  test("hasChangesSinceBaseline treats unreadable untracked files as changes", async () => {
+    initRepoWithCommit()
+    symlinkSync("missing-target.txt", join(dir, "broken-link.txt"))
+    const baseline = await captureRepoBaseline(dir)
+
     assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
   })
 

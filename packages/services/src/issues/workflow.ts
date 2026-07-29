@@ -1,3 +1,4 @@
+import type { AutomaticPrRequestStatus } from "@gentic/validators/agent"
 import type {
   AgentProvider,
   IssueModel,
@@ -8,8 +9,13 @@ import type {
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { logIssueEvent } from "./events"
+import { ensureIssueOwned } from "./ownership"
 import { getIssue } from "./queries"
-import { ISSUE_WITH_PROJECT_SELECT, type UserChatMessage } from "./shared"
+import {
+  getIssueCode,
+  ISSUE_WITH_PROJECT_SELECT,
+  type UserChatMessage,
+} from "./shared"
 
 export async function resetIssueAgent(
   supabase: Supabase,
@@ -474,4 +480,150 @@ export async function attachIssuePullRequest(
   }
 
   return result
+}
+
+// Called from the worker-facing `/agent/issues/[id]/unpublished-changes`
+// route whenever the agent commits work without opening a PR itself. Scoped
+// to `active_run_id` (a single conditional `UPDATE`, so the check-and-write
+// is atomic) so a worker whose run has since finished, been superseded by a
+// re-claim, or belongs to a different run entirely can't resurrect state for
+// a run it no longer owns.
+export async function recordUnpublishedAgentChanges(
+  supabase: Supabase,
+  userId: string,
+  issueId: string,
+  runId: string,
+  hasUnpublishedAgentChanges: boolean
+): Promise<void> {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const updated = unwrap<{ id: string } | null>(
+    await supabase
+      .from("issues")
+      .update({
+        has_unpublished_agent_changes: hasUnpublishedAgentChanges,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issueId)
+      .eq("active_run_id", runId)
+      .select("id")
+      .maybeSingle()
+  )
+
+  if (!updated) {
+    throw new ServiceError("validation", "Run is not the issue's active run")
+  }
+}
+
+export type AutomaticPrPublishResult = {
+  requestId: string
+  messageId: string
+  created: boolean
+  status: AutomaticPrRequestStatus
+  issue: {
+    id: string
+    code: string
+    title: string | null
+    activeRunId: string
+    createPrAutomatically: boolean
+    hasUnpublishedAgentChanges: boolean
+    prUrl: string | null
+  }
+}
+
+// Requests (or, on a duplicate/retried call, returns the already-requested)
+// automatic create-PR message for the issue's active run. Only the "at most
+// one request per run" and "run must still be active" guarantees are atomic
+// — those come from the `request_automatic_pr_publish` RPC's
+// unique-constraint-backed insert and its active-run trigger, so they stay
+// correct under concurrent callers. The `create_pr_automatically`/`pr_url`/
+// `has_unpublished_agent_changes` checks below are a best-effort read here
+// in application code, not re-validated by the RPC, so a concurrent change
+// to any of them between this read and the RPC call is not guarded against
+// — an accepted, narrow race given how rarely those fields change mid-run.
+// Nothing here writes `create_pr_automatically`, so it stays `true` after an
+// automatic attempt for later auditing (the RPC's insert trigger also
+// snapshots it onto the request row).
+export async function requestAutomaticPrPublish(
+  supabase: Supabase,
+  userId: string,
+  issueId: string,
+  runId: string
+): Promise<AutomaticPrPublishResult> {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data: issue, error } = await supabase
+    .from("issues")
+    .select(
+      "id, number, title, active_run_id, create_pr_automatically, has_unpublished_agent_changes, pr_url, projects!inner(key)"
+    )
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!issue) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+  if (issue.active_run_id !== runId) {
+    throw new ServiceError("validation", "Run is not the issue's active run")
+  }
+  if (!issue.create_pr_automatically) {
+    throw new ServiceError(
+      "validation",
+      "Issue is not opted into automatic PR creation"
+    )
+  }
+  if (issue.pr_url) {
+    throw new ServiceError("validation", "Issue already has a pull request")
+  }
+  if (!issue.has_unpublished_agent_changes) {
+    throw new ServiceError(
+      "validation",
+      "Issue has no unpublished agent changes"
+    )
+  }
+
+  const code = getIssueCode(issue.projects.key, issue.number)
+  const content = formatAutomaticCreatePrMessage(code, issue.title)
+
+  const data = unwrap(
+    await supabase
+      .rpc("request_automatic_pr_publish", {
+        p_issue_id: issueId,
+        p_run_id: runId,
+        p_content: content,
+      })
+      .single<{
+        request_id: string
+        message_id: string
+        status: string
+        created: boolean
+      }>()
+  )
+
+  return {
+    requestId: data.request_id,
+    messageId: data.message_id,
+    created: data.created,
+    status: data.status as AutomaticPrRequestStatus,
+    issue: {
+      id: issue.id,
+      code,
+      title: issue.title,
+      activeRunId: runId,
+      createPrAutomatically: issue.create_pr_automatically,
+      hasUnpublishedAgentChanges: issue.has_unpublished_agent_changes,
+      prUrl: issue.pr_url,
+    },
+  }
+}
+
+function formatAutomaticCreatePrMessage(
+  code: string,
+  title: string | null
+): string {
+  const label = title ? `${code}: ${title}` : code
+  return `Automatic PR publishing is enabled for ${label} and there are unpublished changes. Please commit any remaining work and open a pull request now.`
 }

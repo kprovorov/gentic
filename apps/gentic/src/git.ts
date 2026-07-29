@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { createReadStream, existsSync } from "node:fs"
 import { mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
@@ -79,6 +80,7 @@ export async function getPullRequestUrl(dir: string): Promise<string | null> {
 /** Snapshot of a repo's commit history, taken once repository setup has finished. */
 export interface RepoBaseline {
   headSha: string
+  worktreeFingerprint: string
 }
 
 /**
@@ -90,7 +92,8 @@ export interface RepoBaseline {
  */
 export async function captureRepoBaseline(dir: string): Promise<RepoBaseline> {
   const headSha = await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
-  return { headSha: headSha.trim() }
+  const worktreeFingerprint = await captureWorktreeFingerprint(dir)
+  return { headSha: headSha.trim(), worktreeFingerprint }
 }
 
 /**
@@ -122,10 +125,78 @@ export async function hasChangesSinceBaseline(
   dir: string,
   baseline: RepoBaseline
 ): Promise<boolean> {
-  if (await hasUncommittedChanges(dir)) {
+  const worktreeFingerprint = await captureWorktreeFingerprint(dir)
+  if (worktreeFingerprint !== baseline.worktreeFingerprint) {
     return true
   }
   return hasNewCommitsSince(dir, baseline)
+}
+
+async function captureWorktreeFingerprint(dir: string): Promise<string> {
+  const [status, unstagedDiff, stagedDiff, untrackedFilesOutput] =
+    await Promise.all([
+      runCapture(
+        "git",
+        ["--no-optional-locks", "status", "--porcelain=v1", "-z"],
+        { cwd: dir }
+      ),
+      runCapture("git", ["--no-optional-locks", "diff", "--binary"], {
+        cwd: dir,
+      }),
+      runCapture(
+        "git",
+        ["--no-optional-locks", "diff", "--cached", "--binary"],
+        { cwd: dir }
+      ),
+      runCapture(
+        "git",
+        [
+          "--no-optional-locks",
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+        ],
+        { cwd: dir }
+      ),
+    ])
+  const hash = createHash("sha256")
+  hash.update(status)
+  hash.update("\0")
+  hash.update(unstagedDiff)
+  hash.update("\0")
+  hash.update(stagedDiff)
+  hash.update("\0")
+
+  const untrackedFiles = untrackedFilesOutput
+    .split("\0")
+    .filter((file) => file.length > 0)
+    .sort()
+  for (const file of untrackedFiles) {
+    hash.update(file)
+    hash.update("\0")
+    await hashFileInto(hash, join(dir, file))
+    hash.update("\0")
+  }
+
+  return hash.digest("hex")
+}
+
+function hashFileInto(
+  hash: ReturnType<typeof createHash>,
+  file: string
+): Promise<void> {
+  return new Promise((resolve) => {
+    const stream = createReadStream(file)
+    stream.on("data", (chunk) => {
+      hash.update(chunk)
+    })
+    stream.on("error", () => {
+      hash.update(`unreadable:${randomUUID()}`)
+      resolve()
+    })
+    stream.on("end", resolve)
+  })
 }
 
 function run(

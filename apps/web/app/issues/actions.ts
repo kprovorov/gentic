@@ -27,6 +27,7 @@ import {
   rollbackMessageAttachmentUpload,
   validateAttachmentBatch,
 } from "@gentic/services/attachments"
+import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 
@@ -74,6 +75,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     prompt: getString(formData, "prompt"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getIssueModel(formData),
+    priority: getString(formData, "priority") || undefined,
   })
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
@@ -267,9 +269,16 @@ export async function updateIssuePriority(formData: FormData) {
     priority: getString(formData, "priority"),
   })
 
-  await issuesService.updateIssuePriority(supabase, userId, id, priority)
+  const issue = await issuesService.updateIssuePriority(
+    supabase,
+    userId,
+    id,
+    priority
+  )
   revalidatePath("/issues")
-  await revalidateIssuePathById(supabase, userId, id)
+  revalidateIssuePath(issue)
+
+  return issue
 }
 
 export async function bulkUpdateIssueStatus(formData: FormData) {
@@ -404,6 +413,37 @@ export async function sendIssueMessage(formData: FormData) {
         )
       }
     )
+    throw error
+  }
+}
+
+export async function createManualIssuePullRequest(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+
+  try {
+    const message = await issuesService.createManualFirstPrPublishMessage(
+      supabase,
+      userId,
+      issueId
+    )
+
+    await revalidateIssuePathById(supabase, userId, issueId)
+
+    return {
+      ok: true,
+      id: message.id,
+      created_at: message.created_at,
+      content: message.content,
+      created: message.created,
+    } as const
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return {
+        ok: false,
+        error: error.message,
+      } as const
+    }
     throw error
   }
 }

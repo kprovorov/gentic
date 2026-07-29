@@ -1,5 +1,6 @@
 import {
   attachmentsResponseSchema,
+  automaticPrPublishResponseSchema,
   claimIssueInputSchema,
   claimIssueResponseSchema,
   finishRunResponseSchema,
@@ -9,9 +10,11 @@ import {
   realtimeTokenResponseSchema,
   type AckMessagesInput,
   type Attachment,
+  type AutomaticPrPublishResponse,
   type ClaimedIssue,
   type FinishRunFields,
   type InsertMessageInput,
+  type RecordUnpublishedChangesInput,
   type RealtimeRunStateStatus,
   type RealtimeTokenResponse,
   type RunStateFields,
@@ -27,9 +30,11 @@ import type { z } from "zod"
 export type {
   AckMessagesInput,
   Attachment,
+  AutomaticPrPublishResponse,
   ClaimedIssue,
   FinishRunFields,
   InsertMessageInput,
+  RecordUnpublishedChangesInput,
   RealtimeRunStateStatus,
   RealtimeTokenResponse,
   RunStateFields,
@@ -52,6 +57,14 @@ export interface AgentApi {
     runId: string,
     messageIds: string[]
   ): Promise<void>
+  recordUnpublishedAgentChanges(
+    issueId: string,
+    fields: RecordUnpublishedChangesInput
+  ): Promise<void>
+  requestAutomaticPrPublish(
+    issueId: string,
+    activeRunId: string
+  ): Promise<AutomaticPrPublishResponse>
   fetchAttachments(issueId: string, messageId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
   sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void>
@@ -162,6 +175,26 @@ export function createAgentApi(input: {
         {
           method: "PATCH",
           body,
+        }
+      )
+    },
+    async recordUnpublishedAgentChanges(issueId, fields) {
+      await request(
+        `/agent/issues/${encodeURIComponent(issueId)}/unpublished-changes`,
+        okResponseSchema,
+        {
+          method: "PATCH",
+          body: fields,
+        }
+      )
+    },
+    async requestAutomaticPrPublish(issueId, activeRunId) {
+      return request(
+        `/agent/issues/${encodeURIComponent(issueId)}/automatic-pr-requests`,
+        automaticPrPublishResponseSchema,
+        {
+          method: "POST",
+          body: { active_run_id: activeRunId },
         }
       )
     },

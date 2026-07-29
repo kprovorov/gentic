@@ -1,0 +1,307 @@
+import type React from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+const updateIssuePriorityMock = vi.fn()
+const updateIssueStatusMock = vi.fn()
+const addIssueRelationMock = vi.fn()
+const createManualIssuePullRequestMock = vi.fn()
+const deleteIssueRelationMock = vi.fn()
+const toastErrorMock = vi.fn()
+const toastSuccessMock = vi.fn()
+
+vi.mock("@/app/issues/actions", () => ({
+  addIssueRelation: (formData: FormData) => addIssueRelationMock(formData),
+  createManualIssuePullRequest: (formData: FormData) =>
+    createManualIssuePullRequestMock(formData),
+  deleteIssueRelation: (formData: FormData) =>
+    deleteIssueRelationMock(formData),
+  updateIssuePriority: (formData: FormData) =>
+    updateIssuePriorityMock(formData),
+  updateIssueStatus: (formData: FormData) => updateIssueStatusMock(formData),
+}))
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: (message: string) => toastErrorMock(message),
+    success: (message: string) => toastSuccessMock(message),
+  },
+}))
+
+vi.mock("@gentic/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuItem: ({
+    children,
+    disabled,
+    onSelect,
+  }: {
+    children: React.ReactNode
+    disabled?: boolean
+    onSelect?: () => void
+  }) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => onSelect?.()}
+    >
+      {children}
+    </button>
+  ),
+}))
+
+import { queryKeys } from "@/app/query-keys"
+
+import { IssueDetailRail } from "./issue-detail-rail"
+
+const issueId = "11111111-1111-4111-8111-111111111111"
+
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false, networkMode: "always" },
+    },
+  })
+}
+
+function renderRail(
+  queryClient = createQueryClient(),
+  props: Partial<React.ComponentProps<typeof IssueDetailRail>> = {}
+) {
+  queryClient.setQueryData(queryKeys.issue(issueId), {
+    issue: { id: issueId, priority: "medium" },
+  })
+  queryClient.setQueryData(queryKeys.issues, {
+    issues: [{ id: issueId, priority: "medium" }],
+    blockedIssueIds: [],
+    blockingIssueIds: [],
+  })
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <IssueDetailRail
+        issueId={issueId}
+        issueCode="GEN-1"
+        status="todo"
+        priority="medium"
+        hasUnpublishedAgentChanges={false}
+        automaticPrPublishingInProgress={false}
+        pullRequests={[]}
+        relations={[]}
+        relationCandidates={[]}
+        {...props}
+      />
+    </QueryClientProvider>
+  )
+
+  return queryClient
+}
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
+
+describe("IssueDetailRail manual Create PR", () => {
+  it("shows the button in the Pull requests section when eligible", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+
+  it("does not show while automatic publishing is still running", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+      automaticPrPublishingInProgress: true,
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Create PR" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("does not show once a pull request is attached", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+      pullRequests: [
+        {
+          id: "pr-1",
+          issue_id: issueId,
+          url: "https://github.com/acme/widget/pull/1",
+          created_at: "2026-07-29T12:00:00.000Z",
+        },
+      ],
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Create PR" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("prevents duplicate clicks while the request is pending", async () => {
+    const user = userEvent.setup()
+    let resolveMutation: () => void = () => {}
+    createManualIssuePullRequestMock.mockImplementation(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          resolveMutation = () => resolve({ ok: true })
+        })
+    )
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.dblClick(screen.getByRole("button", { name: "Create PR" }))
+
+    expect(createManualIssuePullRequestMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("Requesting pull request...")).toBeVisible()
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith("Create PR request sent")
+    })
+  })
+
+  it("shows a returned failure and restores the button", async () => {
+    const user = userEvent.setup()
+    createManualIssuePullRequestMock.mockResolvedValue({
+      ok: false,
+      error: "Could not create request",
+    })
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.click(screen.getByRole("button", { name: "Create PR" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Could not create request")
+    })
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+
+  it("shows an unexpected failure and restores the button", async () => {
+    const user = userEvent.setup()
+    createManualIssuePullRequestMock.mockRejectedValue(
+      new Error("Network failed")
+    )
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.click(screen.getByRole("button", { name: "Create PR" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Network failed")
+    })
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+})
+
+describe("IssueDetailRail priority", () => {
+  it("submits selected priority and applies optimistic detail/list updates", async () => {
+    const user = userEvent.setup()
+    const queryClient = renderRail()
+    let resolveMutation: () => void = () => {}
+    updateIssuePriorityMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMutation = resolve
+        })
+    )
+
+    await user.click(screen.getByRole("menuitem", { name: "High" }))
+
+    expect(updateIssuePriorityMock).toHaveBeenCalledTimes(1)
+    const formData = updateIssuePriorityMock.mock.calls[0][0] as FormData
+    expect(formData.get("id")).toBe(issueId)
+    expect(formData.get("priority")).toBe("high")
+    expect(
+      screen.getByRole("button", { name: "Change priority from High" })
+    ).toBeVisible()
+    expect(
+      queryClient.getQueryData<{ issue: { priority: string } }>(
+        queryKeys.issue(issueId)
+      )?.issue.priority
+    ).toBe("high")
+    expect(
+      queryClient.getQueryData<{ issues: Array<{ priority: string }> }>(
+        queryKeys.issues
+      )?.issues[0]?.priority
+    ).toBe("high")
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Change priority from Medium" })
+      ).not.toBeDisabled()
+    })
+  })
+
+  it("disables the priority dropdown while saving", async () => {
+    const user = userEvent.setup()
+    let resolveMutation: () => void = () => {}
+    updateIssuePriorityMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMutation = resolve
+        })
+    )
+    renderRail()
+
+    await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Change priority from Urgent" })
+      ).toBeDisabled()
+    })
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Change priority from Medium" })
+      ).not.toBeDisabled()
+    })
+  })
+
+  it("rolls back optimistic priority and shows an error toast when saving fails", async () => {
+    const user = userEvent.setup()
+    const queryClient = renderRail()
+    updateIssuePriorityMock.mockRejectedValue(new Error("network failed"))
+
+    await user.click(screen.getByRole("menuitem", { name: "Low" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Failed to update issue priority"
+      )
+    })
+    expect(
+      screen.getByRole("button", { name: "Change priority from Medium" })
+    ).toBeVisible()
+    expect(
+      queryClient.getQueryData<{ issue: { priority: string } }>(
+        queryKeys.issue(issueId)
+      )?.issue.priority
+    ).toBe("medium")
+  })
+})

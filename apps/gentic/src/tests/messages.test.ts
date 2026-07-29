@@ -455,6 +455,10 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
       return []
     },
     async ackUserMessages() {},
+    async recordUnpublishedAgentChanges() {},
+    async requestAutomaticPrPublish() {
+      throw new Error("not implemented")
+    },
     async fetchAttachments() {
       return []
     },

@@ -28,11 +28,14 @@ type FakeIssue = {
   run_error: string | null
   run_finished_at: string | null
   prompt: string | null
+  number: number
+  title: string | null
   agent_provider: "codex" | "claude"
   issue_model: string | null
   session_id: string | null
   pr_url: string | null
   project_user_id: string
+  project_key: string
   repo: string | null
   setup_script: string | null
   blockerStatuses: Array<"todo" | "held" | "in-progress" | "completed" | "cancelled">
@@ -227,11 +230,14 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
     run_error: "previous error",
     run_finished_at: "2026-07-01T00:01:00.000Z",
     prompt: "Implement the task",
+    number: 1,
+    title: "Implement the task",
     agent_provider: "codex",
     issue_model: null,
     session_id: null,
     pr_url: null,
     project_user_id: "user-1",
+    project_key: "ACME",
     repo: "acme/repo",
     setup_script: null,
     blockerStatuses: [],
@@ -269,12 +275,15 @@ function toClaimCandidate(issue: FakeIssue) {
   return {
     id: issue.id,
     status: issue.status,
+    number: issue.number,
+    title: issue.title,
     agent_provider: issue.agent_provider,
     issue_model: issue.issue_model,
     session_id: issue.session_id,
     pr_url: issue.pr_url,
     prompt: issue.prompt,
     projects: {
+      key: issue.project_key,
       repo: issue.repo,
       setup_script: issue.setup_script,
       user_id: issue.project_user_id,
@@ -317,6 +326,22 @@ test("claim keeps existing pending user messages intact", async () => {
   )
 
   assert.deepEqual(supabase.inserts, [])
+})
+
+test("claim includes the issue code inputs and current title the worker needs", async () => {
+  const supabase = new FakeSupabase([], [
+    issue({
+      id: "coded",
+      project_key: "ACME",
+      number: 42,
+      title: "Fix the thing",
+    }),
+  ])
+
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+
+  assert.equal(claimed?.code, "ACME-42")
+  assert.equal(claimed?.title, "Fix the thing")
 })
 
 test("claim picks urgent before older lower-priority todo issues", async () => {

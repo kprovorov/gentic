@@ -21,8 +21,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
-import type { AgentProvider } from "@gentic/validators/issues"
+import { cn } from "@gentic/ui/utils"
+import {
+  defaultIssuePriority,
+  type AgentProvider,
+  type IssuePriority,
+} from "@gentic/validators/issues"
 
+import {
+  issuePriorityIcons,
+  issuePriorityLabels,
+  issuePriorityOptions,
+  issuePriorityStyles,
+} from "./issue-priority-meta"
 import { MessageComposer } from "./message-composer/message-composer"
 
 const ISSUE_CREATE_DRAFT_STORAGE_KEY = "gentic:issue-create-draft:v1"
@@ -61,12 +72,15 @@ export function IssueCreateForm({
   const [agentProvider, setAgentProvider] =
     useState<AgentProvider>(defaultAgentProvider)
   const [issueModel, setIssueModel] = useState<string | null>(null)
+  const [priority, setPriority] = useState<IssuePriority>(defaultIssuePriority)
   const [projectId, setProjectId] = useState("")
   const [projectError, setProjectError] = useState("")
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
   const selectedProject = projects.find((project) => project.id === projectId)
+  const PriorityIcon = issuePriorityIcons[priority]
   const projectLabelId = "issue-project-label"
   const projectErrorId = "issue-project-error"
+  const priorityLabelId = "issue-priority-label"
   useEffect(() => {
     const storedPrompt = loadStoredIssueDraft()
 
@@ -140,53 +154,95 @@ export function IssueCreateForm({
       onIssueModelChange={(model) => setIssueModel(model)}
       onSubmit={() => {}}
       footerStart={
-        <div className="flex min-w-0 flex-col gap-1">
-          <label className="sr-only" id={projectLabelId}>
-            Project
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <label className="sr-only" id={projectLabelId}>
+              Project
+            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  ref={projectTriggerRef}
+                  type="button"
+                  aria-labelledby={projectLabelId}
+                  aria-describedby={projectError ? projectErrorId : undefined}
+                  data-invalid={projectError ? true : undefined}
+                  className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
+                >
+                  <span className="truncate">
+                    {selectedProject ? selectedProject.name : "Select project"}
+                  </span>
+                  <IconChevronDown className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-56">
+                {projects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.id}
+                    onSelect={() => {
+                      setProjectId(project.id)
+                      setProjectError("")
+                    }}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{project.name}</span>
+                      <span className="block truncate text-xs font-normal text-muted-foreground">
+                        {project.repo}
+                      </span>
+                    </span>
+                    {project.id === projectId ? (
+                      <IconCheck className="ml-auto size-3.5" />
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {projectError ? (
+              <p id={projectErrorId} className="text-xs text-destructive">
+                {projectError}
+              </p>
+            ) : null}
+          </div>
+
+          <label className="sr-only" id={priorityLabelId}>
+            Priority
           </label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                ref={projectTriggerRef}
                 type="button"
-                aria-labelledby={projectLabelId}
-                aria-describedby={projectError ? projectErrorId : undefined}
-                data-invalid={projectError ? true : undefined}
-                className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
+                aria-labelledby={priorityLabelId}
+                className={cn(
+                  "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+                  issuePriorityStyles[priority]
+                )}
               >
-                <span className="truncate">
-                  {selectedProject ? selectedProject.name : "Select project"}
-                </span>
-                <IconChevronDown className="size-3.5" />
+                <PriorityIcon className="size-3.5" />
+                <span>{issuePriorityLabels[priority]}</span>
+                <IconChevronDown className="size-3.5 opacity-70" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-56">
-              {projects.map((project) => (
-                <DropdownMenuItem
-                  key={project.id}
-                  onSelect={() => {
-                    setProjectId(project.id)
-                    setProjectError("")
-                  }}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{project.name}</span>
-                    <span className="block truncate text-xs font-normal text-muted-foreground">
-                      {project.repo}
+            <DropdownMenuContent align="start" className="w-48">
+              {issuePriorityOptions.map((option) => {
+                const OptionIcon = issuePriorityIcons[option.value]
+                const isSelected = option.value === priority
+
+                return (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onSelect={() => setPriority(option.value)}
+                    className="gap-3"
+                  >
+                    <OptionIcon className="size-4" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {option.label}
                     </span>
-                  </span>
-                  {project.id === projectId ? (
-                    <IconCheck className="ml-auto size-3.5" />
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
+                    {isSelected ? <IconCheck className="size-4" /> : null}
+                  </DropdownMenuItem>
+                )
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
-          {projectError ? (
-            <p id={projectErrorId} className="text-xs text-destructive">
-              {projectError}
-            </p>
-          ) : null}
         </div>
       }
       footerEnd={
@@ -214,6 +270,7 @@ export function IssueCreateForm({
       }
     >
       <input type="hidden" name="project_id" value={projectId} />
+      <input type="hidden" name="priority" value={priority} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <input type="hidden" name="issue_model" value={issueModel ?? ""} />
       <label className="sr-only" htmlFor="issue-prompt">
