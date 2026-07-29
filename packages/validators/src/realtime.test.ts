@@ -50,6 +50,21 @@ test("messageEventSchema defaults realtime assistant authorship to agent", () =>
   assert.equal(event.author_type, "agent")
 })
 
+test("messageEventSchema accepts event timestamps with timezone offsets", () => {
+  const event = messageEventSchema.parse({
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    seq: 1,
+    role: "assistant",
+    kind: "text",
+    content: "Done",
+    status: "complete",
+    event_ts: "2026-07-29T14:00:00+02:00",
+    ts: "2026-07-29T12:00:00.000Z",
+  })
+
+  assert.equal(event.event_ts, "2026-07-29T14:00:00+02:00")
+})
+
 test("messageEventSchema requires generated actions to be Gentic-authored", () => {
   assert.throws(() =>
     messageEventSchema.parse({
