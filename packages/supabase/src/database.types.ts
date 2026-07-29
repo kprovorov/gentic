@@ -224,6 +224,7 @@ export type Database = {
       issues: {
         Row: {
           active_run_id: string | null
+          active_worker_id: string | null
           agent_provider: string
           created_at: string
           id: string
@@ -245,6 +246,7 @@ export type Database = {
         }
         Insert: {
           active_run_id?: string | null
+          active_worker_id?: string | null
           agent_provider?: string
           created_at?: string
           id?: string
@@ -266,6 +268,7 @@ export type Database = {
         }
         Update: {
           active_run_id?: string | null
+          active_worker_id?: string | null
           agent_provider?: string
           created_at?: string
           id?: string
@@ -291,6 +294,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_active_worker_id_fkey"
+            columns: ["active_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
             referencedColumns: ["id"]
           },
         ]
@@ -427,6 +437,87 @@ export type Database = {
         Update: {
           created_at?: string
           default_agent_provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      worker_enrollment_codes: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workers: {
+        Row: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          arch?: string | null
+          banned_at?: string | null
+          configured_capacity?: number
+          created_at?: string
+          credential_hash: string
+          display_name: string
+          gentic_version?: string | null
+          id?: string
+          last_seen_at?: string | null
+          normalized_name?: never
+          os?: string | null
+          process_started_at?: string | null
+          provider_capabilities?: Json
+          setup_state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          arch?: string | null
+          banned_at?: string | null
+          configured_capacity?: number
+          created_at?: string
+          credential_hash?: string
+          display_name?: string
+          gentic_version?: string | null
+          id?: string
+          last_seen_at?: string | null
+          normalized_name?: never
+          os?: string | null
+          process_started_at?: string | null
+          provider_capabilities?: Json
+          setup_state?: string
           updated_at?: string
           user_id?: string
         }

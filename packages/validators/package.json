@@ -8,7 +8,8 @@
     "./chat-events": "./src/chat-events.ts",
     "./issues": "./src/issues.ts",
     "./projects": "./src/projects.ts",
-    "./realtime": "./src/realtime.ts"
+    "./realtime": "./src/realtime.ts",
+    "./workers": "./src/workers.ts"
   },
   "scripts": {
     "lint": "eslint .",
