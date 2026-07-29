@@ -115,26 +115,31 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  const issue = unwrap(
-    await supabase
-      .from("issues")
-      .update({
-        title: input.title,
-        prompt: input.prompt ?? null,
-        agent_provider: input.agent_provider,
-        issue_model: input.issue_model,
-        type: input.type,
-        priority: input.priority,
-        ...(current.agent_provider !== input.agent_provider ||
-        current.issue_model !== input.issue_model
-          ? { session_id: null }
-          : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select(ISSUE_WITH_PROJECT_SELECT)
-      .single()
-  )
+  const { data: issue, error: updateError } = await supabase
+    .from("issues")
+    .update({
+      title: input.title,
+      prompt: input.prompt ?? null,
+      agent_provider: input.agent_provider,
+      issue_model: input.issue_model,
+      type: input.type,
+      priority: input.priority,
+      ...(current.agent_provider !== input.agent_provider ||
+      current.issue_model !== input.issue_model
+        ? { session_id: null }
+        : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select(ISSUE_WITH_PROJECT_SELECT)
+    .single()
+
+  if (updateError) {
+    throw new ServiceError("internal", updateError.message)
+  }
+  if (!issue) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
 
   if (current.priority !== input.priority) {
     await logIssueEvent(supabase, id, "priority_changed", {
