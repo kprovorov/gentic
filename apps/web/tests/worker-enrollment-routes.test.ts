@@ -66,6 +66,8 @@ test("worker enrollment code route maps service validation errors", async () => 
 
 test("worker exchange route returns the raw credential on successful exchange", async () => {
   const supabase = {}
+  const originalApiUrl = process.env.GENTIC_PUBLIC_API_URL
+  process.env.GENTIC_PUBLIC_API_URL = "https://workers.example/api/v1/"
   let capturedRateLimitKey: string | undefined
   const handler = createWorkerExchangeHandler({
     createSupabase: () => supabase as never,
@@ -85,29 +87,35 @@ test("worker exchange route returns the raw credential on successful exchange", 
     },
   })
 
-  const response = await handler(
-    new Request("http://localhost/api/v1/workers/exchange", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-forwarded-for": "198.51.100.7, 10.0.0.1",
-        "x-vercel-forwarded-for": "203.0.113.7",
-        "user-agent": "gentic-test",
-      },
-      body: JSON.stringify({ code: "gtce_connection-code" }),
-    })
-  )
+  try {
+    const response = await handler(
+      new Request("http://localhost/api/v1/workers/exchange", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "198.51.100.7, 10.0.0.1",
+          "x-vercel-forwarded-for": "203.0.113.7",
+          "user-agent": "gentic-test",
+        },
+        body: JSON.stringify({ code: "gtce_connection-code" }),
+      })
+    )
 
-  assert.equal(response.status, 200)
-  assert.equal(capturedRateLimitKey, "203.0.113.7")
-  assert.deepEqual(await response.json(), {
-    worker: {
-      id: "worker-1",
-      display_name: "Build Host",
-      setup_state: "enrolling",
-    },
-    credential: "gtwc_worker-credential",
-  })
+    assert.equal(response.status, 200)
+    assert.equal(capturedRateLimitKey, "203.0.113.7")
+    assert.deepEqual(await response.json(), {
+      api_url: "https://workers.example/api/v1",
+      worker: {
+        id: "worker-1",
+        display_name: "Build Host",
+        setup_state: "enrolling",
+      },
+      credential: "gtwc_worker-credential",
+    })
+  } finally {
+    if (originalApiUrl === undefined) delete process.env.GENTIC_PUBLIC_API_URL
+    else process.env.GENTIC_PUBLIC_API_URL = originalApiUrl
+  }
 })
 
 test("worker exchange route falls back to the right-most forwarded-for hop", () => {

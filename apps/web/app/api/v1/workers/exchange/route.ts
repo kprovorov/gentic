@@ -4,6 +4,8 @@ import { createServiceClient } from "@gentic/supabase/service"
 
 export const runtime = "nodejs"
 
+const DEFAULT_PUBLIC_API_URL = "https://app.gentic.chat/api/v1"
+
 export const POST = createWorkerExchangeHandler({
   createSupabase: createServiceClient,
   exchange: exchangeWorkerEnrollmentCode,
@@ -21,6 +23,7 @@ export function createWorkerExchangeHandler(deps: {
       })
 
       return Response.json({
+        api_url: publicApiUrl(),
         worker: {
           id: result.worker.id,
           display_name: result.worker.display_name,
@@ -36,6 +39,13 @@ export function createWorkerExchangeHandler(deps: {
       return Response.json({ error: "Invalid enrollment code" }, { status })
     }
   }
+}
+
+function publicApiUrl(): string {
+  return (process.env.GENTIC_PUBLIC_API_URL ?? DEFAULT_PUBLIC_API_URL).replace(
+    /\/+$/,
+    ""
+  )
 }
 
 export function rateLimitKeyFromRequest(request: Request): string {

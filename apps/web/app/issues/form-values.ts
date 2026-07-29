@@ -26,6 +26,7 @@ export function parseCreateIssueFormData(formData: FormData) {
     create_pr_automatically: getString(formData, "create_pr_automatically"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getString(formData, "issue_model") || null,
+    priority: getString(formData, "priority") || undefined,
   })
 }
 

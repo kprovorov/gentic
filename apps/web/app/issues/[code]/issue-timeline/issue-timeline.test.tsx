@@ -146,6 +146,80 @@ describe("IssueTimeline", () => {
     expect(screen.queryByText("KE")).not.toBeInTheDocument()
   })
 
+  it("renders Gentic attribution for Gentic-authored user-role messages", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "auto-1",
+            role: "user",
+            content: "GitHub tests failed.",
+            author_type: "gentic",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(screen.getByText("Gentic")).toBeInTheDocument()
+    expect(screen.getByText("GitHub tests failed.")).toBeInTheDocument()
+    expect(container.querySelector("img")).not.toBeInTheDocument()
+    expect(container.querySelector("svg")).toBeInTheDocument()
+  })
+
+  it("keeps legacy user messages on the authenticated user's avatar treatment", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "legacy-user",
+            role: "user",
+            content: "Manual follow-up",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(screen.queryByText("Gentic")).not.toBeInTheDocument()
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://img.clerk.com/avatar.png"
+    )
+  })
+
+  it("renders manual create PR prompts with the current user's avatar", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "manual-create-pr",
+            role: "user",
+            content: "The requested work is finished. Publish it now.",
+            author_type: "user",
+            generated_action: "create_pr",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(screen.queryByText("Gentic")).not.toBeInTheDocument()
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://img.clerk.com/avatar.png"
+    )
+  })
+
   it("uses the first user message as the original request when the prompt is empty", () => {
     render(
       <IssueTimeline

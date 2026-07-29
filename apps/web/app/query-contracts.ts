@@ -54,8 +54,10 @@ export const issueDetailSchema = z.object({
   type: issueTypeSchema,
   priority: issuePrioritySchema,
   status: issueStatusSchema,
+  active_run_id: z.string().nullable(),
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
+  has_unpublished_agent_changes: z.boolean(),
   pr_url: z.string().nullable(),
   create_pr_automatically: z.boolean(),
   created_at: z.string(),
@@ -93,8 +95,10 @@ export type IssueDetail = {
   type: IssueType
   priority: IssuePriority
   status: IssueStatus
+  active_run_id: string | null
   usage_limit_reset_at: string | null
   run_started_at: string | null
+  has_unpublished_agent_changes: boolean
   pr_url: string | null
   create_pr_automatically: boolean
   created_at: string
@@ -169,8 +173,10 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     type: issue.type,
     priority: issue.priority,
     status: issue.status,
+    active_run_id: issue.active_run_id,
     usage_limit_reset_at: issue.usage_limit_reset_at,
     run_started_at: issue.run_started_at,
+    has_unpublished_agent_changes: issue.has_unpublished_agent_changes,
     pr_url: issue.pr_url,
     create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,

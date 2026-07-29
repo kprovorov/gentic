@@ -14,9 +14,11 @@ import {
   deleteIssueRelationSchema,
   isIssueModelForAgent,
   issueModelSchema,
+  issuePrioritySchema,
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
+  updateIssuePrioritySchema,
   updateIssueSchema,
   type IssueStatus,
 } from "@gentic/validators/issues"
@@ -25,6 +27,7 @@ import {
   rollbackMessageAttachmentUpload,
   validateAttachmentBatch,
 } from "@gentic/services/attachments"
+import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 
@@ -252,12 +255,40 @@ export async function updateIssueStatus(formData: FormData) {
   await revalidateIssuePathById(supabase, userId, id)
 }
 
+export async function updateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, priority } = updateIssuePrioritySchema.parse({
+    id: getString(formData, "id"),
+    priority: getString(formData, "priority"),
+  })
+
+  const issue = await issuesService.updateIssuePriority(
+    supabase,
+    userId,
+    id,
+    priority
+  )
+  revalidatePath("/issues")
+  revalidateIssuePath(issue)
+
+  return issue
+}
+
 export async function bulkUpdateIssueStatus(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.bulkUpdateIssueStatus(supabase, userId, ids, status)
+  revalidatePath("/issues")
+}
+
+export async function bulkUpdateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
+  const priority = issuePrioritySchema.parse(getString(formData, "priority"))
+
+  await issuesService.bulkUpdateIssuePriority(supabase, userId, ids, priority)
   revalidatePath("/issues")
 }
 
@@ -375,6 +406,37 @@ export async function sendIssueMessage(formData: FormData) {
         )
       }
     )
+    throw error
+  }
+}
+
+export async function createManualIssuePullRequest(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+
+  try {
+    const message = await issuesService.createManualFirstPrPublishMessage(
+      supabase,
+      userId,
+      issueId
+    )
+
+    await revalidateIssuePathById(supabase, userId, issueId)
+
+    return {
+      ok: true,
+      id: message.id,
+      created_at: message.created_at,
+      content: message.content,
+      created: message.created,
+    } as const
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return {
+        ok: false,
+        error: error.message,
+      } as const
+    }
     throw error
   }
 }

@@ -30,11 +30,19 @@ export {
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { slugifyIssueTitle } from "./issues/slug"
 export {
+  formatPublishingRequest,
+  generateFirstPublishBranchName,
+  type PublishingRequestInput,
+} from "./issues/publish"
+export {
   attachIssuePullRequest,
+  type AutomaticPrPublishResult,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
+  recordUnpublishedAgentChanges,
+  requestAutomaticPrPublish,
   resetIssueAgent,
   updateIssueAgentProvider,
   updateIssuePriority,
@@ -43,12 +51,16 @@ export {
   updateIssueStatusByPrUrlIfStatus,
 } from "./issues/workflow"
 export {
+  applyPullRequestComment,
   applyTestsFailed,
   applyChangesRequestedReview,
   type ChangesRequestedReview,
   type ChangesRequestedReviewComment,
+  type PullRequestComment,
   createIssueUserMessage,
+  createManualFirstPrPublishMessage,
   deleteIssueMessage,
+  formatPullRequestCommentMessage,
   formatTestsFailedMessage,
   requeueIssueForUserMessage,
   sendIssueMessage,

@@ -93,6 +93,7 @@ export type IssueDetailData = {
   messages: ChatMessage[]
   attachments: Attachment[]
   pullRequests: IssuePullRequest[]
+  automaticPrPublishingInProgress: boolean
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
   events: IssueEvent[]
@@ -395,6 +396,7 @@ async function getIssueDetailDataForIssue(
     { data: attachmentRows, error: attachmentsError },
     { data: eventRows, error: eventsError },
     pullRequests,
+    { data: automaticPrRequestRows, error: automaticPrRequestsError },
     relations,
     relationCandidates,
     githubIntegration,
@@ -419,6 +421,11 @@ async function getIssueDetailDataForIssue(
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
     issuesService.listIssuePullRequests(supabase, userId, id),
+    supabase
+      .from("issue_automatic_pr_requests")
+      .select("id,status")
+      .eq("issue_id", id)
+      .in("status", ["pending", "claimed"]),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
     githubIntegrationsService.getGithubIntegration(supabase, userId),
@@ -432,6 +439,9 @@ async function getIssueDetailDataForIssue(
   }
   if (eventsError) {
     throw new Error(eventsError.message)
+  }
+  if (automaticPrRequestsError) {
+    throw new Error(automaticPrRequestsError.message)
   }
 
   const events = z.array(issueEventSchema).parse(eventRows ?? [])
@@ -470,6 +480,7 @@ async function getIssueDetailDataForIssue(
       pullRequests,
       githubIntegration?.installation_id
     ),
+    automaticPrPublishingInProgress: (automaticPrRequestRows ?? []).length > 0,
     relations,
     relationCandidates,
     events,

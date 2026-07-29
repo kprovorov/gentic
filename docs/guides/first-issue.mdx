@@ -24,13 +24,13 @@ The output shows configured authentication, service state, boot configuration, a
 gentic start
 ```
 
-If credentials are missing or invalid, re-authenticate first:
+If worker registration is missing, generate a worker code in Gentic and connect this machine first:
 
 ```bash
-gentic auth login
+gentic worker connect <code>
 ```
 
-You will be prompted for your `GENTIC_API_URL` (for example `https://app.gentic.chat/api/v1`) and your `GENTIC_WORKER_CREDENTIAL` (your worker credential). Once saved, run `gentic start` again.
+If local setup was interrupted after connecting, run `gentic onboard` to resume without another code. Once saved, run `gentic start` again.
 
 ### Add a project in Settings
 

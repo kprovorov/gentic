@@ -7,6 +7,7 @@ import { after, afterEach, beforeEach, test } from "node:test"
 import type { OnboardingStatus } from "./onboarding.js"
 
 const CONFIG_KEYS = [
+  "GENTIC_WORKER_ID",
   "GENTIC_WORKER_CREDENTIAL",
   "GENTIC_API_URL",
 ] as const
@@ -54,6 +55,7 @@ async function gateStatus(): Promise<OnboardingStatus> {
 
 test("checkOnboardingGate is satisfied by credentials in the config file", async () => {
   writeConfigFile({
+    GENTIC_WORKER_ID: "file-worker",
     GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
@@ -68,6 +70,7 @@ test("checkOnboardingGate is satisfied by credentials in the config file", async
 })
 
 test("checkOnboardingGate is satisfied by credentials in env vars", async () => {
+  process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
 
@@ -102,5 +105,8 @@ test("checkOnboardingGate fast-fails for non-TTY stdin when credentials are abse
   )
 
   assert.match(output, /Gentic onboarding is required/)
-  assert.match(output, /missing GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL/)
+  assert.match(
+    output,
+    /missing GENTIC_WORKER_ID and GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL/
+  )
 })

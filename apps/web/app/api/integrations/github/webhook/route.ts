@@ -101,6 +101,47 @@ type PullRequestReviewPayload = {
   }
 }
 
+type IssueCommentPayload = {
+  action: string
+  issue: {
+    number: number
+    pull_request?: unknown
+  }
+  comment: {
+    id: number
+    body: string
+    html_url: string
+    user: {
+      login: string
+    }
+  }
+  repository: {
+    name: string
+    owner: {
+      login: string
+    }
+  }
+}
+
+type PullRequestReviewCommentPayload = {
+  action: string
+  comment: {
+    id: number
+    path: string
+    line: number | null
+    original_line: number | null
+    diff_hunk: string
+    body: string
+    html_url: string
+    user: {
+      login: string
+    }
+  }
+  pull_request: {
+    html_url: string
+  }
+}
+
 export async function POST(request: Request) {
   const secret = process.env.GITHUB_WEBHOOK_SECRET
 
@@ -127,6 +168,13 @@ export async function POST(request: Request) {
     await handlePullRequestReviewEvent(
       supabase,
       payload as PullRequestReviewPayload
+    )
+  } else if (event === "issue_comment") {
+    await handleIssueCommentEvent(supabase, payload as IssueCommentPayload)
+  } else if (event === "pull_request_review_comment") {
+    await handlePullRequestReviewCommentEvent(
+      supabase,
+      payload as PullRequestReviewCommentPayload
     )
   } else if (event === "check_suite") {
     await handleCheckSuiteEvent(supabase, payload as CheckSuitePayload)
@@ -188,6 +236,53 @@ async function handlePullRequestEvent(
       pr_url: payload.pull_request.html_url,
     })
   }
+}
+
+async function handleIssueCommentEvent(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: IssueCommentPayload
+) {
+  if (payload.action !== "created" || !isPullRequestIssue(payload)) {
+    return
+  }
+
+  const prUrl = `https://github.com/${payload.repository.owner.login}/${payload.repository.name}/pull/${payload.issue.number}`
+
+  await issuesService.applyPullRequestComment(supabase, prUrl, {
+    id: payload.comment.id,
+    commenterLogin: payload.comment.user.login,
+    body: payload.comment.body,
+    htmlUrl: payload.comment.html_url,
+  })
+}
+
+async function handlePullRequestReviewCommentEvent(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: PullRequestReviewCommentPayload
+) {
+  if (payload.action !== "created") {
+    return
+  }
+
+  await issuesService.applyPullRequestComment(
+    supabase,
+    payload.pull_request.html_url,
+    {
+      id: payload.comment.id,
+      commenterLogin: payload.comment.user.login,
+      body: payload.comment.body,
+      htmlUrl: payload.comment.html_url,
+      path: payload.comment.path,
+      line: payload.comment.line ?? payload.comment.original_line,
+      diffHunk: payload.comment.diff_hunk,
+    }
+  )
+}
+
+export function isPullRequestIssue(
+  payload: Pick<IssueCommentPayload, "issue">
+): boolean {
+  return Boolean(payload.issue.pull_request)
 }
 
 // A commit can have several check suites (GitHub Actions plus any other CI
@@ -343,12 +438,7 @@ async function resolveCompletedChecksForRef(
 
   let suites
   try {
-    suites = await fetchCheckSuitesForRef(
-      installationId,
-      owner,
-      repo,
-      headSha
-    )
+    suites = await fetchCheckSuitesForRef(installationId, owner, repo, headSha)
   } catch (error) {
     console.error(
       "[github-webhook] failed to fetch check suites for ref, skipping:",
@@ -475,9 +565,7 @@ async function applyChangesRequestedReview(
   supabase: ReturnType<typeof createServiceClient>,
   payload: PullRequestReviewPayload
 ) {
-  let comments: Awaited<
-    ReturnType<typeof fetchPullRequestReviewComments>
-  > = []
+  let comments: Awaited<ReturnType<typeof fetchPullRequestReviewComments>> = []
 
   const installationId = payload.installation?.id
 

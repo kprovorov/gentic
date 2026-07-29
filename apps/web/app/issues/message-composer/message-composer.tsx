@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { IconSend } from "@tabler/icons-react"
+import { IconLoader2, IconSend } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
@@ -182,7 +182,11 @@ export function MessageComposer({
           disabled={isSubmitDisabled}
           className="shrink-0"
         >
-          <IconSend />
+          {disabled ? (
+            <IconLoader2 className="animate-spin" />
+          ) : (
+            <IconSend />
+          )}
         </Button>
       )}
     </form>

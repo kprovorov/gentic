@@ -1,11 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import type React from "react"
 import { useEffect, useRef, useState } from "react"
+import { useFormStatus } from "react-dom"
 import {
   IconCheck,
   IconChevronDown,
   IconDeviceFloppy,
+  IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
 
@@ -18,9 +21,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
-import type { AgentProvider } from "@gentic/validators/issues"
+import { cn } from "@gentic/ui/utils"
+import {
+  defaultIssuePriority,
+  type AgentProvider,
+  type IssuePriority,
+} from "@gentic/validators/issues"
 
 import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
+import {
+  issuePriorityIcons,
+  issuePriorityLabels,
+  issuePriorityOptions,
+  issuePriorityStyles,
+} from "./issue-priority-meta"
 import { MessageComposer } from "./message-composer/message-composer"
 
 const ISSUE_CREATE_DRAFT_STORAGE_KEY = "gentic:issue-create-draft:v1"
@@ -59,12 +73,15 @@ export function IssueCreateForm({
   const [agentProvider, setAgentProvider] =
     useState<AgentProvider>(defaultAgentProvider)
   const [issueModel, setIssueModel] = useState<string | null>(null)
+  const [priority, setPriority] = useState<IssuePriority>(defaultIssuePriority)
   const [projectId, setProjectId] = useState("")
   const [projectError, setProjectError] = useState("")
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
   const selectedProject = projects.find((project) => project.id === projectId)
+  const PriorityIcon = issuePriorityIcons[priority]
   const projectLabelId = "issue-project-label"
   const projectErrorId = "issue-project-error"
+  const priorityLabelId = "issue-priority-label"
   useEffect(() => {
     const storedPrompt = loadStoredIssueDraft()
 
@@ -138,7 +155,7 @@ export function IssueCreateForm({
       onIssueModelChange={(model) => setIssueModel(model)}
       onSubmit={() => {}}
       footerStart={
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
           <div className="flex min-w-0 flex-col gap-1">
             <label className="sr-only" id={projectLabelId}>
               Project
@@ -151,7 +168,7 @@ export function IssueCreateForm({
                   aria-labelledby={projectLabelId}
                   aria-describedby={projectError ? projectErrorId : undefined}
                   data-invalid={projectError ? true : undefined}
-                  className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50 data-invalid:ring-1 data-invalid:ring-destructive sm:max-w-56"
+                  className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
                 >
                   <span className="truncate">
                     {selectedProject ? selectedProject.name : "Select project"}
@@ -187,16 +204,51 @@ export function IssueCreateForm({
               </p>
             ) : null}
           </div>
+
+          <label className="sr-only" id={priorityLabelId}>
+            Priority
+          </label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-labelledby={priorityLabelId}
+                className={cn(
+                  "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+                  issuePriorityStyles[priority]
+                )}
+              >
+                <PriorityIcon className="size-3.5" />
+                <span>{issuePriorityLabels[priority]}</span>
+                <IconChevronDown className="size-3.5 opacity-70" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {issuePriorityOptions.map((option) => {
+                const OptionIcon = issuePriorityIcons[option.value]
+                const isSelected = option.value === priority
+
+                return (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onSelect={() => setPriority(option.value)}
+                    className="gap-3"
+                  >
+                    <OptionIcon className="size-4" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {option.label}
+                    </span>
+                    {isSelected ? <IconCheck className="size-4" /> : null}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <AutomaticPrPreferenceField defaultChecked />
         </div>
       }
       footerEnd={
-        <Button
-          type="submit"
-          formAction={saveIssueDraft}
-          variant="ghost"
-          size="sm"
-          className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        <SaveDraftButton
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -204,19 +256,11 @@ export function IssueCreateForm({
             }
             clearStoredPrompt()
           }}
-        >
-          <IconDeviceFloppy />
-          Save draft
-        </Button>
+        />
       }
       submitButton={
-        <Button
-          type="submit"
-          formAction={runIssue}
-          size="icon"
-          aria-label="Run issue"
+        <RunIssueButton
           disabled={!prompt.trim()}
-          className="shrink-0"
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -224,17 +268,67 @@ export function IssueCreateForm({
             }
             clearStoredPrompt()
           }}
-        >
-          <IconSend />
-        </Button>
+        />
       }
     >
       <input type="hidden" name="project_id" value={projectId} />
+      <input type="hidden" name="priority" value={priority} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <input type="hidden" name="issue_model" value={issueModel ?? ""} />
       <label className="sr-only" htmlFor="issue-prompt">
         Prompt
       </label>
     </MessageComposer>
+  )
+}
+
+function SaveDraftButton({
+  onClick,
+}: {
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      formAction={saveIssueDraft}
+      variant="ghost"
+      size="sm"
+      disabled={pending}
+      className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+      onClick={onClick}
+    >
+      {pending ? (
+        <IconLoader2 className="animate-spin" />
+      ) : (
+        <IconDeviceFloppy />
+      )}
+      Save draft
+    </Button>
+  )
+}
+
+function RunIssueButton({
+  disabled,
+  onClick,
+}: {
+  disabled: boolean
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      formAction={runIssue}
+      size="icon"
+      aria-label="Run issue"
+      disabled={disabled || pending}
+      className="shrink-0"
+      onClick={onClick}
+    >
+      {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />}
+    </Button>
   )
 }

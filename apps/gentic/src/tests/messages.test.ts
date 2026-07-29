@@ -2,9 +2,13 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { AgentApi, InsertMessageInput } from "../api.js"
-import { StreamingAssistantMessage, publishMessage } from "../messages.js"
+import {
+  StreamingAssistantMessage,
+  publishMessage,
+  publishStructuredMessage,
+} from "../messages.js"
 import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
-import { issueRunInstructions, runTurn } from "../session.js"
+import { runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T/
@@ -106,6 +110,26 @@ test("tool messages insert at emit time with the broadcast id", async () => {
   assert.equal(api.inserted[0]?.message.id, channel.messages[0]?.id)
   assert.equal(api.inserted[0]?.message.kind, "tool")
   assert.equal(api.inserted[0]?.message.status, "complete")
+})
+
+test("structured generated action messages publish as Gentic-authored", async () => {
+  const api = fakeApi()
+  const channel = fakeChannel()
+
+  await publishStructuredMessage(api, ISSUE_ID, channel, {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    role: "system",
+    kind: "text",
+    content: "Create a pull request.",
+    status: "complete",
+    author_type: "gentic",
+    generated_action: "create_pr",
+  })
+
+  assert.equal(api.inserted[0]?.message.author_type, "gentic")
+  assert.equal(api.inserted[0]?.message.generated_action, "create_pr")
+  assert.equal(channel.messages[0]?.author_type, "gentic")
+  assert.equal(channel.messages[0]?.generated_action, "create_pr")
 })
 
 test("runTurn maps text and thought chunks to structured stable events", async () => {
@@ -370,36 +394,6 @@ test("run error path best-effort persists the current partial", async () => {
   assert.equal(channel.messages.at(-1)?.status, "error")
 })
 
-test("issue run instructions update an existing pull request on follow-up", () => {
-  const instructions = issueRunInstructions(
-    "https://github.com/acme/app/pull/7",
-    true
-  )
-
-  assert.match(instructions, /existing open pull request/)
-  assert.match(instructions, /same branch/)
-  assert.doesNotMatch(instructions, /Do not open a new pull request/)
-  assert.doesNotMatch(instructions, /open a pull request against/)
-})
-
-test("issue run instructions create a new pull request after merged follow-up", () => {
-  const instructions = issueRunInstructions("https://github.com/acme/app/pull/7")
-
-  assert.match(instructions, /previous pull request recorded/)
-  assert.match(instructions, /If the pull request is merged or closed/)
-  assert.match(instructions, /branch was deleted/)
-  assert.match(instructions, /create a new branch/)
-  assert.match(instructions, /open a new ready-for-review pull request/)
-  assert.doesNotMatch(instructions, /Do not open a new pull request/)
-})
-
-test("issue run instructions open a ready for review pull request", () => {
-  const instructions = issueRunInstructions()
-
-  assert.match(instructions, /ready for review/)
-  assert.match(instructions, /do not create it as a draft/)
-})
-
 function fakeChannel(): IssueRealtimeChannel & {
   messages: RealtimeMessageEvent[]
 } {
@@ -461,6 +455,10 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
       return []
     },
     async ackUserMessages() {},
+    async recordUnpublishedAgentChanges() {},
+    async requestAutomaticPrPublish() {
+      throw new Error("not implemented")
+    },
     async fetchAttachments() {
       return []
     },

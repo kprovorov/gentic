@@ -23,12 +23,21 @@ import {
   IconTrash,
 } from "@tabler/icons-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
+import { toast } from "sonner"
 
 import {
   addIssueRelation,
+  createManualIssuePullRequest,
   deleteIssueRelation,
+  updateIssuePriority,
   updateIssueStatus,
 } from "@/app/issues/actions"
+import {
+  issuePriorityIcons,
+  issuePriorityLabels,
+  issuePriorityOptions,
+  issuePriorityStyles,
+} from "@/app/issues/issue-priority-meta"
 import {
   statusIconStyles,
   statusIcons,
@@ -37,7 +46,7 @@ import {
 } from "@/app/issues/issues-columns"
 import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
-import type { IssuePullRequest } from "@/app/queries"
+import type { HomeData, IssueDetailData, IssuePullRequest } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -49,7 +58,9 @@ import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
-import type { IssueStatus } from "@gentic/validators/issues"
+import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
+
+import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 
 function parsePullRequestUrl(url: string) {
   try {
@@ -179,18 +190,196 @@ function IssueDetailStatus({
   )
 }
 
+function IssueDetailPriority({
+  issueId,
+  priority,
+}: {
+  issueId: string
+  priority: IssuePriority
+}) {
+  const queryClient = useQueryClient()
+  const [optimisticPriority, setOptimisticPriority] =
+    useState<IssuePriority | null>(null)
+  const displayedPriority = optimisticPriority ?? priority
+  const mutation = useMutation({
+    mutationFn: updateIssuePriority,
+    onMutate: async (formData) => {
+      const nextPriority = formData.get("priority")
+
+      if (typeof nextPriority !== "string") {
+        return
+      }
+
+      const priorityValue = nextPriority as IssuePriority
+      const previousOptimisticPriority = optimisticPriority
+      setOptimisticPriority(priorityValue)
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+      ])
+
+      const previousIssue = queryClient.getQueryData<IssueDetailData>(
+        queryKeys.issue(issueId)
+      )
+      const previousHome = queryClient.getQueryData<HomeData>(queryKeys.home)
+      const previousIssues = queryClient.getQueryData<HomeData>(
+        queryKeys.issues
+      )
+      const updateListData = (current: HomeData | undefined) =>
+        current
+          ? {
+              ...current,
+              issues: current.issues.map((currentIssue) =>
+                currentIssue.id === issueId
+                  ? { ...currentIssue, priority: priorityValue }
+                  : currentIssue
+              ),
+            }
+          : current
+
+      queryClient.setQueryData<IssueDetailData>(
+        queryKeys.issue(issueId),
+        (current) =>
+          current
+            ? {
+                ...current,
+                issue: { ...current.issue, priority: priorityValue },
+              }
+            : current
+      )
+      queryClient.setQueryData(queryKeys.home, updateListData)
+      queryClient.setQueryData(queryKeys.issues, updateListData)
+
+      return {
+        previousHome,
+        previousIssue,
+        previousIssues,
+        previousOptimisticPriority,
+      }
+    },
+    onError: (_error, _formData, context) => {
+      if (context) {
+        setOptimisticPriority(context.previousOptimisticPriority)
+      }
+
+      if (context?.previousIssue) {
+        queryClient.setQueryData(
+          queryKeys.issue(issueId),
+          context.previousIssue
+        )
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      toast.error("Failed to update issue priority")
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.issueEdit(issueId),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+      setOptimisticPriority(null)
+    },
+  })
+
+  function selectPriority(nextPriority: IssuePriority) {
+    if (nextPriority === displayedPriority || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issueId)
+    formData.set("priority", nextPriority)
+    mutation.mutate(formData)
+  }
+
+  const PriorityIcon = issuePriorityIcons[displayedPriority]
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          aria-label={`Change priority from ${issuePriorityLabels[displayedPriority]}`}
+          className={cn(
+            "flex h-9 w-full items-center gap-2.5 rounded-2xl border px-3 text-[13px] transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            issuePriorityStyles[displayedPriority]
+          )}
+        >
+          <PriorityIcon className="size-[15px] shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-left">
+            {issuePriorityLabels[displayedPriority]}
+          </span>
+          <IconChevronDown className="size-[15px] shrink-0 opacity-65" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {issuePriorityOptions.map((option) => {
+          const OptionIcon = issuePriorityIcons[option.value]
+          const isSelected = option.value === displayedPriority
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              disabled={mutation.isPending}
+              onSelect={() => selectPriority(option.value)}
+              className="gap-3"
+            >
+              <OptionIcon className="size-4" />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {isSelected ? <IconCheck className="size-4" /> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function IssueDetailPullRequests({
+  issueId,
   pullRequests,
   issueStatus,
+  hasUnpublishedAgentChanges,
+  automaticPrPublishingInProgress,
 }: {
+  issueId: string
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
+  hasUnpublishedAgentChanges: boolean
+  automaticPrPublishingInProgress: boolean
 }) {
+  const hasAttachedPullRequest = pullRequests.length > 0
+  const showCreatePr = canShowManualCreatePrAction({
+    status: issueStatus,
+    hasUnpublishedAgentChanges,
+    hasAttachedPullRequest,
+    automaticPublishingInProgress: automaticPrPublishingInProgress,
+  })
+
   if (pullRequests.length === 0) {
     return (
-      <p className="text-[12.5px] text-muted-foreground">
-        No pull requests yet.
-      </p>
+      <div className="grid gap-2">
+        <p className="text-[12.5px] text-muted-foreground">
+          No pull requests yet.
+        </p>
+        {showCreatePr ? (
+          <ManualCreatePrButton issueId={issueId} />
+        ) : null}
+      </div>
     )
   }
 
@@ -235,6 +424,77 @@ function IssueDetailPullRequests({
       })}
     </ul>
   )
+}
+
+function ManualCreatePrButton({
+  issueId,
+}: {
+  issueId: string
+}) {
+  const queryClient = useQueryClient()
+  const [optimisticRequested, setOptimisticRequested] = useState(false)
+  const mutation = useMutation({
+    mutationFn: createManualIssuePullRequest,
+    onMutate: () => {
+      setOptimisticRequested(true)
+    },
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        setOptimisticRequested(false)
+        toast.error(result.error)
+        return
+      }
+      toast.success("Create PR request sent")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+    onError: (error) => {
+      setOptimisticRequested(false)
+      toast.error(getCreatePrErrorMessage(error))
+    },
+  })
+  const isPending = mutation.isPending
+
+  function submit() {
+    if (isPending || optimisticRequested) {
+      return
+    }
+    const formData = new FormData()
+    formData.set("issue_id", issueId)
+    mutation.mutate(formData)
+  }
+
+  if (optimisticRequested) {
+    return (
+      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-2 text-[12.5px] text-emerald-700 dark:text-emerald-300">
+        {isPending ? "Requesting pull request..." : "Create PR request sent."}
+      </p>
+    )
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="w-full justify-start gap-2"
+      disabled={isPending}
+      onClick={submit}
+    >
+      <IconGitPullRequest className="size-4" />
+      Create PR
+    </Button>
+  )
+}
+
+function getCreatePrErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Failed to request pull request creation"
 }
 
 function IssueDetailRelationRow({
@@ -656,6 +916,9 @@ export function IssueDetailRail({
   issueId,
   issueCode,
   status,
+  priority,
+  hasUnpublishedAgentChanges,
+  automaticPrPublishingInProgress,
   pullRequests,
   relations,
   relationCandidates,
@@ -663,6 +926,9 @@ export function IssueDetailRail({
   issueId: string
   issueCode: string | null
   status: IssueStatus
+  priority: IssuePriority
+  hasUnpublishedAgentChanges: boolean
+  automaticPrPublishingInProgress: boolean
   pullRequests: IssuePullRequest[]
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
@@ -682,13 +948,19 @@ export function IssueDetailRail({
   return (
     <div className="min-w-0 divide-y divide-border/70">
       <RailSection title="Status">
-        <IssueDetailStatus issueId={issueId} status={status} />
+        <div className="grid gap-2">
+          <IssueDetailStatus issueId={issueId} status={status} />
+          <IssueDetailPriority issueId={issueId} priority={priority} />
+        </div>
       </RailSection>
 
       <RailSection title="Pull requests">
         <IssueDetailPullRequests
+          issueId={issueId}
           pullRequests={pullRequests}
           issueStatus={status}
+          hasUnpublishedAgentChanges={hasUnpublishedAgentChanges}
+          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
         />
       </RailSection>
 

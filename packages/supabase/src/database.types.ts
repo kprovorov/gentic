@@ -375,6 +375,7 @@ export type Database = {
           event_ts: string | null
           event_type: string | null
           generated_action: string | null
+          github_comment_id: number | null
           github_review_id: number | null
           id: string
           issue_id: string
@@ -399,6 +400,7 @@ export type Database = {
           event_ts?: string | null
           event_type?: string | null
           generated_action?: string | null
+          github_comment_id?: number | null
           github_review_id?: number | null
           id?: string
           issue_id: string
@@ -423,6 +425,7 @@ export type Database = {
           event_ts?: string | null
           event_type?: string | null
           generated_action?: string | null
+          github_comment_id?: number | null
           github_review_id?: number | null
           id?: string
           issue_id?: string
@@ -695,6 +698,15 @@ export type Database = {
         Returns: {
           failed_count: number
           locked_until: string
+        }[]
+      }
+      request_automatic_pr_publish: {
+        Args: { p_content: string; p_issue_id: string; p_run_id: string }
+        Returns: {
+          created: boolean
+          message_id: string
+          request_id: string
+          status: string
         }[]
       }
       reset_issue_run:
