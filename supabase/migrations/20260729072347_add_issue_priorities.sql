@@ -16,5 +16,5 @@ alter table public.issues
   alter column priority set not null;
 
 create index issues_worker_selection_priority_idx
-  on public.issues(status, usage_limit_reset_at, priority desc, updated_at asc)
+  on public.issues(priority desc, updated_at asc)
   where status in ('todo', 'held');
