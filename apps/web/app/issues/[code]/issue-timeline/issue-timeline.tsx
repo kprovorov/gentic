@@ -23,9 +23,13 @@ import {
 } from "@tabler/icons-react"
 
 import { AttachmentPreviews, type Attachment } from "../attachments"
+import { Logo } from "@/components/logo"
 import { ChatMarkdown } from "../issue-chat/chat-markdown"
 import type { ChatMessage } from "../issue-chat-state"
-import { firstLine } from "../issue-chat/transcript-items"
+import {
+  firstLine,
+  isGenticAuthoredMessage,
+} from "../issue-chat/transcript-items"
 import { statusIcons, statusLabels, statusStyles } from "../issue-status-meta"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
@@ -58,6 +62,7 @@ const MARKER_TINTS = {
   error: "bg-destructive/15 text-destructive",
   success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   user: "bg-primary/20 text-primary",
+  gentic: "bg-lime-400 text-[#35530E]",
 }
 
 const priorityIcons = {
@@ -364,6 +369,9 @@ function formatTimelineTimestamp(value: string): string | null {
 }
 
 function messageMarkerClassName(message: ChatMessage): string | undefined {
+  if (isGenticAuthoredMessage(message)) {
+    return MARKER_TINTS.gentic
+  }
   if (message.role === "user") {
     return MARKER_TINTS.user
   }
@@ -398,6 +406,9 @@ function MessageIcon({
   currentUserName?: string | null
   currentUserImageUrl?: string | null
 }) {
+  if (isGenticAuthoredMessage(message)) {
+    return <Logo className="size-full" />
+  }
   if (message.kind === "thinking") {
     return <IconBrain />
   }
@@ -436,6 +447,7 @@ function MessageBody({
 }) {
   const isStreaming = message.status === "streaming"
   const content = message.content ?? ""
+  const isGenticAuthored = isGenticAuthoredMessage(message)
 
   if (message.kind === "thinking") {
     return <ThinkingContent message={message} />
@@ -460,6 +472,11 @@ function MessageBody({
       {isOriginalRequest ? (
         <div className="mb-2 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
           Original request
+        </div>
+      ) : null}
+      {isGenticAuthored ? (
+        <div className="mb-1.5 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
+          Gentic
         </div>
       ) : null}
       <Bubble align="start" variant={variant} className="w-full max-w-full">

@@ -23,52 +23,80 @@ export function issueRealtimeTopic(issueId: string): string {
   return `issue:${issueId}`
 }
 
+export const messageAuthorTypeSchema = z.enum(["user", "agent", "gentic"])
+export const generatedMessageActionSchema = z.enum(["create_pr"])
+
 export const realtimeMessageRoleSchema = z.enum(["assistant", "system"])
 export const chatMessageRoleSchema = z.enum(["user", "assistant", "system"])
 export const realtimeMessageKindSchema = chatMessageKindSchema
 export const realtimeMessageStatusSchema = chatMessageStatusSchema
 
-export const chatMessageSchema = z.object({
-  id: z.string(),
-  role: chatMessageRoleSchema,
-  kind: realtimeMessageKindSchema,
-  content: z.string().nullable(),
-  status: realtimeMessageStatusSchema,
-  author_type: z.enum(["user", "agent", "gentic"]).optional(),
-  generated_action: z.enum(["create_pr"]).nullable().optional(),
-  created_at: z.string(),
-  event_id: z.string().min(1).nullable().optional(),
-  run_id: z.string().min(1).nullable().optional(),
-  event_type: chatEventTypeSchema.nullable().optional(),
-  event_status: chatEventStatusSchema.nullable().optional(),
-  event_ts: z.string().datetime({ offset: true }).nullable().optional(),
-  event_seq: z.number().int().positive().nullable().optional(),
-  tool_call_id: z.string().min(1).nullable().optional(),
-  payload: chatEventPayloadSchema.nullable().optional(),
-})
+export function requireGenticGeneratedMessageAction<
+  T extends {
+    author_type?: "user" | "agent" | "gentic"
+    generated_action?: "create_pr" | null
+  },
+>(value: T): boolean {
+  return (
+    value.generated_action === undefined ||
+    value.generated_action === null ||
+    value.author_type === "gentic"
+  )
+}
+
+export const chatMessageSchema = z
+  .object({
+    id: z.string(),
+    role: chatMessageRoleSchema,
+    kind: realtimeMessageKindSchema,
+    content: z.string().nullable(),
+    status: realtimeMessageStatusSchema,
+    author_type: messageAuthorTypeSchema.optional(),
+    generated_action: generatedMessageActionSchema.nullable().optional(),
+    created_at: z.string(),
+    event_id: z.string().min(1).nullable().optional(),
+    run_id: z.string().min(1).nullable().optional(),
+    event_type: chatEventTypeSchema.nullable().optional(),
+    event_status: chatEventStatusSchema.nullable().optional(),
+    event_ts: z.string().datetime({ offset: true }).nullable().optional(),
+    event_seq: z.number().int().positive().nullable().optional(),
+    tool_call_id: z.string().min(1).nullable().optional(),
+    payload: chatEventPayloadSchema.nullable().optional(),
+  })
+  .refine(requireGenticGeneratedMessageAction, {
+    message: "Generated actions must be Gentic-authored",
+    path: ["author_type"],
+  })
 
 export type ChatMessageContract = z.infer<typeof chatMessageSchema>
 
 // Worker -> browser: full-snapshot upsert of one transcript message.
-export const messageEventSchema = z.object({
-  id: z.string().uuid(),
-  seq: z.number().int().positive(),
-  role: realtimeMessageRoleSchema,
-  kind: realtimeMessageKindSchema,
-  content: z.string(),
-  status: realtimeMessageStatusSchema,
-  author_type: z.enum(["agent", "gentic"]).optional(),
-  generated_action: z.enum(["create_pr"]).nullable().optional(),
-  event_id: z.string().min(1).nullable().optional(),
-  run_id: z.string().min(1).nullable().optional(),
-  event_type: chatEventTypeSchema.nullable().optional(),
-  event_status: chatEventStatusSchema.nullable().optional(),
-  event_ts: z.string().datetime().nullable().optional(),
-  event_seq: z.number().int().positive().nullable().optional(),
-  tool_call_id: z.string().min(1).nullable().optional(),
-  payload: chatEventPayloadSchema.nullable().optional(),
-  ts: z.string(),
-})
+export const messageEventSchema = z
+  .object({
+    id: z.string().uuid(),
+    seq: z.number().int().positive(),
+    role: realtimeMessageRoleSchema,
+    kind: realtimeMessageKindSchema,
+    content: z.string(),
+    status: realtimeMessageStatusSchema,
+    author_type: messageAuthorTypeSchema
+      .extract(["agent", "gentic"])
+      .default("agent"),
+    generated_action: generatedMessageActionSchema.nullable().optional(),
+    event_id: z.string().min(1).nullable().optional(),
+    run_id: z.string().min(1).nullable().optional(),
+    event_type: chatEventTypeSchema.nullable().optional(),
+    event_status: chatEventStatusSchema.nullable().optional(),
+    event_ts: z.string().datetime({ offset: true }).nullable().optional(),
+    event_seq: z.number().int().positive().nullable().optional(),
+    tool_call_id: z.string().min(1).nullable().optional(),
+    payload: chatEventPayloadSchema.nullable().optional(),
+    ts: z.string(),
+  })
+  .refine(requireGenticGeneratedMessageAction, {
+    message: "Generated actions must be Gentic-authored",
+    path: ["author_type"],
+  })
 
 export type MessageEvent = {
   id: string

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { groupChatMessages, isVisibleChatMessage } from "./transcript-items"
+import {
+  groupChatMessages,
+  isGenticAuthoredMessage,
+  isVisibleChatMessage,
+} from "./transcript-items"
 import type { ChatMessage } from "./types"
 
 const baseMessage: ChatMessage = {
@@ -22,6 +26,18 @@ test("isVisibleChatMessage hides available command events", () => {
     false
   )
   assert.equal(isVisibleChatMessage(baseMessage), true)
+})
+
+test("isGenticAuthoredMessage treats legacy user messages as user-authored", () => {
+  assert.equal(isGenticAuthoredMessage(baseMessage), false)
+  assert.equal(
+    isGenticAuthoredMessage({
+      ...baseMessage,
+      role: "user",
+      author_type: "gentic",
+    }),
+    true
+  )
 })
 
 test("groupChatMessages groups adjacent tool calls without crossing message rows", () => {
