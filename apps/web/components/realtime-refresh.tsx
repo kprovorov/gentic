@@ -1,7 +1,11 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import {
+  usePathname,
+  useRouter,
+  useSelectedLayoutSegments,
+} from "next/navigation"
 import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
@@ -32,6 +36,7 @@ export function RealtimeRefresh({
   const supabase = useSupabaseClient()
   const router = useRouter()
   const pathname = usePathname()
+  const modalSegments = useSelectedLayoutSegments("modal")
   const queryClient = useQueryClient()
   const tableKey = tables.join(",")
   // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
@@ -40,21 +45,23 @@ export function RealtimeRefresh({
   // risk dropping events) on every unrelated re-render.
   const queryKeyRef = useRef(queryKey)
   const pathnameRef = useRef(pathname)
+  const modalSegmentsRef = useRef(modalSegments)
   const pendingRouteRefreshRef = useRef(false)
   useEffect(() => {
     queryKeyRef.current = queryKey
   })
   useEffect(() => {
     pathnameRef.current = pathname
+    modalSegmentsRef.current = modalSegments
 
     if (
       pendingRouteRefreshRef.current &&
-      !shouldDeferRouteRefresh(pathname)
+      !shouldDeferRouteRefresh({ pathname, modalSegments })
     ) {
       pendingRouteRefreshRef.current = false
       router.refresh()
     }
-  }, [pathname, router])
+  }, [pathname, modalSegments, router])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +78,12 @@ export function RealtimeRefresh({
           void queryClient.invalidateQueries({ queryKey })
           return
         }
-        if (shouldDeferRouteRefresh(pathnameRef.current)) {
+        if (
+          shouldDeferRouteRefresh({
+            pathname: pathnameRef.current,
+            modalSegments: modalSegmentsRef.current,
+          })
+        ) {
           pendingRouteRefreshRef.current = true
           return
         }

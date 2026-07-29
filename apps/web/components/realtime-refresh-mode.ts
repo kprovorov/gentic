@@ -1,6 +1,10 @@
 import type { QueryKey } from "@tanstack/react-query"
 
 export type RealtimeRefreshMode = "invalidate-query" | "refresh-route"
+export type RealtimeRouteState = {
+  pathname?: string | null
+  modalSegments?: string[]
+}
 export type RealtimeSubscribeStatus =
   | "SUBSCRIBED"
   | "TIMED_OUT"
@@ -22,6 +26,13 @@ export function shouldUseRealtimeFallback(
   return status !== "SUBSCRIBED"
 }
 
-export function shouldDeferRouteRefresh(pathname: string | null | undefined) {
+export function shouldDeferRouteRefresh({
+  pathname,
+  modalSegments = [],
+}: RealtimeRouteState) {
+  if (modalSegments.join("/") === "issues/new") {
+    return true
+  }
+
   return pathname ? routeRefreshDeferredPathnames.has(pathname) : false
 }

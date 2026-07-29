@@ -27,8 +27,18 @@ test("realtime fallback polling runs until the channel is subscribed", () => {
 })
 
 test("route refreshes defer while the new issue modal route is active", () => {
-  assert.equal(shouldDeferRouteRefresh("/issues/new"), true)
-  assert.equal(shouldDeferRouteRefresh("/issues"), false)
-  assert.equal(shouldDeferRouteRefresh("/issues/WEB-123"), false)
-  assert.equal(shouldDeferRouteRefresh(null), false)
+  assert.equal(shouldDeferRouteRefresh({ pathname: "/issues/new" }), true)
+  assert.equal(shouldDeferRouteRefresh({ pathname: "/issues" }), false)
+  assert.equal(shouldDeferRouteRefresh({ pathname: "/issues/WEB-123" }), false)
+  assert.equal(shouldDeferRouteRefresh({ pathname: null }), false)
+})
+
+test("route refreshes defer when issue detail is behind the new issue modal slot", () => {
+  assert.equal(
+    shouldDeferRouteRefresh({
+      pathname: "/issues/WEB-123",
+      modalSegments: ["issues", "new"],
+    }),
+    true
+  )
 })
