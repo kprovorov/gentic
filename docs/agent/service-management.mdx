@@ -176,7 +176,7 @@ scp -r dist/linux-x64 deploy@prod-server:/opt/gentic
 
 # On the production server
 cd /opt/gentic
-./gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <your-worker-credential>
+./gentic worker connect <code>
 ./gentic start
 
 # Verify it is running

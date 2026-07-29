@@ -1,18 +1,18 @@
 ---
 title: "Configure the Gentic Agent Worker"
 sidebarTitle: "Configuration"
-description: "Configure the Gentic agent worker with gentic auth login or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
+description: "Configure the Gentic agent worker with worker enrollment or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
 ---
 
-The primary way to configure the agent worker is with `gentic auth login`, which saves your worker credential and API URL to a persistent config file on disk. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
+The primary way to configure the agent worker is with `gentic worker connect <code>`, which exchanges a single-use enrollment code for a stable worker id, API URL, and worker-specific credential. The CLI saves those values to a persistent config file on disk with owner-only permissions. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
 
 ## First-run behavior
 
-When you run a `gentic` command for the first time, the CLI checks whether the worker is ready before it continues. This onboarding gate runs for normal worker commands, including `gentic start`, `gentic run`, and `gentic status`. It does not run for `gentic auth`, `--help`, or `--version`, so you can always configure credentials or inspect the CLI without completing onboarding first.
+When you run a `gentic` command for the first time, the CLI checks whether the worker is ready before it continues. This onboarding gate runs for normal worker commands, including `gentic start` and `gentic run`. It does not run for `gentic worker connect`, `gentic onboard`, `gentic status`, `gentic doctor`, `gentic auth`, `--help`, or `--version`, so you can always connect a worker, resume setup, or inspect the CLI without completing onboarding first.
 
 If the command is running in an interactive terminal and any required setup is missing, Gentic starts the first-run flow automatically. The flow has four steps:
 
-1. **Gentic auth** — prompts for `GENTIC_API_URL` and `GENTIC_WORKER_CREDENTIAL`. This is required.
+1. **Gentic worker** — verifies that this machine has a stored worker id, API URL, and worker credential from `gentic worker connect <code>`. This is required.
 2. **GitHub CLI** — checks that `gh` is installed and authenticated, and offers to install or run `gh auth login` when possible. This is required because agents use GitHub CLI access to open pull requests.
 3. **Agent CLI** — checks both Claude Code and Codex. Both agent CLIs must be installed and authenticated because the worker can claim issues for either provider.
 4. **Worker service** — shows a summary and asks whether to enable the background worker with `gentic start`. This step is optional; you can decline and run `gentic start` later.
@@ -21,50 +21,43 @@ For CI, containers, or other non-interactive environments, bypass the prompts by
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1 \
+GENTIC_WORKER_ID=<worker-id> \
 GENTIC_WORKER_CREDENTIAL=<your-worker-credential> \
 gentic run
 ```
 
-You can also write credentials to the config file non-interactively before starting the worker:
+You can also connect once, skip local onboarding, and resume setup later:
 
 ```bash
-gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <your-worker-credential>
-gentic run
+gentic worker connect <code> --no-onboard
+gentic onboard
 ```
 
 Non-interactive runs still require `gh`, Claude Code, and Codex to be installed and authenticated before the worker command starts. If any required item is missing, Gentic exits with the unmet requirements instead of prompting.
 
-## Authentication via CLI
+## Worker Enrollment via CLI
 
-The recommended way to configure credentials is with the `gentic auth` commands. These commands read and write an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
+The recommended way to configure credentials is with `gentic worker connect <code>`. This command reads and writes an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
 
 <Note>
-  `GENTIC_WORKER_CREDENTIAL` must be a worker-specific credential issued by the Gentic
-  deployment. The worker only receives issues belonging to that user. Ask the
-  deployment administrator how worker credentials are issued; the current Gentic web
-  settings page does not create them.
+  `GENTIC_WORKER_CREDENTIAL` is issued by the enrollment exchange. Do not reuse
+  a shared API key. Losing the config file loses the local worker identity; the
+  next enrollment creates a new worker instead of reclaiming by hostname.
 </Note>
 
-### Log in
+### Connect
 
-Run `gentic auth login` to start the interactive prompt. It asks for your API URL and worker credential, then saves them to the config file. The worker always supports both Claude Code and Codex.
-
-```bash
-gentic auth login
-```
-
-For scripted or CI environments where you cannot interact with a prompt, pass both flags directly:
+Generate a worker enrollment code in the Gentic web app, then connect this machine:
 
 ```bash
-gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <your-worker-credential>
+gentic worker connect <code>
 ```
 
-<Warning>
-  The Gentic API does not currently expose a read-only endpoint for credential
-  validation. Your credential is saved without a live check and will surface as an
-  error on the worker's first poll if it is incorrect. Double-check your credential
-  before starting the service.
-</Warning>
+For a self-hosted or local API, override the initial exchange URL:
+
+```bash
+gentic worker connect <code> --api-url http://localhost:3000/api/v1
+```
 
 ### Check authentication status
 
@@ -83,17 +76,18 @@ gentic auth logout
 gentic auth logout --yes
 ```
 
-Logging out removes only the `GENTIC_WORKER_CREDENTIAL` and `GENTIC_API_URL` entries. Other settings stored in the config file — such as `GIT_REMOTE_BASE`, `WORKDIR`, and `POLL_INTERVAL_MS` — are preserved.
+Logging out removes the local worker registration entries: `GENTIC_WORKER_ID`, `GENTIC_WORKER_CREDENTIAL`, `GENTIC_API_URL`, and `GENTIC_WORKER_SETUP_STATE`. Other settings stored in the config file — such as `GIT_REMOTE_BASE`, `WORKDIR`, and `POLL_INTERVAL_MS` — are preserved.
 
 ---
 
 ## Environment variables (alternative)
 
-Environment variables give you fine-grained control over every configuration value and are an alternative to `gentic auth login` — useful for local development, containers, or CI systems where you manage secrets through the environment directly. Create a `.env` file in the directory where you run `gentic` and fill in the values for your environment:
+Environment variables give you fine-grained control over every configuration value and are an alternative to the persisted config file — useful for local development, containers, or CI systems where you manage secrets through the environment directly. Create a `.env` file in the directory where you run `gentic` and fill in the values for your environment:
 
 ```bash
 # .env
 GENTIC_API_URL=https://app.gentic.chat/api/v1
+GENTIC_WORKER_ID=worker_id_from_enrollment
 GENTIC_WORKER_CREDENTIAL=your_worker_credential_here
 ```
 
@@ -110,8 +104,17 @@ GENTIC_API_URL=https://app.gentic.chat/api/v1
 
 </ParamField>
 
+<ParamField body="GENTIC_WORKER_ID" type="string" required>
+  The stable worker id returned by `gentic worker connect <code>`. Keep it paired with its credential so service and process restarts preserve the same worker identity.
+
+```bash
+GENTIC_WORKER_ID=worker_id_from_enrollment
+```
+
+</ParamField>
+
 <ParamField body="GENTIC_WORKER_CREDENTIAL" type="string" required>
-  A worker-specific credential issued by the Gentic deployment. The hosted API verifies the worker credential and only returns issues that belong to its user.
+  A worker-specific credential issued by the enrollment exchange. The hosted API verifies the worker credential and only returns issues that belong to its user.
 
 ```bash
 GENTIC_WORKER_CREDENTIAL=your_worker_credential_here
@@ -170,8 +173,8 @@ POLL_INTERVAL_MS=5000
 
 The worker merges all configuration sources in the following order, with later sources winning:
 
-1. **Config file** — written by `gentic auth login` (e.g. `~/.config/gentic/config.json`)
+1. **Config file** — written by `gentic worker connect <code>` (e.g. `~/.config/gentic/config.json`)
 2. **`.env` file** — loaded from the working directory at startup
 3. **Shell environment variables** — exported in the process environment at runtime
 
-This means you can set your worker credential once with `gentic auth login` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.
+This means you can enroll the worker once with `gentic worker connect <code>` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.

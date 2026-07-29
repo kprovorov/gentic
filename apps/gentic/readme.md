@@ -45,6 +45,7 @@ Fill in these values:
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1
+GENTIC_WORKER_ID=worker-id-from-enrollment
 GENTIC_WORKER_CREDENTIAL=your-worker-credential
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
@@ -75,35 +76,35 @@ project belongs to that user.
 
 Besides `.env`, settings can also live in a persisted config file at an
 OS-appropriate config directory (e.g. `~/.config/gentic/config.json` on
-Linux), written by `gentic auth login` (see below). `loadConfig()` merges
+Linux), written by `gentic worker connect <code>` (see below). `loadConfig()` merges
 both sources, with environment variables taking precedence over the config
 file for each key. This keeps `.env` usable for local development while
 giving an installed CLI a durable place to store settings and the worker credential.
 
-## Authentication
+## Worker enrollment
 
-`gentic auth login` prompts for the API URL, key, and which coding agent(s)
-this worker will run. The agent prompt is single-select and defaults to
-Claude Code; choosing only Claude Code skips Codex checks entirely, choosing
-only Codex skips Claude Code checks entirely, and choosing both enables both
-provider paths.
+Generate a worker enrollment code in the Gentic web app, then connect the
+machine with that single-use code:
 
 ```bash
-gentic auth login
+gentic worker connect <code>
 ```
 
-Pass both flags for non-interactive/scripted use:
+The exchange stores the API URL, stable worker id, and worker-specific
+credential in the OS-appropriate config file with owner-only permissions. The
+initial suggested worker name is the machine hostname. If local onboarding is
+cancelled after the exchange, run this command later without generating another
+code:
 
 ```bash
-gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <credential>
+gentic onboard
 ```
 
-`gentic auth status` shows whether credentials are configured (with the credential
-masked) and `gentic auth logout` clears them (`--yes`/`-y` to skip the
-confirmation prompt). The hosted API currently has no read-only authenticated
-endpoint, so `login` saves the credential without a live validation call; an
-incorrect worker credential surfaces as a failure on the worker's first poll
-instead.
+`gentic auth status` shows the connected worker id, API URL, setup state, and
+masked credential. `gentic auth logout` clears the local registration
+(`--yes`/`-y` to skip the confirmation prompt). Losing the config file loses
+the local identity; the next `gentic worker connect <code>` creates a new
+worker identity rather than reclaiming one by hostname.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
@@ -164,7 +165,7 @@ The output directory contains:
   per the Codex prerequisite above.
 
 Copy the whole output directory to the target machine and run
-`./gentic run` with `GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
+`./gentic run` with `GENTIC_WORKER_ID`/`GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
 no install step needed.
 
 Pushing a `v*` tag (e.g. `v0.0.1`) runs

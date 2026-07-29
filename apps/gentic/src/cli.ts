@@ -8,11 +8,13 @@ import { registerLogsCommand } from "./commands/logs.js"
 import { registerRunCommand } from "./commands/run.js"
 import { registerServiceCommands } from "./commands/service.js"
 import { registerStatusCommand } from "./commands/status.js"
+import { registerWorkerCommand } from "./commands/worker.js"
 import { checkOnboardingGate } from "./cli-gate.js"
 import { logError } from "./log.js"
 import {
   formatOnboardingUnmet,
   getOnboardingStatus,
+  runOnboarding,
 } from "./onboarding.js"
 import { log, note } from "./ui.js"
 
@@ -32,6 +34,14 @@ registerLogsCommand(program)
 registerRunCommand(program)
 registerServiceCommands(program)
 registerStatusCommand(program)
+registerWorkerCommand(program)
+
+program
+  .command("onboard")
+  .description("Resume local GitHub, Codex, and Claude Code onboarding")
+  .action(async () => {
+    await runOnboarding()
+  })
 
 program
   .command("doctor")

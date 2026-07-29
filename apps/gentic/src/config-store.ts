@@ -10,17 +10,18 @@ import { dirname, join } from "node:path"
 import envPaths from "env-paths"
 
 export interface ConfigFile {
+  GENTIC_WORKER_ID?: string
   GENTIC_WORKER_CREDENTIAL?: string
   GENTIC_API_URL?: string
+  GENTIC_WORKER_SETUP_STATE?: "setup-incomplete" | "ready"
   GIT_REMOTE_BASE?: string
   WORKDIR?: string
   POLL_INTERVAL_MS?: number
   MAX_CONCURRENT_ISSUES?: number
 }
 
-const paths = envPaths("gentic", { suffix: "" })
-
 export function configFilePath(): string {
+  const paths = envPaths("gentic", { suffix: "" })
   return join(paths.config, "config.json")
 }
 
