@@ -136,6 +136,20 @@ export const workerControlResponseSchema = z
 
 export type WorkerControlResponse = z.infer<typeof workerControlResponseSchema>
 
+export const renameWorkerInputSchema = z
+  .object({
+    display_name: workerDisplayNameSchema,
+  })
+  .strict()
+
+export type RenameWorkerInput = z.infer<typeof renameWorkerInputSchema>
+
+export const workerLifecycleOperationInputSchema = z.object({}).strict()
+
+export type WorkerLifecycleOperationInput = z.infer<
+  typeof workerLifecycleOperationInputSchema
+>
+
 export const updateWorkerManagementInputSchema = z
   .object({
     id: z.string().uuid(),

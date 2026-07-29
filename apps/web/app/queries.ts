@@ -4,6 +4,7 @@ import * as githubIntegrationsService from "@gentic/services/github-integrations
 import * as issuesService from "@gentic/services/issues"
 import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
+import * as workersService from "@gentic/services/workers"
 import { ServiceError } from "@gentic/services/errors"
 import {
   chatMessageSchema,
@@ -76,6 +77,7 @@ export type IssuesData = HomeData
 
 export type SettingsData = {
   projects: SettingsProject[]
+  workers: workersService.WorkerDomain[]
   githubIntegration: githubIntegrationsService.GithubIntegration | null
   defaultAgentProvider: "claude_code" | "codex"
   githubAppConfigured: boolean
@@ -201,11 +203,13 @@ export async function getSettingsData(
   context?: AuthenticatedContext
 ): Promise<SettingsData> {
   const { supabase, userId } = await resolveContext(context)
-  const [projects, githubIntegration, userSettings] = await Promise.all([
-    projectsService.listProjects(supabase, userId),
-    githubIntegrationsService.getGithubIntegration(supabase, userId),
-    userSettingsService.getUserSettings(supabase, userId),
-  ])
+  const [projects, githubIntegration, userSettings, workers] =
+    await Promise.all([
+      projectsService.listProjects(supabase, userId),
+      githubIntegrationsService.getGithubIntegration(supabase, userId),
+      userSettingsService.getUserSettings(supabase, userId),
+      workersService.listWorkers(supabase, userId),
+    ])
 
   let githubRepositories: GithubRepositoryOption[] = []
   let githubRepositoriesError: string | null = null
@@ -233,6 +237,7 @@ export async function getSettingsData(
       setup_script: project.setup_script,
       auto_respond_to_reviews: project.auto_respond_to_reviews,
     })),
+    workers,
     githubIntegration,
     defaultAgentProvider: userSettings.default_agent_provider,
     githubAppConfigured: Boolean(process.env.GITHUB_APP_SLUG),

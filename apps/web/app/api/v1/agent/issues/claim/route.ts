@@ -113,6 +113,30 @@ export async function claimNextQueuedIssue(
     return null
   }
 
+  const freshWorker = await getWorker(supabase, userId, workerId, {
+    compatibilityPolicy: options.compatibilityPolicy,
+  })
+  if (
+    freshWorker.primary_state !== "online" ||
+    freshWorker.version_health === "unsupported"
+  ) {
+    await supabase
+      .from("issues")
+      .update({
+        status: candidate.status,
+        active_run_id: null,
+        active_worker_id: null,
+        run_started_at: null,
+        run_error: null,
+        run_finished_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("active_worker_id", workerId)
+      .eq("active_run_id", activeRunId)
+    return null
+  }
+
   if (!candidate.projects.repo) {
     throw new Error("Issue has no associated project repo")
   }

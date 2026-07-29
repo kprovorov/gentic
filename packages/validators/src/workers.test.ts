@@ -4,7 +4,9 @@ import { test } from "node:test"
 import {
   consumeWorkerEnrollmentCodeInputSchema,
   createWorkerEnrollmentCodeInputSchema,
+  renameWorkerInputSchema,
   updateWorkerManagementInputSchema,
+  workerLifecycleOperationInputSchema,
   workerCapabilitiesSchema,
   workerHeartbeatTelemetrySchema,
   workerLifecycleEventSchema,
@@ -125,6 +127,20 @@ test("heartbeat telemetry validates worker process state", () => {
 })
 
 test("management and lifecycle inputs reject empty updates", () => {
+  assert.deepEqual(
+    renameWorkerInputSchema.parse({
+      display_name: "Build box",
+    }),
+    {
+      display_name: "Build box",
+    }
+  )
+  assert.throws(() =>
+    renameWorkerInputSchema.parse({ display_name: "x".repeat(81) })
+  )
+  assert.deepEqual(workerLifecycleOperationInputSchema.parse({}), {})
+  assert.throws(() => workerLifecycleOperationInputSchema.parse({ force: true }))
+
   assert.deepEqual(
     updateWorkerManagementInputSchema.parse({
       id: workerId,
