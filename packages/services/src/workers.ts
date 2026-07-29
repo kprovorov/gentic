@@ -460,12 +460,12 @@ export async function renameWorker(
 ): Promise<WorkerDomain> {
   const displayName = parseWorkerName(input.display_name)
   const { data, error } = await supabase
-    .rpc("rename_worker" as never, {
+    .rpc("rename_worker", {
       p_user_id: userId,
       p_worker_id: workerId,
       p_display_name: displayName,
       p_now: (options.now ?? new Date()).toISOString(),
-    } as never)
+    })
     .maybeSingle()
     .returns<WorkerRow | null>()
 
@@ -513,11 +513,11 @@ export async function deleteWorker(
   } = {}
 ): Promise<void> {
   const { data, error } = await supabase
-    .rpc("delete_worker" as never, {
+    .rpc("delete_worker", {
       p_user_id: userId,
       p_worker_id: workerId,
       p_now: (options.now ?? new Date()).toISOString(),
-    } as never)
+    })
     .single<boolean>()
 
   if (error) {
@@ -921,11 +921,11 @@ async function runWorkerLifecycleRpc(
   }
 ): Promise<WorkerDomain> {
   const { data, error } = await supabase
-    .rpc(name as never, {
+    .rpc(name, {
       p_user_id: userId,
       p_worker_id: workerId,
       p_now: (options.now ?? new Date()).toISOString(),
-    } as never)
+    })
     .maybeSingle()
     .returns<WorkerRow | null>()
 
