@@ -13,6 +13,7 @@ import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
 import {
   agentModelOptions,
+  issuePriorityOptions,
   type AgentProvider,
 } from "@gentic/validators/issues"
 import {
@@ -112,6 +113,23 @@ export function EditIssueView({
                     Feedback
                   </NativeSelectOption>
                   <NativeSelectOption value="idea">Idea</NativeSelectOption>
+                </NativeSelect>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="issue-priority">Priority</Label>
+                <NativeSelect
+                  name="priority"
+                  required
+                  defaultValue={issue.priority}
+                  id="issue-priority"
+                  className="w-full"
+                >
+                  {issuePriorityOptions.map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
               </div>
 
