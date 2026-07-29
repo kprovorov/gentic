@@ -35,7 +35,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const { supabase, userId } = await getAgentContext(request)
 
     return json(await recordIssueUnpublishedChanges(supabase, userId, id, body))

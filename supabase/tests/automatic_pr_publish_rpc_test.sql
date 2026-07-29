@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(9);
+SELECT plan(14);
 
 INSERT INTO public.projects (
   id,
@@ -29,6 +29,7 @@ INSERT INTO public.issues (
   status,
   number,
   create_pr_automatically,
+  has_unpublished_agent_changes,
   active_run_id
 ) VALUES (
   '20000000-0000-4000-8000-000000000201',
@@ -38,8 +39,46 @@ INSERT INTO public.issues (
   'in-progress',
   1,
   true,
+  true,
   '40000000-0000-4000-8000-000000000201'
+), (
+  -- Already has a PR: ineligible for an automatic request.
+  '20000000-0000-4000-8000-000000000202',
+  '10000000-0000-4000-8000-000000000201',
+  'Already published issue',
+  'Prompt',
+  'in-progress',
+  2,
+  true,
+  true,
+  '40000000-0000-4000-8000-000000000203'
+), (
+  -- No unpublished changes: ineligible for an automatic request.
+  '20000000-0000-4000-8000-000000000203',
+  '10000000-0000-4000-8000-000000000201',
+  'Clean issue',
+  'Prompt',
+  'in-progress',
+  3,
+  true,
+  false,
+  '40000000-0000-4000-8000-000000000204'
+), (
+  -- Not opted in to automatic PR creation: ineligible for a request.
+  '20000000-0000-4000-8000-000000000204',
+  '10000000-0000-4000-8000-000000000201',
+  'Opted-out issue',
+  'Prompt',
+  'in-progress',
+  4,
+  false,
+  true,
+  '40000000-0000-4000-8000-000000000205'
 );
+
+UPDATE public.issues
+   SET pr_url = 'https://github.com/gentic/gamma/pull/1'
+ WHERE id = '20000000-0000-4000-8000-000000000202';
 
 SELECT lives_ok(
   $$
@@ -99,7 +138,7 @@ SELECT is(
 
 -- A duplicate/retried call for the same run must not create a second
 -- request or message (idempotent under a worker restart replaying the
--- same run id).
+-- same run id), and must report the winning caller's own ids.
 SELECT lives_ok(
   $$
     SELECT * FROM public.request_automatic_pr_publish(
@@ -109,6 +148,34 @@ SELECT lives_ok(
     )
   $$,
   'a duplicate request for the same run does not raise'
+);
+
+SELECT is(
+  (
+    SELECT created FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000201',
+      '40000000-0000-4000-8000-000000000201',
+      'Please open a pull request.'
+    )
+  ),
+  false,
+  'a duplicate request reports created = false'
+);
+
+SELECT is(
+  (
+    SELECT message_id FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000201',
+      '40000000-0000-4000-8000-000000000201',
+      'Please open a pull request.'
+    )
+  ),
+  (
+    SELECT requested_by_message_id
+      FROM public.issue_automatic_pr_requests
+     WHERE issue_id = '20000000-0000-4000-8000-000000000201'
+  ),
+  'a duplicate request returns the winning message id'
 );
 
 SELECT is(
@@ -144,6 +211,46 @@ SELECT throws_ok(
   $$,
   '23514',
   'a stale run id is rejected'
+);
+
+-- Eligibility (create_pr_automatically, no existing PR, unpublished changes
+-- remain) is re-checked atomically inside the insert itself, not just as a
+-- pre-check in application code, so a request can't be created for an issue
+-- that no longer qualifies.
+SELECT throws_ok(
+  $$
+    SELECT * FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000202',
+      '40000000-0000-4000-8000-000000000203',
+      'Please open a pull request.'
+    )
+  $$,
+  '23514',
+  'a request for an issue that already has a pull request is rejected'
+);
+
+SELECT throws_ok(
+  $$
+    SELECT * FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000203',
+      '40000000-0000-4000-8000-000000000204',
+      'Please open a pull request.'
+    )
+  $$,
+  '23514',
+  'a request for an issue with no unpublished changes is rejected'
+);
+
+SELECT throws_ok(
+  $$
+    SELECT * FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000204',
+      '40000000-0000-4000-8000-000000000205',
+      'Please open a pull request.'
+    )
+  $$,
+  '23514',
+  'a request for an issue not opted into automatic PR creation is rejected'
 );
 
 SELECT * FROM finish();

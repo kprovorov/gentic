@@ -5,14 +5,22 @@
 -- would be, so the worker never has to leave `in-progress`/wait state).
 --
 -- Concurrency/idempotency: the `issue_automatic_pr_requests_issue_run_unique`
--- constraint is the source of truth. `insert ... on conflict do nothing`
--- lets exactly one caller win the race (or a worker restart replaying the
--- same run) and insert the message; every other caller — concurrent or a
--- later retry — falls through to the `select` below and gets back the
--- winner's existing request/message untouched. The
+-- constraint is the source of truth. `insert ... select ... where exists`
+-- both re-validates eligibility (active run, opted in, no PR yet, changes
+-- still unpublished) against the current row and, via `on conflict do
+-- nothing`, lets exactly one caller win the race (or a worker restart
+-- replaying the same run) and insert the message; every other caller —
+-- concurrent or a later retry — falls through to the `select` below and
+-- gets back the winner's existing request/message untouched. This closes
+-- the gap a caller's own pre-check in application code can't: eligibility
+-- is re-read and the row is only proposed for insertion inside the same
+-- statement, so a concurrent change to any of those fields between the
+-- caller's read and this call can't produce a request that no longer
+-- reflects the issue's current state. The
 -- `ensure_issue_automatic_pr_request_active_run` trigger (added in
--- 20260729102215) rejects the insert outright when `p_run_id` is no longer
--- the issue's `active_run_id`, covering stale/superseded/cross-worker calls.
+-- 20260729102215) still independently rejects the insert when `p_run_id` is
+-- no longer the issue's `active_run_id`, covering stale/superseded/
+-- cross-worker calls.
 create or replace function public.request_automatic_pr_publish(
   p_issue_id uuid,
   p_run_id uuid,
@@ -34,7 +42,16 @@ declare
   v_status text;
 begin
   insert into public.issue_automatic_pr_requests(issue_id, run_id, status)
-  values (p_issue_id, p_run_id, 'pending')
+  select p_issue_id, p_run_id, 'pending'
+  where exists (
+    select 1
+      from public.issues
+     where issues.id = p_issue_id
+       and issues.active_run_id = p_run_id
+       and issues.create_pr_automatically
+       and issues.pr_url is null
+       and issues.has_unpublished_agent_changes
+  )
   on conflict (issue_id, run_id) do nothing
   returning id into v_request_id;
 
@@ -58,15 +75,26 @@ begin
    where issue_id = p_issue_id
      and run_id = p_run_id;
 
-  if not found then
-    -- No existing row and nothing was inserted: the active-run trigger
-    -- rejected the insert with its own exception before we get here, so
-    -- this branch only guards against an unexpected empty result.
+  if found then
+    return query select v_request_id, v_message_id, v_status, false;
+    return;
+  end if;
+
+  -- No existing row and nothing was inserted: either the run is no longer
+  -- active (the trigger would already have raised for that on a proposed
+  -- row, but a stale run also fails the `where exists` above without ever
+  -- reaching the trigger) or the issue is no longer eligible (opted out,
+  -- already has a PR, or no unpublished changes remain).
+  if not exists (
+    select 1 from public.issues
+     where id = p_issue_id and active_run_id = p_run_id
+  ) then
     raise exception 'Automatic pull request must target the issue active run'
       using errcode = '23514';
   end if;
 
-  return query select v_request_id, v_message_id, v_status, false;
+  raise exception 'Issue is not eligible for an automatic pull request'
+    using errcode = '23514';
 end;
 $$;
 

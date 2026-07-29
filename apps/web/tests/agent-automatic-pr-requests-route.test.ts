@@ -232,6 +232,7 @@ test("creates the automatic PR request and returns session-continuation context"
   assert.equal(supabase.rpcCalls[0]?.name, "request_automatic_pr_publish")
   assert.equal(supabase.rpcCalls[0]?.args.p_issue_id, "issue-1")
   assert.equal(supabase.rpcCalls[0]?.args.p_run_id, runId1)
+  assert.match(String(supabase.rpcCalls[0]?.args.p_content), /ACME-7/)
 
   // create_pr_automatically stays true after the automatic attempt so it
   // keeps auditing the user's opt-in, rather than being consumed/cleared.
@@ -261,6 +262,13 @@ test("a duplicate/retried call for the same run is idempotent, not a second mess
   assert.equal(supabase.rpcCalls.length, 2)
 })
 
+// `FakeSupabase.rpc` resolves synchronously, so `Promise.all` here can't
+// interleave the two calls the way real concurrent Postgres transactions
+// would — this only proves the fake's own Map-based dedup is consistent
+// under either call order, not the real DB-level guarantee. That guarantee
+// comes from the `request_automatic_pr_publish` RPC's unique-constraint-
+// backed insert (see the migration and
+// supabase/tests/automatic_pr_publish_rpc_test.sql).
 test("concurrent calls for the same run only create one message", async () => {
   const supabase = new FakeSupabase([issue({ id: "issue-1" })])
 
