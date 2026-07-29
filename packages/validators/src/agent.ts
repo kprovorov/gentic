@@ -19,6 +19,8 @@ export type ClaimIssueInput = z.infer<typeof claimIssueInputSchema>
 export const claimedIssueSchema = z.object({
   id: z.string().uuid(),
   activeRunId: z.string().uuid(),
+  code: z.string(),
+  title: z.string().nullable(),
   agentProvider: agentProviderSchema,
   issueModel: issueModelSchema,
   repo: z.string(),
@@ -161,6 +163,49 @@ export const automaticPrRequestSchema = z.object({
 })
 
 export type AutomaticPrRequest = z.infer<typeof automaticPrRequestSchema>
+export type AutomaticPrRequestStatus = AutomaticPrRequest["status"]
+
+export const recordUnpublishedChangesInputSchema = z.object({
+  active_run_id: z.string().uuid(),
+  has_unpublished_agent_changes: z.boolean(),
+})
+
+export type RecordUnpublishedChangesInput = z.infer<
+  typeof recordUnpublishedChangesInputSchema
+>
+
+export const requestAutomaticPrPublishInputSchema = z.object({
+  active_run_id: z.string().uuid(),
+})
+
+export type RequestAutomaticPrPublishInput = z.infer<
+  typeof requestAutomaticPrPublishInputSchema
+>
+
+// The full issue context a worker needs to keep acting on the same session
+// without an extra round trip (e.g. it must not fall back to a
+// waiting-for-input transition just to learn the issue's code/title/PR
+// state) is echoed back alongside the created (or already-existing, on a
+// retried/duplicate call) request and message.
+export const automaticPrPublishResponseSchema = z.object({
+  requestId: z.string().uuid(),
+  messageId: z.string().uuid(),
+  created: z.boolean(),
+  status: automaticPrRequestSchema.shape.status,
+  issue: z.object({
+    id: z.string().uuid(),
+    code: z.string(),
+    title: z.string().nullable(),
+    activeRunId: z.string().uuid(),
+    createPrAutomatically: z.boolean(),
+    hasUnpublishedAgentChanges: z.boolean(),
+    prUrl: z.string().nullable(),
+  }),
+})
+
+export type AutomaticPrPublishResponse = z.infer<
+  typeof automaticPrPublishResponseSchema
+>
 
 export const attachmentSchema = z.object({
   id: z.string().uuid(),

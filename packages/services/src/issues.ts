@@ -31,10 +31,13 @@ export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { slugifyIssueTitle } from "./issues/slug"
 export {
   attachIssuePullRequest,
+  type AutomaticPrPublishResult,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
+  recordUnpublishedAgentChanges,
+  requestAutomaticPrPublish,
   resetIssueAgent,
   updateIssueAgentProvider,
   updateIssuePriority,

@@ -2,9 +2,12 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  automaticPrPublishResponseSchema,
   automaticPrRequestSchema,
   claimedIssueSchema,
   insertMessageInputSchema,
+  recordUnpublishedChangesInputSchema,
+  requestAutomaticPrPublishInputSchema,
 } from "./agent.js"
 
 const issueId = "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1"
@@ -16,6 +19,8 @@ test("claimedIssueSchema includes automatic PR foundation fields", () => {
     claimedIssueSchema.parse({
       id: issueId,
       activeRunId: runId,
+      code: "GEN-42",
+      title: "Fix the thing",
       agentProvider: "codex",
       issueModel: null,
       repo: "gentic/app",
@@ -28,6 +33,8 @@ test("claimedIssueSchema includes automatic PR foundation fields", () => {
     {
       id: issueId,
       activeRunId: runId,
+      code: "GEN-42",
+      title: "Fix the thing",
       agentProvider: "codex",
       issueModel: null,
       repo: "gentic/app",
@@ -90,4 +97,55 @@ test("automaticPrRequestSchema validates request audit rows", () => {
       status: "queued",
     })
   )
+})
+
+test("recordUnpublishedChangesInputSchema requires an active run id and flag", () => {
+  const input = recordUnpublishedChangesInputSchema.parse({
+    active_run_id: runId,
+    has_unpublished_agent_changes: true,
+  })
+
+  assert.equal(input.active_run_id, runId)
+  assert.equal(input.has_unpublished_agent_changes, true)
+  assert.throws(() =>
+    recordUnpublishedChangesInputSchema.parse({
+      active_run_id: runId,
+    })
+  )
+  assert.throws(() =>
+    recordUnpublishedChangesInputSchema.parse({
+      active_run_id: "not-a-uuid",
+      has_unpublished_agent_changes: true,
+    })
+  )
+})
+
+test("requestAutomaticPrPublishInputSchema requires an active run id", () => {
+  const input = requestAutomaticPrPublishInputSchema.parse({
+    active_run_id: runId,
+  })
+
+  assert.equal(input.active_run_id, runId)
+  assert.throws(() => requestAutomaticPrPublishInputSchema.parse({}))
+})
+
+test("automaticPrPublishResponseSchema carries session-continuation context", () => {
+  const response = automaticPrPublishResponseSchema.parse({
+    requestId: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    messageId,
+    created: true,
+    status: "pending",
+    issue: {
+      id: issueId,
+      code: "GEN-42",
+      title: "Fix the thing",
+      activeRunId: runId,
+      createPrAutomatically: true,
+      hasUnpublishedAgentChanges: true,
+      prUrl: null,
+    },
+  })
+
+  assert.equal(response.created, true)
+  assert.equal(response.issue.code, "GEN-42")
 })

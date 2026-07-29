@@ -697,6 +697,15 @@ export type Database = {
           locked_until: string
         }[]
       }
+      request_automatic_pr_publish: {
+        Args: { p_content: string; p_issue_id: string; p_run_id: string }
+        Returns: {
+          created: boolean
+          message_id: string
+          request_id: string
+          status: string
+        }[]
+      }
       reset_issue_run:
         | {
             Args: { p_agent_provider: string; p_issue_id: string }
