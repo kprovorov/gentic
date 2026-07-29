@@ -27,6 +27,7 @@ import { toast } from "sonner"
 
 import {
   addIssueRelation,
+  createManualIssuePullRequest,
   deleteIssueRelation,
   updateIssuePriority,
   updateIssueStatus,
@@ -58,6 +59,8 @@ import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
+
+import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 
 function parsePullRequestUrl(url: string) {
   try {
@@ -347,17 +350,36 @@ function IssueDetailPriority({
 }
 
 function IssueDetailPullRequests({
+  issueId,
   pullRequests,
   issueStatus,
+  hasUnpublishedAgentChanges,
+  automaticPrPublishingInProgress,
 }: {
+  issueId: string
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
+  hasUnpublishedAgentChanges: boolean
+  automaticPrPublishingInProgress: boolean
 }) {
+  const hasAttachedPullRequest = pullRequests.length > 0
+  const showCreatePr = canShowManualCreatePrAction({
+    status: issueStatus,
+    hasUnpublishedAgentChanges,
+    hasAttachedPullRequest,
+    automaticPublishingInProgress: automaticPrPublishingInProgress,
+  })
+
   if (pullRequests.length === 0) {
     return (
-      <p className="text-[12.5px] text-muted-foreground">
-        No pull requests yet.
-      </p>
+      <div className="grid gap-2">
+        <p className="text-[12.5px] text-muted-foreground">
+          No pull requests yet.
+        </p>
+        {showCreatePr ? (
+          <ManualCreatePrButton issueId={issueId} />
+        ) : null}
+      </div>
     )
   }
 
@@ -402,6 +424,77 @@ function IssueDetailPullRequests({
       })}
     </ul>
   )
+}
+
+function ManualCreatePrButton({
+  issueId,
+}: {
+  issueId: string
+}) {
+  const queryClient = useQueryClient()
+  const [optimisticRequested, setOptimisticRequested] = useState(false)
+  const mutation = useMutation({
+    mutationFn: createManualIssuePullRequest,
+    onMutate: () => {
+      setOptimisticRequested(true)
+    },
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        setOptimisticRequested(false)
+        toast.error(result.error)
+        return
+      }
+      toast.success("Create PR request sent")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+    onError: (error) => {
+      setOptimisticRequested(false)
+      toast.error(getCreatePrErrorMessage(error))
+    },
+  })
+  const isPending = mutation.isPending
+
+  function submit() {
+    if (isPending || optimisticRequested) {
+      return
+    }
+    const formData = new FormData()
+    formData.set("issue_id", issueId)
+    mutation.mutate(formData)
+  }
+
+  if (optimisticRequested) {
+    return (
+      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-2 text-[12.5px] text-emerald-700 dark:text-emerald-300">
+        {isPending ? "Requesting pull request..." : "Create PR request sent."}
+      </p>
+    )
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="w-full justify-start gap-2"
+      disabled={isPending}
+      onClick={submit}
+    >
+      <IconGitPullRequest className="size-4" />
+      Create PR
+    </Button>
+  )
+}
+
+function getCreatePrErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Failed to request pull request creation"
 }
 
 function IssueDetailRelationRow({
@@ -824,6 +917,8 @@ export function IssueDetailRail({
   issueCode,
   status,
   priority,
+  hasUnpublishedAgentChanges,
+  automaticPrPublishingInProgress,
   pullRequests,
   relations,
   relationCandidates,
@@ -832,6 +927,8 @@ export function IssueDetailRail({
   issueCode: string | null
   status: IssueStatus
   priority: IssuePriority
+  hasUnpublishedAgentChanges: boolean
+  automaticPrPublishingInProgress: boolean
   pullRequests: IssuePullRequest[]
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
@@ -859,8 +956,11 @@ export function IssueDetailRail({
 
       <RailSection title="Pull requests">
         <IssueDetailPullRequests
+          issueId={issueId}
           pullRequests={pullRequests}
           issueStatus={status}
+          hasUnpublishedAgentChanges={hasUnpublishedAgentChanges}
+          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
         />
       </RailSection>
 

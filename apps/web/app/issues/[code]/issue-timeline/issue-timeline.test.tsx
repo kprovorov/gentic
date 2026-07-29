@@ -194,6 +194,32 @@ describe("IssueTimeline", () => {
     )
   })
 
+  it("renders manual create PR prompts with the current user's avatar", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "manual-create-pr",
+            role: "user",
+            content: "The requested work is finished. Publish it now.",
+            author_type: "user",
+            generated_action: "create_pr",
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        currentUserName="Kai Example"
+        currentUserImageUrl="https://img.clerk.com/avatar.png"
+      />
+    )
+
+    expect(screen.queryByText("Gentic")).not.toBeInTheDocument()
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://img.clerk.com/avatar.png"
+    )
+  })
+
   it("uses the first user message as the original request when the prompt is empty", () => {
     render(
       <IssueTimeline

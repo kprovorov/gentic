@@ -12,6 +12,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     messages,
     attachments,
     pullRequests,
+    automaticPrPublishingInProgress,
     relations,
     relationCandidates,
     events,
@@ -67,6 +68,8 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             issueCode={issue.code}
             status={issue.status}
             priority={issue.priority}
+            hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
+            automaticPrPublishingInProgress={automaticPrPublishingInProgress}
             pullRequests={displayedPullRequests}
             relations={relations}
             relationCandidates={relationCandidates}
