@@ -18,6 +18,7 @@ import {
   IconChevronDown,
   IconList,
   IconLock,
+  IconLockOpen,
   IconPlus,
   IconSearch,
   IconTable,
@@ -62,13 +63,19 @@ import {
 } from "./issues-columns"
 
 type IssuesViewMode = "list" | "table"
-type BlockingFilter = "all" | "blocked" | "blocking" | "non-blocking"
+type BlockingFilter =
+  | "all"
+  | "blocked"
+  | "non-blocked"
+  | "blocking"
+  | "non-blocking"
 
 const pageSize = 20
 
 const blockingFilterLabels: Record<BlockingFilter, string> = {
   all: "All",
   blocked: "Blocked",
+  "non-blocked": "Non-blocked",
   blocking: "Blocking",
   "non-blocking": "Non-blocking",
 }
@@ -76,6 +83,7 @@ const blockingFilterLabels: Record<BlockingFilter, string> = {
 const blockingFilterOptions = [
   "all",
   "blocked",
+  "non-blocked",
   "blocking",
   "non-blocking",
 ] as const
@@ -84,12 +92,14 @@ const activeFilterCountBadgeStyles =
 
 const blockingFilterBadgeStyles: Partial<Record<BlockingFilter, string>> = {
   blocked: blockingBadgeStyles.blocked,
+  "non-blocked": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   blocking: blockingBadgeStyles.blocking,
   "non-blocking": "bg-muted text-muted-foreground",
 }
 
 const blockingFilterIconStyles: Partial<Record<BlockingFilter, string>> = {
   blocked: "text-red-700 dark:text-red-300",
+  "non-blocked": "text-emerald-700 dark:text-emerald-300",
   blocking: "text-amber-700 dark:text-amber-300",
 }
 
@@ -105,6 +115,8 @@ function matchesBlockingFilter(
   switch (filter) {
     case "blocked":
       return isBlocked
+    case "non-blocked":
+      return !isBlocked
     case "blocking":
       return isBlocking
     case "non-blocking":
@@ -790,6 +802,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                           ? IconList
                           : option === "blocked"
                             ? IconLock
+                            : option === "non-blocked"
+                              ? IconLockOpen
                             : option === "non-blocking"
                               ? IconX
                               : IconArrowBarToRight
