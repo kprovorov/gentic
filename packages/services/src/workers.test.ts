@@ -13,6 +13,8 @@ import {
   getWorker,
   hashWorkerSecret,
   listWorkers,
+  markWorkerOffline,
+  recordWorkerHeartbeat,
   renameWorker,
   unbanWorker,
   updateWorker,
@@ -666,6 +668,43 @@ test("primary state derives setup, heartbeat boundary, and banned precedence", a
   assert.equal(stateById(states, "online"), "online")
   assert.equal(stateById(states, "offline"), "offline")
   assert.equal(stateById(states, "banned"), "banned")
+})
+
+test("explicit offline time is clock-controlled and a heartbeat clears it", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.workers.push(
+    workerRow({
+      id: "worker-1",
+      last_seen_at: now.toISOString(),
+      offline_since_at: null,
+    })
+  )
+
+  const offlineAt = new Date(now.getTime() + 30_000)
+  await markWorkerOffline(supabase as never, "user-1", "worker-1", {
+    now: offlineAt,
+  })
+
+  assert.equal(supabase.db.workers[0]?.last_seen_at, null)
+  assert.equal(
+    supabase.db.workers[0]?.offline_since_at,
+    offlineAt.toISOString()
+  )
+
+  const reconnectedAt = new Date(now.getTime() + 60_000)
+  await recordWorkerHeartbeat(
+    supabase as never,
+    "user-1",
+    "worker-1",
+    { ...telemetry(), setup_completed: true },
+    { now: reconnectedAt }
+  )
+
+  assert.equal(
+    supabase.db.workers[0]?.last_seen_at,
+    reconnectedAt.toISOString()
+  )
+  assert.equal(supabase.db.workers[0]?.offline_since_at, null)
 })
 
 test("classifyWorkerVersion applies a centralized compatibility policy", () => {

@@ -86,6 +86,7 @@ SELECT throws_ok(
     )
   $$,
   '23505',
+  null,
   'duplicate normalized worker names are rejected for the same owner'
 );
 
@@ -148,6 +149,7 @@ SELECT throws_ok(
     )
   $$,
   '23P01',
+  null,
   'overlapping unconsumed enrollment codes are rejected per user'
 );
 
@@ -226,6 +228,7 @@ SELECT throws_ok(
      WHERE id = '20000000-0000-4000-8000-000000000001'
   $$,
   '23514',
+  null,
   'issues cannot reference a worker owned by another user'
 );
 

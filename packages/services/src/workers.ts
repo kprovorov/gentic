@@ -96,6 +96,7 @@ export type UpdateWorkerInput = {
   setup_state?: WorkerSetupState
   banned_at?: string | null
   last_seen_at?: string | null
+  offline_since_at?: string | null
   process_started_at?: string | null
   gentic_version?: string | null
   os?: string | null
@@ -414,6 +415,7 @@ export async function recordWorkerHeartbeat(
     workerId,
     {
       last_seen_at: telemetry.last_seen_at ?? (options.now ?? new Date()).toISOString(),
+      offline_since_at: null,
       process_started_at: telemetry.process_started_at,
       gentic_version: telemetry.gentic_version,
       os: telemetry.os,
@@ -443,6 +445,7 @@ export async function markWorkerOffline(
     workerId,
     {
       last_seen_at: null,
+      offline_since_at: (options.now ?? new Date()).toISOString(),
     },
     { ...options, requireUnbanned: true }
   )
@@ -595,6 +598,9 @@ export async function updateWorker(
   }
   if (input.banned_at !== undefined) values.banned_at = input.banned_at
   if (input.last_seen_at !== undefined) values.last_seen_at = input.last_seen_at
+  if (input.offline_since_at !== undefined) {
+    values.offline_since_at = input.offline_since_at
+  }
   if (input.process_started_at !== undefined) {
     values.process_started_at = input.process_started_at
   }

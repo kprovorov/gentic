@@ -210,6 +210,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'a stale run id is rejected'
 );
 
@@ -226,6 +227,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'a request for an issue that already has a pull request is rejected'
 );
 
@@ -238,6 +240,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'a request for an issue with no unpublished changes is rejected'
 );
 
@@ -250,6 +253,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'a request for an issue not opted into automatic PR creation is rejected'
 );
 

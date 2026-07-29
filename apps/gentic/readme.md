@@ -250,8 +250,11 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
   session per issue.
 - `src/session.ts` — spawns Claude Code or Codex over the Agent Client Protocol and
   streams assistant output into the issue transcript, one prompt turn per user
-  message. Appends an instruction to the agent's prompt or system prompt so every
-  session commits its changes and opens a pull request before finishing.
+  message. It does not append hidden commit, push, or pull-request instructions.
+  When the issue opts into automatic PR creation and a successful turn leaves
+  unpublished changes, Gentic sends a visible publishing follow-up in the same
+  session. Failed, held, cancelled, interrupted, and unchanged runs do not
+  trigger that follow-up.
 - `src/git.ts` — clones a project repo into a fresh per-issue work directory.
 - `src/attachments.ts` — turns an issue's uploaded attachments into ACP
   content blocks for the first prompt: images and text files are embedded

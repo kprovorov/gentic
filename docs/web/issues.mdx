@@ -1,10 +1,10 @@
 ---
 title: "Create, Assign, and Manage AI Coding Issues in Gentic"
 sidebarTitle: "Issues"
-description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, and the agent writes code and opens a pull request on your behalf."
+description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, track its code changes, and optionally publish them as a pull request."
 ---
 
-An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the agent clones your repository, follows the instructions in your prompt, commits changes, and opens a pull request. Every issue tracks its own status, agent conversation, and pull requests in one place.
+An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the worker clones your repository and the agent follows the instructions in your prompt. Every issue tracks its own status, agent conversation, publishing preference, and pull requests in one place.
 
 ## Create an Issue
 
@@ -60,6 +60,10 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   **Save draft** creates the issue as `draft`. A **Run with...** action creates it as a draft and immediately transitions it to `todo`, which queues the agent. See the [Issue Statuses reference](/web/issue-statuses).
 </ParamField>
 
+<ParamField body="Create PR automatically" type="boolean">
+  Enabled by default for new issues created in the web app. After a successful turn with unpublished changes and no existing pull request, Gentic adds a visible publishing request and continues the same agent session. Saving a draft preserves your selection. Existing issues and issues created through non-web clients remain disabled unless a client explicitly opts in.
+</ParamField>
+
 ## Issue Workflow
 
 ### Triggering an Agent Run
@@ -86,9 +90,13 @@ Every pull request the agent opens for an issue is attached to it and shown on t
 
 An issue can accumulate multiple pull requests over its lifetime. When you [re-queue an ended run](#re-queuing-an-ended-run), any new PR the agent opens is added to the list alongside the earlier ones. Older PRs stay visible so you can trace every change the agent has shipped for that issue in one place.
 
+Automatic publishing runs once at most for each active run. The publishing request appears in the transcript with Gentic attribution. It reuses an existing branch or pull request, avoids empty commits, and requires a ready-for-review pull request with a Conventional Commit title plus **Summary** and **Test plan** sections. The first Gentic-requested branch follows `issue-key-issue-slug`; later pull requests can use any branch name.
+
+If a finished, idle run has unpublished changes and no pull request, the issue sidebar shows **Create PR**. This manual action appears with your attribution. It is unavailable during an active run, while automatic publishing is pending, and after a pull request is attached.
+
 ## Edit an Issue
 
-Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, and **Type** fields. The **Project** field cannot be changed after creation.
+Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, **Type**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
 
 ## Retry an Agent
 

@@ -28,6 +28,11 @@ import {
 import type { Attachment } from "./issues/[code]/attachments"
 import type { ChatMessage } from "./issues/[code]/issue-chat-state"
 import {
+  listSettingsWorkersData,
+  type SettingsWorker,
+  type SettingsWorkersData,
+} from "./settings/workers-read-model"
+import {
   fetchInstallationRepositories,
   fetchPullRequestState,
   type GithubPullRequestState,
@@ -84,6 +89,8 @@ export type SettingsData = {
   githubRepositories: GithubRepositoryOption[]
   githubRepositoriesError: string | null
 }
+
+export type { SettingsWorker, SettingsWorkersData }
 
 export type NewIssueData = {
   projects: ProjectOption[]
@@ -244,6 +251,13 @@ export async function getSettingsData(
     githubRepositories,
     githubRepositoriesError,
   }
+}
+
+export async function getSettingsWorkersData(
+  context?: AuthenticatedContext
+): Promise<SettingsWorkersData> {
+  const { supabase, userId } = await resolveContext(context)
+  return listSettingsWorkersData(supabase, userId)
 }
 
 export async function getNewIssueData(

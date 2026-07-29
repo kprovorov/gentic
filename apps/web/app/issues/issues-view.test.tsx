@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HomeIssue, IssuesData } from "@/app/queries"
+import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssuesView } from "./issues-view"
 import { bulkUpdateIssuePriority, updateIssuePriority } from "./actions"
@@ -82,7 +83,9 @@ function renderIssuesView({
     user: userEvent.setup(),
     ...render(
       <QueryClientProvider client={queryClient}>
-        <IssuesView initialData={data} />
+        <TooltipProvider>
+          <IssuesView initialData={data} />
+        </TooltipProvider>
       </QueryClientProvider>
     ),
   }

@@ -89,6 +89,28 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   After fixing the underlying issue, click **Retry with Claude Code** or choose another agent from its dropdown. The issue moves back to `todo` and the worker attempts a fresh run on its next poll.
 </Accordion>
 
+<Accordion title="Automatic pull request was not created">
+  Automatic publishing starts only after a successful agent turn that changed the repository, while **Create PR automatically** is enabled and no pull request is attached.
+
+  **Step 1 — Check the issue preference and transcript:**
+
+  Open **Edit issue** and check **Create PR automatically**. Existing issues remain opted out, and the database and non-web API default is `false`. If a pull request is already attached, the preference is shown only as historical data.
+
+  A valid automatic attempt appears as a visible Gentic-authored message in the same run. Gentic never hides commit, push, or pull-request instructions in the agent's system prompt.
+
+  **Step 2 — Check how the run ended:**
+
+  Gentic skips automatic publishing for unchanged, failed, held, usage-limited, cancelled, and interrupted runs. It attempts publishing at most once per active run. Send a user follow-up after the run ends to start a later run that can try again.
+
+  **Step 3 — Publish idle work manually:**
+
+  If the issue is idle with unpublished changes and no pull request, click **Create PR** in the sidebar. The button is intentionally hidden while a run or automatic attempt is active and after any pull request is attached.
+
+  **Step 4 — Check a mixed-version deployment:**
+
+  Roll out this feature in this order: apply the database migration, deploy the web app and API, then update agent workers. This order preserves compatibility because old issues and non-web callers default to automatic publishing disabled.
+</Accordion>
+
 <Accordion title="Issue stuck on 'held' — waiting for a usage limit reset">
   A `held` status means the agent hit a usage limit, session limit, rate limit, or quota during its last run. The worker parses a reset time out of the error message and skips the issue until that time has passed.
 
