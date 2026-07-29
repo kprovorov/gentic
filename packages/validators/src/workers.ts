@@ -100,12 +100,12 @@ export type ConsumeWorkerEnrollmentCodeInput = z.infer<
 
 export const workerHeartbeatTelemetrySchema = z
   .object({
-    worker_id: z.string().uuid(),
     process_started_at: z.string().datetime({ offset: true }),
     gentic_version: workerPlatformSchema,
     os: workerPlatformSchema,
     arch: workerPlatformSchema,
     configured_capacity: workerCapacitySchema,
+    setup_completed: z.boolean(),
     provider_capabilities: workerCapabilitiesSchema,
     last_seen_at: z.string().datetime({ offset: true }).optional(),
   })
@@ -114,6 +114,27 @@ export const workerHeartbeatTelemetrySchema = z
 export type WorkerHeartbeatTelemetry = z.infer<
   typeof workerHeartbeatTelemetrySchema
 >
+
+export const workerOfflineInputSchema = z.object({}).strict()
+
+export const workerControlResponseSchema = z
+  .object({
+    worker: z.object({
+      banned: z.boolean(),
+    }),
+    runs: z.array(
+      z
+        .object({
+          issue_id: z.string().uuid(),
+          active_run_id: z.string().uuid().nullable(),
+          status: z.string(),
+        })
+        .strict()
+    ),
+  })
+  .strict()
+
+export type WorkerControlResponse = z.infer<typeof workerControlResponseSchema>
 
 export const updateWorkerManagementInputSchema = z
   .object({

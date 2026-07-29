@@ -38,6 +38,11 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
         expiresAt: new Date().toISOString(),
       }
     },
+    async sendHeartbeat() {},
+    async markOffline() {},
+    async fetchWorkerControl() {
+      return { worker: { banned: false }, runs: [] }
+    },
   }
 }
 

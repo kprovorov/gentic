@@ -1,7 +1,9 @@
 import { rm } from "node:fs/promises"
+import { arch, platform } from "node:os"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
+import packageJson from "../package.json" with { type: "json" }
 import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
 import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
@@ -19,8 +21,23 @@ import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import { createPendingMessagePromptSource } from "./pending-messages.js"
 import { connectIssueChannel, type IssueRealtimeChannel } from "./realtime.js"
-import { runAgentSession } from "./session.js"
+import {
+  isSessionCancelled,
+  runAgentSession,
+  throwIfAborted,
+} from "./session.js"
+import { getToolStatuses, type ToolStatuses } from "./tools.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
+import type {
+  WorkerCapabilities,
+  WorkerControlResponse,
+  WorkerProviderCapability,
+  WorkerHeartbeatTelemetry,
+} from "@gentic/validators/workers"
+
+export const HEARTBEAT_INTERVAL_MS = 30_000
+export const CONTROL_INTERVAL_MS = 10_000
+export const PROVIDER_CHECK_CACHE_MS = 5 * 60_000
 
 export interface ProcessIssueDeps {
   connectIssueChannel: typeof connectIssueChannel
@@ -34,6 +51,12 @@ export interface ProcessIssueDeps {
   buildAttachmentBlocks: typeof buildAttachmentBlocks
   runAgentSession: typeof runAgentSession
   getPullRequestUrl: typeof getPullRequestUrl
+}
+
+export interface WorkerLoopDeps extends ProcessIssueDeps {
+  sleep: (ms: number) => Promise<void>
+  now: () => Date
+  getToolStatuses: () => Promise<ToolStatuses>
 }
 
 const defaultProcessIssueDeps: ProcessIssueDeps = {
@@ -50,6 +73,13 @@ const defaultProcessIssueDeps: ProcessIssueDeps = {
   getPullRequestUrl,
 }
 
+const defaultWorkerLoopDeps: WorkerLoopDeps = {
+  ...defaultProcessIssueDeps,
+  sleep,
+  now: () => new Date(),
+  getToolStatuses,
+}
+
 export async function runWorker(): Promise<void> {
   const config = loadConfig()
   const api = createAgentApi({
@@ -57,9 +87,31 @@ export async function runWorker(): Promise<void> {
     apiKey: config.GENTIC_WORKER_CREDENTIAL,
   })
 
+  await runWorkerLoop(api, config, defaultWorkerLoopDeps)
+}
+
+export async function runWorkerLoop(
+  api: AgentApi,
+  config: Config,
+  deps: WorkerLoopDeps = defaultWorkerLoopDeps
+): Promise<void> {
   let running = true
+  let offlineMarked = false
+  let offlinePending: Promise<void> | null = null
+  let stoppedByControl = false
+  const activeRuns = new Map<
+    Promise<void>,
+    { issueId: string; activeRunId: string; controller: AbortController }
+  >()
   const stop = (): void => {
     running = false
+    abortActiveRuns(activeRuns)
+    if (!stoppedByControl && !offlineMarked) {
+      offlineMarked = true
+      offlinePending = api.markOffline().catch((error) => {
+        logError("failed to mark worker offline:", describe(error))
+      })
+    }
   }
   process.on("SIGINT", stop)
   process.on("SIGTERM", stop)
@@ -68,20 +120,81 @@ export async function runWorker(): Promise<void> {
     `worker started; polling every ${config.POLL_INTERVAL_MS}ms with up to ${config.MAX_CONCURRENT_ISSUES} concurrent issues`
   )
 
-  const activeRuns = new Set<Promise<void>>()
+  const telemetry = createTelemetrySource(config, deps)
+  let nextHeartbeatAt = 0
+  let nextControlAt = 0
+
+  const sendHeartbeat = async (): Promise<void> => {
+    try {
+      await api.sendHeartbeat(await telemetry.snapshot())
+    } catch (error) {
+      logError("worker heartbeat failed:", describe(error))
+    }
+  }
+
+  const pollControl = async (): Promise<void> => {
+    let control: WorkerControlResponse
+    try {
+      control = await api.fetchWorkerControl()
+    } catch (error) {
+      logError("worker control check failed:", describe(error))
+      return
+    }
+
+    if (control.worker.banned) {
+      stoppedByControl = true
+      running = false
+      abortActiveRuns(activeRuns)
+      return
+    }
+
+    const validRuns = new Map(
+      control.runs.map((run) => [run.issue_id, run.active_run_id])
+    )
+    for (const run of activeRuns.values()) {
+      if (validRuns.get(run.issueId) !== run.activeRunId) {
+        run.controller.abort()
+      }
+    }
+  }
 
   while (running) {
+    const nowMs = deps.now().getTime()
+    if (nowMs >= nextHeartbeatAt) {
+      await sendHeartbeat()
+      nextHeartbeatAt = nowMs + HEARTBEAT_INTERVAL_MS
+    }
+    if (nowMs >= nextControlAt) {
+      await pollControl()
+      nextControlAt = nowMs + CONTROL_INTERVAL_MS
+      if (!running) {
+        break
+      }
+    }
+
+    if (!running) {
+      break
+    }
+
     if (activeRuns.size >= config.MAX_CONCURRENT_ISSUES) {
       // Wake promptly when a run frees a slot, but periodically re-check the
       // stop flag when every slot remains occupied.
       await Promise.race([
-        Promise.race(activeRuns),
-        sleep(config.POLL_INTERVAL_MS),
+        Promise.race(activeRuns.keys()),
+        sleepUntilNextTick(
+          deps,
+          config.POLL_INTERVAL_MS,
+          nextHeartbeatAt,
+          nextControlAt
+        ),
       ])
       continue
     }
 
     let issue: ClaimedIssue | null = null
+    if (!running) {
+      break
+    }
     try {
       // Atomically claims the highest-priority eligible issue by flipping it
       // to `queued`. The conditional update keeps the claim safe if more
@@ -92,12 +205,24 @@ export async function runWorker(): Promise<void> {
     }
 
     if (!issue) {
-      await sleep(config.POLL_INTERVAL_MS)
+      await sleepUntilNextTick(
+        deps,
+        config.POLL_INTERVAL_MS,
+        nextHeartbeatAt,
+        nextControlAt
+      )
       continue
     }
 
-    const run = processIssue(api, config, issue)
+    const controller = new AbortController()
+    const run = processIssue(api, config, issue, deps, {
+      signal: controller.signal,
+    })
       .catch((error) => {
+        if (isSessionCancelled(error)) {
+          logInfo(`issue ${issue.id} cancelled by worker control`)
+          return
+        }
         // processIssue records ordinary failures itself. This protects the
         // pool from an unexpected failure in its cleanup path.
         logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
@@ -105,17 +230,34 @@ export async function runWorker(): Promise<void> {
       .finally(() => {
         activeRuns.delete(run)
       })
-    activeRuns.add(run)
+    activeRuns.set(run, {
+      issueId: issue.id,
+      activeRunId: issue.activeRunId,
+      controller,
+    })
     logInfo(
       `issue ${issue.id} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
     )
   }
 
-  if (activeRuns.size > 0) {
-    logInfo(`waiting for ${activeRuns.size} active issue run(s) to finish`)
-    await Promise.all(activeRuns)
+  if (!stoppedByControl && !offlineMarked) {
+    offlineMarked = true
+    offlinePending = api.markOffline().catch((error) => {
+      logError("failed to mark worker offline:", describe(error))
+    })
+    await offlinePending
+  } else if (offlinePending) {
+    await offlinePending
   }
 
+  if (activeRuns.size > 0) {
+    abortActiveRuns(activeRuns)
+    logInfo(`waiting for ${activeRuns.size} active issue run(s) to finish`)
+    await Promise.all(activeRuns.keys())
+  }
+
+  process.off("SIGINT", stop)
+  process.off("SIGTERM", stop)
   logInfo("worker stopped")
 }
 
@@ -124,6 +266,9 @@ export async function processIssue(
   config: Config,
   issue: ClaimedIssue,
   deps: ProcessIssueDeps = defaultProcessIssueDeps,
+  options: {
+    signal?: AbortSignal
+  } = {},
   state: { automaticPrAttemptedRunIds: Set<string> } = {
     automaticPrAttemptedRunIds: new Set(),
   }
@@ -137,6 +282,7 @@ export async function processIssue(
   let currentSessionId = issue.sessionId
 
   try {
+    throwIfAborted(options.signal)
     const promptSource = createPendingMessagePromptSource({
       api,
       issueId: issue.id,
@@ -172,6 +318,7 @@ export async function processIssue(
         return createNoopIssueChannel()
       })
 
+    throwIfAborted(options.signal)
     await rm(attachmentsDir, { recursive: true, force: true })
 
     // A follow-up message resumes `issue.sessionId`'s ACP conversation. If
@@ -209,6 +356,7 @@ export async function processIssue(
       await deps.runSetupScript({ script: issue.setupScript, dir })
     }
 
+    throwIfAborted(options.signal)
     const baseline = await deps.captureRepoBaseline(dir)
 
     await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
@@ -231,8 +379,10 @@ export async function processIssue(
       },
       onPromptProcessed: promptSource.onPromptProcessed,
       nextPrompt: promptSource.nextPrompt,
+      signal: options.signal,
     })
 
+    throwIfAborted(options.signal)
     const turnResult = await recordCompletedTurnState({
       api,
       deps,
@@ -261,6 +411,7 @@ export async function processIssue(
           hasUnpublishedAgentChanges: true,
         },
         deps,
+        options,
         state
       )
       return
@@ -287,11 +438,13 @@ export async function processIssue(
           hasUnpublishedAgentChanges: turnResult.hasUnpublishedAgentChanges,
         },
         deps,
+        options,
         state
       )
       return
     }
     if (channel) {
+      throwIfAborted(options.signal)
       await channel.publishRunState({
         status: finishedStatus,
         pr_url: prUrl ?? null,
@@ -301,6 +454,9 @@ export async function processIssue(
     }
     logInfo(`issue ${issue.id} completed`)
   } catch (error) {
+    if (options.signal?.aborted || isSessionCancelled(error)) {
+      throw error
+    }
     const message = describe(error)
     const usageLimitResetAt = getUsageLimitResetAt(error)
     if (usageLimitResetAt) {
@@ -337,6 +493,99 @@ export async function processIssue(
         logError("failed to close realtime channel:", describe(closeError))
       })
     }
+  }
+}
+
+function abortActiveRuns(
+  activeRuns: Map<
+    Promise<void>,
+    { issueId: string; activeRunId: string; controller: AbortController }
+  >
+): void {
+  for (const run of activeRuns.values()) {
+    run.controller.abort()
+  }
+}
+
+function sleepUntilNextTick(
+  deps: Pick<WorkerLoopDeps, "sleep" | "now">,
+  pollIntervalMs: number,
+  nextHeartbeatAt: number,
+  nextControlAt: number
+): Promise<void> {
+  const nowMs = deps.now().getTime()
+  const nextInterval = Math.max(
+    1,
+    Math.min(pollIntervalMs, nextHeartbeatAt - nowMs, nextControlAt - nowMs)
+  )
+  return deps.sleep(nextInterval)
+}
+
+function createTelemetrySource(
+  config: Config,
+  deps: Pick<WorkerLoopDeps, "getToolStatuses" | "now">
+): {
+  snapshot: () => Promise<WorkerHeartbeatTelemetry>
+} {
+  const processStartedAt = deps.now().toISOString()
+  let cached:
+    | {
+        expiresAt: number
+        value: WorkerCapabilities
+      }
+    | null = null
+
+  return {
+    async snapshot() {
+      const nowMs = deps.now().getTime()
+      if (!cached || nowMs >= cached.expiresAt) {
+        try {
+          cached = {
+            expiresAt: nowMs + PROVIDER_CHECK_CACHE_MS,
+            value: providerCapabilities(await deps.getToolStatuses()),
+          }
+        } catch (error) {
+          logError("provider capability check failed:", describe(error))
+          cached = {
+            expiresAt: nowMs + PROVIDER_CHECK_CACHE_MS,
+            value: cached?.value ?? { providers: {} },
+          }
+        }
+      }
+
+      return {
+        process_started_at: processStartedAt,
+        gentic_version: packageJson.version,
+        os: platform(),
+        arch: arch(),
+        configured_capacity: config.MAX_CONCURRENT_ISSUES,
+        setup_completed: config.GENTIC_WORKER_SETUP_STATE === "ready",
+        provider_capabilities: cached.value,
+        last_seen_at: deps.now().toISOString(),
+      }
+    },
+  }
+}
+
+function providerCapabilities(tools: ToolStatuses): WorkerCapabilities {
+  return {
+    providers: {
+      claude_code: toolCapability(tools.claude),
+      codex: toolCapability(tools.codex),
+    },
+  }
+}
+
+function toolCapability(
+  status: ToolStatuses["claude"]
+): WorkerProviderCapability {
+  return {
+    enabled: status !== undefined,
+    available: status?.installed ?? false,
+    authenticated: status?.authenticated ?? null,
+    version: status?.version ?? null,
+    models: [],
+    metadata: {},
   }
 }
 

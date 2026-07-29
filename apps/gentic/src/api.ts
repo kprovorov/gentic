@@ -20,6 +20,11 @@ import {
   type RunStateFields,
   type UserMessage,
 } from "@gentic/validators/agent"
+import {
+  workerControlResponseSchema,
+  type WorkerControlResponse,
+  type WorkerHeartbeatTelemetry,
+} from "@gentic/validators/workers"
 import type { z } from "zod"
 
 export type {
@@ -62,6 +67,9 @@ export interface AgentApi {
   ): Promise<AutomaticPrPublishResponse>
   fetchAttachments(issueId: string, messageId: string): Promise<Attachment[]>
   fetchRealtimeToken(): Promise<RealtimeTokenResponse>
+  sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void>
+  markOffline(): Promise<void>
+  fetchWorkerControl(): Promise<WorkerControlResponse>
 }
 
 export function createAgentApi(input: {
@@ -202,6 +210,21 @@ export function createAgentApi(input: {
       return request("/agent/realtime/token", realtimeTokenResponseSchema, {
         method: "POST",
       })
+    },
+    async sendHeartbeat(telemetry) {
+      await request("/agent/worker/heartbeat", okResponseSchema, {
+        method: "PATCH",
+        body: telemetry,
+      })
+    },
+    async markOffline() {
+      await request("/agent/worker/heartbeat", okResponseSchema, {
+        method: "DELETE",
+        body: {},
+      })
+    },
+    async fetchWorkerControl() {
+      return request("/agent/worker/control", workerControlResponseSchema)
     },
   }
 }

@@ -470,6 +470,11 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
       }
     },
+    async sendHeartbeat() {},
+    async markOffline() {},
+    async fetchWorkerControl() {
+      return { worker: { banned: false }, runs: [] }
+    },
   }
   return api
 }

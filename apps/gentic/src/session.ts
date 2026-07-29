@@ -107,6 +107,7 @@ export interface RunSessionInput {
    */
   nextPrompt: () => Promise<PromptTurn | PromptDelivery | null>
   onPromptProcessed?: (messageIds: string[]) => Promise<void>
+  signal?: AbortSignal
 }
 
 /**
@@ -115,12 +116,17 @@ export interface RunSessionInput {
  * into the issue transcript. Resolves once `nextPrompt` returns `null`.
  */
 export async function runAgentSession(input: RunSessionInput): Promise<void> {
+  throwIfAborted(input.signal)
   const agent = getAgentProviderConfig(input)
   const child = spawn(agent.entry.command, agent.entry.args, {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "inherit"],
     env: { ...process.env, ...agent.env },
   })
+  const abort = (): void => {
+    child.kill()
+  }
+  input.signal?.addEventListener("abort", abort, { once: true })
 
   try {
     const stream = ndJsonStream(
@@ -152,19 +158,29 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
       await input.onSessionId(session.sessionId)
 
       for (;;) {
-        const next = await input.nextPrompt()
+        throwIfAborted(input.signal)
+        const next = await abortable(input.nextPrompt(), input.signal)
         if (next === null) {
           break
         }
         const delivery = normalizePromptDelivery(next)
         const prompt = delivery.prompt
-        await runTurn(session, input.api, input.issueId, input.channel, prompt)
+        await runTurn(
+          session,
+          input.api,
+          input.issueId,
+          input.channel,
+          prompt,
+          input.signal
+        )
         if (delivery.messageIds.length > 0) {
+          throwIfAborted(input.signal)
           await input.onPromptProcessed?.(delivery.messageIds)
         }
       }
     })
   } finally {
+    input.signal?.removeEventListener("abort", abort)
     child.kill()
   }
 }
@@ -302,8 +318,10 @@ export async function runTurn(
   api: AgentApi,
   issueId: string,
   channel: IssueRealtimeChannel,
-  prompt: PromptTurn
+  prompt: PromptTurn,
+  signal?: AbortSignal
 ): Promise<void> {
+  throwIfAborted(signal)
   const promptDone = session.prompt(prompt)
   const runId = session.sessionId
 
@@ -375,10 +393,11 @@ export async function runTurn(
 
   try {
     for (;;) {
-      const message = await session.nextUpdate()
+      const message = await abortable(session.nextUpdate(), signal)
       if (message.kind === "stop") {
         break
       }
+      throwIfAborted(signal)
 
       const update = message.update
       if (update.sessionUpdate === "agent_message_chunk") {
@@ -444,7 +463,7 @@ export async function runTurn(
 
     await finalizeCurrent()
     // Surface any prompt-turn error (the loop above already saw the stop).
-    await promptDone
+    await abortable(promptDone, signal)
   } catch (error) {
     const partial = current as StreamingAssistantMessage | null
     if (partial) {
@@ -454,6 +473,43 @@ export async function runTurn(
     }
     throw error
   }
+}
+
+export class SessionCancelledError extends Error {
+  constructor() {
+    super("Session cancelled")
+    this.name = "SessionCancelledError"
+  }
+}
+
+export function isSessionCancelled(error: unknown): boolean {
+  return error instanceof SessionCancelledError
+}
+
+export function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new SessionCancelledError()
+  }
+}
+
+function abortable<T>(
+  promise: Promise<T>,
+  signal: AbortSignal | undefined
+): Promise<T> {
+  if (!signal) {
+    return promise
+  }
+  throwIfAborted(signal)
+  let abort: (() => void) | null = null
+  const aborted = new Promise<T>((_, reject) => {
+    abort = () => reject(new SessionCancelledError())
+    signal.addEventListener("abort", abort, { once: true })
+  })
+  return Promise.race([promise, aborted]).finally(() => {
+    if (abort) {
+      signal.removeEventListener("abort", abort)
+    }
+  })
 }
 
 function textOf(content: ContentBlock): string {
