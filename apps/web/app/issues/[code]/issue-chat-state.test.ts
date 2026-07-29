@@ -65,9 +65,68 @@ test("optimistic delivery keeps a stable client key after persistence", () => {
       clientKey: "optimistic-1",
       role: "user",
       content: "ship it",
+      author_type: "user",
+      generated_action: null,
       created_at: "2026-07-14T00:00:02.000Z",
     }),
   ])
+})
+
+test("legacy hydration defaults missing authorship to user", () => {
+  const state = createIssueChatState([
+    message({ id: "legacy-user", role: "user", content: "hello" }),
+  ])
+
+  assert.equal(selectIssueChatMessages(state)[0]?.author_type, "user")
+  assert.equal(selectIssueChatMessages(state)[0]?.generated_action, null)
+})
+
+test("optimistic persistence preserves user authorship metadata", () => {
+  let state = createIssueChatState()
+  state = issueChatReducer(state, {
+    type: "optimistic_send",
+    message: message({
+      id: "optimistic-1",
+      role: "user",
+      content: "ship it",
+      author_type: "user",
+      generated_action: null,
+    }),
+  })
+
+  state = issueChatReducer(state, {
+    type: "persisted_insert_update",
+    optimisticId: "optimistic-1",
+    message: message({
+      id: "server-1",
+      role: "user",
+      content: "ship it",
+      created_at: "2026-07-14T00:00:02.000Z",
+    }),
+  })
+
+  assert.equal(selectIssueChatMessages(state)[0]?.author_type, "user")
+})
+
+test("realtime inserts preserve Gentic authorship metadata", () => {
+  const state = issueChatReducer(createIssueChatState(), {
+    type: "finalization",
+    event: {
+      id: "00000000-0000-4000-8000-000000000010",
+      seq: 1,
+      role: "system",
+      kind: "text",
+      content: "Create a pull request.",
+      status: "complete",
+      author_type: "gentic",
+      generated_action: "create_pr",
+      ts: "2026-07-14T00:00:02.000Z",
+    },
+  })
+
+  const [stored] = selectIssueChatMessages(state)
+  assert.equal(stored?.author_type, "gentic")
+  assert.equal(stored?.generated_action, "create_pr")
 })
 
 test("reconnect reconciliation does not erase active streaming state", () => {
@@ -312,6 +371,8 @@ test("failed optimistic sends remain visible with failed pending state", () => {
         role: "user",
         content: "try me",
         status: "error",
+        author_type: "user",
+        generated_action: null,
       }),
       deliveryError: "Network dropped",
       pending: "failed",

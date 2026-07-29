@@ -2,6 +2,11 @@ import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { ensureIssueOwned } from "./ownership"
 
+export const GENTIC_AUTHORED_USER_MESSAGE = {
+  role: "user",
+  author_type: "gentic",
+} as const
+
 export async function sendIssueMessage(
   supabase: Supabase,
   userId: string,
@@ -140,7 +145,7 @@ export async function applyChangesRequestedReview(
 
   const { error: insertError } = await supabase.from("messages").insert({
     issue_id: issue.id,
-    role: "user",
+    ...GENTIC_AUTHORED_USER_MESSAGE,
     content: formatChangesRequestedMessage(prUrl, review),
     github_review_id: review.id,
   })
@@ -176,7 +181,7 @@ export async function applyTestsFailed(
   unwrap(
     await supabase.from("messages").insert({
       issue_id: issueId,
-      role: "user",
+      ...GENTIC_AUTHORED_USER_MESSAGE,
       content: formatTestsFailedMessage(prUrl),
     })
   )

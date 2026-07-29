@@ -2,9 +2,11 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  applyChangesRequestedReview,
   applyTestsFailed,
   formatChangesRequestedMessage,
   formatTestsFailedMessage,
+  GENTIC_AUTHORED_USER_MESSAGE,
 } from "./chat"
 
 test("formatChangesRequestedMessage includes review body and inline comments", () => {
@@ -48,14 +50,24 @@ class TestsFailedQuery implements PromiseLike<{ data: unknown; error: null }> {
   private filters: Array<[string, unknown]> = []
   private updateValues: Row | null = null
   private insertValues: Row | null = null
+  private selected = false
 
   constructor(
     private readonly table: "issues" | "messages",
     private readonly db: TestsFailedDb
   ) {}
 
+  select() {
+    this.selected = true
+    return this
+  }
+
   eq(col: string, val: unknown) {
     this.filters.push([col, val])
+    return this
+  }
+
+  maybeSingle() {
     return this
   }
 
@@ -104,6 +116,13 @@ class TestsFailedQuery implements PromiseLike<{ data: unknown; error: null }> {
         .forEach((row) => Object.assign(row, this.updateValues))
     }
 
+    if (this.selected) {
+      return {
+        data: this.rows().find((row) => this.matches(row)) ?? null,
+        error: null,
+      }
+    }
+
     return { data: null, error: null }
   }
 }
@@ -131,7 +150,7 @@ test("applyTestsFailed inserts a follow-up message and requeues the issue", asyn
     {
       id: "messages-1",
       issue_id: "issue-1",
-      role: "user",
+      ...GENTIC_AUTHORED_USER_MESSAGE,
       content: formatTestsFailedMessage(
         "https://github.com/acme/widget/pull/42"
       ),
@@ -140,4 +159,44 @@ test("applyTestsFailed inserts a follow-up message and requeues the issue", asyn
   assert.equal(supabase.issues[0]?.status, "todo")
   assert.equal(supabase.issues[0]?.usage_limit_reset_at, null)
   assert.equal(typeof supabase.issues[0]?.updated_at, "string")
+})
+
+test("applyChangesRequestedReview inserts a Gentic-authored follow-up message", async () => {
+  const supabase = new TestsFailedDb()
+  supabase.issues.push({
+    id: "issue-1",
+    status: "changes-requested",
+    pr_url: "https://github.com/acme/widget/pull/42",
+    projects: { auto_respond_to_reviews: true },
+  })
+
+  await applyChangesRequestedReview(
+    supabase as never,
+    "https://github.com/acme/widget/pull/42",
+    {
+      id: 42,
+      reviewerLogin: "reviewer",
+      body: null,
+      comments: [],
+    }
+  )
+
+  assert.deepEqual(supabase.messages, [
+    {
+      id: "messages-1",
+      issue_id: "issue-1",
+      ...GENTIC_AUTHORED_USER_MESSAGE,
+      content: formatChangesRequestedMessage(
+        "https://github.com/acme/widget/pull/42",
+        {
+          id: 42,
+          reviewerLogin: "reviewer",
+          body: null,
+          comments: [],
+        }
+      ),
+      github_review_id: 42,
+    },
+  ])
+  assert.equal(supabase.issues[0]?.status, "todo")
 })

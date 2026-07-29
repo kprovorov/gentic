@@ -8,6 +8,10 @@ export function isVisibleChatMessage(message: ChatMessage) {
   return message.event_type !== "available_commands"
 }
 
+export function isGenticAuthoredMessage(message: ChatMessage) {
+  return message.author_type === "gentic"
+}
+
 export function groupChatMessages(messages: ChatMessage[]): DisplayItem[] {
   const items: DisplayItem[] = []
   let toolGroup: ChatMessage[] = []

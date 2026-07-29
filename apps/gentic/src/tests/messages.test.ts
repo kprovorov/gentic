@@ -2,7 +2,11 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { AgentApi, InsertMessageInput } from "../api.js"
-import { StreamingAssistantMessage, publishMessage } from "../messages.js"
+import {
+  StreamingAssistantMessage,
+  publishMessage,
+  publishStructuredMessage,
+} from "../messages.js"
 import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
 import { issueRunInstructions, runTurn } from "../session.js"
 
@@ -106,6 +110,26 @@ test("tool messages insert at emit time with the broadcast id", async () => {
   assert.equal(api.inserted[0]?.message.id, channel.messages[0]?.id)
   assert.equal(api.inserted[0]?.message.kind, "tool")
   assert.equal(api.inserted[0]?.message.status, "complete")
+})
+
+test("structured generated action messages publish as Gentic-authored", async () => {
+  const api = fakeApi()
+  const channel = fakeChannel()
+
+  await publishStructuredMessage(api, ISSUE_ID, channel, {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    role: "system",
+    kind: "text",
+    content: "Create a pull request.",
+    status: "complete",
+    author_type: "gentic",
+    generated_action: "create_pr",
+  })
+
+  assert.equal(api.inserted[0]?.message.author_type, "gentic")
+  assert.equal(api.inserted[0]?.message.generated_action, "create_pr")
+  assert.equal(channel.messages[0]?.author_type, "gentic")
+  assert.equal(channel.messages[0]?.generated_action, "create_pr")
 })
 
 test("runTurn maps text and thought chunks to structured stable events", async () => {

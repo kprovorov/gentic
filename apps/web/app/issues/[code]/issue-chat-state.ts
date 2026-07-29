@@ -19,6 +19,14 @@ export type ChatMessage = ChatMessageContract & {
   attachments?: Attachment[]
 }
 
+export function normalizeChatMessageAuthor(message: ChatMessage): ChatMessage {
+  return {
+    ...message,
+    author_type: message.author_type ?? "user",
+    generated_action: message.generated_action ?? null,
+  }
+}
+
 type TranscriptEntity = ChatMessage
 
 export type IssueChatState = {
@@ -121,7 +129,8 @@ function mergeBatch(
   messages: ChatMessage[]
 ): IssueChatState {
   return messages.reduce(
-    (next, message) => upsertPersistedMessage(next, message),
+    (next, message) =>
+      upsertPersistedMessage(next, normalizeChatMessageAuthor(message)),
     state
   )
 }
@@ -170,7 +179,11 @@ function upsertSequencedEvent(
     return state
   }
   const existing = state.entities[event.id]
-  if (existing && existing.status !== "streaming" && event.status === "streaming") {
+  if (
+    existing &&
+    existing.status !== "streaming" &&
+    event.status === "streaming"
+  ) {
     return {
       ...state,
       lastSeqById: {
@@ -186,6 +199,8 @@ function upsertSequencedEvent(
     kind: event.kind,
     content: event.content,
     status: event.status ?? fallbackStatus,
+    author_type: event.author_type ?? "agent",
+    generated_action: event.generated_action ?? null,
     created_at: event.ts,
     event_id: event.event_id ?? null,
     run_id: event.run_id ?? null,
@@ -230,8 +245,9 @@ function upsertMessage(
   state: IssueChatState,
   incoming: TranscriptEntity
 ): IssueChatState {
-  const existing = state.entities[incoming.id]
-  const merged = mergeEntity(existing, incoming)
+  const normalizedIncoming = normalizeChatMessageAuthor(incoming)
+  const existing = state.entities[normalizedIncoming.id]
+  const merged = mergeEntity(existing, normalizedIncoming)
 
   if (existing && sameEntity(existing, merged)) {
     return state
@@ -239,12 +255,12 @@ function upsertMessage(
 
   const entities = {
     ...state.entities,
-    [incoming.id]: merged,
+    [normalizedIncoming.id]: merged,
   }
   const order = sortMessageIds(
-    state.order.includes(incoming.id)
+    state.order.includes(normalizedIncoming.id)
       ? state.order
-      : [...state.order, incoming.id],
+      : [...state.order, normalizedIncoming.id],
     entities
   )
 
@@ -339,6 +355,8 @@ function sameEntity(left: TranscriptEntity, right: TranscriptEntity): boolean {
     left.kind === right.kind &&
     left.content === right.content &&
     left.status === right.status &&
+    left.author_type === right.author_type &&
+    left.generated_action === right.generated_action &&
     left.created_at === right.created_at &&
     left.pending === right.pending &&
     left.attachments === right.attachments
