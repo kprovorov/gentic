@@ -6,6 +6,7 @@ import type {
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
+import { logIssueEvent } from "./events"
 import {
   ensureIssueOwned,
   ensureIssuesOwned,
@@ -102,7 +103,7 @@ export async function updateIssue(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider, issue_model, projects!inner(user_id)")
+    .select("agent_provider, issue_model, priority, projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -114,26 +115,35 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  const result = await supabase
-    .from("issues")
-    .update({
-      title: input.title,
-      prompt: input.prompt ?? null,
-      agent_provider: input.agent_provider,
-      issue_model: input.issue_model,
-      type: input.type,
-      priority: input.priority,
-      ...(current.agent_provider !== input.agent_provider ||
-      current.issue_model !== input.issue_model
-        ? { session_id: null }
-        : {}),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select(ISSUE_WITH_PROJECT_SELECT)
-    .single()
+  const issue = unwrap(
+    await supabase
+      .from("issues")
+      .update({
+        title: input.title,
+        prompt: input.prompt ?? null,
+        agent_provider: input.agent_provider,
+        issue_model: input.issue_model,
+        type: input.type,
+        priority: input.priority,
+        ...(current.agent_provider !== input.agent_provider ||
+        current.issue_model !== input.issue_model
+          ? { session_id: null }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select(ISSUE_WITH_PROJECT_SELECT)
+      .single()
+  )
 
-  return unwrap(result)
+  if (current.priority !== input.priority) {
+    await logIssueEvent(supabase, id, "priority_changed", {
+      from: current.priority,
+      to: input.priority,
+    })
+  }
+
+  return issue
 }
 
 export async function updateIssueTitle(

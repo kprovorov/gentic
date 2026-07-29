@@ -1,6 +1,7 @@
 import type {
   AgentProvider,
   IssueModel,
+  IssuePriority,
   IssueStatus,
 } from "@gentic/validators/issues"
 
@@ -138,6 +139,89 @@ export async function bulkUpdateIssueStatus(
       .from("issues")
       .update({ status, updated_at: new Date().toISOString() })
       .in("id", directUpdateIds)
+  )
+}
+
+export async function updateIssuePriority(
+  supabase: Supabase,
+  userId: string,
+  id: string,
+  priority: IssuePriority
+) {
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("priority,projects!inner(user_id)")
+    .eq("id", id)
+    .eq("projects.user_id", userId)
+    .maybeSingle()
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!current) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+  if (current.priority === priority) {
+    return getIssue(supabase, userId, id)
+  }
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ priority, updated_at: new Date().toISOString() })
+      .eq("id", id)
+  )
+
+  await logIssueEvent(supabase, id, "priority_changed", {
+    from: current.priority,
+    to: priority,
+  })
+
+  return getIssue(supabase, userId, id)
+}
+
+export async function bulkUpdateIssuePriority(
+  supabase: Supabase,
+  userId: string,
+  issueIds: string[],
+  priority: IssuePriority
+) {
+  const uniqueIds = Array.from(new Set(issueIds))
+  const { data: issues, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,priority,projects!inner(user_id)")
+    .in("id", uniqueIds)
+    .eq("projects.user_id", userId)
+
+  if (fetchError) {
+    throw new ServiceError("internal", fetchError.message)
+  }
+  if (!issues || issues.length !== uniqueIds.length) {
+    throw new ServiceError("not_found", "Issue not found")
+  }
+
+  const changedIssues = issues.filter((issue) => issue.priority !== priority)
+  if (changedIssues.length === 0) {
+    return
+  }
+
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ priority, updated_at: new Date().toISOString() })
+      .in(
+        "id",
+        changedIssues.map((issue) => issue.id)
+      )
+  )
+
+  await Promise.all(
+    changedIssues.map((issue) =>
+      logIssueEvent(supabase, issue.id, "priority_changed", {
+        from: issue.priority,
+        to: priority,
+      })
+    )
   )
 }
 
