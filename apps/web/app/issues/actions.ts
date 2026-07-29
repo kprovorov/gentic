@@ -416,6 +416,26 @@ export async function sendIssueMessage(formData: FormData) {
   }
 }
 
+export async function createManualIssuePullRequest(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+
+  const message = await issuesService.createManualFirstPrPublishMessage(
+    supabase,
+    userId,
+    issueId
+  )
+
+  await revalidateIssuePathById(supabase, userId, issueId)
+
+  return {
+    id: message.id,
+    created_at: message.created_at,
+    content: message.content,
+    created: message.created,
+  }
+}
+
 export async function uploadAttachments(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))

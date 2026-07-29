@@ -58,6 +58,7 @@ export {
   type ChangesRequestedReviewComment,
   type PullRequestComment,
   createIssueUserMessage,
+  createManualFirstPrPublishMessage,
   deleteIssueMessage,
   formatPullRequestCommentMessage,
   formatTestsFailedMessage,

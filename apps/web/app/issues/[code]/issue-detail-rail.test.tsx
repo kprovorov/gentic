@@ -7,11 +7,15 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 const updateIssuePriorityMock = vi.fn()
 const updateIssueStatusMock = vi.fn()
 const addIssueRelationMock = vi.fn()
+const createManualIssuePullRequestMock = vi.fn()
 const deleteIssueRelationMock = vi.fn()
 const toastErrorMock = vi.fn()
+const toastSuccessMock = vi.fn()
 
 vi.mock("@/app/issues/actions", () => ({
   addIssueRelation: (formData: FormData) => addIssueRelationMock(formData),
+  createManualIssuePullRequest: (formData: FormData) =>
+    createManualIssuePullRequestMock(formData),
   deleteIssueRelation: (formData: FormData) =>
     deleteIssueRelationMock(formData),
   updateIssuePriority: (formData: FormData) =>
@@ -22,6 +26,7 @@ vi.mock("@/app/issues/actions", () => ({
 vi.mock("sonner", () => ({
   toast: {
     error: (message: string) => toastErrorMock(message),
+    success: (message: string) => toastSuccessMock(message),
   },
 }))
 
@@ -70,7 +75,10 @@ function createQueryClient() {
   })
 }
 
-function renderRail(queryClient = createQueryClient()) {
+function renderRail(
+  queryClient = createQueryClient(),
+  props: Partial<React.ComponentProps<typeof IssueDetailRail>> = {}
+) {
   queryClient.setQueryData(queryKeys.issue(issueId), {
     issue: { id: issueId, priority: "medium" },
   })
@@ -87,9 +95,12 @@ function renderRail(queryClient = createQueryClient()) {
         issueCode="GEN-1"
         status="todo"
         priority="medium"
+        hasUnpublishedAgentChanges={false}
+        automaticPrPublishingInProgress={false}
         pullRequests={[]}
         relations={[]}
         relationCandidates={[]}
+        {...props}
       />
     </QueryClientProvider>
   )
@@ -99,6 +110,91 @@ function renderRail(queryClient = createQueryClient()) {
 
 afterEach(() => {
   vi.clearAllMocks()
+})
+
+describe("IssueDetailRail manual Create PR", () => {
+  it("shows the button in the Pull requests section when eligible", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+
+  it("does not show while automatic publishing is still running", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+      automaticPrPublishingInProgress: true,
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Create PR" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("does not show once a pull request is attached", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+      pullRequests: [
+        {
+          id: "pr-1",
+          issue_id: issueId,
+          url: "https://github.com/acme/widget/pull/1",
+          created_at: "2026-07-29T12:00:00.000Z",
+        },
+      ],
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Create PR" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("prevents duplicate clicks while the request is pending", async () => {
+    const user = userEvent.setup()
+    let resolveMutation: () => void = () => {}
+    createManualIssuePullRequestMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMutation = resolve
+        })
+    )
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.dblClick(screen.getByRole("button", { name: "Create PR" }))
+
+    expect(createManualIssuePullRequestMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("Requesting pull request...")).toBeVisible()
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith("Create PR request sent")
+    })
+  })
+
+  it("shows a failure and restores the button when the request fails", async () => {
+    const user = userEvent.setup()
+    createManualIssuePullRequestMock.mockRejectedValue(
+      new Error("Could not create request")
+    )
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.click(screen.getByRole("button", { name: "Create PR" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Could not create request")
+    })
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
 })
 
 describe("IssueDetailRail priority", () => {

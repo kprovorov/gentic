@@ -36,6 +36,22 @@ test("chatMessageSchema accepts Gentic-authored user prompts", () => {
   assert.equal(row.author_type, "gentic")
 })
 
+test("chatMessageSchema accepts user-authored manual create PR prompts", () => {
+  const row = chatMessageSchema.parse({
+    id: "manual-create-pr",
+    role: "user",
+    kind: "text",
+    content: "Create a pull request.",
+    status: "complete",
+    author_type: "user",
+    generated_action: "create_pr",
+    created_at: "2026-07-29T12:00:00.000Z",
+  })
+
+  assert.equal(row.author_type, "user")
+  assert.equal(row.generated_action, "create_pr")
+})
+
 test("messageEventSchema defaults realtime assistant authorship to agent", () => {
   const event = messageEventSchema.parse({
     id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
