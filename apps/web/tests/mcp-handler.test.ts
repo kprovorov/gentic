@@ -1,0 +1,192 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+
+const { registerGenticMcpTools } = await import("../lib/mcp/handler")
+
+const projectId = "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2"
+const issueId = "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1"
+
+type RegisteredTool = {
+  config: {
+    inputSchema: Record<string, { description?: string; safeParse?: unknown }>
+    outputSchema: Record<string, { description?: string; safeParse: unknown }>
+  }
+  handler: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
+}
+
+class FakeServer {
+  readonly tools = new Map<string, RegisteredTool>()
+
+  registerTool(
+    name: string,
+    config: RegisteredTool["config"],
+    handler: RegisteredTool["handler"]
+  ) {
+    this.tools.set(name, { config, handler })
+  }
+}
+
+function registerTools(
+  issuesService: Record<string, unknown> = {}
+): Map<string, RegisteredTool> {
+  const server = new FakeServer()
+
+  registerGenticMcpTools(server as never, {
+    issuesService: issuesService as never,
+    projectsService: {} as never,
+    tool: ((
+        run: (ctx: unknown, input: unknown) => Promise<Record<string, unknown>>
+      ) =>
+      (input: Record<string, unknown>) =>
+        run({ supabase: "supabase", userId: "user_1" }, input)) as never,
+  })
+
+  return server.tools
+}
+
+test("issue MCP tools document and return priority in their output contracts", () => {
+  const tools = registerTools()
+
+  for (const name of [
+    "list_issues",
+    "get_issue",
+    "create_issue",
+    "update_issue",
+    "update_issue_priority",
+  ]) {
+    const outputSchema = tools.get(name)?.config.outputSchema
+    assert.ok(outputSchema, `${name} is registered`)
+
+    const field =
+      name === "list_issues" ? outputSchema.issues : outputSchema.issue
+    assert.match(field.description ?? "", /priority/)
+
+    const candidate =
+      name === "list_issues"
+        ? [{ id: issueId, priority: "urgent" }]
+        : { id: issueId, priority: "urgent" }
+    assert.equal(
+      (field.safeParse as (value: unknown) => { success: boolean })(candidate)
+        .success,
+      true
+    )
+
+    const invalid =
+      name === "list_issues"
+        ? [{ id: issueId, priority: "normal" }]
+        : { id: issueId, priority: "normal" }
+    assert.equal(
+      (field.safeParse as (value: unknown) => { success: boolean })(invalid)
+        .success,
+      false
+    )
+  }
+})
+
+test("priority MCP inputs document the four accepted values", () => {
+  const tools = registerTools()
+
+  for (const name of [
+    "create_issue",
+    "update_issue",
+    "update_issue_priority",
+  ]) {
+    const description = tools.get(name)?.config.inputSchema.priority.description
+    assert.match(description ?? "", /low, medium, high, urgent/)
+  }
+})
+
+test("create_issue defaults priority to medium without changing other defaults", async () => {
+  let createInput: Record<string, unknown> | null = null
+  const tools = registerTools({
+    createIssue: async (
+      supabase: unknown,
+      userId: string,
+      input: Record<string, unknown>
+    ) => {
+      createInput = { supabase, userId, ...input }
+      return { id: issueId, priority: input.priority }
+    },
+  })
+
+  const result = await tools.get("create_issue")?.handler({
+    project_id: projectId,
+    title: "Expose priority",
+  })
+
+  assert.deepEqual(createInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    project_id: projectId,
+    title: "Expose priority",
+    status: "draft",
+    priority: "medium",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+  })
+  assert.deepEqual(result, { issue: { id: issueId, priority: "medium" } })
+})
+
+test("update_issue passes priority through the ownership-checked update service", async () => {
+  let updateInput: Record<string, unknown> | null = null
+  const tools = registerTools({
+    updateIssue: async (
+      supabase: unknown,
+      userId: string,
+      id: string,
+      input: Record<string, unknown>
+    ) => {
+      updateInput = { supabase, userId, id, ...input }
+      return { id, priority: input.priority }
+    },
+  })
+
+  const result = await tools.get("update_issue")?.handler({
+    id: issueId,
+    title: "Expose priority",
+    agent_provider: "codex",
+    priority: "high",
+    type: "bug",
+  })
+
+  assert.deepEqual(updateInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    id: issueId,
+    title: "Expose priority",
+    agent_provider: "codex",
+    issue_model: null,
+    priority: "high",
+    type: "bug",
+  })
+  assert.deepEqual(result, { issue: { id: issueId, priority: "high" } })
+})
+
+test("update_issue_priority routes to the priority workflow mutation", async () => {
+  let updatePriorityInput: Record<string, unknown> | null = null
+  const tools = registerTools({
+    updateIssuePriority: async (
+      supabase: unknown,
+      userId: string,
+      id: string,
+      priority: string
+    ) => {
+      updatePriorityInput = { supabase, userId, id, priority }
+      return { id, priority }
+    },
+  })
+
+  const result = await tools.get("update_issue_priority")?.handler({
+    id: issueId,
+    priority: "urgent",
+  })
+
+  assert.deepEqual(updatePriorityInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    id: issueId,
+    priority: "urgent",
+  })
+  assert.deepEqual(result, { issue: { id: issueId, priority: "urgent" } })
+})

@@ -131,7 +131,7 @@ Permanently deletes a project and all of its issues. All issues belonging to the
 
 ### `list_issues`
 
-Lists issues owned by the authenticated account. Filter by project to narrow results.
+Lists issues owned by the authenticated account. Filter by project to narrow results. Returned issue objects include `priority`.
 
 <ParamField body="project_id" type="string (uuid)">
   Optional. When provided, returns only issues belonging to this project. Omit to list issues across all projects.
@@ -147,7 +147,7 @@ Lists issues owned by the authenticated account. Filter by project to narrow res
 
 ### `get_issue`
 
-Returns full details for a single issue, including its current status, prompt, and agent configuration.
+Returns full details for a single issue, including its current status, priority, prompt, and agent configuration.
 
 <ParamField body="id" type="string (uuid)" required>
   The issue ID, from `list_issues` or `create_issue`.
@@ -183,6 +183,12 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
   Accepted values: `draft`, `todo`, `queued`, `held`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `run-failed`, `completed`, `cancelled`
 </ParamField>
 
+<ParamField body="priority" type="enum">
+  Issue priority. Defaults to `medium`.
+
+  Accepted values: `low`, `medium`, `high`, `urgent`
+</ParamField>
+
 <ParamField body="agent_provider" type="enum">
   The AI coding agent to assign to this issue. Defaults to `claude_code`.
 
@@ -205,7 +211,7 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
 
 ### `update_issue`
 
-Updates the title, prompt, agent provider, and type for an existing issue. Use this to refine the agent's instructions before queuing a run. `title`, `agent_provider`, and `type` are required; `prompt` is optional.
+Updates the title, prompt, agent provider, issue model, type, and priority for an existing issue. Use this to refine the agent's instructions before queuing a run. `title`, `agent_provider`, `type`, and `priority` are required; `prompt` and `issue_model` are optional.
 
 <ParamField body="id" type="string (uuid)" required>
   The issue ID to update.
@@ -225,10 +231,20 @@ Updates the title, prompt, agent provider, and type for an existing issue. Use t
   Accepted values: `claude_code`, `codex`
 </ParamField>
 
+<ParamField body="issue_model" type="string">
+  Optional coding-agent model to run for this issue. Omit or pass `null` to use the provider default.
+</ParamField>
+
 <ParamField body="type" type="enum" required>
   Updated issue type.
 
   Accepted values: `feature`, `bug`, `feedback`, `idea`
+</ParamField>
+
+<ParamField body="priority" type="enum" required>
+  Updated issue priority.
+
+  Accepted values: `low`, `medium`, `high`, `urgent`
 </ParamField>
 
 <Expandable title="Output fields">
@@ -253,6 +269,28 @@ Permanently deletes an issue. This action cannot be undone.
   </ResponseField>
   <ResponseField name="deleted" type="boolean">
     Always `true` when the deletion completed successfully.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `update_issue_priority`
+
+Updates only the priority for an existing issue and records `priority_changed` history when the value changes.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID to update.
+</ParamField>
+
+<ParamField body="priority" type="enum" required>
+  New issue priority.
+
+  Accepted values: `low`, `medium`, `high`, `urgent`
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue" type="object">
+    The updated issue object, reflecting the new priority.
   </ResponseField>
 </Expandable>
 

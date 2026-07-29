@@ -2,9 +2,11 @@ import { verifyClerkToken } from "@clerk/mcp-tools/next"
 import { auth } from "@clerk/nextjs/server"
 import { withMcpAuth } from "mcp-handler"
 
-import { mcpHandler } from "./handler"
+import { createGenticMcpHandler } from "./handler"
 
 type VerifyClerkTokenAuth = Parameters<typeof verifyClerkToken>[0]
+
+const mcpHandler = createGenticMcpHandler()
 
 export const authenticatedMcpHandler = withMcpAuth(
   mcpHandler,
