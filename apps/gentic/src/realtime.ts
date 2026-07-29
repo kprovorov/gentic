@@ -39,9 +39,10 @@ export interface IssueRealtimeChannel {
 export async function connectIssueChannel(
   api: AgentApi,
   issueId: string,
+  activeRunId: string,
   onUserMessage: () => void
 ): Promise<IssueRealtimeChannel> {
-  const token = await api.fetchRealtimeToken()
+  const token = await api.fetchRealtimeToken(issueId, activeRunId)
   const client = createClient(token.url, token.apiKey)
   await client.realtime.setAuth(token.token)
 
@@ -70,7 +71,14 @@ export async function connectIssueChannel(
     })
   })
 
-  return new SupabaseIssueRealtimeChannel(api, client, channel, token.expiresAt)
+  return new SupabaseIssueRealtimeChannel(
+    api,
+    issueId,
+    activeRunId,
+    client,
+    channel,
+    token.expiresAt
+  )
 }
 
 class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
@@ -78,6 +86,8 @@ class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
 
   constructor(
     private readonly api: AgentApi,
+    private readonly issueId: string,
+    private readonly activeRunId: string,
     private readonly client: SupabaseClient,
     private readonly channel: RealtimeChannel,
     expiresAt: string
@@ -129,7 +139,10 @@ class SupabaseIssueRealtimeChannel implements IssueRealtimeChannel {
 
   private async refresh(): Promise<void> {
     try {
-      const token = await this.api.fetchRealtimeToken()
+      const token = await this.api.fetchRealtimeToken(
+        this.issueId,
+        this.activeRunId
+      )
       await this.client.realtime.setAuth(token.token)
       this.scheduleRefresh(token.expiresAt)
     } catch {

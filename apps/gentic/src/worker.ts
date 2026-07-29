@@ -292,6 +292,7 @@ export async function processIssue(
         const attachmentBlocks = await deps.buildAttachmentBlocks(
           api,
           issue.id,
+          issue.activeRunId,
           message.id,
           attachmentsDir
         )
@@ -309,7 +310,7 @@ export async function processIssue(
     })
 
     channel = await deps
-      .connectIssueChannel(api, issue.id, promptSource.wake)
+      .connectIssueChannel(api, issue.id, issue.activeRunId, promptSource.wake)
       .catch((error) => {
         logError(
           `issue ${issue.id} realtime unavailable; continuing with database polling:`,
@@ -359,7 +360,9 @@ export async function processIssue(
     throwIfAborted(options.signal)
     const baseline = await deps.captureRepoBaseline(dir)
 
-    await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
+    await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
+      status: "in-progress",
+    })
 
     await deps.runAgentSession({
       api,
@@ -373,9 +376,15 @@ export async function processIssue(
       existingPrCheckedOut,
       onSessionId: (sessionId) => {
         currentSessionId = sessionId
-        return deps.setRunState(api, channel, issue.id, {
-          session_id: sessionId,
-        })
+        return deps.setRunState(
+          api,
+          channel,
+          issue.id,
+          issue.activeRunId,
+          {
+            session_id: sessionId,
+          }
+        )
       },
       onPromptProcessed: promptSource.onPromptProcessed,
       nextPrompt: promptSource.nextPrompt,
@@ -400,7 +409,9 @@ export async function processIssue(
         attemptedRunIds: state.automaticPrAttemptedRunIds,
       })
     ) {
-      await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
+      await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
+        status: "in-progress",
+      })
       await processIssue(
         api,
         config,
@@ -427,7 +438,9 @@ export async function processIssue(
       logInfo(
         `issue ${issue.id} received more prompts before finish; re-queueing`
       )
-      await deps.setRunState(api, channel, issue.id, { status: "in-progress" })
+      await deps.setRunState(api, channel, issue.id, issue.activeRunId, {
+        status: "in-progress",
+      })
       await processIssue(
         api,
         config,
@@ -464,7 +477,7 @@ export async function processIssue(
         `issue ${issue.id} held until ${usageLimitResetAt}: usage limit reached`
       )
       await deps
-        .setRunState(api, channel, issue.id, {
+        .setRunState(api, channel, issue.id, issue.activeRunId, {
           status: "held",
           run_error: message,
           run_finished_at: new Date().toISOString(),
@@ -478,7 +491,7 @@ export async function processIssue(
 
     logError(`issue ${issue.id} failed:`, message)
     await deps
-      .setRunState(api, channel, issue.id, {
+      .setRunState(api, channel, issue.id, issue.activeRunId, {
         status: "run-failed",
         run_error: message,
         run_finished_at: new Date().toISOString(),

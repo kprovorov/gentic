@@ -1,6 +1,9 @@
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
-import { authenticateWorkerCredential } from "@gentic/services/workers"
+import {
+  WORKER_OFFLINE_AFTER_MS,
+  authenticateWorkerCredential,
+} from "@gentic/services/workers"
 import { createServiceClient } from "@gentic/supabase/service"
 import {
   ackMessagesInputSchema,
@@ -8,6 +11,7 @@ import {
   insertMessageInputShape,
   recordUnpublishedChangesInputSchema,
   requestAutomaticPrPublishInputSchema,
+  realtimeTokenInputSchema,
   requireGenticGeneratedActionAuthor,
   runStateFieldsSchema,
 } from "@gentic/validators/agent"
@@ -48,6 +52,67 @@ export const insertMessageSchema = z
 export const unpublishedChangesSchema = recordUnpublishedChangesInputSchema
 export const automaticPrPublishRequestSchema =
   requestAutomaticPrPublishInputSchema
+export const realtimeTokenSchema = realtimeTokenInputSchema
+
+export async function ensureActiveWorkerRun(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  issueId: string,
+  runId: string
+): Promise<void> {
+  const issueResult = await supabase
+    .from("issues")
+    .select("id,active_worker_id,active_run_id,projects!inner(user_id)")
+    .eq("id", issueId)
+    .maybeSingle()
+
+  const { data: issue, error: issueError } = issueResult as {
+    data: {
+      id: string
+      active_worker_id: string | null
+      active_run_id: string | null
+      projects: { user_id: string }
+    } | null
+    error: { message: string } | null
+  }
+
+  if (issueError) {
+    throw new Error(issueError.message)
+  }
+  if (!issue || issue.projects.user_id !== userId) {
+    throw new ApiError(404, "Issue not found")
+  }
+  if (issue.active_worker_id !== workerId || issue.active_run_id !== runId) {
+    throw new ApiError(409, "Run is not active for this worker")
+  }
+
+  const { data: worker, error: workerError } = await supabase
+    .from("workers")
+    .select("id,banned_at,last_seen_at")
+    .eq("id", workerId)
+    .eq("user_id", userId)
+    .maybeSingle()
+    .returns<{
+      id: string
+      banned_at: string | null
+      last_seen_at: string | null
+    } | null>()
+
+  if (workerError) {
+    throw new Error(workerError.message)
+  }
+  if (!worker || worker.banned_at || !isWorkerOnline(worker.last_seen_at)) {
+    throw new ApiError(409, "Run is not active for this worker")
+  }
+}
+
+function isWorkerOnline(lastSeenAt: string | null): boolean {
+  if (!lastSeenAt) {
+    return false
+  }
+  return Date.now() - new Date(lastSeenAt).getTime() <= WORKER_OFFLINE_AFTER_MS
+}
 
 export async function getAgentContext(request: Request): Promise<{
   userId: string

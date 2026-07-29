@@ -30,7 +30,7 @@ type FakeIssue = {
   prompt: string | null
   number: number
   title: string | null
-  agent_provider: "codex" | "claude"
+  agent_provider: "codex" | "claude_code"
   issue_model: string | null
   session_id: string | null
   pr_url: string | null
@@ -41,6 +41,38 @@ type FakeIssue = {
   blockerStatuses: Array<"todo" | "held" | "in-progress" | "completed" | "cancelled">
 }
 
+type FakeWorker = {
+  id: string
+  user_id: string
+  display_name: string
+  setup_state: "enrolling" | "ready" | "setup_failed"
+  banned_at: string | null
+  created_at: string
+  updated_at: string
+  last_seen_at: string | null
+  process_started_at: string | null
+  gentic_version: string | null
+  os: string | null
+  arch: string | null
+  configured_capacity: number
+  provider_capabilities: {
+    providers: {
+      codex?: {
+        enabled: boolean
+        available: boolean
+        authenticated: boolean | null
+        version: string | null
+      }
+      claude_code?: {
+        enabled: boolean
+        available: boolean
+        authenticated: boolean | null
+        version: string | null
+      }
+    }
+  }
+}
+
 const PRIORITY_RANK: Record<IssuePriority, number> = {
   low: 0,
   medium: 1,
@@ -48,6 +80,7 @@ const PRIORITY_RANK: Record<IssuePriority, number> = {
   urgent: 3,
 }
 const workerId = "worker-1"
+const claudeWorkerId = "worker-2"
 
 class FakeMessagesQuery {
   private insertValues: Record<string, unknown> | null = null
@@ -96,6 +129,9 @@ class FakeIssuesQuery {
     userId?: string
     eligibleAt?: string
     requireNoUnfinishedBlockers?: boolean
+    agentProviders?: string[]
+    activeWorkerIds?: string[]
+    activeRunIdIsNull?: boolean
   } = {}
   private updateValues: Partial<FakeIssue> | null = null
   private limitCount: number | null = null
@@ -129,13 +165,35 @@ class FakeIssuesQuery {
     return this
   }
 
+  in(column: string, values: unknown[]) {
+    if (column === "agent_provider") {
+      this.filters.agentProviders = values.map(String)
+    } else if (column === "active_worker_id") {
+      this.filters.activeWorkerIds = values.map(String)
+    }
+    return this
+  }
+
   not() {
     return this
+  }
+
+  returns<T>() {
+    const data = this.matchingIssues()
+      .filter(
+        (issue) =>
+          issue.active_worker_id &&
+          !["completed", "cancelled"].includes(issue.status)
+      )
+      .map((issue) => ({ active_worker_id: issue.active_worker_id }))
+    return Promise.resolve({ data: data as T, error: null })
   }
 
   is(column: string, value: unknown) {
     if (column === "unfinished_blockers" && value === null) {
       this.filters.requireNoUnfinishedBlockers = true
+    } else if (column === "active_run_id" && value === null) {
+      this.filters.activeRunIdIsNull = true
     }
     return this
   }
@@ -184,6 +242,22 @@ class FakeIssuesQuery {
         return false
       }
       if (
+        this.filters.agentProviders &&
+        !this.filters.agentProviders.includes(issue.agent_provider)
+      ) {
+        return false
+      }
+      if (
+        this.filters.activeWorkerIds &&
+        (!issue.active_worker_id ||
+          !this.filters.activeWorkerIds.includes(issue.active_worker_id))
+      ) {
+        return false
+      }
+      if (this.filters.activeRunIdIsNull && issue.active_run_id !== null) {
+        return false
+      }
+      if (
         this.filters.requireNoUnfinishedBlockers &&
         issue.blockerStatuses.some(
           (status) => status !== "completed" && status !== "cancelled"
@@ -197,6 +271,45 @@ class FakeIssuesQuery {
   }
 }
 
+class FakeWorkersQuery {
+  private readonly filters: {
+    id?: string
+    userId?: string
+  } = {}
+
+  constructor(private readonly db: FakeSupabase) {}
+
+  select() {
+    return this
+  }
+
+  eq(column: string, value: unknown) {
+    if (column === "id") {
+      this.filters.id = String(value)
+    } else if (column === "user_id") {
+      this.filters.userId = String(value)
+    }
+    return this
+  }
+
+  maybeSingle() {
+    const worker =
+      this.db.workers.find((entry) => {
+        if (this.filters.id && entry.id !== this.filters.id) return false
+        if (this.filters.userId && entry.user_id !== this.filters.userId) {
+          return false
+        }
+        return true
+      }) ?? null
+
+    return {
+      returns<T>() {
+        return Promise.resolve({ data: worker as T, error: null })
+      },
+    }
+  }
+}
+
 class FakeSupabase {
   readonly inserts: Record<string, unknown>[] = []
   readonly issueQueries: FakeIssuesQuery[] = []
@@ -204,15 +317,48 @@ class FakeSupabase {
 
   constructor(
     readonly pendingMessages: Record<string, unknown>[] = [],
-    readonly issues: FakeIssue[] = []
+    readonly issues: FakeIssue[] = [],
+    readonly workers: FakeWorker[] = [worker()]
   ) {}
 
   from(table: string) {
     if (table === "issues") {
       return new FakeIssuesQuery(this)
     }
+    if (table === "workers") {
+      return new FakeWorkersQuery(this)
+    }
     assert.equal(table, "messages")
     return new FakeMessagesQuery(this)
+  }
+}
+
+function worker(overrides: Partial<FakeWorker> = {}): FakeWorker {
+  return {
+    id: workerId,
+    user_id: "user-1",
+    display_name: "Worker",
+    setup_state: "ready",
+    banned_at: null,
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z",
+    last_seen_at: new Date().toISOString(),
+    process_started_at: "2026-07-01T00:00:00.000Z",
+    gentic_version: "0.15.0",
+    os: "linux",
+    arch: "x64",
+    configured_capacity: 1,
+    provider_capabilities: {
+      providers: {
+        codex: {
+          enabled: true,
+          available: true,
+          authenticated: true,
+          version: "1.0.0",
+        },
+      },
+    },
+    ...overrides,
   }
 }
 
@@ -369,6 +515,118 @@ test("claim picks urgent before older lower-priority todo issues", async () => {
     { column: "priority", ascending: false },
     { column: "updated_at", ascending: true },
   ])
+})
+
+test("claim routes a shared queue by the authenticated worker's provider readiness", async () => {
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "claude-urgent",
+        priority: "urgent",
+        agent_provider: "claude_code",
+      }),
+      issue({
+        id: "codex-low",
+        priority: "low",
+        agent_provider: "codex",
+      }),
+    ],
+    [
+      worker(),
+      worker({
+        id: claudeWorkerId,
+        provider_capabilities: {
+          providers: {
+            claude_code: {
+              enabled: true,
+              available: true,
+              authenticated: true,
+              version: "1.0.0",
+            },
+          },
+        },
+      }),
+    ]
+  )
+
+  const codexClaim = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
+  const claudeClaim = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    claudeWorkerId
+  )
+
+  assert.equal(codexClaim?.id, "codex-low")
+  assert.equal(claudeClaim?.id, "claude-urgent")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "codex-low")
+      ?.active_worker_id,
+    workerId
+  )
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "claude-urgent")
+      ?.active_worker_id,
+    claudeWorkerId
+  )
+})
+
+test("claim derives capacity from active issue assignments", async () => {
+  const supabase = new FakeSupabase([], [
+    issue({
+      id: "already-running",
+      status: "in-progress",
+      active_worker_id: workerId,
+      active_run_id: "already-running-run",
+    }),
+    issue({ id: "queued-work" }),
+  ])
+
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+
+  assert.equal(claimed, null)
+  assert.equal(supabase.issues.find((entry) => entry.id === "queued-work")?.status, "todo")
+})
+
+test("unsupported workers cannot claim but update-available workers can", async () => {
+  const unsupported = new FakeSupabase(
+    [],
+    [issue({ id: "unsupported-work" })],
+    [worker({ gentic_version: "0.13.0" })]
+  )
+  const updateAvailable = new FakeSupabase(
+    [],
+    [issue({ id: "update-available-work" })],
+    [worker({ gentic_version: "0.14.0" })]
+  )
+
+  assert.equal(
+    await claimNextQueuedIssue(unsupported as never, "user-1", workerId, {
+      compatibilityPolicy: {
+        minimumSupportedVersion: "0.14.0",
+        currentVersion: "0.15.0",
+      },
+    }),
+    null
+  )
+
+  const claimed = await claimNextQueuedIssue(
+    updateAvailable as never,
+    "user-1",
+    workerId,
+    {
+      compatibilityPolicy: {
+        minimumSupportedVersion: "0.14.0",
+        currentVersion: "0.15.0",
+      },
+    }
+  )
+
+  assert.equal(claimed?.id, "update-available-work")
 })
 
 test("claim breaks equal-priority ties FIFO by oldest eligible issue", async () => {

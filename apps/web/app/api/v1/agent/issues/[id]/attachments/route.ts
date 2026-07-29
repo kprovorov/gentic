@@ -1,4 +1,5 @@
 import {
+  ensureActiveWorkerRun,
   ensureIssueOwned,
   getAgentContext,
   handleAgentError,
@@ -16,10 +17,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const messageId = new URL(request.url).searchParams.get("message_id")
-    const { supabase, userId } = await getAgentContext(request)
+    const searchParams = new URL(request.url).searchParams
+    const messageId = searchParams.get("message_id")
+    const runId = searchParams.get("run_id")
+    const { supabase, userId, workerId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
+    if (!runId) {
+      return json({ error: "Missing run_id" }, { status: 400 })
+    }
+    await ensureActiveWorkerRun(supabase, userId, workerId, id, runId)
 
     let query = supabase
       .from("attachments")

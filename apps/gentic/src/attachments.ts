@@ -71,10 +71,11 @@ async function downloadBytes(url: string, fileName: string): Promise<Uint8Array>
 export async function buildAttachmentBlocks(
   api: AgentApi,
   issueId: string,
+  runId: string,
   messageId: string,
   attachmentsDir: string
 ): Promise<ContentBlock[]> {
-  const attachments = await api.fetchAttachments(issueId, messageId)
+  const attachments = await api.fetchAttachments(issueId, runId, messageId)
   if (attachments.length === 0) {
     return []
   }

@@ -182,6 +182,7 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
     deps.buildAttachmentBlocks = async (
       _api,
       issueId,
+      _runId,
       messageId,
       attachmentsDir
     ) => {
@@ -753,7 +754,7 @@ function fakeDeps(
   realtimeWakes: Map<string, () => void>
 ): ProcessIssueDeps {
   return {
-    async connectIssueChannel(_api, issueId, onUserMessage) {
+    async connectIssueChannel(_api, issueId, _activeRunId, onUserMessage) {
       realtimeWakes.set(issueId, onUserMessage)
       return fakeChannel(api)
     },
@@ -774,8 +775,8 @@ function fakeDeps(
     async hasChangesSinceBaseline() {
       return api.hasChanges
     },
-    async setRunState(agentApi, _channel, issueId, fields) {
-      await agentApi.setRunState(issueId, fields)
+    async setRunState(agentApi, _channel, issueId, activeRunId, fields) {
+      await agentApi.setRunState(issueId, activeRunId, fields)
     },
     async buildAttachmentBlocks() {
       return []
@@ -865,8 +866,15 @@ class FakeApi implements AgentApi {
     return this.claims.shift() ?? null
   }
 
-  async setRunState(issueId: string, fields: RunStateFields): Promise<void> {
-    this.runStates.push({ issueId, fields })
+  async setRunState(
+    issueId: string,
+    activeRunId: string,
+    fields: Omit<RunStateFields, "active_run_id">
+  ): Promise<void> {
+    this.runStates.push({
+      issueId,
+      fields: { active_run_id: activeRunId, ...fields },
+    })
   }
 
   async finishRun(

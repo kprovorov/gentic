@@ -10,6 +10,7 @@ import {
   handleAgentError,
   json,
   runStateSchema,
+  ensureActiveWorkerRun,
 } from "../../../_lib"
 
 export const runtime = "nodejs"
@@ -21,7 +22,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { supabase, userId } = await getAgentContext(request)
+    const { supabase, userId, workerId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
 
@@ -31,6 +32,13 @@ export async function PATCH(
       "finish_if_no_pending" in body
     ) {
       const fields = finishRunSchema.parse(body)
+      await ensureActiveWorkerRun(
+        supabase,
+        userId,
+        workerId,
+        id,
+        fields.active_run_id
+      )
 
       // `finish_issue_run_if_no_pending` only accepts the two statuses a
       // run can natively finish into. CI-gating resolves to a status the RPC
@@ -79,13 +87,24 @@ export async function PATCH(
     }
 
     const fields = runStateSchema.parse(body)
+    await ensureActiveWorkerRun(
+      supabase,
+      userId,
+      workerId,
+      id,
+      fields.active_run_id
+    )
     const { error } = await supabase
       .from("issues")
       .update({
-        ...fields,
+        ...Object.fromEntries(
+          Object.entries(fields).filter(([key]) => key !== "active_run_id")
+        ),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("active_worker_id", workerId)
+      .eq("active_run_id", fields.active_run_id)
 
     if (error) {
       throw new Error(error.message)

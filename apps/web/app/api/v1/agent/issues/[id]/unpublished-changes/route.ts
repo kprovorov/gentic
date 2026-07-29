@@ -1,6 +1,7 @@
 import * as issuesService from "@gentic/services/issues"
 
 import {
+  ensureActiveWorkerRun,
   getAgentContext,
   handleAgentError,
   json,
@@ -13,10 +14,18 @@ export const runtime = "nodejs"
 export async function recordIssueUnpublishedChanges(
   supabase: Supabase,
   userId: string,
+  workerId: string,
   issueId: string,
   body: unknown
 ) {
   const fields = unpublishedChangesSchema.parse(body)
+  await ensureActiveWorkerRun(
+    supabase,
+    userId,
+    workerId,
+    issueId,
+    fields.active_run_id
+  )
 
   await issuesService.recordUnpublishedAgentChanges(
     supabase,
@@ -36,9 +45,11 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
-    const { supabase, userId } = await getAgentContext(request)
+    const { supabase, userId, workerId } = await getAgentContext(request)
 
-    return json(await recordIssueUnpublishedChanges(supabase, userId, id, body))
+    return json(
+      await recordIssueUnpublishedChanges(supabase, userId, workerId, id, body)
+    )
   } catch (error) {
     return handleAgentError(error)
   }
