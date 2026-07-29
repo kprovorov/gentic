@@ -4,7 +4,7 @@ import { test } from "node:test"
 import type { AgentApi, InsertMessageInput } from "../api.js"
 import { StreamingAssistantMessage, publishMessage } from "../messages.js"
 import type { IssueRealtimeChannel, RealtimeMessageEvent } from "../realtime.js"
-import { issueRunInstructions, runTurn } from "../session.js"
+import { runTurn } from "../session.js"
 
 const ISSUE_ID = "11111111-1111-4111-8111-111111111111"
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T/
@@ -368,36 +368,6 @@ test("run error path best-effort persists the current partial", async () => {
   assert.equal(api.inserted[0]?.message.content, "partial output")
   assert.equal(api.inserted[0]?.message.status, "error")
   assert.equal(channel.messages.at(-1)?.status, "error")
-})
-
-test("issue run instructions update an existing pull request on follow-up", () => {
-  const instructions = issueRunInstructions(
-    "https://github.com/acme/app/pull/7",
-    true
-  )
-
-  assert.match(instructions, /existing open pull request/)
-  assert.match(instructions, /same branch/)
-  assert.doesNotMatch(instructions, /Do not open a new pull request/)
-  assert.doesNotMatch(instructions, /open a pull request against/)
-})
-
-test("issue run instructions create a new pull request after merged follow-up", () => {
-  const instructions = issueRunInstructions("https://github.com/acme/app/pull/7")
-
-  assert.match(instructions, /previous pull request recorded/)
-  assert.match(instructions, /If the pull request is merged or closed/)
-  assert.match(instructions, /branch was deleted/)
-  assert.match(instructions, /create a new branch/)
-  assert.match(instructions, /open a new ready-for-review pull request/)
-  assert.doesNotMatch(instructions, /Do not open a new pull request/)
-})
-
-test("issue run instructions open a ready for review pull request", () => {
-  const instructions = issueRunInstructions()
-
-  assert.match(instructions, /ready for review/)
-  assert.match(instructions, /do not create it as a draft/)
 })
 
 function fakeChannel(): IssueRealtimeChannel & {

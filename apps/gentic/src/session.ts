@@ -75,26 +75,6 @@ function resolveAgentEntry(
   }
 }
 
-// Appended to the selected agent's instructions so every issue run ends
-// with its work committed and proposed for review, without relying on each
-// issue's own instructions to say so.
-const COMMIT_AND_PR_INSTRUCTIONS = `Before you finish working on this issue, commit your changes with a descriptive commit message and open a pull request against the repository's default branch using the \`gh\` CLI. The pull request must be ready for review; do not create it as a draft. Title the pull request following the Conventional Commits spec: prefix it with a type such as \`feat:\`, \`fix:\`, \`chore:\`, \`docs:\`, \`refactor:\`, \`test:\`, \`perf:\`, \`build:\`, or \`ci:\` (for example, \`feat: add issue assignment API\`), so it produces a clean squash-merge commit message for CI/CD. Do this even if not explicitly asked. Skip it only if you made no changes to commit.`
-
-export function issueRunInstructions(
-  existingPrUrl?: string | null,
-  existingPrCheckedOut = false
-): string {
-  if (existingPrUrl) {
-    if (existingPrCheckedOut) {
-      return `This follow-up run already has an existing open pull request: ${existingPrUrl}. This supersedes any prior instruction to open a pull request. The existing pull request branch has already been checked out. Before you finish, commit your changes with a descriptive commit message and push them to that same branch. Skip committing and pushing only if you made no changes.`
-    }
-
-    return `This follow-up run has a previous pull request recorded: ${existingPrUrl}. Before deciding how to publish changes, inspect that pull request with the \`gh\` CLI. If it is still open and its branch exists, check out that branch, commit your changes with a descriptive commit message, and push to that same branch. If the pull request is merged or closed, or if its branch was deleted and cannot be checked out, create a new branch from the repository's default branch, commit your changes there, and open a new ready-for-review pull request using the \`gh\` CLI. Title any new pull request following the Conventional Commits spec. Skip committing, pushing, and opening a pull request only if you made no changes.`
-  }
-
-  return COMMIT_AND_PR_INSTRUCTIONS
-}
-
 /** One prompt turn: plain text, or text plus attachment content blocks. */
 export type PromptTurn = string | ContentBlock[]
 export interface PromptDelivery {
@@ -171,22 +151,13 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           : await ctx.buildSession(agent.newSession(input)).start()
       await input.onSessionId(session.sessionId)
 
-      let shouldPrependInstructions = agent.provider === "codex"
       for (;;) {
         const next = await input.nextPrompt()
         if (next === null) {
           break
         }
         const delivery = normalizePromptDelivery(next)
-        let prompt = delivery.prompt
-        if (shouldPrependInstructions) {
-          prompt = prependInstructions(
-            prompt,
-            input.existingPrUrl,
-            input.existingPrCheckedOut
-          )
-          shouldPrependInstructions = false
-        }
+        const prompt = delivery.prompt
         await runTurn(session, input.api, input.issueId, input.channel, prompt)
         if (delivery.messageIds.length > 0) {
           await input.onPromptProcessed?.(delivery.messageIds)
@@ -211,10 +182,12 @@ interface AgentProviderConfig {
   provider: AgentProvider
   entry: AgentEntry
   env: NodeJS.ProcessEnv
-  newSession: (input: RunSessionInput) => NewSessionRequest
+  newSession: (
+    input: Pick<RunSessionInput, "cwd" | "issueModel" | "resumeSessionId">
+  ) => NewSessionRequest
 }
 
-function getAgentProviderConfig(
+export function getAgentProviderConfig(
   input: Pick<RunSessionInput, "agentProvider" | "issueModel">
 ): AgentProviderConfig {
   const provider = input.agentProvider
@@ -282,10 +255,6 @@ function getAgentProviderConfig(
             systemPrompt: {
               type: "preset",
               preset: "claude_code",
-              append: issueRunInstructions(
-                input.existingPrUrl,
-                input.existingPrCheckedOut
-              ),
             },
             ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
           },
@@ -304,20 +273,6 @@ function mergeCodexConfigModel(issueModel: string): string {
     ...config,
     model: issueModel,
   })
-}
-
-function prependInstructions(
-  prompt: PromptTurn,
-  existingPrUrl?: string | null,
-  existingPrCheckedOut = false
-): PromptTurn {
-  const instructions = `System instructions for this issue run:\n${issueRunInstructions(existingPrUrl, existingPrCheckedOut)}\n\nUser request:\n`
-
-  if (typeof prompt === "string") {
-    return `${instructions}${prompt}`
-  }
-
-  return [{ type: "text", text: instructions }, ...prompt]
 }
 
 async function resumeSession(

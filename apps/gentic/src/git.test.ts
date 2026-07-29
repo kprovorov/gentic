@@ -1,10 +1,17 @@
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, test } from "node:test"
+import { afterEach, beforeEach, describe, test } from "node:test"
 
-import { hasLocalCheckout } from "./git.js"
+import {
+  captureRepoBaseline,
+  hasChangesSinceBaseline,
+  hasLocalCheckout,
+  hasNewCommitsSince,
+  hasUncommittedChanges,
+} from "./git.js"
 
 let dir: string
 
@@ -27,4 +34,71 @@ test("hasLocalCheckout is false for a directory that doesn't exist", () => {
 test("hasLocalCheckout is true once a .git directory is present", () => {
   mkdirSync(join(dir, ".git"))
   assert.equal(hasLocalCheckout(dir), true)
+})
+
+describe("repo baseline helpers", () => {
+  function git(...args: string[]): void {
+    execFileSync("git", args, { cwd: dir, stdio: "ignore" })
+  }
+
+  function initRepoWithCommit(): void {
+    git("init", "-q")
+    git("config", "user.email", "gentic-test@example.com")
+    git("config", "user.name", "Gentic Test")
+    writeFileSync(join(dir, "README.md"), "hello\n")
+    git("add", "README.md")
+    git("commit", "-q", "-m", "initial commit")
+  }
+
+  test("hasUncommittedChanges is false for a clean repo", async () => {
+    initRepoWithCommit()
+    assert.equal(await hasUncommittedChanges(dir), false)
+  })
+
+  test("hasUncommittedChanges is true for a modified tracked file", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "README.md"), "changed\n")
+    assert.equal(await hasUncommittedChanges(dir), true)
+  })
+
+  test("hasUncommittedChanges is true for an untracked file", async () => {
+    initRepoWithCommit()
+    writeFileSync(join(dir, "new-file.txt"), "new\n")
+    assert.equal(await hasUncommittedChanges(dir), true)
+  })
+
+  test("hasNewCommitsSince is false when HEAD hasn't moved", async () => {
+    initRepoWithCommit()
+    const baseline = await captureRepoBaseline(dir)
+    assert.equal(await hasNewCommitsSince(dir, baseline), false)
+  })
+
+  test("hasNewCommitsSince is true once a new commit lands", async () => {
+    initRepoWithCommit()
+    const baseline = await captureRepoBaseline(dir)
+    writeFileSync(join(dir, "README.md"), "changed\n")
+    git("commit", "-q", "-am", "second commit")
+    assert.equal(await hasNewCommitsSince(dir, baseline), true)
+  })
+
+  test("hasChangesSinceBaseline is false for an unchanged repo", async () => {
+    initRepoWithCommit()
+    const baseline = await captureRepoBaseline(dir)
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), false)
+  })
+
+  test("hasChangesSinceBaseline is true for a dirty working tree", async () => {
+    initRepoWithCommit()
+    const baseline = await captureRepoBaseline(dir)
+    writeFileSync(join(dir, "untracked.txt"), "new\n")
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
+  })
+
+  test("hasChangesSinceBaseline is true once a new commit lands", async () => {
+    initRepoWithCommit()
+    const baseline = await captureRepoBaseline(dir)
+    writeFileSync(join(dir, "README.md"), "changed\n")
+    git("commit", "-q", "-am", "second commit")
+    assert.equal(await hasChangesSinceBaseline(dir, baseline), true)
+  })
 })
