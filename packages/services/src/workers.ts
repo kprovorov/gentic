@@ -291,23 +291,25 @@ export async function exchangeWorkerEnrollmentCode(
   const credential = generateWorkerCredential()
   const credentialHash = hashWorkerSecret(credential)
 
+  const rpcArgs = {
+    p_code_hash: hashWorkerSecret(fields.code),
+    p_credential_hash: credentialHash,
+    p_display_name: parseWorkerName(fields.display_name),
+    p_gentic_version: parseOptionalPlatform(fields.telemetry.gentic_version),
+    p_os: parseOptionalPlatform(fields.telemetry.os),
+    p_arch: parseOptionalPlatform(fields.telemetry.arch),
+    p_configured_capacity: parseWorkerValue(() =>
+      workerCapacitySchema.parse(fields.telemetry.configured_capacity)
+    ),
+    p_provider_capabilities: parseWorkerValue(() =>
+      workerCapabilitiesSchema.parse(fields.telemetry.provider_capabilities)
+    ) as Json,
+    p_process_started_at: fields.telemetry.process_started_at,
+    p_now: now.toISOString(),
+  }
+
   const { data, error } = await supabase
-    .rpc("consume_worker_enrollment_code", {
-      p_code_hash: hashWorkerSecret(fields.code),
-      p_credential_hash: credentialHash,
-      p_display_name: parseWorkerName(fields.display_name),
-      p_gentic_version: parseOptionalPlatform(fields.telemetry.gentic_version),
-      p_os: parseOptionalPlatform(fields.telemetry.os),
-      p_arch: parseOptionalPlatform(fields.telemetry.arch),
-      p_configured_capacity: parseWorkerValue(() =>
-        workerCapacitySchema.parse(fields.telemetry.configured_capacity)
-      ),
-      p_provider_capabilities: parseWorkerValue(() =>
-        workerCapabilitiesSchema.parse(fields.telemetry.provider_capabilities)
-      ) as Json,
-      p_process_started_at: fields.telemetry.process_started_at,
-      p_now: now.toISOString(),
-    })
+    .rpc("consume_worker_enrollment_code", rpcArgs as never)
     .maybeSingle()
     .returns<WorkerRow | null>()
 

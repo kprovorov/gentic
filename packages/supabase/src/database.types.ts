@@ -466,6 +466,30 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_enrollment_exchange_failures: {
+        Row: {
+          failed_count: number
+          locked_until: string | null
+          rate_limit_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       workers: {
         Row: {
           arch: string | null
@@ -526,30 +550,6 @@ export type Database = {
         }
         Relationships: []
       }
-      worker_enrollment_exchange_failures: {
-        Row: {
-          failed_count: number
-          locked_until: string | null
-          rate_limit_key: string
-          updated_at: string
-          window_started_at: string
-        }
-        Insert: {
-          failed_count?: number
-          locked_until?: string | null
-          rate_limit_key: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Update: {
-          failed_count?: number
-          locked_until?: string | null
-          rate_limit_key?: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -557,18 +557,42 @@ export type Database = {
     Functions: {
       consume_worker_enrollment_code: {
         Args: {
-          p_arch: string | null
+          p_arch: string
           p_code_hash: string
           p_configured_capacity: number
           p_credential_hash: string
           p_display_name: string
-          p_gentic_version: string | null
+          p_gentic_version: string
           p_now?: string
-          p_os: string | null
-          p_process_started_at: string | null
+          p_os: string
+          p_process_started_at: string
           p_provider_capabilities: Json
         }
-        Returns: Database["public"]["Tables"]["workers"]["Row"]
+        Returns: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       delete_old_orphaned_attachments: {
         Args: { older_than?: string }
