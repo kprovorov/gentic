@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -42,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { Input } from "@gentic/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { cn } from "@gentic/ui/utils"
 import {
@@ -176,6 +178,34 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
   )
 }
 
+function IssueIndicatorBadge({
+  label,
+  className,
+  children,
+}: {
+  label: string
+  className: string
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          aria-label={label}
+          className={cn(
+            "inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+            className
+          )}
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function IssueRow({
   issue,
   isBlocked,
@@ -226,36 +256,27 @@ function IssueRow({
             {issue.title ?? "Generating title..."}
           </span>
         </Link>
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-            issueTypeStyles[issue.type]
-          )}
+        <IssueIndicatorBadge
+          label={issueTypeLabels[issue.type]}
+          className={issueTypeStyles[issue.type]}
         >
-          <TypeIcon className="size-3" />
-          {issueTypeLabels[issue.type]}
-        </span>
+          <TypeIcon className="size-3.5" />
+        </IssueIndicatorBadge>
         {isBlocked ? (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              blockingBadgeStyles.blocked
-            )}
+          <IssueIndicatorBadge
+            label="Blocked"
+            className={blockingBadgeStyles.blocked}
           >
-            <IconLock className="size-3" />
-            Blocked
-          </span>
+            <IconLock className="size-3.5" />
+          </IssueIndicatorBadge>
         ) : null}
         {isBlocking ? (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              blockingBadgeStyles.blocking
-            )}
+          <IssueIndicatorBadge
+            label="Blocking"
+            className={blockingBadgeStyles.blocking}
           >
-            <IconArrowBarToRight className="size-3" />
-            Blocking
-          </span>
+            <IconArrowBarToRight className="size-3.5" />
+          </IssueIndicatorBadge>
         ) : null}
       </div>
       <div className="col-start-2 min-w-0 md:col-start-auto">
