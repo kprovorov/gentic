@@ -17,6 +17,7 @@ import {
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
+  updateIssuePrioritySchema,
   updateIssueSchema,
   type IssueStatus,
 } from "@gentic/validators/issues"
@@ -72,6 +73,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     prompt: getString(formData, "prompt"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getIssueModel(formData),
+    priority: getString(formData, "priority") || undefined,
   })
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
@@ -256,6 +258,25 @@ export async function updateIssueStatus(formData: FormData) {
   await issuesService.updateIssueStatus(supabase, userId, id, status)
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
+}
+
+export async function updateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, priority } = updateIssuePrioritySchema.parse({
+    id: getString(formData, "id"),
+    priority: getString(formData, "priority"),
+  })
+
+  const issue = await issuesService.updateIssuePriority(
+    supabase,
+    userId,
+    id,
+    priority
+  )
+  revalidatePath("/issues")
+  revalidateIssuePath(issue)
+
+  return issue
 }
 
 export async function bulkUpdateIssueStatus(formData: FormData) {

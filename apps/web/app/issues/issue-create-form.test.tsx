@@ -91,6 +91,36 @@ describe("IssueCreateForm", () => {
     expect(screen.getByText("Gentic")).toBeVisible()
   })
 
+  it("defaults new issues to medium priority", () => {
+    render(<IssueCreateForm projects={projects} />)
+
+    const priorityInput = screen.getByDisplayValue("medium")
+
+    expect(screen.getByRole("button", { name: "Priority" })).toBeVisible()
+    expect(screen.getByText("Medium")).toBeVisible()
+    expect(priorityInput).toHaveAttribute("name", "priority")
+  })
+
+  it("stores the selected priority for the shared create form", async () => {
+    const user = userEvent.setup()
+
+    render(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Priority" }))
+    await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
+
+    const priorityInput = screen.getByDisplayValue("urgent")
+    const form = priorityInput.closest("form")
+
+    expect(priorityInput).toHaveAttribute("name", "priority")
+    expect(form).toContainElement(
+      screen.getByRole("button", { name: "Save draft" })
+    )
+    expect(form).toContainElement(
+      screen.getByRole("button", { name: "Run issue" })
+    )
+  })
+
   it("highlights the project select when running without a selected project", async () => {
     const user = userEvent.setup()
 

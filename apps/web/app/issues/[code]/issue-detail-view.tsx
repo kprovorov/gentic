@@ -66,6 +66,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             issueId={issue.id}
             issueCode={issue.code}
             status={issue.status}
+            priority={issue.priority}
             pullRequests={displayedPullRequests}
             relations={relations}
             relationCandidates={relationCandidates}
