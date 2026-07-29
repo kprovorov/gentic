@@ -476,17 +476,33 @@ test("claim returns null when a held issue becomes reset-ineligible before updat
   assert.equal(supabase.issues[0]?.active_run_id, null)
 })
 
-test("worker selection index leads with priority and FIFO tie columns", async () => {
-  const migration = await readFile(
+test("worker selection index update is in a forward migration", async () => {
+  const appliedMigration = await readFile(
     new URL(
       "../../../supabase/migrations/20260729072347_add_issue_priorities.sql",
       import.meta.url
     ),
     "utf8"
   )
+  const forwardMigration = await readFile(
+    new URL(
+      "../../../supabase/migrations/20260729101749_optimize_worker_claim_priority_index.sql",
+      import.meta.url
+    ),
+    "utf8"
+  )
 
   assert.match(
-    migration,
+    appliedMigration,
+    /create index issues_worker_selection_priority_idx\s+on public\.issues\(status, usage_limit_reset_at, priority desc, updated_at asc\)\s+where status in \('todo', 'held'\);/
+  )
+
+  assert.match(
+    forwardMigration,
+    /drop index if exists public\.issues_worker_selection_priority_idx;\s+create index issues_worker_selection_priority_idx\s+on public\.issues\(priority desc, updated_at asc\)\s+where status in \('todo', 'held'\);/
+  )
+  assert.match(
+    forwardMigration,
     /create index issues_worker_selection_priority_idx\s+on public\.issues\(priority desc, updated_at asc\)\s+where status in \('todo', 'held'\);/
   )
 })
