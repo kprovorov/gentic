@@ -14,6 +14,10 @@ export const runtime = "nodejs"
 const CLAIM_ISSUE_SELECT =
   "id, status, agent_provider, issue_model, session_id, pr_url, prompt, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
+function eligibleIssueFilter(now: string): string {
+  return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
+}
+
 export async function POST(request: Request) {
   try {
     const { supabase, userId } = await getAgentContext(request)
@@ -26,12 +30,12 @@ export async function POST(request: Request) {
   }
 }
 
-async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
+export async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
   const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
-    .or(`status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`)
+    .or(eligibleIssueFilter(now))
     .eq("projects.user_id", userId)
     .eq("unfinished_blockers.type", "blocks")
     .not(
@@ -40,6 +44,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
       "(completed,cancelled)"
     )
     .is("unfinished_blockers", null)
+    .order("priority", { ascending: false })
     .order("updated_at", { ascending: true })
     .limit(1)
     .maybeSingle()
@@ -65,7 +70,7 @@ async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
       updated_at: now,
     })
     .eq("id", id)
-    .in("status", ["todo", "held"])
+    .or(eligibleIssueFilter(now))
     .select("id")
     .maybeSingle()
 
