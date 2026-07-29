@@ -35,7 +35,22 @@ export function getUsageLimitResetAt(
 
 function describe(error: unknown): string {
   if (error instanceof Error) {
-    return [error.message, error.stack].filter(Boolean).join("\n")
+    const parts = [error.message, error.stack]
+
+    // ACP errors (e.g. codex-acp) carry the real error text in a JSON-RPC
+    // `data` payload instead of `.message`, which is often just "Internal
+    // error" for usage-limit failures.
+    const data = (error as { data?: unknown }).data
+    if (data && typeof data === "object") {
+      const { message, additionalDetails } = data as {
+        message?: unknown
+        additionalDetails?: unknown
+      }
+      if (typeof message === "string") parts.push(message)
+      if (typeof additionalDetails === "string") parts.push(additionalDetails)
+    }
+
+    return parts.filter(Boolean).join("\n")
   }
   return String(error)
 }
@@ -59,13 +74,16 @@ function parseRelativeReset(message: string, now: Date): Date | null {
 
 function parseAbsoluteReset(message: string, now: Date): Date | null {
   const match = message.match(
-    /(?:reset(?:s)?|retry|try again|available|until)(?:\s+\w+){0,3}\s+(?:at|on|after|by)?\s*([A-Z][a-z]+ \d{1,2},? \d{4}(?:,)?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?(?:\s*[A-Z]{2,4})?|\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/i
+    /(?:reset(?:s)?|retry|try again|available|until)(?:\s+\w+){0,3}\s+(?:at|on|after|by)?\s*([A-Z][a-z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4}(?:,)?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?(?:\s*[A-Z]{2,4})?|\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/i
   )
   if (!match) {
     return null
   }
 
-  const parsed = new Date(match[1])
+  // Strip ordinal suffixes (e.g. "5th" -> "5") — Codex's usage-limit
+  // messages use them, but the Date constructor can't parse them.
+  const dateText = match[1].replace(/(\d)(?:st|nd|rd|th)\b/i, "$1")
+  const parsed = new Date(dateText)
   return Number.isNaN(parsed.getTime()) || parsed <= now ? null : parsed
 }
 

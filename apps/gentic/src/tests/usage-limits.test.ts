@@ -58,6 +58,34 @@ test("rolls time-only reset times to tomorrow when already passed", () => {
   )
 })
 
+test("extracts reset times with ordinal day suffixes", () => {
+  assert.equal(
+    getUsageLimitResetAt(
+      new Error(
+        "You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 5th, 2026 7:01 AM."
+      ),
+      new Date("2026-07-09T10:00:00.000Z")
+    ),
+    "2026-08-05T07:01:00.000Z"
+  )
+})
+
+test("reads the real error text from an ACP RequestError's data payload", () => {
+  const error = new Error("Internal error")
+  Object.assign(error, {
+    data: {
+      message:
+        "You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 5th, 2026 7:01 AM.",
+      codexErrorInfo: "usageLimitExceeded",
+    },
+  })
+
+  assert.equal(
+    getUsageLimitResetAt(error, new Date("2026-07-09T10:00:00.000Z")),
+    "2026-08-05T07:01:00.000Z"
+  )
+})
+
 test("ignores non-limit errors", () => {
   assert.equal(
     getUsageLimitResetAt(
