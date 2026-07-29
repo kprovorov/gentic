@@ -364,6 +364,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          author_type: string
           consumed_at: string | null
           consumed_by_run_id: string | null
           content: string | null
@@ -373,7 +374,6 @@ export type Database = {
           event_status: string | null
           event_ts: string | null
           event_type: string | null
-          author_type: string
           generated_action: string | null
           github_review_id: number | null
           id: string
@@ -388,6 +388,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          author_type?: string
           consumed_at?: string | null
           consumed_by_run_id?: string | null
           content?: string | null
@@ -397,7 +398,6 @@ export type Database = {
           event_status?: string | null
           event_ts?: string | null
           event_type?: string | null
-          author_type?: string
           generated_action?: string | null
           github_review_id?: number | null
           id?: string
@@ -412,6 +412,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          author_type?: string
           consumed_at?: string | null
           consumed_by_run_id?: string | null
           content?: string | null
@@ -421,7 +422,6 @@ export type Database = {
           event_status?: string | null
           event_ts?: string | null
           event_type?: string | null
-          author_type?: string
           generated_action?: string | null
           github_review_id?: number | null
           id?: string
