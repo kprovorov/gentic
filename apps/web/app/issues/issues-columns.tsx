@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -47,6 +48,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
 import {
   issuePriorityLabels,
@@ -223,6 +225,34 @@ export const issueTypeOptions: { value: IssueType; label: string }[] = [
   { value: "feedback", label: issueTypeLabels.feedback },
   { value: "idea", label: issueTypeLabels.idea },
 ]
+
+function IssueIndicatorBadge({
+  label,
+  className,
+  children,
+}: {
+  label: string
+  className: string
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          aria-label={label}
+          className={cn(
+            "inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+            className
+          )}
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export const priorityIconStyles: Record<IssuePriority, string> = {
   low: "text-gray-600 dark:text-gray-300",
@@ -591,15 +621,12 @@ export function getIssuesColumns(
         const TypeIcon = issueTypeIcons[issue.type]
 
         return (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              issueTypeStyles[issue.type]
-            )}
+          <IssueIndicatorBadge
+            label={issueTypeLabels[issue.type]}
+            className={issueTypeStyles[issue.type]}
           >
-            <TypeIcon className="size-3" />
-            {issueTypeLabels[issue.type]}
-          </span>
+            <TypeIcon className="size-3.5" />
+          </IssueIndicatorBadge>
         )
       },
     },
@@ -650,15 +677,12 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockedIssueIds.has(row.original.id) ? (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              blockingBadgeStyles.blocked
-            )}
+          <IssueIndicatorBadge
+            label="Blocked"
+            className={blockingBadgeStyles.blocked}
           >
-            <IconLock className="size-3" />
-            Blocked
-          </span>
+            <IconLock className="size-3.5" />
+          </IssueIndicatorBadge>
         ) : null,
     },
     {
@@ -669,15 +693,12 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockingIssueIds.has(row.original.id) ? (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              blockingBadgeStyles.blocking
-            )}
+          <IssueIndicatorBadge
+            label="Blocking"
+            className={blockingBadgeStyles.blocking}
           >
-            <IconArrowBarToRight className="size-3" />
-            Blocking
-          </span>
+            <IconArrowBarToRight className="size-3.5" />
+          </IssueIndicatorBadge>
         ) : null,
     },
     {
