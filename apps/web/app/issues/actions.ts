@@ -27,6 +27,7 @@ import {
   rollbackMessageAttachmentUpload,
   validateAttachmentBatch,
 } from "@gentic/services/attachments"
+import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
 import { createServiceClient } from "@gentic/supabase/service"
 
@@ -420,19 +421,30 @@ export async function createManualIssuePullRequest(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
 
-  const message = await issuesService.createManualFirstPrPublishMessage(
-    supabase,
-    userId,
-    issueId
-  )
+  try {
+    const message = await issuesService.createManualFirstPrPublishMessage(
+      supabase,
+      userId,
+      issueId
+    )
 
-  await revalidateIssuePathById(supabase, userId, issueId)
+    await revalidateIssuePathById(supabase, userId, issueId)
 
-  return {
-    id: message.id,
-    created_at: message.created_at,
-    content: message.content,
-    created: message.created,
+    return {
+      ok: true,
+      id: message.id,
+      created_at: message.created_at,
+      content: message.content,
+      created: message.created,
+    } as const
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return {
+        ok: false,
+        error: error.message,
+      } as const
+    }
+    throw error
   }
 }
 

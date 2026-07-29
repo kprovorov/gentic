@@ -59,13 +59,14 @@ export async function createManualFirstPrPublishMessage(
   userId: string,
   issueId: string
 ) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id, number, title, status, active_run_id, has_unpublished_agent_changes, pr_url, projects!inner(key,user_id)"
+      "id, number, title, status, active_run_id, has_unpublished_agent_changes, pr_url, projects!inner(key)"
     )
     .eq("id", issueId)
-    .eq("projects.user_id", userId)
     .maybeSingle()
 
   if (error) {

@@ -416,6 +416,21 @@ test("createManualFirstPrPublishMessage stores a user-authored first-PR request 
   assert.equal(supabase.issues[0]?.status, "todo")
 })
 
+test("createManualFirstPrPublishMessage rejects when the issue belongs to another user", async () => {
+  const supabase = new ManualCreatePrDb()
+  supabase.issues.push(manualPrIssue())
+
+  await assert.rejects(
+    createManualFirstPrPublishMessage(
+      supabase as never,
+      "another-user",
+      "issue-manual-pr"
+    ),
+    { name: "ServiceError", code: "not_found" }
+  )
+  assert.equal(supabase.messages.length, 0)
+})
+
 test("createManualFirstPrPublishMessage is idempotent for duplicate manual clicks", async () => {
   const supabase = new ManualCreatePrDb()
   supabase.issues.push(manualPrIssue())

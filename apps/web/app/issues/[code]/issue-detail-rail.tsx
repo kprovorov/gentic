@@ -438,7 +438,12 @@ function ManualCreatePrButton({
     onMutate: () => {
       setOptimisticRequested(true)
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        setOptimisticRequested(false)
+        toast.error(result.error)
+        return
+      }
       toast.success("Create PR request sent")
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),

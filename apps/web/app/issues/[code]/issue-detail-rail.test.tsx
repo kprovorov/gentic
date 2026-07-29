@@ -158,8 +158,8 @@ describe("IssueDetailRail manual Create PR", () => {
     let resolveMutation: () => void = () => {}
     createManualIssuePullRequestMock.mockImplementation(
       () =>
-        new Promise<void>((resolve) => {
-          resolveMutation = resolve
+        new Promise<{ ok: true }>((resolve) => {
+          resolveMutation = () => resolve({ ok: true })
         })
     )
     renderRail(createQueryClient(), {
@@ -178,11 +178,12 @@ describe("IssueDetailRail manual Create PR", () => {
     })
   })
 
-  it("shows a failure and restores the button when the request fails", async () => {
+  it("shows a returned failure and restores the button", async () => {
     const user = userEvent.setup()
-    createManualIssuePullRequestMock.mockRejectedValue(
-      new Error("Could not create request")
-    )
+    createManualIssuePullRequestMock.mockResolvedValue({
+      ok: false,
+      error: "Could not create request",
+    })
     renderRail(createQueryClient(), {
       status: "ready-for-review",
       hasUnpublishedAgentChanges: true,
@@ -192,6 +193,24 @@ describe("IssueDetailRail manual Create PR", () => {
 
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalledWith("Could not create request")
+    })
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+
+  it("shows an unexpected failure and restores the button", async () => {
+    const user = userEvent.setup()
+    createManualIssuePullRequestMock.mockRejectedValue(
+      new Error("Network failed")
+    )
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      hasUnpublishedAgentChanges: true,
+    })
+
+    await user.click(screen.getByRole("button", { name: "Create PR" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Network failed")
     })
     expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
   })
