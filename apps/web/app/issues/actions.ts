@@ -14,9 +14,11 @@ import {
   deleteIssueRelationSchema,
   isIssueModelForAgent,
   issueModelSchema,
+  issuePrioritySchema,
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
+  updateIssuePrioritySchema,
   updateIssueSchema,
   type IssueStatus,
 } from "@gentic/validators/issues"
@@ -258,12 +260,33 @@ export async function updateIssueStatus(formData: FormData) {
   await revalidateIssuePathById(supabase, userId, id)
 }
 
+export async function updateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, priority } = updateIssuePrioritySchema.parse({
+    id: getString(formData, "id"),
+    priority: getString(formData, "priority"),
+  })
+
+  await issuesService.updateIssuePriority(supabase, userId, id, priority)
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, id)
+}
+
 export async function bulkUpdateIssueStatus(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.bulkUpdateIssueStatus(supabase, userId, ids, status)
+  revalidatePath("/issues")
+}
+
+export async function bulkUpdateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
+  const priority = issuePrioritySchema.parse(getString(formData, "priority"))
+
+  await issuesService.bulkUpdateIssuePriority(supabase, userId, ids, priority)
   revalidatePath("/issues")
 }
 
