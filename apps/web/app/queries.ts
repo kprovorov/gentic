@@ -177,10 +177,7 @@ export async function getHomeData(
     throw new Error(error.message)
   }
 
-  const parsedIssues = z
-    .array(homeIssueSchema)
-    .parse(issues)
-    .map(toHomeIssue)
+  const parsedIssues = z.array(homeIssueSchema).parse(issues).map(toHomeIssue)
   const issueIds = parsedIssues.map((issue) => issue.id)
   const [blockedIssueIds, blockingIssueIds] = await Promise.all([
     issuesService.listBlockedIssueIds(supabase, issueIds),
@@ -272,7 +269,7 @@ export async function getIssueEditData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,prompt,agent_provider,issue_model,type,priority,projects(id,name,repo,key)"
+      "id,number,title,prompt,agent_provider,issue_model,type,priority,create_pr_automatically,pr_url,issue_pull_requests(id),projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -301,7 +298,20 @@ export async function getIssueEditDataByCode(
     issueNumber
   )
 
-  return toIssueEdit(issue)
+  const pullRequests = await issuesService.listIssuePullRequests(
+    supabase,
+    userId,
+    issue.id
+  )
+
+  return toIssueEdit(
+    issueEditSchema.parse({
+      ...issue,
+      issue_pull_requests: pullRequests.map((pullRequest) => ({
+        id: pullRequest.id,
+      })),
+    })
+  )
 }
 
 export async function getIssueDetailData(

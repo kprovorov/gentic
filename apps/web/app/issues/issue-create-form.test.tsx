@@ -1,6 +1,10 @@
+import type React from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssueCreateForm } from "./issue-create-form"
 
@@ -18,9 +22,22 @@ const projects = [
   },
 ]
 
+class TestResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+function renderForm(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>)
+}
+
 describe("IssueCreateForm", () => {
   beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", TestResizeObserver)
     window.localStorage.clear()
+    vi.mocked(runIssue).mockClear()
+    vi.mocked(saveIssueDraft).mockClear()
   })
 
   it("restores the saved prompt from browser storage", async () => {
@@ -29,7 +46,7 @@ describe("IssueCreateForm", () => {
       "Keep this issue draft after refresh."
     )
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
       expect(screen.getByLabelText("Prompt")).toHaveValue(
@@ -41,7 +58,7 @@ describe("IssueCreateForm", () => {
   it("stores prompt changes in browser storage", async () => {
     const user = userEvent.setup()
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await user.type(
       screen.getByLabelText("Prompt"),
@@ -60,7 +77,7 @@ describe("IssueCreateForm", () => {
       "Persist until submit."
     )
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
       expect(screen.getByLabelText("Prompt")).toHaveValue(
@@ -79,7 +96,7 @@ describe("IssueCreateForm", () => {
   it("stores the selected project from the dropdown", async () => {
     const user = userEvent.setup()
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
@@ -92,7 +109,7 @@ describe("IssueCreateForm", () => {
   })
 
   it("defaults new issues to medium priority", () => {
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     const priorityInput = screen.getByDisplayValue("medium")
 
@@ -104,7 +121,7 @@ describe("IssueCreateForm", () => {
   it("stores the selected priority for the shared create form", async () => {
     const user = userEvent.setup()
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await user.click(screen.getByRole("button", { name: "Priority" }))
     await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
@@ -124,7 +141,7 @@ describe("IssueCreateForm", () => {
   it("highlights the project select when running without a selected project", async () => {
     const user = userEvent.setup()
 
-    render(<IssueCreateForm projects={projects} />)
+    renderForm(<IssueCreateForm projects={projects} />)
 
     await user.type(
       screen.getByLabelText("Prompt"),
@@ -144,7 +161,9 @@ describe("IssueCreateForm", () => {
   })
 
   it("preselects the configured default agent", () => {
-    render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
+    renderForm(
+      <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
+    )
 
     expect(screen.getByText("Codex")).toBeVisible()
     expect(screen.getByDisplayValue("codex")).toHaveAttribute(
@@ -156,7 +175,9 @@ describe("IssueCreateForm", () => {
   it("stores the selected model from the selected agent", async () => {
     const user = userEvent.setup()
 
-    render(<IssueCreateForm projects={projects} defaultAgentProvider="codex" />)
+    renderForm(
+      <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
+    )
 
     await user.click(screen.getByRole("button", { name: "Choose model" }))
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
@@ -166,5 +187,76 @@ describe("IssueCreateForm", () => {
       "name",
       "issue_model"
     )
+  })
+
+  it("initializes automatic PR creation checked and submits it when running", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    expect(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    ).toBeChecked()
+    expect(screen.getByDisplayValue("true")).toHaveAttribute(
+      "name",
+      "create_pr_automatically"
+    )
+
+    await user.type(screen.getByLabelText("Prompt"), "Open a PR.")
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Run issue" }))
+
+    await waitFor(() => expect(runIssue).toHaveBeenCalled())
+    const formData = vi.mocked(runIssue).mock.calls[0][0] as FormData
+    expect(formData.get("create_pr_automatically")).toBe("true")
+  })
+
+  it("submits automatic PR creation unchecked when saving a draft", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    )
+    expect(screen.getByDisplayValue("false")).toHaveAttribute(
+      "name",
+      "create_pr_automatically"
+    )
+
+    await user.type(screen.getByLabelText("Prompt"), "Keep this as a draft.")
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Save draft" }))
+
+    await waitFor(() => expect(saveIssueDraft).toHaveBeenCalled())
+    const formData = vi.mocked(saveIssueDraft).mock.calls[0][0] as FormData
+    expect(formData.get("create_pr_automatically")).toBe("false")
+  })
+
+  it("exposes the automatic PR tooltip by hover and keyboard focus", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const info = screen.getByRole("button", {
+      name: "About Create PR automatically",
+    })
+
+    await user.hover(info)
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/When the agent finishes with code changes/)[0]
+      ).toBeVisible()
+    })
+
+    info.focus()
+    expect(info).toHaveFocus()
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/ready-for-review pull request/)[0]
+      ).toBeVisible()
+    })
   })
 })

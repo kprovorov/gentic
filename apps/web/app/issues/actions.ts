@@ -34,18 +34,16 @@ import { createServiceClient } from "@gentic/supabase/service"
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
 import { formatGeneratedIssueTitle } from "./title-format"
+import {
+  parseCreateIssueFormData,
+  parseUpdateIssueFormData,
+} from "./form-values"
 import { generateIssueTitle } from "./title"
 import { generateIssueType } from "./type"
 import { fallbackIssueType } from "./type-parser"
 import { getIssueHref } from "./urls"
 
 const ATTACHMENTS_BUCKET = "attachments"
-
-const createIssueFormSchema = createIssueSchema
-  .omit({ title: true, status: true, type: true })
-  .extend({
-    prompt: z.string().trim().min(1).max(10_000),
-  })
 
 function sanitizeFileName(name: string): string {
   const base = name.split(/[/\\]/).pop() || "file"
@@ -70,13 +68,7 @@ async function revalidateIssuePathById(
 
 async function createIssue(status: IssueStatus, formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const fields = createIssueFormSchema.parse({
-    project_id: getString(formData, "project_id"),
-    prompt: getString(formData, "prompt"),
-    agent_provider: getString(formData, "agent_provider") || "claude_code",
-    issue_model: getIssueModel(formData),
-    priority: getString(formData, "priority") || undefined,
-  })
+  const fields = parseCreateIssueFormData(formData)
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
   // Save the issue with no title and the placeholder "issue" type right away
@@ -174,16 +166,16 @@ export async function runIssue(formData: FormData) {
 
 export async function updateIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const { id, title, prompt, agent_provider, issue_model, type, priority } =
-    updateIssueSchema.parse({
-      id: getString(formData, "id"),
-      title: getString(formData, "title"),
-      prompt: getString(formData, "prompt") || undefined,
-      agent_provider: getString(formData, "agent_provider") || "claude_code",
-      issue_model: getIssueModel(formData),
-      type: getString(formData, "type") || "feature",
-      priority: getString(formData, "priority") || undefined,
-    })
+  const {
+    id,
+    title,
+    prompt,
+    agent_provider,
+    issue_model,
+    type,
+    priority,
+    create_pr_automatically,
+  } = parseUpdateIssueFormData(formData)
   validateIssueModelForAgent(agent_provider, issue_model)
 
   const issue = await issuesService.updateIssue(supabase, userId, id, {
@@ -194,6 +186,7 @@ export async function updateIssue(formData: FormData) {
     issue_model,
     type,
     priority,
+    create_pr_automatically,
   })
   revalidatePath("/issues")
   revalidateIssuePath(issue)

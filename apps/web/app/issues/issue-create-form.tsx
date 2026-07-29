@@ -28,6 +28,7 @@ import {
   type IssuePriority,
 } from "@gentic/validators/issues"
 
+import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
 import {
   issuePriorityIcons,
   issuePriorityLabels,
@@ -117,7 +118,7 @@ export function IssueCreateForm({
   if (projects.length === 0) {
     return (
       <div className="mx-auto grid w-full max-w-md gap-4 rounded-3xl border border-dashed p-6 text-center">
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Create a project before adding issues.
         </p>
         <Button asChild variant="outline" className="mx-auto">
@@ -243,6 +244,7 @@ export function IssueCreateForm({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
+          <AutomaticPrPreferenceField defaultChecked />
         </div>
       }
       footerEnd={

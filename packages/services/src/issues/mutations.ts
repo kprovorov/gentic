@@ -3,6 +3,7 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
+import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
@@ -104,7 +105,9 @@ export async function updateIssue(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider, issue_model, priority, projects!inner(user_id)")
+    .select(
+      "agent_provider, issue_model, priority, pr_url, issue_pull_requests(id), projects!inner(user_id)"
+    )
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -116,6 +119,8 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
+  const hasAttachedPullRequest = hasAttachedIssuePullRequest(current)
+
   const { data: issue, error: updateError } = await supabase
     .from("issues")
     .update({
@@ -125,6 +130,9 @@ export async function updateIssue(
       issue_model: input.issue_model,
       type: input.type,
       priority: input.priority,
+      ...(input.create_pr_automatically !== undefined && !hasAttachedPullRequest
+        ? { create_pr_automatically: input.create_pr_automatically }
+        : {}),
       ...(current.agent_provider !== input.agent_provider ||
       current.issue_model !== input.issue_model
         ? { session_id: null }

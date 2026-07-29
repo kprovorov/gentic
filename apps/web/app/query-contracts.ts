@@ -4,6 +4,7 @@ import {
   issuePrioritySchema,
   issueStatusSchema,
   issueTypeSchema,
+  hasAttachedIssuePullRequest,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
@@ -37,6 +38,9 @@ export const issueEditSchema = z.object({
   issue_model: z.string().nullable(),
   type: issueTypeSchema,
   priority: issuePrioritySchema,
+  create_pr_automatically: z.boolean(),
+  pr_url: z.string().nullable(),
+  issue_pull_requests: z.array(z.object({ id: z.string() })).optional(),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -55,6 +59,7 @@ export const issueDetailSchema = z.object({
   run_started_at: z.string().nullable(),
   has_unpublished_agent_changes: z.boolean(),
   pr_url: z.string().nullable(),
+  create_pr_automatically: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
   projects: projectOptionSchema.nullable(),
@@ -95,6 +100,7 @@ export type IssueDetail = {
   run_started_at: string | null
   has_unpublished_agent_changes: boolean
   pr_url: string | null
+  create_pr_automatically: boolean
   created_at: string
   updated_at: string
   projects: ProjectOption | null
@@ -111,8 +117,11 @@ export type IssueEdit = Pick<
   | "issue_model"
   | "type"
   | "priority"
+  | "create_pr_automatically"
   | "projects"
->
+> & {
+  has_attached_pull_request: boolean
+}
 
 export type IssueDetailRow = z.infer<typeof issueDetailSchema>
 export type IssueEditRow = z.infer<typeof issueEditSchema>
@@ -169,6 +178,7 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     run_started_at: issue.run_started_at,
     has_unpublished_agent_changes: issue.has_unpublished_agent_changes,
     pr_url: issue.pr_url,
+    create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,
     updated_at: issue.updated_at,
     projects: toProjectOption(issue.projects),
@@ -186,6 +196,8 @@ export function toIssueEdit(issue: IssueEditRow): IssueEdit {
     issue_model: issue.issue_model,
     type: issue.type,
     priority: issue.priority,
+    create_pr_automatically: issue.create_pr_automatically,
+    has_attached_pull_request: hasAttachedIssuePullRequest(issue),
     projects: toProjectOption(issue.projects),
   }
 }
