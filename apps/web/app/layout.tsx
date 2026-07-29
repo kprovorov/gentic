@@ -6,6 +6,7 @@ import "./globals.css"
 import { Providers } from "./providers"
 import { AppSidebar } from "@/components/app-sidebar"
 import { PublicHeader } from "@/components/public-header"
+import { RealtimeRouteRefreshBoundary } from "@/components/realtime-route-refresh-boundary"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@gentic/ui/sidebar"
 import { ThemeProvider } from "@gentic/ui/theme-provider"
@@ -71,16 +72,18 @@ export default function RootLayout({
           <ThemeProvider>
             <TooltipProvider>
               <Providers>
-                <Show when="signed-in">
-                  <SidebarProvider>
-                    <AppSidebar variant="inset" />
-                    <SidebarInset>
-                      <SiteHeader />
-                      {children}
-                    </SidebarInset>
-                    {modal}
-                  </SidebarProvider>
-                </Show>
+                <RealtimeRouteRefreshBoundary>
+                  <Show when="signed-in">
+                    <SidebarProvider>
+                      <AppSidebar variant="inset" />
+                      <SidebarInset>
+                        <SiteHeader />
+                        {children}
+                      </SidebarInset>
+                      {modal}
+                    </SidebarProvider>
+                  </Show>
+                </RealtimeRouteRefreshBoundary>
                 <Show when="signed-out">
                   <PublicHeader />
                   {children}

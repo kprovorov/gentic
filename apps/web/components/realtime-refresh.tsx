@@ -9,10 +9,10 @@ import { useSupabaseClient } from "@gentic/supabase/client"
 import {
   getRealtimeRefreshMode,
   realtimeFallbackRefreshMs,
-  shouldDeferRouteRefresh,
   shouldUseRealtimeFallback,
   type RealtimeSubscribeStatus,
 } from "./realtime-refresh-mode"
+import { useShouldDeferRealtimeRouteRefresh } from "./realtime-route-refresh-boundary"
 
 /**
  * Subscribes to Postgres changes on the given tables (already scoped by RLS
@@ -33,6 +33,7 @@ export function RealtimeRefresh({
   const router = useRouter()
   const pathname = usePathname()
   const queryClient = useQueryClient()
+  const shouldDeferRefresh = useShouldDeferRealtimeRouteRefresh(pathname)
   const tableKey = tables.join(",")
   // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
   // a new array reference every render. Read the latest value through a ref
@@ -40,21 +41,22 @@ export function RealtimeRefresh({
   // risk dropping events) on every unrelated re-render.
   const queryKeyRef = useRef(queryKey)
   const pathnameRef = useRef(pathname)
+  const shouldDeferRefreshRef = useRef(shouldDeferRefresh)
   const pendingRouteRefreshRef = useRef(false)
   useEffect(() => {
     queryKeyRef.current = queryKey
   })
   useEffect(() => {
+    shouldDeferRefreshRef.current = shouldDeferRefresh
+  })
+  useEffect(() => {
     pathnameRef.current = pathname
 
-    if (
-      pendingRouteRefreshRef.current &&
-      !shouldDeferRouteRefresh(pathname)
-    ) {
+    if (pendingRouteRefreshRef.current && !shouldDeferRefresh) {
       pendingRouteRefreshRef.current = false
       router.refresh()
     }
-  }, [pathname, router])
+  }, [pathname, router, shouldDeferRefresh])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +73,7 @@ export function RealtimeRefresh({
           void queryClient.invalidateQueries({ queryKey })
           return
         }
-        if (shouldDeferRouteRefresh(pathnameRef.current)) {
+        if (shouldDeferRefreshRef.current) {
           pendingRouteRefreshRef.current = true
           return
         }
