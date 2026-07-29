@@ -772,7 +772,15 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 </DropdownMenu>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={
+                        priorityFilter.size > 0
+                          ? `Priority (${priorityFilter.size})`
+                          : "Priority"
+                      }
+                    >
                       Priority
                       {priorityFilter.size > 0 ? (
                         <span className={activeFilterCountBadgeStyles}>

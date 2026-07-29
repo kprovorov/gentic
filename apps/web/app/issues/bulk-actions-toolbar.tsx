@@ -49,6 +49,7 @@ import {
   statusLabels,
   statusOptions,
 } from "./issues-columns"
+import { updateIssuesInCaches } from "./issues-cache"
 
 const agentLabels: Record<AgentProvider, string> = {
   claude_code: "Claude Code",
@@ -65,26 +66,6 @@ const agentOptions: {
 
 function pluralize(count: number, noun: string) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`
-}
-
-function updateSelectedIssuesInCaches(
-  queryClient: ReturnType<typeof useQueryClient>,
-  selectedIds: string[],
-  updater: (issue: IssuesData["issues"][number]) => IssuesData["issues"][number]
-) {
-  const selectedIdSet = new Set(selectedIds)
-  const updateData = (current: IssuesData | undefined) =>
-    current
-      ? {
-          ...current,
-          issues: current.issues.map((issue) =>
-            selectedIdSet.has(issue.id) ? updater(issue) : issue
-          ),
-        }
-      : current
-
-  queryClient.setQueryData(queryKeys.issues, updateData)
-  queryClient.setQueryData(queryKeys.home, updateData)
 }
 
 export function BulkActionsToolbar({
@@ -142,11 +123,16 @@ export function BulkActionsToolbar({
         queryKeys.issues
       )
       const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+      const selectedIdSet = new Set(selectedIds)
 
-      updateSelectedIssuesInCaches(queryClient, selectedIds, (issue) => ({
-        ...issue,
-        priority: priority as IssuePriority,
-      }))
+      updateIssuesInCaches(
+        queryClient,
+        (issue) => selectedIdSet.has(issue.id),
+        (issue) => ({
+          ...issue,
+          priority: priority as IssuePriority,
+        })
+      )
 
       return { previousHome, previousIssues }
     },

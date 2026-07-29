@@ -59,6 +59,7 @@ import {
 } from "@gentic/validators/issues"
 
 import { updateIssuePriority, updateIssueStatus } from "./actions"
+import { updateIssuesInCaches } from "./issues-cache"
 
 export const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
@@ -396,25 +397,6 @@ export function IssueStatusMenu({
   )
 }
 
-function updateIssueInCaches(
-  queryClient: ReturnType<typeof useQueryClient>,
-  issueId: string,
-  updater: (issue: HomeIssue) => HomeIssue
-) {
-  const updateData = (current: IssuesData | undefined) =>
-    current
-      ? {
-          ...current,
-          issues: current.issues.map((currentIssue) =>
-            currentIssue.id === issueId ? updater(currentIssue) : currentIssue
-          ),
-        }
-      : current
-
-  queryClient.setQueryData(queryKeys.issues, updateData)
-  queryClient.setQueryData(queryKeys.home, updateData)
-}
-
 export function IssuePriorityMenu({
   issue,
   showLabel = false,
@@ -443,10 +425,14 @@ export function IssuePriorityMenu({
       )
       const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
 
-      updateIssueInCaches(queryClient, issue.id, (currentIssue) => ({
-        ...currentIssue,
-        priority: nextPriority as HomeIssue["priority"],
-      }))
+      updateIssuesInCaches(
+        queryClient,
+        (currentIssue) => currentIssue.id === issue.id,
+        (currentIssue) => ({
+          ...currentIssue,
+          priority: nextPriority as HomeIssue["priority"],
+        })
+      )
 
       return { previousHome, previousIssues }
     },

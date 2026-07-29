@@ -177,7 +177,7 @@ describe("IssuesView priority triage", () => {
     await user.click(screen.getByRole("menuitemcheckbox", { name: "Urgent" }))
     await user.click(screen.getByRole("menuitemcheckbox", { name: "High" }))
 
-    expect(screen.getByRole("menu", { name: "Priority2" })).toBeVisible()
+    expect(screen.getByRole("menu", { name: "Priority (2)" })).toBeVisible()
     expect(screen.getByText("Urgent issue")).toBeVisible()
     expect(screen.getByText("High issue")).toBeVisible()
     expect(screen.queryByText("Low issue")).not.toBeInTheDocument()
@@ -185,7 +185,7 @@ describe("IssuesView priority triage", () => {
     await user.click(screen.getByRole("menuitem", { name: "Clear filter" }))
 
     expect(screen.getByText("Low issue")).toBeVisible()
-    expect(screen.getByRole("button", { name: /^Priority$/ })).toBeVisible()
+    expect(screen.getByRole("button", { name: "Priority" })).toBeVisible()
   })
 
   it("optimistically updates an inline list priority and rolls back on error", async () => {
@@ -274,19 +274,33 @@ describe("IssuesView priority triage", () => {
       data: baseData([
         issue({
           id: "11111111-1111-4111-8111-111111111111",
-          title: "Table issue",
-          priority: "medium",
+          title: "Low table issue",
+          priority: "low",
+        }),
+        issue({
+          id: "22222222-2222-4222-8222-222222222222",
+          title: "Urgent table issue",
+          priority: "urgent",
         }),
       ]),
     })
 
-    expect(screen.getAllByRole("button", { name: "Priority" })[1]).toBeVisible()
+    const table = screen.getByRole("table")
+    const priorityHeader = within(table).getByRole("button", {
+      name: "Priority",
+    })
+
+    expectTextOrder(table, ["Urgent table issue", "Low table issue"])
+
+    await user.click(priorityHeader)
+
+    expectTextOrder(table, ["Low table issue", "Urgent table issue"])
     expect(
-      screen.getByRole("button", { name: "Change priority from Medium" })
+      screen.getByRole("button", { name: "Change priority from Low" })
     ).toBeVisible()
 
     await user.click(
-      screen.getByRole("button", { name: "Change priority from Medium" })
+      screen.getByRole("button", { name: "Change priority from Low" })
     )
 
     const menu = screen.getByRole("menu")
