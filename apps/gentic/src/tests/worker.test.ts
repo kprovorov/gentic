@@ -274,7 +274,9 @@ test("dirty or untracked work requests automatic publishing and continues the sa
     ])
     assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
     assert.deepEqual(
-      api.runStates.map((entry) => entry.fields.status ?? entry.fields.session_id),
+      api.runStates.map(
+        (entry) => entry.fields.status ?? entry.fields.session_id
+      ),
       ["in-progress", "session-1", "in-progress", "in-progress", "session-1"]
     )
   })
@@ -287,10 +289,10 @@ test("agent-created commits are publishable changes", async () => {
 
     await processIssue(api, config, issue, deps)
 
-    assert.deepEqual(api.unpublishedChanges.map((entry) => entry.hasUnpublishedAgentChanges), [
-      true,
-      true,
-    ])
+    assert.deepEqual(
+      api.unpublishedChanges.map((entry) => entry.hasUnpublishedAgentChanges),
+      [true, true]
+    )
     assert.equal(api.automaticPrPublishRequests.length, 1)
   })
 })
@@ -377,6 +379,19 @@ test("automatic publishing request failures finish waiting without looping", asy
     issue.createPrAutomatically = true
     api.hasChanges = true
     api.automaticPrPublishError = new Error("request failed")
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("unpublished-change record failures do not fail completed turns", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    api.recordUnpublishedChangesError = new Error("bookkeeping unavailable")
 
     await processIssue(api, config, issue, deps)
 
@@ -584,6 +599,7 @@ class FakeApi implements AgentApi {
   hasChanges = false
   automaticPrPublishCreated = true
   automaticPrPublishError: Error | null = null
+  recordUnpublishedChangesError: Error | null = null
 
   addMessage(issueId: string, message: UserMessage): void {
     this.messages.set(issueId, [...(this.messages.get(issueId) ?? []), message])
@@ -645,6 +661,9 @@ class FakeApi implements AgentApi {
       has_unpublished_agent_changes: boolean
     }
   ): Promise<void> {
+    if (this.recordUnpublishedChangesError) {
+      throw this.recordUnpublishedChangesError
+    }
     this.unpublishedChanges.push({
       issueId,
       activeRunId: fields.active_run_id,

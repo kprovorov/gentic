@@ -245,7 +245,6 @@ export async function processIssue(
     if (
       await shouldContinueWithAutomaticPrPublish({
         api,
-        channel,
         issue,
         turnResult,
         attemptedRunIds: state.automaticPrAttemptedRunIds,
@@ -354,17 +353,25 @@ async function recordCompletedTurnState(input: {
   dir: string
   baseline: RepoBaseline
 }): Promise<CompletedTurnState> {
-  const prUrl = (await input.deps.getPullRequestUrl(input.dir)) ?? input.issue.prUrl
+  const prUrl =
+    (await input.deps.getPullRequestUrl(input.dir)) ?? input.issue.prUrl
   const hasPublishableChanges = await input.deps.hasChangesSinceBaseline(
     input.dir,
     input.baseline
   )
   const hasUnpublishedAgentChanges = !prUrl && hasPublishableChanges
 
-  await input.api.recordUnpublishedAgentChanges(input.issue.id, {
-    active_run_id: input.issue.activeRunId,
-    has_unpublished_agent_changes: hasUnpublishedAgentChanges,
-  })
+  await input.api
+    .recordUnpublishedAgentChanges(input.issue.id, {
+      active_run_id: input.issue.activeRunId,
+      has_unpublished_agent_changes: hasUnpublishedAgentChanges,
+    })
+    .catch((error) => {
+      logError(
+        `issue ${input.issue.id} failed to record unpublished changes:`,
+        describe(error)
+      )
+    })
 
   return {
     prUrl,
@@ -375,7 +382,6 @@ async function recordCompletedTurnState(input: {
 
 async function shouldContinueWithAutomaticPrPublish(input: {
   api: AgentApi
-  channel: IssueRealtimeChannel | null
   issue: ClaimedIssue
   turnResult: CompletedTurnState
   attemptedRunIds: Set<string>
@@ -383,7 +389,6 @@ async function shouldContinueWithAutomaticPrPublish(input: {
   if (
     !input.turnResult.hasUnpublishedAgentChanges ||
     !input.issue.createPrAutomatically ||
-    input.issue.prUrl ||
     input.attemptedRunIds.has(input.issue.activeRunId)
   ) {
     return false

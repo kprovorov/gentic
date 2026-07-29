@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
-import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { mkdir, readFile, rm } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import { createReadStream, existsSync } from "node:fs"
+import { mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { spawnInteractive } from "./installers.js"
@@ -135,12 +135,30 @@ export async function hasChangesSinceBaseline(
 async function captureWorktreeFingerprint(dir: string): Promise<string> {
   const [status, unstagedDiff, stagedDiff, untrackedFilesOutput] =
     await Promise.all([
-      runCapture("git", ["status", "--porcelain=v1", "-z"], { cwd: dir }),
-      runCapture("git", ["diff", "--binary"], { cwd: dir }),
-      runCapture("git", ["diff", "--cached", "--binary"], { cwd: dir }),
-      runCapture("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+      runCapture(
+        "git",
+        ["--no-optional-locks", "status", "--porcelain=v1", "-z"],
+        { cwd: dir }
+      ),
+      runCapture("git", ["--no-optional-locks", "diff", "--binary"], {
         cwd: dir,
       }),
+      runCapture(
+        "git",
+        ["--no-optional-locks", "diff", "--cached", "--binary"],
+        { cwd: dir }
+      ),
+      runCapture(
+        "git",
+        [
+          "--no-optional-locks",
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+        ],
+        { cwd: dir }
+      ),
     ])
   const hash = createHash("sha256")
   hash.update(status)
@@ -157,11 +175,28 @@ async function captureWorktreeFingerprint(dir: string): Promise<string> {
   for (const file of untrackedFiles) {
     hash.update(file)
     hash.update("\0")
-    hash.update(await readFile(join(dir, file)))
+    await hashFileInto(hash, join(dir, file))
     hash.update("\0")
   }
 
   return hash.digest("hex")
+}
+
+function hashFileInto(
+  hash: ReturnType<typeof createHash>,
+  file: string
+): Promise<void> {
+  return new Promise((resolve) => {
+    const stream = createReadStream(file)
+    stream.on("data", (chunk) => {
+      hash.update(chunk)
+    })
+    stream.on("error", () => {
+      hash.update(`unreadable:${randomUUID()}`)
+      resolve()
+    })
+    stream.on("end", resolve)
+  })
 }
 
 function run(
