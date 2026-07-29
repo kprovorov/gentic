@@ -320,6 +320,27 @@ describe("IssueTimeline", () => {
     ).toBeInTheDocument()
   })
 
+  it("renders priority changes with from and to labels", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "priority-milestone",
+            key: "evt-priority",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            from: "medium",
+            to: "urgent",
+          },
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+      />
+    )
+
+    expect(screen.getByText("Medium")).toBeInTheDocument()
+    expect(screen.getByText("Urgent")).toBeInTheDocument()
+  })
+
   it("renders pr-opened and pr-merged nodes with links", () => {
     render(
       <IssueTimeline

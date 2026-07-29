@@ -13,6 +13,10 @@ import {
   IconGitPullRequest,
   IconInfoCircle,
   IconLoader2,
+  IconAlertTriangle,
+  IconArrowDown,
+  IconArrowUp,
+  IconMinus,
   IconSparkles,
   IconTool,
   IconUserCircle,
@@ -31,7 +35,12 @@ import {
 } from "@gentic/ui/collapsible"
 import { MarkerContent, MarkerIcon } from "@gentic/ui/marker"
 import { cn } from "@gentic/ui/utils"
-import type { IssueStatus } from "@gentic/validators/issues"
+import {
+  issuePriorityLabels,
+  issuePriorityStyles,
+  type IssuePriority,
+  type IssueStatus,
+} from "@gentic/validators/issues"
 
 import type { TimelineItem } from "./build-timeline"
 import { groupTimelineItems, type TimelineDisplayItem } from "./timeline-items"
@@ -50,6 +59,13 @@ const MARKER_TINTS = {
   success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   user: "bg-primary/20 text-primary",
 }
+
+const priorityIcons = {
+  low: IconArrowDown,
+  medium: IconMinus,
+  high: IconArrowUp,
+  urgent: IconAlertTriangle,
+} satisfies Record<IssuePriority, typeof IconAlertTriangle>
 
 export function IssueTimeline({
   items,
@@ -197,6 +213,26 @@ function buildTimelineRows(
           content: <StatusMilestoneContent from={item.from} to={item.to} />,
           markerClassName: isKnownStatus
             ? statusStyles[milestoneStatus as IssueStatus]
+            : undefined,
+        })
+        break
+      }
+      case "priority-milestone": {
+        const milestonePriority = item.to ?? item.from
+        const isKnownPriority =
+          milestonePriority !== null &&
+          milestonePriority in issuePriorityStyles
+        const PriorityIcon =
+          isKnownPriority && item.to
+            ? priorityIcons[item.to as IssuePriority]
+            : IconArrowRight
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <PriorityIcon />,
+          content: <PriorityMilestoneContent from={item.from} to={item.to} />,
+          markerClassName: isKnownPriority
+            ? issuePriorityStyles[milestonePriority as IssuePriority]
             : undefined,
         })
         break
@@ -646,6 +682,52 @@ function StatusBadge({ status }: { status: string | null }) {
     >
       <StatusIcon className="size-3.5" />
       {statusLabels[knownStatus]}
+    </span>
+  )
+}
+
+function PriorityMilestoneContent({
+  from,
+  to,
+}: {
+  from: string | null
+  to: string | null
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {from ? (
+        <>
+          <PriorityBadge priority={from} />
+          <IconArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+        </>
+      ) : null}
+      <PriorityBadge priority={to} />
+    </div>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: string | null }) {
+  const isKnownPriority = priority !== null && priority in issuePriorityLabels
+  if (!isKnownPriority) {
+    return (
+      <span className="inline-flex h-6 items-center rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+        {priority ?? "Unknown"}
+      </span>
+    )
+  }
+
+  const knownPriority = priority as IssuePriority
+  const PriorityIcon = priorityIcons[knownPriority]
+
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium",
+        issuePriorityStyles[knownPriority]
+      )}
+    >
+      <PriorityIcon className="size-3.5" />
+      {issuePriorityLabels[knownPriority]}
     </span>
   )
 }
