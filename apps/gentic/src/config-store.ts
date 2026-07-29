@@ -10,7 +10,7 @@ import { dirname, join } from "node:path"
 import envPaths from "env-paths"
 
 export interface ConfigFile {
-  GENTIC_API_KEY?: string
+  GENTIC_WORKER_CREDENTIAL?: string
   GENTIC_API_URL?: string
   GIT_REMOTE_BASE?: string
   WORKDIR?: string

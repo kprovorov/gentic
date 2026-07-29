@@ -56,5 +56,5 @@ Gentic currently supports two AI coding agents. Choose one when you run an issue
 When you move an issue from **Draft** to **Todo**, Gentic queues it for the worker. Your deployed agent worker polls the Gentic API every few seconds, claims the next queued issue, clones the project's GitHub repository into a fresh working directory, and runs the chosen agent through the Agent Client Protocol (ACP). The agent writes code and opens a pull request, and the issue status updates in real time in your web app. The worker never exposes a public endpoint — it is a private outbound polling process that you run in a trusted environment.
 
 <Note>
-  Because the agent worker runs in your own environment, it has access to your source code and Git credentials. Run it on a server or VM you control, and treat your `GENTIC_API_KEY` as a secret.
+  Because the agent worker runs in your own environment, it has access to your source code and Git credentials. Run it on a server or VM you control, and treat your `GENTIC_WORKER_CREDENTIAL` as a secret.
 </Note>

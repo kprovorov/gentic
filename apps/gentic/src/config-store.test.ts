@@ -27,33 +27,33 @@ test("readConfigFile returns {} when the file does not exist", async () => {
 
 test("writeConfigFile then readConfigFile round-trips", async () => {
   const { writeConfigFile, readConfigFile } = await freshConfigStore()
-  writeConfigFile({ GENTIC_API_KEY: "secret", POLL_INTERVAL_MS: 5000 })
+  writeConfigFile({ GENTIC_WORKER_CREDENTIAL: "secret", POLL_INTERVAL_MS: 5000 })
   assert.deepEqual(readConfigFile(), {
-    GENTIC_API_KEY: "secret",
+    GENTIC_WORKER_CREDENTIAL: "secret",
     POLL_INTERVAL_MS: 5000,
   })
 })
 
 test("writeConfigFile merges rather than clobbers unrelated keys", async () => {
   const { writeConfigFile, readConfigFile } = await freshConfigStore()
-  writeConfigFile({ GENTIC_API_KEY: "secret" })
+  writeConfigFile({ GENTIC_WORKER_CREDENTIAL: "secret" })
   writeConfigFile({ WORKDIR: "/custom/workdir" })
   assert.deepEqual(readConfigFile(), {
-    GENTIC_API_KEY: "secret",
+    GENTIC_WORKER_CREDENTIAL: "secret",
     WORKDIR: "/custom/workdir",
   })
 })
 
 test("writeConfigFile creates the file with mode 0o600", async () => {
   const { writeConfigFile, configFilePath } = await freshConfigStore()
-  writeConfigFile({ GENTIC_API_KEY: "secret" })
+  writeConfigFile({ GENTIC_WORKER_CREDENTIAL: "secret" })
   const mode = statSync(configFilePath()).mode & 0o777
   assert.equal(mode, 0o600)
 })
 
 test("clearConfigFile removes the file", async () => {
   const { writeConfigFile, clearConfigFile, configFilePath } = await freshConfigStore()
-  writeConfigFile({ GENTIC_API_KEY: "secret" })
+  writeConfigFile({ GENTIC_WORKER_CREDENTIAL: "secret" })
   assert.ok(existsSync(configFilePath()))
   clearConfigFile()
   assert.ok(!existsSync(configFilePath()))

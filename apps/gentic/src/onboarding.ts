@@ -31,8 +31,8 @@ export type OnboardingRequirement =
 export interface OnboardingAuthStatus {
   authenticated: boolean
   apiUrl?: string
-  maskedApiKey?: string
-  missing: ("GENTIC_API_KEY" | "GENTIC_API_URL")[]
+  maskedWorkerCredential?: string
+  missing: ("GENTIC_WORKER_CREDENTIAL" | "GENTIC_API_URL")[]
 }
 
 export interface OnboardingStatus {
@@ -108,22 +108,22 @@ const GITHUB_REQUIRED_MESSAGE =
 const AGENT_REQUIRED_MESSAGE =
   "both Claude Code and Codex must be installed and authenticated to run gentic"
 
-function maskApiKey(apiKey: string): string {
+function maskWorkerCredential(apiKey: string): string {
   const suffix = apiKey.slice(-4)
   return `${apiKey.slice(0, 3)}...${suffix}`
 }
 
 function authStatus(config: Partial<ConfigFile>): OnboardingAuthStatus {
   const missing: OnboardingAuthStatus["missing"] = []
-  if (!config.GENTIC_API_KEY) missing.push("GENTIC_API_KEY")
+  if (!config.GENTIC_WORKER_CREDENTIAL) missing.push("GENTIC_WORKER_CREDENTIAL")
   if (!config.GENTIC_API_URL) missing.push("GENTIC_API_URL")
 
   if (missing.length > 0) {
     return {
       authenticated: false,
       apiUrl: config.GENTIC_API_URL,
-      maskedApiKey: config.GENTIC_API_KEY
-        ? maskApiKey(config.GENTIC_API_KEY)
+      maskedWorkerCredential: config.GENTIC_WORKER_CREDENTIAL
+        ? maskWorkerCredential(config.GENTIC_WORKER_CREDENTIAL)
         : undefined,
       missing,
     }
@@ -132,7 +132,7 @@ function authStatus(config: Partial<ConfigFile>): OnboardingAuthStatus {
   return {
     authenticated: true,
     apiUrl: config.GENTIC_API_URL,
-    maskedApiKey: maskApiKey(config.GENTIC_API_KEY ?? ""),
+    maskedWorkerCredential: maskWorkerCredential(config.GENTIC_WORKER_CREDENTIAL ?? ""),
     missing,
   }
 }
@@ -229,7 +229,7 @@ async function runAuthStep(
 
   if (status.auth.authenticated) {
     ui?.success(
-      `Gentic auth already configured (${status.auth.maskedApiKey}, ${status.auth.apiUrl}).`
+      `Gentic auth already configured (${status.auth.maskedWorkerCredential}, ${status.auth.apiUrl}).`
     )
     return "skipped"
   }
@@ -280,7 +280,7 @@ function reportAgentStep(
 
 function formatOnboardingSummary(status: OnboardingStatus): string[] {
   const auth = status.auth.authenticated
-    ? `configured (${status.auth.maskedApiKey}, ${status.auth.apiUrl})`
+    ? `configured (${status.auth.maskedWorkerCredential}, ${status.auth.apiUrl})`
     : "not configured"
   const agents = Object.entries({
     Claude: status.tools.claude,

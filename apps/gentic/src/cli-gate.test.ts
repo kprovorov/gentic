@@ -12,7 +12,7 @@ const readyStatus: OnboardingStatus = {
   auth: {
     authenticated: true,
     apiUrl: "https://gentic.example/api/v1",
-    maskedApiKey: "gen...test",
+    maskedWorkerCredential: "gen...test",
     missing: [],
   },
   agentProviders: ["codex"],
@@ -27,7 +27,7 @@ const unmetStatus: OnboardingStatus = {
   ready: false,
   auth: {
     authenticated: false,
-    missing: ["GENTIC_API_KEY", "GENTIC_API_URL"],
+    missing: ["GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
   },
   agentProviders: ["codex"],
   tools: {
@@ -106,6 +106,9 @@ test("checkOnboardingGate prints setup instructions and exits 1 without promptin
   )
 
   assert.equal(prompted, false)
-  assert.match(output, /GENTIC_API_KEY and GENTIC_API_URL/)
-  assert.match(output, /gentic auth login --api-key \.\.\. --api-url \.\.\./)
+  assert.match(output, /GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL/)
+  assert.match(
+    output,
+    /gentic auth login --worker-credential \.\.\. --api-url \.\.\./
+  )
 })

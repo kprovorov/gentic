@@ -241,7 +241,7 @@ async function withHarness(
   const workdir = await mkdtemp(join(tmpdir(), "gentic-worker-test-"))
   try {
     const config: Config = {
-      GENTIC_API_KEY: "test-key",
+      GENTIC_WORKER_CREDENTIAL: "test-key",
       GENTIC_API_URL: "https://gentic.example",
       GIT_REMOTE_BASE: "git@github.com:",
       WORKDIR: workdir,

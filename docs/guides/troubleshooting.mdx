@@ -31,13 +31,13 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   gentic auth status
   ```
 
-  You should see a masked API key and a valid API URL. If either is missing, re-authenticate:
+  You should see a masked worker credential and a valid API URL. If either is missing, re-authenticate:
 
   ```bash
   gentic auth login
   ```
 
-  Supply your `GENTIC_API_URL` (e.g. `https://app.gentic.chat/api/v1`) and your `GENTIC_API_KEY` when prompted.
+  Supply your `GENTIC_API_URL` (e.g. `https://app.gentic.chat/api/v1`) and your `GENTIC_WORKER_CREDENTIAL` when prompted.
 
   **Step 3 — Restart the worker:**
 
@@ -168,7 +168,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   The two values that cause an immediate exit if missing are:
 
   ```bash
-  GENTIC_API_KEY=<your-api-key>
+  GENTIC_WORKER_CREDENTIAL=<your-worker-credential>
   GENTIC_API_URL=https://app.gentic.chat/api/v1
   ```
 

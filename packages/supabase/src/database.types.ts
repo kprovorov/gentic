@@ -529,12 +529,37 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_enrollment_exchange_failures: {
+        Row: {
+          failed_count: number
+          locked_until: string | null
+          rate_limit_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       workers: {
         Row: {
           arch: string | null
           banned_at: string | null
           configured_capacity: number
           created_at: string
+          credential_expires_at: string | null
           credential_hash: string
           display_name: string
           gentic_version: string | null
@@ -553,6 +578,7 @@ export type Database = {
           banned_at?: string | null
           configured_capacity?: number
           created_at?: string
+          credential_expires_at?: string | null
           credential_hash: string
           display_name: string
           gentic_version?: string | null
@@ -571,6 +597,7 @@ export type Database = {
           banned_at?: string | null
           configured_capacity?: number
           created_at?: string
+          credential_expires_at?: string | null
           credential_hash?: string
           display_name?: string
           gentic_version?: string | null
@@ -591,6 +618,45 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_worker_enrollment_code: {
+        Args: {
+          p_arch: string
+          p_code_hash: string
+          p_configured_capacity: number
+          p_credential_hash: string
+          p_display_name: string
+          p_gentic_version: string
+          p_now?: string
+          p_os: string
+          p_process_started_at: string
+          p_provider_capabilities: Json
+        }
+        Returns: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       delete_old_orphaned_attachments: {
         Args: { older_than?: string }
         Returns: {
@@ -618,6 +684,18 @@ export type Database = {
       next_issue_number_for_project: {
         Args: { p_project_id: string }
         Returns: number
+      }
+      record_worker_enrollment_exchange_failure: {
+        Args: {
+          p_max_failures: number
+          p_now: string
+          p_rate_limit_key: string
+          p_window_ms: number
+        }
+        Returns: {
+          failed_count: number
+          locked_until: string
+        }[]
       }
       reset_issue_run:
         | {
