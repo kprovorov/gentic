@@ -10,6 +10,10 @@ export function hasLocalCheckout(dir: string): boolean {
   return existsSync(join(dir, ".git"))
 }
 
+export interface GitBaseline {
+  head: string
+}
+
 /**
  * Clones a project repo into a fresh directory. Any existing directory at
  * `dir` is removed first so each run starts from a clean checkout.
@@ -55,6 +59,32 @@ export async function runSetupScript(options: {
   dir: string
 }): Promise<void> {
   await run("sh", ["-c", options.script], { cwd: options.dir })
+}
+
+export async function captureGitBaseline(dir: string): Promise<GitBaseline> {
+  const head = await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
+  return { head: head.trim() }
+}
+
+export async function hasRepositoryChangesSinceBaseline(
+  dir: string,
+  baseline: GitBaseline
+): Promise<boolean> {
+  const status = await runCapture(
+    "git",
+    ["status", "--porcelain=v1", "--untracked-files=all"],
+    { cwd: dir }
+  )
+  if (status.trim().length > 0) {
+    return true
+  }
+
+  const commits = await runCapture(
+    "git",
+    ["rev-list", "--count", `${baseline.head}..HEAD`],
+    { cwd: dir }
+  )
+  return Number.parseInt(commits.trim(), 10) > 0
 }
 
 /**
