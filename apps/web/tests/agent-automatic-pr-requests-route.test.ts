@@ -298,7 +298,10 @@ test("creates the automatic PR request and returns session-continuation context"
   assert.equal(supabase.rpcCalls[0]?.name, "request_automatic_pr_publish")
   assert.equal(supabase.rpcCalls[0]?.args.p_issue_id, "issue-1")
   assert.equal(supabase.rpcCalls[0]?.args.p_run_id, runId1)
-  assert.match(String(supabase.rpcCalls[0]?.args.p_content), /ACME-7/)
+  const publishingMessage = String(supabase.rpcCalls[0]?.args.p_content)
+  assert.match(publishingMessage, /`acme-7-fix-the-thing` branch/)
+  assert.match(publishingMessage, /never create an empty commit/i)
+  assert.match(publishingMessage, /summary section and a test plan section/i)
 
   // create_pr_automatically stays true after the automatic attempt so it
   // keeps auditing the user's opt-in, rather than being consumed/cleared.

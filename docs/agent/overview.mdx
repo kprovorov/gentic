@@ -1,14 +1,22 @@
 ---
 title: "Gentic Agent Worker: Background AI Coding Runner"
 sidebarTitle: "Overview"
-description: "The Gentic agent worker is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and opens pull requests automatically."
+description: "The Gentic agent worker is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and can publish successful changes as pull requests."
 ---
 
-The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims work up to its configured concurrency limit, clones each associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. When the agent finishes, it commits its changes and opens a pull request against your repository automatically. The default concurrency limit is one issue.
+The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims work up to its configured concurrency limit, clones each associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. The default concurrency limit is one issue.
 
 ## How it works
 
-When you move an issue from **Draft** to **Todo** in the Gentic web app, the API adds it to the unclaimed `todo` pool. On its next poll cycle, the agent worker claims that issue (flipping it to `queued`), creates a fresh clone of its configured repository, and runs the issue's assigned agent provider through the Agent Client Protocol. The worker streams assistant output back into the issue transcript in real time; once the agent goes quiet, the run resolves directly to `ready-for-review` (if a pull request was opened) or `waiting-for-input`. If you send a follow-up message to an issue whose run has already ended, the API returns it to `todo` and the worker resumes the same ACP session — preserving the full conversation context.
+When you move an issue from **Draft** to **Todo** in the Gentic web app, the API adds it to the unclaimed `todo` pool. On its next poll cycle, the agent worker claims that issue (flipping it to `queued`), creates a fresh clone of its configured repository, and runs the issue's assigned agent provider through the Agent Client Protocol. The worker streams assistant output back into the issue transcript in real time.
+
+The worker does not add hidden publishing instructions to the agent session. After a successful turn, it records whether that turn produced unpublished changes. If **Create PR automatically** is enabled and no pull request exists, the API atomically adds one visible Gentic-authored publishing message for the active run. The worker continues the same ACP session to process it. Worker restarts and concurrent calls reuse that request instead of creating a duplicate.
+
+Unchanged, failed, held, usage-limited, cancelled, and interrupted runs do not trigger automatic publishing. Once the agent goes quiet, the run resolves to `ready-for-review` if a pull request was opened or `waiting-for-input` otherwise. If you send a follow-up message to an issue whose run has already ended, the API returns it to `todo` and the worker resumes the same ACP session — preserving the full conversation context.
+
+<Note>
+  For a backward-compatible deployment, apply the database migration first, deploy the web app and API second, and update agent workers last. The database and non-web API default is `false`, so older workers and existing issues remain opted out until the web/API layer and then the worker understand the new fields.
+</Note>
 
 ## Deployment options
 

@@ -40,8 +40,8 @@ These statuses indicate a worker is actively handling the issue.
 |---|---|
 | `queued` | A worker has claimed the issue and is preparing the run — cloning the configured repository, running the project's setup script, and starting the agent session. This is a short-lived state; if it persists, see [Troubleshooting](/guides/troubleshooting). |
 | `held` | The agent hit a usage or session limit (for example, a Claude Code quota reset or a Codex rate-limit response). The worker parses the reset time out of the error and stores it on the issue. Once the reset time has passed, the next poll re-claims the issue automatically — you do not need to do anything. |
-| `in-progress` | The agent session is live. The transcript panel streams assistant output in real time as the agent reads files, writes code, and runs commands inside the cloned repository. |
-| `waiting-for-input` | The agent has finished a turn without opening a pull request and is waiting for you to send a follow-up message. Reply in the transcript to continue the same session. |
+| `in-progress` | The agent session is live. The transcript panel streams assistant output in real time. A successful changed turn may stay in this status for one visible automatic publishing turn when **Create PR automatically** is enabled. |
+| `waiting-for-input` | The agent has finished without opening a pull request and is waiting for you to send a follow-up message. If the run left unpublished changes, the issue sidebar offers **Create PR** while the issue is idle. |
 
 ## Review
 
@@ -50,9 +50,9 @@ These statuses cover the period between the agent opening a pull request and the
 | Status | Description |
 |---|---|
 | `testing` | Automated tests are running against the pull request. GitHub check webhooks can set this when checks start or are re-run. |
-| `tests-failed` | Automated tests failed for the pull request. GitHub check webhooks can set this when completed checks fail. |
+| `tests-failed` | Automated tests failed for the pull request. GitHub check webhooks can set this when completed checks fail and can add a Gentic-authored follow-up for the agent. |
 | `ready-for-review` | The agent has opened a pull request and it is ready for human review on GitHub. |
-| `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. Send the agent a message describing what to fix, or push changes yourself. |
+| `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. When automatic review responses are enabled, Gentic adds the feedback with Gentic attribution and re-queues the same agent session. |
 | `approved` | A reviewer submitted an **Approve** review on GitHub. The pull request is ready to merge. |
 
 ## Merge and deploy

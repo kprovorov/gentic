@@ -10,6 +10,10 @@ import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { logIssueEvent } from "./events"
 import { ensureIssueOwned } from "./ownership"
+import {
+  formatPublishingRequest,
+  generateFirstPublishBranchName,
+} from "./publish"
 import { getIssue } from "./queries"
 import {
   getIssueCode,
@@ -586,7 +590,13 @@ export async function requestAutomaticPrPublish(
   }
 
   const code = getIssueCode(issue.projects.key, issue.number)
-  const content = formatAutomaticCreatePrMessage(code, issue.title)
+  const content = formatPublishingRequest({
+    branchName: generateFirstPublishBranchName({
+      projectKey: issue.projects.key,
+      issueNumber: issue.number,
+      issueTitle: issue.title,
+    }),
+  })
 
   const data = unwrap(
     await supabase
@@ -618,12 +628,4 @@ export async function requestAutomaticPrPublish(
       prUrl: issue.pr_url,
     },
   }
-}
-
-function formatAutomaticCreatePrMessage(
-  code: string,
-  title: string | null
-): string {
-  const label = title ? `${code}: ${title}` : code
-  return `Automatic PR publishing is enabled for ${label} and there are unpublished changes. Please commit any remaining work and open a pull request now.`
 }

@@ -1,7 +1,7 @@
 ---
 title: "How Gentic Works: Issues, Agents, and Pull Requests"
 sidebarTitle: "How It Works"
-description: "Understand Gentic's end-to-end workflow: from creating an issue in the web app to receiving an automated pull request from an AI coding agent."
+description: "Understand Gentic's end-to-end workflow: from creating an issue in the web app to optionally publishing an AI coding agent's work as a pull request."
 ---
 
 Gentic connects two things: a web app where your team writes and manages work, and a background worker that turns that work into real code. Understanding how these two parts communicate helps you configure Gentic correctly and troubleshoot issues when something unexpected happens.
@@ -34,20 +34,30 @@ When the worker finds a `todo` issue, it claims it (moving the status to `queued
 
 Once the clone finishes and the agent session starts, the status flips to `in-progress`. Each issue gets its own working directory. A worker processes one issue at a time by default; set `MAX_CONCURRENT_ISSUES` to allow more isolated runs on the same worker.
 
-### The agent writes code and opens a pull request
+### The agent writes code
 
 With the repository cloned, the worker spawns the chosen agent through the **Agent Client Protocol (ACP)**:
 
 - **Claude Code** issues run through `@agentclientprotocol/claude-agent-acp`, using Claude Code credentials already present in the worker environment.
 - **Codex** issues run through `@agentclientprotocol/codex-acp`, which shells out to the `codex` CLI already installed and authenticated in the worker environment.
 
-The agent receives the issue prompt (plus any attachment content) as its first user message. The worker appends an automatic instruction telling the agent to commit its changes and open a pull request before finishing — you do not need to include this in your prompt.
+The agent receives the issue prompt (plus any attachment content) as its first user message. Gentic does not append hidden commit, push, or pull-request instructions to the agent's system prompt.
 
 As the agent works, its output streams back into the issue's transcript in real time so you can follow along in the web app.
 
+### Gentic can publish successful changes
+
+New issues created in the web app have **Create PR automatically** enabled by default. You can change the preference while creating a draft, starting a run, or editing an issue before a pull request is attached. The database and non-web API default remains disabled, and issues created before this preference was introduced remain opted out.
+
+After a successful agent turn, the worker checks for changes made during that turn. If automatic publishing is enabled, the work changed, and no pull request exists, Gentic adds a visible Gentic-authored message to the same run. That additional turn asks the agent to reuse existing Git state, avoid empty commits, push the branch, and open a ready-for-review pull request. The first Gentic-requested branch uses the issue code and title slug, such as `gen-123-update-login-modal`. Later pull requests are not restricted to that name.
+
+Gentic makes at most one automatic publishing attempt per active run. It does not start one for unchanged, failed, held, usage-limited, cancelled, or interrupted runs. A later user follow-up starts a new run and can try again.
+
+If an idle run has unpublished changes but no pull request, use **Create PR** on the issue. This adds a user-authored publishing message and resumes the session. The action is hidden while work is active, while automatic publishing is pending, or after any pull request is attached.
+
 ### The issue status updates automatically
 
-When the agent finishes its run, the worker resolves the issue directly to `ready-for-review` (if a pull request was opened) or `waiting-for-input` (if the agent stopped without opening one). If the agent encounters an unrecoverable error the status becomes `run-failed`, and if it hits a usage or session limit it moves to `held` with a parsed reset time — the worker will auto-retry once that time has passed.
+When the agent finishes its run, the worker resolves the issue to `ready-for-review` if a pull request was opened or `waiting-for-input` if it stopped without one. If the agent encounters an unrecoverable error the status becomes `run-failed`, and if it hits a usage or session limit it moves to `held` with a parsed reset time — the worker will auto-retry once that time has passed.
 
 ### You can send follow-up messages while the agent is running
 

@@ -435,6 +435,8 @@ test("worker control invalidates active runs and cancels their sessions", async 
 
 test("processIssue cancellation reaches an active agent session", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
     const controller = new AbortController()
     let enteredSession: (() => void) | null = null
     const sessionStarted = new Promise<void>((resolve) => {
@@ -460,6 +462,7 @@ test("processIssue cancellation reaches an active agent session", async () => {
 
     assert.equal(api.sessionAborted, true)
     assert.equal(api.finishedStatuses.length, 0)
+    assert.deepEqual(api.automaticPrPublishRequests, [])
     assert.equal(
       api.runStates.some((entry) => entry.fields.status === "run-failed"),
       false

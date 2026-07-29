@@ -146,6 +146,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'invalid message author metadata is rejected'
 );
 
@@ -164,6 +165,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'invalid generated action metadata is rejected'
 );
 
@@ -244,6 +246,7 @@ SELECT throws_ok(
     )
   $$,
   '23505',
+  null,
   'only one automatic PR request is allowed for a run'
 );
 
@@ -258,6 +261,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'automatic PR requests must target the active run'
 );
 
