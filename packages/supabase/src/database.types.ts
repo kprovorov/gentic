@@ -229,6 +229,7 @@ export type Database = {
           id: string
           issue_model: string | null
           number: number
+          priority: Database["public"]["Enums"]["issue_priority"]
           pr_url: string | null
           project_id: string
           prompt: string | null
@@ -249,6 +250,7 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number: number
+          priority?: Database["public"]["Enums"]["issue_priority"]
           pr_url?: string | null
           project_id: string
           prompt?: string | null
@@ -269,6 +271,7 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number?: number
+          priority?: Database["public"]["Enums"]["issue_priority"]
           pr_url?: string | null
           project_id?: string
           prompt?: string | null
@@ -488,7 +491,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      issue_priority: "low" | "medium" | "high" | "urgent"
     }
     CompositeTypes: {
       [_ in never]: never
