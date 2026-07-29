@@ -159,7 +159,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
 
       for (;;) {
         throwIfAborted(input.signal)
-        const next = await input.nextPrompt()
+        const next = await abortable(input.nextPrompt(), input.signal)
         if (next === null) {
           break
         }
@@ -486,7 +486,7 @@ export function isSessionCancelled(error: unknown): boolean {
   return error instanceof SessionCancelledError
 }
 
-function throwIfAborted(signal: AbortSignal | undefined): void {
+export function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) {
     throw new SessionCancelledError()
   }

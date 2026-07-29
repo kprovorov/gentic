@@ -15,6 +15,10 @@ import type { Config } from "../config.js"
 import type { IssueRealtimeChannel } from "../realtime.js"
 import type { PromptDelivery, PromptTurn, RunSessionInput } from "../session.js"
 import type { ToolStatuses } from "../tools.js"
+import type {
+  WorkerControlResponse,
+  WorkerHeartbeatTelemetry,
+} from "@gentic/validators/workers"
 import {
   CONTROL_INTERVAL_MS,
   processIssue,
@@ -268,7 +272,7 @@ test("worker loop sends heartbeat every 30s and checks control every 10s", async
     ])
     assert.equal(api.providerCheckCalls, 1)
     assert.equal(api.offlineCalls, 0)
-  })
+  }, { now: () => clock.now() })
 })
 
 test("worker loop marks graceful shutdown offline immediately", async () => {
@@ -282,6 +286,38 @@ test("worker loop marks graceful shutdown offline immediately", async () => {
 
     assert.equal(api.offlineCalls, 1)
   })
+})
+
+test("worker loop waits for signal-triggered offline update", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    let releaseOffline = (): void => {}
+    let completed = false
+    api.offlineDelay = new Promise<void>((resolve) => {
+      releaseOffline = resolve
+    })
+    const signalSent = new Promise<void>((resolve) => {
+      clock.onSleep = () => {
+        process.emit("SIGTERM")
+        resolve()
+      }
+    })
+    api.controlResponse = () => ({ worker: { banned: false }, runs: [] })
+
+    const run = runWorkerLoop(api, config, loopDeps(deps, clock, api)).then(
+      () => {
+        completed = true
+      }
+    )
+
+    await signalSent
+    assert.equal(api.offlineCalls, 1)
+    assert.equal(completed, false)
+
+    releaseOffline()
+    await run
+    assert.equal(completed, true)
+  }, { now: () => clock.now() })
 })
 
 test("worker loop survives transient heartbeat and control failures", async () => {
@@ -299,7 +335,27 @@ test("worker loop survives transient heartbeat and control failures", async () =
 
     assert.equal(api.heartbeats.length, 1)
     assert.equal(api.controlChecks.length, 4)
-  })
+  }, { now: () => clock.now() })
+})
+
+test("worker heartbeat survives transient provider check failures", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.failNextProviderCheck = true
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 31_000 },
+      runs: [],
+    })
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.equal(api.providerCheckCalls, 1)
+    assert.deepEqual(
+      api.heartbeats.map((entry) => entry.provider_capabilities),
+      [{ providers: {} }, { providers: {} }]
+    )
+  }, { now: () => clock.now() })
 })
 
 test("worker control ban aborts active sessions without recording failures", async () => {
@@ -309,8 +365,11 @@ test("worker control ban aborts active sessions without recording failures", asy
     config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
     api.claims.push(issue)
     api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+    let sessionEntered = false
     api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= CONTROL_INTERVAL_MS },
+      worker: {
+        banned: sessionEntered && clock.elapsedMs >= CONTROL_INTERVAL_MS,
+      },
       runs: [
         {
           issue_id: issue.id,
@@ -322,18 +381,20 @@ test("worker control ban aborts active sessions without recording failures", asy
     deps.runAgentSession = async (input) => {
       assert.ok(input.signal)
       await input.onSessionId("session-1")
+      sessionEntered = true
       await waitForAbort(input.signal)
       api.sessionAborted = true
     }
 
     await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
+    assert.equal(api.sessionAborted, true)
     assert.equal(api.finishedStatuses.length, 0)
     assert.equal(
       api.runStates.some((entry) => entry.fields.status === "run-failed"),
       false
     )
-  })
+  }, { now: () => clock.now() })
 })
 
 test("worker control invalidates active runs and cancels their sessions", async () => {
@@ -342,10 +403,11 @@ test("worker control invalidates active runs and cancels their sessions", async 
     config.MAX_CONCURRENT_ISSUES = 1
     config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
     api.claims.push(issue)
+    let sessionEntered = false
     api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 20_000 },
+      worker: { banned: sessionEntered && clock.elapsedMs >= 20_000 },
       runs:
-        clock.elapsedMs < CONTROL_INTERVAL_MS
+        !sessionEntered || clock.elapsedMs < CONTROL_INTERVAL_MS
           ? [
               {
                 issue_id: issue.id,
@@ -358,14 +420,16 @@ test("worker control invalidates active runs and cancels their sessions", async 
     deps.runAgentSession = async (input) => {
       assert.ok(input.signal)
       await input.onSessionId("session-1")
+      sessionEntered = true
       await waitForAbort(input.signal)
       api.sessionAborted = true
     }
 
     await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
+    assert.equal(api.sessionAborted, true)
     assert.equal(api.finishedStatuses.length, 0)
-  })
+  }, { now: () => clock.now() })
 })
 
 test("processIssue cancellation reaches an active agent session", async () => {
@@ -409,7 +473,10 @@ async function withHarness(
     api: FakeApi
     deps: ProcessIssueDeps
     realtimeWakes: Map<string, () => void>
-  }) => Promise<void>
+  }) => Promise<void>,
+  options: {
+    now?: () => Date
+  } = {}
 ): Promise<void> {
   const workdir = await mkdtemp(join(tmpdir(), "gentic-worker-test-"))
   try {
@@ -423,7 +490,7 @@ async function withHarness(
       POLL_INTERVAL_MS: 1,
       MAX_CONCURRENT_ISSUES: 2,
     }
-    const api = new FakeApi()
+    const api = new FakeApi(options.now)
     const realtimeWakes = new Map<string, () => void>()
     const deps = fakeDeps(api, realtimeWakes)
     const issue = claimedIssue("issue-1")
@@ -489,6 +556,8 @@ function fakeChannel(api: FakeApi): IssueRealtimeChannel {
 }
 
 class FakeApi implements AgentApi {
+  constructor(private readonly now: () => Date = () => new Date()) {}
+
   readonly messages = new Map<string, UserMessage[]>()
   readonly ackedIds = new Map<string, Set<string>>()
   readonly acked: { issueId: string; runId: string; messageIds: string[] }[] =
@@ -501,21 +570,24 @@ class FakeApi implements AgentApi {
     messageId: string
     attachmentsDir: string
   }[] = []
-  readonly heartbeats: import("@gentic/validators/workers").WorkerHeartbeatTelemetry[] =
-    []
+  readonly heartbeats: WorkerHeartbeatTelemetry[] = []
   readonly controlChecks: string[] = []
   readonly claims: ClaimedIssue[] = []
   finishResults: boolean[] = [true]
   onFinishAttempt: ((attempt: number) => void) | null = null
-  controlResponse: () => import("@gentic/validators/workers").WorkerControlResponse =
-    () => ({ worker: { banned: true }, runs: [] })
+  controlResponse: () => WorkerControlResponse = () => ({
+    worker: { banned: true },
+    runs: [],
+  })
   failNextHeartbeat = false
   failNextControl = false
+  failNextProviderCheck = false
   private finishAttempts = 0
   cloneCalls = 0
   checkoutCalls = 0
   closedChannels = 0
   offlineCalls = 0
+  offlineDelay: Promise<void> | null = null
   providerCheckCalls = 0
   sessionAborted = false
 
@@ -582,7 +654,7 @@ class FakeApi implements AgentApi {
   }
 
   async sendHeartbeat(
-    telemetry: import("@gentic/validators/workers").WorkerHeartbeatTelemetry
+    telemetry: WorkerHeartbeatTelemetry
   ): Promise<void> {
     if (this.failNextHeartbeat) {
       this.failNextHeartbeat = false
@@ -593,21 +665,18 @@ class FakeApi implements AgentApi {
 
   async markOffline(): Promise<void> {
     this.offlineCalls += 1
+    await this.offlineDelay
   }
 
-  async fetchWorkerControl(): Promise<
-    import("@gentic/validators/workers").WorkerControlResponse
-  > {
+  async fetchWorkerControl(): Promise<WorkerControlResponse> {
     if (this.failNextControl) {
       this.failNextControl = false
       throw new Error("temporary control failure")
     }
-    this.controlChecks.push(new Date(fakeNowMs).toISOString())
+    this.controlChecks.push(this.now().toISOString())
     return this.controlResponse()
   }
 }
-
-let fakeNowMs = Date.parse("2026-07-29T08:30:00.000Z")
 
 class FakeClock {
   readonly startMs = Date.parse("2026-07-29T08:30:00.000Z")
@@ -619,14 +688,12 @@ class FakeClock {
   }
 
   now(): Date {
-    fakeNowMs = this.nowMs
     return new Date(this.nowMs)
   }
 
   async sleep(ms: number): Promise<void> {
     await flushMicrotasks()
     this.nowMs += ms
-    fakeNowMs = this.nowMs
     await flushMicrotasks()
     this.onSleep?.()
     this.onSleep = null
@@ -637,6 +704,9 @@ async function flushMicrotasks(): Promise<void> {
   for (let index = 0; index < 20; index += 1) {
     await Promise.resolve()
   }
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve)
+  })
 }
 
 function loopDeps(
@@ -650,6 +720,10 @@ function loopDeps(
     now: () => clock.now(),
     async getToolStatuses(): Promise<ToolStatuses> {
       api.providerCheckCalls += 1
+      if (api.failNextProviderCheck) {
+        api.failNextProviderCheck = false
+        throw new Error("temporary provider failure")
+      }
       return {
         github: { installed: true, authenticated: true, version: "2.0.0" },
         claude: { installed: true, authenticated: true, version: "1.0.0" },

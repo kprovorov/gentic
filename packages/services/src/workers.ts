@@ -107,6 +107,10 @@ export type UpdateWorkerInput = {
 type WorkerRow = Tables<"workers">
 const workerSelect =
   "id,user_id,display_name,setup_state,banned_at,created_at,updated_at,last_seen_at,process_started_at,gentic_version,os,arch,configured_capacity,provider_capabilities"
+const supportedWorkerProviderKeys: Record<WorkerProviderKey, true> = {
+  claude_code: true,
+  codex: true,
+}
 
 export type WorkerEnrollmentCodeResult = {
   code: string
@@ -766,7 +770,8 @@ function sanitizeProviderCapabilities(
   capabilities: WorkerCapabilities
 ): WorkerCapabilities {
   const sanitized: WorkerCapabilities = { providers: {} }
-  for (const key of ["claude_code", "codex"] as const) {
+  for (const key of Object.keys(capabilities.providers)) {
+    if (!isSupportedWorkerProviderKey(key)) continue
     const capability = capabilities.providers[key]
     if (!capability) continue
     sanitized.providers[key] = {
@@ -779,6 +784,12 @@ function sanitizeProviderCapabilities(
     }
   }
   return sanitized
+}
+
+function isSupportedWorkerProviderKey(
+  key: string
+): key is WorkerProviderKey {
+  return key in supportedWorkerProviderKeys
 }
 
 function toProviderReadiness(

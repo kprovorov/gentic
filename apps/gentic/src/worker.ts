@@ -19,15 +19,16 @@ import { setRunState } from "./messages.js"
 import { createPendingMessagePromptSource } from "./pending-messages.js"
 import { connectIssueChannel, type IssueRealtimeChannel } from "./realtime.js"
 import {
-  SessionCancelledError,
   isSessionCancelled,
   runAgentSession,
+  throwIfAborted,
 } from "./session.js"
-import { getToolStatuses, type ToolStatus, type ToolStatuses } from "./tools.js"
+import { getToolStatuses, type ToolStatuses } from "./tools.js"
 import { getUsageLimitResetAt } from "./usage-limits.js"
 import type {
   WorkerCapabilities,
   WorkerControlResponse,
+  WorkerProviderCapability,
   WorkerHeartbeatTelemetry,
 } from "@gentic/validators/workers"
 
@@ -89,6 +90,7 @@ export async function runWorkerLoop(
 ): Promise<void> {
   let running = true
   let offlineMarked = false
+  let offlinePending: Promise<void> | null = null
   let stoppedByControl = false
   const activeRuns = new Map<
     Promise<void>,
@@ -99,7 +101,7 @@ export async function runWorkerLoop(
     abortActiveRuns(activeRuns)
     if (!stoppedByControl && !offlineMarked) {
       offlineMarked = true
-      void api.markOffline().catch((error) => {
+      offlinePending = api.markOffline().catch((error) => {
         logError("failed to mark worker offline:", describe(error))
       })
     }
@@ -163,6 +165,10 @@ export async function runWorkerLoop(
       }
     }
 
+    if (!running) {
+      break
+    }
+
     if (activeRuns.size >= config.MAX_CONCURRENT_ISSUES) {
       // Wake promptly when a run frees a slot, but periodically re-check the
       // stop flag when every slot remains occupied.
@@ -179,6 +185,9 @@ export async function runWorkerLoop(
     }
 
     let issue: ClaimedIssue | null = null
+    if (!running) {
+      break
+    }
     try {
       // Atomically claims the highest-priority eligible issue by flipping it
       // to `queued`. The conditional update keeps the claim safe if more
@@ -226,9 +235,12 @@ export async function runWorkerLoop(
 
   if (!stoppedByControl && !offlineMarked) {
     offlineMarked = true
-    await api.markOffline().catch((error) => {
+    offlinePending = api.markOffline().catch((error) => {
       logError("failed to mark worker offline:", describe(error))
     })
+    await offlinePending
+  } else if (offlinePending) {
+    await offlinePending
   }
 
   if (activeRuns.size > 0) {
@@ -438,9 +450,7 @@ export async function processIssue(
 }
 
 function throwIfCancelled(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) {
-    throw new SessionCancelledError()
-  }
+  throwIfAborted(signal)
 }
 
 function abortActiveRuns(
@@ -486,9 +496,17 @@ function createTelemetrySource(
     async snapshot() {
       const nowMs = deps.now().getTime()
       if (!cached || nowMs >= cached.expiresAt) {
-        cached = {
-          expiresAt: nowMs + PROVIDER_CHECK_CACHE_MS,
-          value: providerCapabilities(await deps.getToolStatuses()),
+        try {
+          cached = {
+            expiresAt: nowMs + PROVIDER_CHECK_CACHE_MS,
+            value: providerCapabilities(await deps.getToolStatuses()),
+          }
+        } catch (error) {
+          logError("provider capability check failed:", describe(error))
+          cached = {
+            expiresAt: nowMs + PROVIDER_CHECK_CACHE_MS,
+            value: cached?.value ?? { providers: {} },
+          }
         }
       }
 
@@ -515,9 +533,11 @@ function providerCapabilities(tools: ToolStatuses): WorkerCapabilities {
   }
 }
 
-function toolCapability(status: ToolStatus | undefined) {
+function toolCapability(
+  status: ToolStatuses["claude"]
+): WorkerProviderCapability {
   return {
-    enabled: true,
+    enabled: status !== undefined,
     available: status?.installed ?? false,
     authenticated: status?.authenticated ?? null,
     version: status?.version ?? null,
