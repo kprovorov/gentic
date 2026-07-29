@@ -23,7 +23,13 @@ export function shouldBypassOnboardingGate(argv: string[]): boolean {
   if (args.some((arg) => HELP_OR_VERSION_FLAGS.has(arg))) return true
 
   const command = args.find((arg) => !arg.startsWith("-"))
-  return command === "auth"
+  return (
+    command === "auth" ||
+    command === "worker" ||
+    command === "onboard" ||
+    command === "status" ||
+    command === "doctor"
+  )
 }
 
 export async function checkOnboardingGate(
@@ -40,15 +46,17 @@ export async function checkOnboardingGate(
   const exit = deps.exit ?? process.exit
 
   if (stdin.isTTY) {
-    const { loginInteractive } = await import("./commands/auth.js")
-    await (deps.runOnboarding ?? loginInteractive)()
+    const { runOnboarding } = await import("./onboarding.js")
+    await (deps.runOnboarding ?? runOnboarding)()
     exit(0)
   }
 
   const message = [
     "Gentic onboarding is required before running this command.",
-    "Set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL, or run:",
-    "  gentic auth login --worker-credential ... --api-url ...",
+    "Generate a worker code in Gentic, then run:",
+    "  gentic worker connect <code>",
+    "Resume interrupted local setup with:",
+    "  gentic onboard",
     "",
     ...formatOnboardingUnmet(status),
   ].join("\n")
@@ -59,8 +67,10 @@ export async function checkOnboardingGate(
     log.error("Gentic onboarding is required before running this command.")
     note(
       [
-        "Set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL, or run:",
-        "  gentic auth login --worker-credential ... --api-url ...",
+        "Generate a worker code in Gentic, then run:",
+        "  gentic worker connect <code>",
+        "Resume interrupted local setup with:",
+        "  gentic onboard",
         "",
         ...formatOnboardingUnmet(status),
       ].join("\n"),

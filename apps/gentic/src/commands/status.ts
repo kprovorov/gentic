@@ -102,12 +102,10 @@ async function status(opts: StatusOptions): Promise<void> {
 
   if (!auth.authenticated) {
     if (opts.json) {
-      console.log(
-        JSON.stringify({ auth: "not-configured", tools: toolsJson(tools) })
-      )
+      console.log(JSON.stringify({ worker: "not-connected", tools: toolsJson(tools) }))
       return
     }
-    log.warn('Auth: not configured — run "gentic auth login"')
+    log.warn('Worker: not connected - run "gentic worker connect <code>"')
     note(formatToolLines(tools).join("\n"), "Tools")
     return
   }
@@ -129,8 +127,11 @@ async function status(opts: StatusOptions): Promise<void> {
       console.log(
         JSON.stringify({
           auth: "configured",
+          worker: "connected",
+          workerId: auth.workerId,
           apiUrl: auth.apiUrl,
           maskedWorkerCredential: auth.maskedWorkerCredential,
+          setupState: auth.setupState,
           agents: agentProviders,
           serviceError: describe(error),
           tools: toolsJson(tools),
@@ -152,8 +153,11 @@ async function status(opts: StatusOptions): Promise<void> {
     console.log(
       JSON.stringify({
         auth: "configured",
+        worker: "connected",
+        workerId: auth.workerId,
         apiUrl: auth.apiUrl,
         maskedWorkerCredential: auth.maskedWorkerCredential,
+        setupState: auth.setupState,
         agents: agentProviders,
         service: serviceStatus.state,
         serviceBackend: backendName,
@@ -175,6 +179,7 @@ async function status(opts: StatusOptions): Promise<void> {
   note(
     [
       `Auth:     configured (worker credential: ${auth.maskedWorkerCredential}, url: ${auth.apiUrl})`,
+      `Worker:   ${auth.workerId ?? "unknown"} (${auth.setupState ?? "ready"})`,
       `Agents:   ${formatAgentProviders([...agentProviders])}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,

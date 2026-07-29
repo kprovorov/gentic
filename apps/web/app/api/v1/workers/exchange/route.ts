@@ -21,6 +21,7 @@ export function createWorkerExchangeHandler(deps: {
       })
 
       return Response.json({
+        api_url: apiUrlFromRequest(request),
         worker: {
           id: result.worker.id,
           display_name: result.worker.display_name,
@@ -36,6 +37,13 @@ export function createWorkerExchangeHandler(deps: {
       return Response.json({ error: "Invalid enrollment code" }, { status })
     }
   }
+}
+
+function apiUrlFromRequest(request: Request): string {
+  const url = new URL(request.url)
+  url.pathname = "/api/v1"
+  url.search = ""
+  return url.toString().replace(/\/$/, "")
 }
 
 export function rateLimitKeyFromRequest(request: Request): string {

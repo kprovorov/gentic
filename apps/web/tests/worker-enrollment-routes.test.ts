@@ -101,6 +101,7 @@ test("worker exchange route returns the raw credential on successful exchange", 
   assert.equal(response.status, 200)
   assert.equal(capturedRateLimitKey, "203.0.113.7")
   assert.deepEqual(await response.json(), {
+    api_url: "http://localhost/api/v1",
     worker: {
       id: "worker-1",
       display_name: "Build Host",

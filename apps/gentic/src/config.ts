@@ -8,8 +8,12 @@ import { readConfigFile, type ConfigFile } from "./config-store.js"
 const paths = envPaths("gentic", { suffix: "" })
 
 const configSchema = z.object({
+  GENTIC_WORKER_ID: z.string().min(1).optional(),
   GENTIC_WORKER_CREDENTIAL: z.string().min(1),
   GENTIC_API_URL: z.string().url(),
+  GENTIC_WORKER_SETUP_STATE: z
+    .enum(["setup-incomplete", "ready"])
+    .default("ready"),
   GIT_REMOTE_BASE: z.string().default("git@github.com:"),
   WORKDIR: z.string().default(join(paths.data, "workspaces")),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
@@ -19,8 +23,10 @@ const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 export const CONFIG_KEYS = [
+  "GENTIC_WORKER_ID",
   "GENTIC_WORKER_CREDENTIAL",
   "GENTIC_API_URL",
+  "GENTIC_WORKER_SETUP_STATE",
   "GIT_REMOTE_BASE",
   "WORKDIR",
   "POLL_INTERVAL_MS",
@@ -48,9 +54,13 @@ export function getConfigInput(
 export function loadConfig(): Config {
   const merged = getConfigInput()
 
-  if (!merged.GENTIC_WORKER_CREDENTIAL || !merged.GENTIC_API_URL) {
+  if (
+    !merged.GENTIC_WORKER_ID ||
+    !merged.GENTIC_WORKER_CREDENTIAL ||
+    !merged.GENTIC_API_URL
+  ) {
     throw new Error(
-      "Not authenticated. Run `gentic auth login` or set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL."
+      "No Gentic worker is connected. Run `gentic worker connect <code>`."
     )
   }
 

@@ -28,30 +28,29 @@ Still in **Settings**, click **Connect GitHub** and install the configured GitHu
 
 The agent worker is a CLI you run on a server, VM, or any machine that can reach both the Gentic API and GitHub. Download the latest pre-built binary for your platform from the [GitHub Releases page](https://github.com/kprovorov/gentic/releases), or build from source.
 
-Once the binary is on your server, authenticate it with your worker credential:
+Once the binary is on your server, generate a worker enrollment code in the Gentic web app and connect the machine:
 
 ```bash
-gentic auth login
+gentic worker connect <code>
 ```
 
-The interactive prompt asks for the API URL and your worker credential. For non-interactive or scripted setup, pass both flags directly:
+The exchange stores the API URL, stable worker id, and worker-specific credential locally, then immediately runs GitHub CLI, Codex, and Claude Code onboarding. If you cancel before local setup finishes, resume without another code:
 
 ```bash
-gentic auth login \
-  --api-url https://app.gentic.chat/api/v1 \
-  --worker-credential your-worker-credential-here
+gentic onboard
 ```
 
 Alternatively, create a `.env` file next to the binary and set the variables there:
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1
+GENTIC_WORKER_ID=worker-id-from-enrollment
 GENTIC_WORKER_CREDENTIAL=your-worker-credential-here
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
 ```
 
-Then install and start the worker as a managed OS service so it restarts automatically:
+After onboarding succeeds, the CLI asks whether to install and start the worker as a managed OS service so it restarts automatically. You can also do that later:
 
 ```bash
 gentic start

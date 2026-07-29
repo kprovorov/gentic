@@ -11,8 +11,10 @@ const readyStatus: OnboardingStatus = {
   ready: true,
   auth: {
     authenticated: true,
+    workerId: "worker-1",
     apiUrl: "https://gentic.example/api/v1",
     maskedWorkerCredential: "gen...test",
+    setupState: "ready",
     missing: [],
   },
   agentProviders: ["codex"],
@@ -27,7 +29,7 @@ const unmetStatus: OnboardingStatus = {
   ready: false,
   auth: {
     authenticated: false,
-    missing: ["GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
+    missing: ["GENTIC_WORKER_ID", "GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
   },
   agentProviders: ["codex"],
   tools: {
@@ -37,7 +39,7 @@ const unmetStatus: OnboardingStatus = {
   unmet: ["gentic-auth"],
 }
 
-test("shouldBypassOnboardingGate bypasses help, version, and auth subtree", () => {
+test("shouldBypassOnboardingGate bypasses setup and informational commands", () => {
   assert.equal(shouldBypassOnboardingGate(["node", "gentic", "--help"]), true)
   assert.equal(
     shouldBypassOnboardingGate(["node", "gentic", "run", "--help"]),
@@ -48,6 +50,12 @@ test("shouldBypassOnboardingGate bypasses help, version, and auth subtree", () =
     shouldBypassOnboardingGate(["node", "gentic", "auth", "login"]),
     true
   )
+  assert.equal(
+    shouldBypassOnboardingGate(["node", "gentic", "worker", "connect", "code"]),
+    true
+  )
+  assert.equal(shouldBypassOnboardingGate(["node", "gentic", "onboard"]), true)
+  assert.equal(shouldBypassOnboardingGate(["node", "gentic", "status"]), true)
   assert.equal(shouldBypassOnboardingGate(["node", "gentic", "run"]), false)
 })
 
@@ -106,9 +114,7 @@ test("checkOnboardingGate prints setup instructions and exits 1 without promptin
   )
 
   assert.equal(prompted, false)
-  assert.match(output, /GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL/)
-  assert.match(
-    output,
-    /gentic auth login --worker-credential \.\.\. --api-url \.\.\./
-  )
+  assert.match(output, /GENTIC_WORKER_ID and GENTIC_WORKER_CREDENTIAL/)
+  assert.match(output, /gentic worker connect <code>/)
+  assert.match(output, /gentic onboard/)
 })

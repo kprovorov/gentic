@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { after, afterEach, beforeEach, test } from "node:test"
 
 const CONFIG_KEYS = [
+  "GENTIC_WORKER_ID",
   "GENTIC_WORKER_CREDENTIAL",
   "GENTIC_API_URL",
   "AGENT_PROVIDERS",
@@ -46,6 +47,7 @@ after(() => {
 })
 
 test("loadConfig works with only env vars set (no config file)", () => {
+  process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
 
@@ -59,6 +61,7 @@ test("loadConfig works with only env vars set (no config file)", () => {
 
 test("loadConfig works with only the config file set", () => {
   writeConfigFile({
+    GENTIC_WORKER_ID: "file-worker",
     GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
@@ -70,9 +73,11 @@ test("loadConfig works with only the config file set", () => {
 
 test("loadConfig prefers env over the config file for the same key", () => {
   writeConfigFile({
+    GENTIC_WORKER_ID: "file-worker",
     GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
+  process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
 
   const loaded = loadConfig()
@@ -81,6 +86,7 @@ test("loadConfig prefers env over the config file for the same key", () => {
 })
 
 test("loadConfig accepts a concurrent-issue limit", () => {
+  process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.MAX_CONCURRENT_ISSUES = "3"
@@ -89,6 +95,7 @@ test("loadConfig accepts a concurrent-issue limit", () => {
 })
 
 test("loadConfig ignores legacy selected agent providers from env", () => {
+  process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.AGENT_PROVIDERS = "claude_code,codex"
@@ -98,6 +105,7 @@ test("loadConfig ignores legacy selected agent providers from env", () => {
 
 test("loadConfig ignores legacy selected agent providers from config file", () => {
   writeConfigFile({
+    GENTIC_WORKER_ID: "file-worker",
     GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })

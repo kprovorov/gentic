@@ -31,8 +31,10 @@ const missingTool = {
 test("getOnboardingStatus reports ready when credentials, gh, and all agents are authenticated", async () => {
   const status = await getOnboardingStatus({
     configInput: {
+      GENTIC_WORKER_ID: "worker-1",
       GENTIC_WORKER_CREDENTIAL: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
+      GENTIC_WORKER_SETUP_STATE: "ready",
     },
     getTools: async (): Promise<ToolStatuses> => ({
       github: readyTool,
@@ -64,10 +66,13 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
     "github-cli-authenticated",
     "agent-cli-authenticated",
   ])
-  assert.deepEqual(status.auth.missing, ["GENTIC_WORKER_CREDENTIAL"])
+  assert.deepEqual(status.auth.missing, [
+    "GENTIC_WORKER_ID",
+    "GENTIC_WORKER_CREDENTIAL",
+  ])
   assert.ok(
     formatOnboardingUnmet(status).some((line) =>
-      line.includes("missing GENTIC_WORKER_CREDENTIAL")
+      line.includes("missing GENTIC_WORKER_ID and GENTIC_WORKER_CREDENTIAL")
     )
   )
 })
@@ -75,8 +80,10 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
 test("getOnboardingStatus reports agent install when any agent CLI is missing", async () => {
   const status = await getOnboardingStatus({
     configInput: {
+      GENTIC_WORKER_ID: "worker-1",
       GENTIC_WORKER_CREDENTIAL: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
+      GENTIC_WORKER_SETUP_STATE: "ready",
     },
     getTools: async (): Promise<ToolStatuses> => ({
       github: readyTool,
@@ -93,11 +100,13 @@ function makeStatus(authenticated: boolean): OnboardingStatus {
     ready: authenticated,
     auth: {
       authenticated,
+      workerId: authenticated ? "worker-1" : undefined,
       apiUrl: authenticated ? "https://gentic.example/api/v1" : undefined,
       maskedWorkerCredential: authenticated ? "tes...-key" : undefined,
+      setupState: authenticated ? "ready" : undefined,
       missing: authenticated
         ? []
-        : ["GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
+        : ["GENTIC_WORKER_ID", "GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
     },
     agentProviders: ["claude_code", "codex"],
     tools: {
@@ -142,21 +151,15 @@ function defaultRunOnboardingDeps(status: OnboardingStatus) {
 
 test("runOnboarding shows welcome and skips auth prompt when already authenticated", async () => {
   const { messages, ui } = createUiRecorder()
-  let loginCalls = 0
   const status = makeStatus(true)
 
   await runOnboarding({
     ...defaultRunOnboardingDeps(status),
     getStatus: async () => status,
-    runAuthLogin: async () => {
-      loginCalls += 1
-      return { cancelled: false, apiKeyConfigured: true }
-    },
     confirm: async () => false,
     ui,
   })
 
-  assert.equal(loginCalls, 0)
   assert.equal(messages[0], "intro:Welcome to Gentic")
   assert.ok(
     messages.includes(
@@ -165,39 +168,29 @@ test("runOnboarding shows welcome and skips auth prompt when already authenticat
   )
   assert.ok(
     messages.some((message) =>
-      message.startsWith("success:Gentic auth already configured")
+      message.startsWith("success:Gentic worker connected")
     )
   )
 })
 
-test("runOnboarding calls auth prompt when credentials are missing", async () => {
+test("runOnboarding tells the user to connect first when registration is missing", async () => {
   const { messages, ui } = createUiRecorder()
-  let loginCalls = 0
-  const readyStatus = makeStatus(true)
-  const statuses = [makeStatus(false), makeStatus(true)]
+  const status = makeStatus(false)
 
   await runOnboarding({
-    ...defaultRunOnboardingDeps(readyStatus),
-    getStatus: async () => statuses.shift() ?? makeStatus(true),
-    runAuthLogin: async () => {
-      loginCalls += 1
-      return { cancelled: false, apiKeyConfigured: true }
-    },
+    ...defaultRunOnboardingDeps(status),
+    getStatus: async () => status,
     confirm: async () => false,
     ui,
   })
 
-  assert.equal(loginCalls, 1)
   assert.ok(
-    messages.includes(`info:Step 2/${ONBOARDING_STEPS.length}: GitHub CLI`)
+    messages.includes("warn:No Gentic worker is connected. Run `gentic worker connect <code>`.")
   )
   assert.ok(
-    messages.includes(`info:Step 3/${ONBOARDING_STEPS.length}: Agent CLI`)
+    messages.some((message) => message.includes("gentic worker connect <code>"))
   )
-  assert.ok(
-    messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
-  )
-  assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
+  assert.equal(messages.at(-1), "outro:Connect this worker first.")
 })
 
 test("runOnboarding prints ready summary and starts worker when confirmed", async () => {
@@ -209,9 +202,6 @@ test("runOnboarding prints ready summary and starts worker when confirmed", asyn
   await runOnboarding({
     ...defaultRunOnboardingDeps(status),
     getStatus: async () => status,
-    runAuthLogin: async () => {
-      throw new Error("auth prompt should not be called")
-    },
     confirm: async ({ message }) => {
       prompts.push(message)
       return true
@@ -225,7 +215,7 @@ test("runOnboarding prints ready summary and starts worker when confirmed", asyn
 
   assert.deepEqual(prompts, ["Enable the gentic worker now?"])
   assert.equal(startCalls, 1)
-  assert.ok(messages.includes("info:Gentic auth: configured (tes...-key, https://gentic.example/api/v1)"))
+  assert.ok(messages.includes("info:Gentic auth: connected (worker-1, tes...-key, https://gentic.example/api/v1)"))
   assert.ok(messages.includes("info:GitHub CLI: installed, authenticated"))
   assert.ok(
     messages.includes(
@@ -242,9 +232,6 @@ test("runOnboarding prints gentic start instructions when worker enable is decli
   await runOnboarding({
     ...defaultRunOnboardingDeps(status),
     getStatus: async () => status,
-    runAuthLogin: async () => {
-      throw new Error("auth prompt should not be called")
-    },
     confirm: async () => false,
     startWorker: async () => {
       startCalls += 1
@@ -255,6 +242,42 @@ test("runOnboarding prints gentic start instructions when worker enable is decli
 
   assert.equal(startCalls, 0)
   assert.ok(messages.includes("info:Run `gentic start` later to enable the worker."))
+  assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
+})
+
+test("runOnboarding resumes setup-incomplete registration without another code", async () => {
+  const { messages, ui } = createUiRecorder()
+  let markReadyCalls = 0
+  let startCalls = 0
+  const status: OnboardingStatus = {
+    ...makeStatus(true),
+    ready: false,
+    auth: {
+      ...makeStatus(true).auth,
+      setupState: "setup-incomplete",
+    },
+    unmet: ["worker-setup-incomplete"],
+  }
+
+  await runOnboarding({
+    ...defaultRunOnboardingDeps(status),
+    getStatus: async () => status,
+    markWorkerReady: async () => {
+      markReadyCalls += 1
+    },
+    confirm: async () => false,
+    startWorker: async () => {
+      startCalls += 1
+      return true
+    },
+    ui,
+  })
+
+  assert.equal(markReadyCalls, 1)
+  assert.equal(startCalls, 0)
+  assert.ok(
+    messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)
+  )
   assert.equal(messages.at(-1), "outro:Onboarding checks complete.")
 })
 
@@ -274,9 +297,6 @@ test("runOnboarding exits immediately when required gh setup declines", async ()
   await assert.rejects(
     runOnboarding({
       getStatus: async () => missingGithubStatus,
-      runAuthLogin: async () => {
-        throw new Error("auth prompt should not be called")
-      },
       ensureGithubCli: async () => {
         throw new Error("exited")
       },
@@ -315,9 +335,6 @@ test("runOnboarding exits immediately when an agent is not authenticated", async
   await assert.rejects(
     runOnboarding({
       getStatus: async () => unauthenticatedAgentStatus,
-      runAuthLogin: async () => {
-        throw new Error("auth prompt should not be called")
-      },
       setupAgentCLIs: async () => true,
       ensureAgentCli: async () => {
         throw new Error("exited")
@@ -360,9 +377,6 @@ test("runOnboarding errors when agent setups are declined", async () => {
   await assert.rejects(
     runOnboarding({
       getStatus: async () => noAgentStatus,
-      runAuthLogin: async () => {
-        throw new Error("auth prompt should not be called")
-      },
       setupAgentCLIs: async (tools) => {
         setupCalls += 1
         assert.deepEqual(tools, noAgentStatus.tools)
@@ -422,9 +436,6 @@ test("runOnboarding passes when all agent setups are accepted", async () => {
 
   await runOnboarding({
     getStatus: async () => initialStatus,
-    runAuthLogin: async () => {
-      throw new Error("auth prompt should not be called")
-    },
     setupAgentCLIs: async (tools) => {
       assert.deepEqual(tools, initialStatus.tools)
       return true
