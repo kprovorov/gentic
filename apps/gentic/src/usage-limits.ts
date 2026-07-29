@@ -23,10 +23,11 @@ export function getUsageLimitResetAt(
     return null
   }
 
+  const defaultTimeZone = options.defaultTimeZone ?? "local"
   const resetAt =
     parseRelativeReset(message, now) ??
-    parseAbsoluteReset(message, now) ??
-    parseTimeOnlyReset(message, now, options.defaultTimeZone ?? "local")
+    parseAbsoluteReset(message, now, defaultTimeZone) ??
+    parseTimeOnlyReset(message, now, defaultTimeZone)
 
   return resetAt && resetAt.getTime() > now.getTime()
     ? resetAt.toISOString()
@@ -72,18 +73,36 @@ function parseRelativeReset(message: string, now: Date): Date | null {
   return totalMs > 0 ? new Date(now.getTime() + totalMs) : null
 }
 
-function parseAbsoluteReset(message: string, now: Date): Date | null {
+function parseAbsoluteReset(
+  message: string,
+  now: Date,
+  defaultTimeZone: "local" | "utc"
+): Date | null {
   const match = message.match(
-    /(?:reset(?:s)?|retry|try again|available|until)(?:\s+\w+){0,3}\s+(?:at|on|after|by)?\s*([A-Z][a-z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4}(?:,)?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?(?:\s*[A-Z]{2,4})?|\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/i
+    /(?:reset(?:s)?|retry|try again|available|until)(?:\s+\w+){0,3}\s+(?:at|on|after|by)?\s*(?:([A-Z][a-z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4}(?:,)?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?)(?:\s*([A-Z]{2,4}))?|(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?))/i
   )
   if (!match) {
     return null
   }
+  const [, human, tz, iso] = match
+
+  if (iso) {
+    const parsed = new Date(iso)
+    return Number.isNaN(parsed.getTime()) || parsed <= now ? null : parsed
+  }
 
   // Strip ordinal suffixes (e.g. "5th" -> "5") — Codex's usage-limit
   // messages use them, but the Date constructor can't parse them.
-  const dateText = match[1].replace(/(\d)(?:st|nd|rd|th)\b/i, "$1")
-  const parsed = new Date(dateText)
+  const dateText = human.replace(/(\d)(?:st|nd|rd|th)\b/i, "$1")
+  // A bare "Month day, year time" string is parsed in the host's local
+  // timezone, so pin it explicitly using the message's own timezone
+  // abbreviation (if any) or the caller's default.
+  const dateTextWithZone = tz
+    ? `${dateText} ${tz}`
+    : defaultTimeZone === "utc"
+      ? `${dateText} UTC`
+      : dateText
+  const parsed = new Date(dateTextWithZone)
   return Number.isNaN(parsed.getTime()) || parsed <= now ? null : parsed
 }
 
