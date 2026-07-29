@@ -41,7 +41,18 @@ test("issue priority defaults to medium on create and update validators", () => 
 
   assert.equal(defaultIssuePriority, "medium")
   assert.equal(createValues.priority, "medium")
+  assert.equal(createValues.create_pr_automatically, false)
   assert.equal(updateValues.priority, "medium")
+})
+
+test("createIssueSchema preserves explicit automatic PR opt-in", () => {
+  const createValues = createIssueSchema.parse({
+    project_id: projectId,
+    status: "draft",
+    create_pr_automatically: true,
+  })
+
+  assert.equal(createValues.create_pr_automatically, true)
 })
 
 test("issue priority contract exposes reusable metadata in priority order", () => {

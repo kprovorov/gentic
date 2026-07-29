@@ -37,6 +37,7 @@ export async function createIssue(
       prompt: input.prompt ?? null,
       status: input.status === "todo" ? "draft" : input.status,
       priority: input.priority,
+      create_pr_automatically: input.create_pr_automatically,
       agent_provider: input.agent_provider,
       issue_model: input.issue_model,
       type: input.type,

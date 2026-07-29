@@ -367,6 +367,7 @@ test("createIssue persists the requested priority", async () => {
     prompt: "Do the thing",
     status: "draft",
     priority: "urgent",
+    create_pr_automatically: false,
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",

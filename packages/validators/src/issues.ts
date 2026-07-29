@@ -132,6 +132,7 @@ export const createIssueSchema = z.object({
   prompt: z.string().trim().optional(),
   status: issueStatusSchema,
   priority: issuePrioritySchema.default(defaultIssuePriority),
+  create_pr_automatically: z.boolean().default(false),
   agent_provider: agentProviderSchema.default("claude_code"),
   issue_model: issueModelSchema.default(null),
   // Omitted by the web app's create-issue form the same way: the type is

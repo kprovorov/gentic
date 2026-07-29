@@ -29,6 +29,8 @@ export interface StructuredMessageFields {
   kind: MessageKind
   content: string
   status: MessageStatus
+  author_type?: "agent" | "gentic"
+  generated_action?: "create_pr" | null
   event_id?: string | null
   run_id?: string | null
   event_type?: EventType | null
@@ -127,6 +129,7 @@ export class StreamingAssistantMessage {
         kind: this.kind,
         content: this.content,
         status: "complete",
+        author_type: "agent",
         event_id: this.eventId ?? this.id,
         run_id: this.runId ?? null,
         event_type: this.kind === "thinking" ? "thought" : "text",
@@ -160,6 +163,7 @@ export class StreamingAssistantMessage {
         kind: this.kind,
         content: this.content,
         status: "error",
+        author_type: "agent",
         event_id: this.eventId ?? this.id,
         run_id: this.runId ?? null,
         event_type: this.kind === "thinking" ? "thought" : "text",
@@ -189,6 +193,7 @@ export class StreamingAssistantMessage {
       kind: this.kind,
       content: this.content,
       status,
+      author_type: "agent",
       event_id: this.eventId ?? this.id,
       run_id: this.runId ?? null,
       event_type: this.kind === "thinking" ? "thought" : "text",
@@ -228,6 +233,7 @@ export async function publishMessage(
       kind: fields.kind ?? "text",
       content: fields.content,
       status,
+      author_type: "agent",
     },
     fields.persistOptions
   )
@@ -238,6 +244,7 @@ export async function publishMessage(
     kind: fields.kind ?? "text",
     content: fields.content,
     status,
+    author_type: "agent",
   })
 }
 
@@ -271,6 +278,8 @@ export async function publishStructuredMessage(
     kind: message.kind,
     content: message.content,
     status: message.status,
+    author_type: message.author_type,
+    generated_action: message.generated_action ?? null,
     event_id: message.event_id ?? null,
     run_id: message.run_id ?? null,
     event_type: message.event_type ?? null,
@@ -325,6 +334,8 @@ async function persistMessageWithRetry(
     kind: MessageKind
     content: string
     status: MessageStatus
+    author_type?: "agent" | "gentic"
+    generated_action?: "create_pr" | null
     event_id?: string | null
     run_id?: string | null
     event_type?: EventType | null

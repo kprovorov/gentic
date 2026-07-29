@@ -547,7 +547,7 @@ async function getIssueDetailDataForIssue(
     supabase
       .from("messages")
       .select(
-        "id,role,kind,content,status,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
+        "id,role,kind,content,status,author_type,generated_action,created_at,event_id,run_id,event_type,event_status,event_ts,event_seq,tool_call_id,payload"
       )
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),

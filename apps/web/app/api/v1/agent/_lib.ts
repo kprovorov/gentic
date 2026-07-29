@@ -7,7 +7,8 @@ import { createServiceClient } from "@gentic/supabase/service"
 import {
   ackMessagesInputSchema,
   finishRunFieldsSchema,
-  insertMessageInputSchema,
+  insertMessageInputShape,
+  requireGenticGeneratedActionAuthor,
   runStateFieldsSchema,
 } from "@gentic/validators/agent"
 import { issueStatusSchema } from "@gentic/validators/issues"
@@ -38,7 +39,13 @@ export const finishRunSchema = finishRunFieldsSchema
   .strict()
 
 export const ackMessagesSchema = ackMessagesInputSchema
-export const insertMessageSchema = insertMessageInputSchema.partial({ id: true })
+export const insertMessageSchema = z
+  .object(insertMessageInputShape)
+  .partial({ id: true })
+  .refine(requireGenticGeneratedActionAuthor, {
+    message: "Generated actions must be Gentic-authored",
+    path: ["author_type"],
+  })
 
 // Two-tier cache over the Clerk API-key -> user id lookup. Every verify against
 // Clerk bills one API-key usage and the worker polls constantly, so caching is

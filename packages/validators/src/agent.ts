@@ -25,6 +25,8 @@ export const claimedIssueSchema = z.object({
   setupScript: z.string().nullable(),
   sessionId: z.string().nullable(),
   prUrl: z.string().nullable(),
+  createPrAutomatically: z.boolean(),
+  hasUnpublishedAgentChanges: z.boolean(),
 })
 
 export type ClaimedIssue = z.infer<typeof claimedIssueSchema>
@@ -102,12 +104,14 @@ export const realtimeTokenResponseSchema = z.object({
 
 export type RealtimeTokenResponse = z.infer<typeof realtimeTokenResponseSchema>
 
-export const insertMessageInputSchema = z.object({
+export const insertMessageInputShape = {
   id: z.string().uuid(),
   role: z.enum(["assistant", "system"]),
   kind: chatMessageKindSchema.optional(),
   content: z.string(),
   status: chatMessageStatusSchema.optional(),
+  author_type: z.enum(["agent", "gentic"]).optional(),
+  generated_action: z.enum(["create_pr"]).nullable().optional(),
   event_id: z.string().nullable().optional(),
   run_id: z.string().nullable().optional(),
   event_type: chatEventTypeSchema.nullable().optional(),
@@ -116,13 +120,47 @@ export const insertMessageInputSchema = z.object({
   event_seq: z.number().int().positive().nullable().optional(),
   tool_call_id: z.string().nullable().optional(),
   payload: chatEventPayloadSchema.nullable().optional(),
-})
+}
+
+export function requireGenticGeneratedActionAuthor<
+  T extends {
+    author_type?: "agent" | "gentic"
+    generated_action?: "create_pr" | null
+  },
+>(value: T): boolean {
+  return (
+    value.generated_action === undefined ||
+    value.generated_action === null ||
+    value.author_type === "gentic"
+  )
+}
+
+export const insertMessageInputSchema = z
+  .object(insertMessageInputShape)
+  .refine(requireGenticGeneratedActionAuthor, {
+    message: "Generated actions must be Gentic-authored",
+    path: ["author_type"],
+  })
 
 export type InsertMessageInput = z.infer<typeof insertMessageInputSchema>
 
 export const insertMessageResponseSchema = z.object({
   id: z.string().uuid(),
 })
+
+export const automaticPrRequestSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+  run_id: z.string().uuid(),
+  requested_by_message_id: z.string().uuid().nullable(),
+  create_pr_automatically_snapshot: z.boolean(),
+  status: z.enum(["pending", "claimed", "completed", "failed", "skipped"]),
+  error: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export type AutomaticPrRequest = z.infer<typeof automaticPrRequestSchema>
 
 export const attachmentSchema = z.object({
   id: z.string().uuid(),
