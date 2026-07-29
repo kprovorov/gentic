@@ -43,12 +43,15 @@ export {
   updateIssueStatusByPrUrlIfStatus,
 } from "./issues/workflow"
 export {
+  applyPullRequestComment,
   applyTestsFailed,
   applyChangesRequestedReview,
   type ChangesRequestedReview,
   type ChangesRequestedReviewComment,
+  type PullRequestComment,
   createIssueUserMessage,
   deleteIssueMessage,
+  formatPullRequestCommentMessage,
   formatTestsFailedMessage,
   requeueIssueForUserMessage,
   sendIssueMessage,

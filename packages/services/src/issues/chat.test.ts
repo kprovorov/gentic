@@ -4,6 +4,7 @@ import { test } from "node:test"
 import {
   applyTestsFailed,
   formatChangesRequestedMessage,
+  formatPullRequestCommentMessage,
   formatTestsFailedMessage,
 } from "./chat"
 
@@ -29,6 +30,26 @@ test("formatChangesRequestedMessage includes review body and inline comments", (
   assert.match(message, /Needs another pass\./)
   assert.match(message, /\*\*src\/app\.ts:12\*\*/)
   assert.match(message, /Handle null here\./)
+})
+
+test("formatPullRequestCommentMessage includes PR comment context", () => {
+  const message = formatPullRequestCommentMessage(
+    "https://github.com/acme/widget/pull/42",
+    {
+      id: 10,
+      commenterLogin: "reviewer",
+      body: "Please cover this edge case.",
+      htmlUrl: "https://github.com/acme/widget/pull/42#discussion_r10",
+      path: "src/app.ts",
+      line: 12,
+      diffHunk: "@@ -1 +1 @@",
+    }
+  )
+
+  assert.match(message, /@reviewer commented on src\/app\.ts:12/)
+  assert.match(message, /same branch/)
+  assert.match(message, /discussion_r10/)
+  assert.match(message, /Please cover this edge case\./)
 })
 
 test("formatTestsFailedMessage tells the agent to fix the same PR branch", () => {

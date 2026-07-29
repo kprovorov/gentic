@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { after, afterEach, beforeEach, test } from "node:test"
 
 const CONFIG_KEYS = [
-  "GENTIC_API_KEY",
+  "GENTIC_WORKER_CREDENTIAL",
   "GENTIC_API_URL",
   "AGENT_PROVIDERS",
   "GIT_REMOTE_BASE",
@@ -46,11 +46,11 @@ after(() => {
 })
 
 test("loadConfig works with only env vars set (no config file)", () => {
-  process.env.GENTIC_API_KEY = "env-key"
+  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_API_KEY, "env-key")
+  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://env.example.com")
   assert.equal(loaded.GIT_REMOTE_BASE, "git@github.com:")
   assert.equal(loaded.POLL_INTERVAL_MS, 3000)
@@ -59,29 +59,29 @@ test("loadConfig works with only env vars set (no config file)", () => {
 
 test("loadConfig works with only the config file set", () => {
   writeConfigFile({
-    GENTIC_API_KEY: "file-key",
+    GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_API_KEY, "file-key")
+  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "file-key")
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
 })
 
 test("loadConfig prefers env over the config file for the same key", () => {
   writeConfigFile({
-    GENTIC_API_KEY: "file-key",
+    GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
-  process.env.GENTIC_API_KEY = "env-key"
+  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_API_KEY, "env-key")
+  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
 })
 
 test("loadConfig accepts a concurrent-issue limit", () => {
-  process.env.GENTIC_API_KEY = "env-key"
+  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.MAX_CONCURRENT_ISSUES = "3"
 
@@ -89,7 +89,7 @@ test("loadConfig accepts a concurrent-issue limit", () => {
 })
 
 test("loadConfig ignores legacy selected agent providers from env", () => {
-  process.env.GENTIC_API_KEY = "env-key"
+  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.AGENT_PROVIDERS = "claude_code,codex"
 
@@ -98,7 +98,7 @@ test("loadConfig ignores legacy selected agent providers from env", () => {
 
 test("loadConfig ignores legacy selected agent providers from config file", () => {
   writeConfigFile({
-    GENTIC_API_KEY: "file-key",
+    GENTIC_WORKER_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
 

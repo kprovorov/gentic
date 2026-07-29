@@ -14,6 +14,7 @@ import {
   deleteIssueRelationSchema,
   isIssueModelForAgent,
   issueModelSchema,
+  issuePrioritySchema,
   issueStatusSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
@@ -285,6 +286,15 @@ export async function bulkUpdateIssueStatus(formData: FormData) {
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.bulkUpdateIssueStatus(supabase, userId, ids, status)
+  revalidatePath("/issues")
+}
+
+export async function bulkUpdateIssuePriority(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const ids = z.array(z.string().uuid()).min(1).parse(formData.getAll("id"))
+  const priority = issuePrioritySchema.parse(getString(formData, "priority"))
+
+  await issuesService.bulkUpdateIssuePriority(supabase, userId, ids, priority)
   revalidatePath("/issues")
 }
 

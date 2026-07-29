@@ -23,6 +23,7 @@ type FakeIssue = {
   updated_at: string
   usage_limit_reset_at: string | null
   active_run_id: string | null
+  active_worker_id: string | null
   run_started_at: string | null
   run_error: string | null
   run_finished_at: string | null
@@ -43,6 +44,7 @@ const PRIORITY_RANK: Record<IssuePriority, number> = {
   high: 2,
   urgent: 3,
 }
+const workerId = "worker-1"
 
 class FakeMessagesQuery {
   private insertValues: Record<string, unknown> | null = null
@@ -220,6 +222,7 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
     updated_at: "2026-07-01T00:00:00.000Z",
     usage_limit_reset_at: null,
     active_run_id: null,
+    active_worker_id: null,
     run_started_at: null,
     run_error: "previous error",
     run_finished_at: "2026-07-01T00:01:00.000Z",
@@ -330,9 +333,13 @@ test("claim picks urgent before older lower-priority todo issues", async () => {
     }),
   ])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed?.id, "urgent-new")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "urgent-new")?.active_worker_id,
+    workerId
+  )
   assert.deepEqual(supabase.issueQueries[0]?.orders, [
     { column: "priority", ascending: false },
     { column: "updated_at", ascending: true },
@@ -353,7 +360,7 @@ test("claim breaks equal-priority ties FIFO by oldest eligible issue", async () 
     }),
   ])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed?.id, "older")
 })
@@ -373,7 +380,7 @@ test("claim preserves blocker checks before applying priority", async () => {
     issue({ id: "unblocked-low", priority: "low" }),
   ])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed?.id, "completed-blocker-high")
   assert.equal(
@@ -399,7 +406,7 @@ test("claim includes reset-ready held issues by priority but skips future holds"
     issue({ id: "todo-low", priority: "low" }),
   ])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed?.id, "ready-held")
   assert.equal(supabase.inserts.length, 0)
@@ -426,7 +433,7 @@ test("claim does not start drafts or preempt active runs", async () => {
     issue({ id: "todo-low", status: "todo", priority: "low" }),
   ])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed?.id, "todo-low")
   assert.equal(
@@ -450,7 +457,7 @@ test("claim returns null when another worker wins the conditional update", async
     supabase.issues[0]!.status = "queued"
   }
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed, null)
   assert.equal(supabase.issues[0]?.active_run_id, null)
@@ -469,7 +476,7 @@ test("claim returns null when a held issue becomes reset-ineligible before updat
     supabase.issues[0]!.usage_limit_reset_at = "2999-01-01T00:00:00.000Z"
   }
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1")
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
 
   assert.equal(claimed, null)
   assert.equal(supabase.issues[0]?.status, "held")

@@ -8,7 +8,7 @@ import { readConfigFile, type ConfigFile } from "./config-store.js"
 const paths = envPaths("gentic", { suffix: "" })
 
 const configSchema = z.object({
-  GENTIC_API_KEY: z.string().min(1),
+  GENTIC_WORKER_CREDENTIAL: z.string().min(1),
   GENTIC_API_URL: z.string().url(),
   GIT_REMOTE_BASE: z.string().default("git@github.com:"),
   WORKDIR: z.string().default(join(paths.data, "workspaces")),
@@ -19,7 +19,7 @@ const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 export const CONFIG_KEYS = [
-  "GENTIC_API_KEY",
+  "GENTIC_WORKER_CREDENTIAL",
   "GENTIC_API_URL",
   "GIT_REMOTE_BASE",
   "WORKDIR",
@@ -48,9 +48,9 @@ export function getConfigInput(
 export function loadConfig(): Config {
   const merged = getConfigInput()
 
-  if (!merged.GENTIC_API_KEY || !merged.GENTIC_API_URL) {
+  if (!merged.GENTIC_WORKER_CREDENTIAL || !merged.GENTIC_API_URL) {
     throw new Error(
-      "Not authenticated. Run `gentic auth login` or set GENTIC_API_KEY and GENTIC_API_URL."
+      "Not authenticated. Run `gentic auth login` or set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL."
     )
   }
 

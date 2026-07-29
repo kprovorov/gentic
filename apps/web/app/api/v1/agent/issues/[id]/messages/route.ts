@@ -91,6 +91,8 @@ export async function POST(
           kind: fields.kind ?? "text",
           content: fields.content,
           status: fields.status ?? "complete",
+          author_type: fields.author_type ?? "agent",
+          generated_action: fields.generated_action ?? null,
           event_id: fields.event_id ?? null,
           run_id: fields.run_id ?? null,
           event_type: fields.event_type ?? null,

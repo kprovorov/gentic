@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
-import { IconPaperclip, IconTrash, IconUpload } from "@tabler/icons-react"
+import { IconPaperclip, IconTrash } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
@@ -176,15 +176,13 @@ export function AttachmentPromptField({
           disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
           aria-label="Attach files"
+          className="rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <IconPaperclip />
         </Button>
         {footerStart}
         {selectedFiles.length === 0 ? (
-          <span className="flex min-h-8 min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground max-sm:hidden">
-            <IconUpload className="size-3.5" />
-            Drop files here or attach
-          </span>
+          <span className="min-h-8 min-w-0 flex-1" aria-hidden="true" />
         ) : (
           <ul className="order-last flex min-w-0 basis-full flex-wrap gap-1.5 sm:order-none sm:basis-auto sm:flex-1">
             {selectedFiles.map((file, index) => (

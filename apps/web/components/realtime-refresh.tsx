@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useQueryClient, type QueryKey } from "@tanstack/react-query"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
@@ -9,6 +9,7 @@ import { useSupabaseClient } from "@gentic/supabase/client"
 import {
   getRealtimeRefreshMode,
   realtimeFallbackRefreshMs,
+  shouldDeferRouteRefresh,
   shouldUseRealtimeFallback,
   type RealtimeSubscribeStatus,
 } from "./realtime-refresh-mode"
@@ -30,6 +31,7 @@ export function RealtimeRefresh({
 }) {
   const supabase = useSupabaseClient()
   const router = useRouter()
+  const pathname = usePathname()
   const queryClient = useQueryClient()
   const tableKey = tables.join(",")
   // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
@@ -37,9 +39,22 @@ export function RealtimeRefresh({
   // so the effect below doesn't tear down and resubscribe the channel (and
   // risk dropping events) on every unrelated re-render.
   const queryKeyRef = useRef(queryKey)
+  const pathnameRef = useRef(pathname)
+  const pendingRouteRefreshRef = useRef(false)
   useEffect(() => {
     queryKeyRef.current = queryKey
   })
+  useEffect(() => {
+    pathnameRef.current = pathname
+
+    if (
+      pendingRouteRefreshRef.current &&
+      !shouldDeferRouteRefresh(pathname)
+    ) {
+      pendingRouteRefreshRef.current = false
+      router.refresh()
+    }
+  }, [pathname, router])
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +69,10 @@ export function RealtimeRefresh({
         const queryKey = queryKeyRef.current
         if (getRealtimeRefreshMode(queryKey) === "invalidate-query") {
           void queryClient.invalidateQueries({ queryKey })
+          return
+        }
+        if (shouldDeferRouteRefresh(pathnameRef.current)) {
+          pendingRouteRefreshRef.current = true
           return
         }
         router.refresh()

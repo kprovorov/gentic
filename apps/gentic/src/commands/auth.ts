@@ -31,25 +31,27 @@ import {
 export interface AuthState {
   authenticated: boolean
   apiUrl?: string
-  maskedApiKey?: string
+  maskedWorkerCredential?: string
 }
 
 /** Reused by any future `gentic status` dashboard that wants auth info. */
 export function getAuthState(): AuthState {
   const config = getConfigInput()
-  if (!config.GENTIC_API_KEY || !config.GENTIC_API_URL) {
+  if (!config.GENTIC_WORKER_CREDENTIAL || !config.GENTIC_API_URL) {
     return { authenticated: false }
   }
   return {
     authenticated: true,
     apiUrl: config.GENTIC_API_URL,
-    maskedApiKey: maskApiKey(config.GENTIC_API_KEY),
+    maskedWorkerCredential: maskWorkerCredential(
+      config.GENTIC_WORKER_CREDENTIAL
+    ),
   }
 }
 
-function maskApiKey(apiKey: string): string {
-  const suffix = apiKey.slice(-4)
-  return `${apiKey.slice(0, 3)}...${suffix}`
+function maskWorkerCredential(credential: string): string {
+  const suffix = credential.slice(-4)
+  return `${credential.slice(0, 3)}...${suffix}`
 }
 
 export function registerAuthCommand(program: Command): void {
@@ -61,9 +63,12 @@ export function registerAuthCommand(program: Command): void {
     .command("login")
     .description("Save Gentic API credentials")
     .option("--api-url <url>", "Gentic API URL")
-    .option("--api-key <key>", "Gentic API key")
-    .action(async (opts: { apiUrl?: string; apiKey?: string }) => {
-      if (opts.apiUrl !== undefined || opts.apiKey !== undefined) {
+    .option("--worker-credential <credential>", "Gentic worker credential")
+    .action(async (opts: { apiUrl?: string; workerCredential?: string }) => {
+      if (
+        opts.apiUrl !== undefined ||
+        opts.workerCredential !== undefined
+      ) {
         loginNonInteractive(opts)
       } else {
         await loginInteractive()
@@ -86,18 +91,21 @@ export function registerAuthCommand(program: Command): void {
     })
 }
 
-function loginNonInteractive(opts: { apiUrl?: string; apiKey?: string }): void {
+function loginNonInteractive(opts: {
+  apiUrl?: string
+  workerCredential?: string
+}): void {
   const apiUrl = opts.apiUrl ?? DEFAULT_API_URL
-  const apiKey = opts.apiKey
+  const workerCredential = opts.workerCredential
 
-  if (!apiKey) {
-    logError("auth login: --api-key is required")
+  if (!workerCredential) {
+    logError("auth login: --worker-credential is required")
     process.exitCode = 1
     return
   }
 
   writeConfigFile({
-    GENTIC_API_KEY: apiKey,
+    GENTIC_WORKER_CREDENTIAL: workerCredential,
     GENTIC_API_URL: apiUrl,
   })
   logInfo(
@@ -145,7 +153,7 @@ async function logout(opts: { yes?: boolean }): Promise<void> {
 
   // Clears only the auth keys, not the whole config file, so unrelated
   // settings (GIT_REMOTE_BASE, WORKDIR, POLL_INTERVAL_MS) survive a logout.
-  writeConfigFile({ GENTIC_API_KEY: undefined, GENTIC_API_URL: undefined })
+  writeConfigFile({ GENTIC_WORKER_CREDENTIAL: undefined, GENTIC_API_URL: undefined })
   log.success("Cleared stored Gentic API credentials.")
 }
 
@@ -158,6 +166,6 @@ function status(): void {
   }
 
   log.info(`API URL: ${state.apiUrl}`)
-  log.info(`API key: ${state.maskedApiKey}`)
+  log.info(`Worker credential: ${state.maskedWorkerCredential}`)
   log.info(`Agents: ${formatAgentProviders([...agentProviders])}`)
 }

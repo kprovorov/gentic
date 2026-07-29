@@ -47,8 +47,8 @@ export async function checkOnboardingGate(
 
   const message = [
     "Gentic onboarding is required before running this command.",
-    "Set GENTIC_API_KEY and GENTIC_API_URL, or run:",
-    "  gentic auth login --api-key ... --api-url ...",
+    "Set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL, or run:",
+    "  gentic auth login --worker-credential ... --api-url ...",
     "",
     ...formatOnboardingUnmet(status),
   ].join("\n")
@@ -59,8 +59,8 @@ export async function checkOnboardingGate(
     log.error("Gentic onboarding is required before running this command.")
     note(
       [
-        "Set GENTIC_API_KEY and GENTIC_API_URL, or run:",
-        "  gentic auth login --api-key ... --api-url ...",
+        "Set GENTIC_WORKER_CREDENTIAL and GENTIC_API_URL, or run:",
+        "  gentic auth login --worker-credential ... --api-url ...",
         "",
         ...formatOnboardingUnmet(status),
       ].join("\n"),

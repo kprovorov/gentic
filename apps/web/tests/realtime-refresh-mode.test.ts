@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   getRealtimeRefreshMode,
+  shouldDeferRouteRefresh,
   shouldUseRealtimeFallback,
 } from "../components/realtime-refresh-mode"
 
@@ -23,4 +24,11 @@ test("realtime fallback polling runs until the channel is subscribed", () => {
   assert.equal(shouldUseRealtimeFallback("CHANNEL_ERROR"), true)
   assert.equal(shouldUseRealtimeFallback("CLOSED"), true)
   assert.equal(shouldUseRealtimeFallback("SUBSCRIBED"), false)
+})
+
+test("route refreshes defer while the new issue modal route is active", () => {
+  assert.equal(shouldDeferRouteRefresh("/issues/new"), true)
+  assert.equal(shouldDeferRouteRefresh("/issues"), false)
+  assert.equal(shouldDeferRouteRefresh("/issues/WEB-123"), false)
+  assert.equal(shouldDeferRouteRefresh(null), false)
 })
