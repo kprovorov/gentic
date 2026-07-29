@@ -229,6 +229,253 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
   })
 })
 
+test("unchanged successful work records no unpublished changes and waits for input", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.unpublishedChanges, [
+      {
+        issueId: issue.id,
+        activeRunId: issue.activeRunId,
+        hasUnpublishedAgentChanges: false,
+      },
+    ])
+    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("dirty or untracked work requests automatic publishing and continues the same session", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    let sessionRuns = 0
+    deps.runAgentSession = async (input) => {
+      sessionRuns += 1
+      await input.onSessionId("session-1")
+      const prompt = await input.nextPrompt()
+      if (sessionRuns === 1) {
+        assert.equal(prompt, null)
+        return
+      }
+      assert.equal(
+        normalizeDelivery(prompt!).prompt,
+        "Automatic PR publishing is enabled. Please commit any remaining work and open a pull request now."
+      )
+      await input.onPromptProcessed?.(normalizeDelivery(prompt!).messageIds)
+      assert.equal(await input.nextPrompt(), null)
+    }
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(sessionRuns, 2)
+    assert.deepEqual(api.automaticPrPublishRequests, [
+      { issueId: issue.id, activeRunId: issue.activeRunId },
+    ])
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+    assert.deepEqual(
+      api.runStates.map(
+        (entry) => entry.fields.status ?? entry.fields.session_id
+      ),
+      ["in-progress", "session-1", "in-progress", "in-progress", "session-1"]
+    )
+  })
+})
+
+test("agent-created commits are publishable changes", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    deps.hasChangesSinceBaseline = async () => true
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(
+      api.unpublishedChanges.map((entry) => entry.hasUnpublishedAgentChanges),
+      [true, true]
+    )
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+  })
+})
+
+test("agent-created pull requests are attached without automatic publishing", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    deps.getPullRequestUrl = async () => "https://github.com/acme/repo/pull/12"
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
+    assert.deepEqual(api.unpublishedChanges, [
+      {
+        issueId: issue.id,
+        activeRunId: issue.activeRunId,
+        hasUnpublishedAgentChanges: false,
+      },
+    ])
+  })
+})
+
+test("pre-existing pull requests skip automatic publishing", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    issue.prUrl = "https://github.com/acme/repo/pull/5"
+    api.hasChanges = true
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
+    assert.deepEqual(api.unpublishedChanges, [
+      {
+        issueId: issue.id,
+        activeRunId: issue.activeRunId,
+        hasUnpublishedAgentChanges: false,
+      },
+    ])
+  })
+})
+
+test("automatic publishing attempts at most once per active run", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("a later run may retry automatic publishing", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    api.automaticPrPublishError = new Error("publish API down")
+
+    await processIssue(api, config, issue, deps)
+    await processIssue(
+      api,
+      config,
+      { ...issue, activeRunId: `${issue.id}-next-run` },
+      deps
+    )
+
+    assert.deepEqual(api.automaticPrPublishRequests, [
+      { issueId: issue.id, activeRunId: issue.activeRunId },
+      { issueId: issue.id, activeRunId: `${issue.id}-next-run` },
+    ])
+    assert.deepEqual(api.finishedStatuses, [
+      "waiting-for-input",
+      "waiting-for-input",
+    ])
+  })
+})
+
+test("automatic publishing request failures finish waiting without looping", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    api.automaticPrPublishError = new Error("request failed")
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("unpublished-change record failures do not fail completed turns", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    api.recordUnpublishedChangesError = new Error("bookkeeping unavailable")
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("usage limits do not trigger automatic publishing", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    deps.runAgentSession = async () => {
+      throw new Error("Claude Code usage limit reached. Try again in 2 hours.")
+    }
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.unpublishedChanges, [])
+    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.deepEqual(
+      api.runStates.map((entry) => entry.fields.status),
+      ["in-progress", "held"]
+    )
+  })
+})
+
+test("run failures do not trigger automatic publishing", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    deps.runAgentSession = async () => {
+      throw new Error("agent failed")
+    }
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.unpublishedChanges, [])
+    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.deepEqual(
+      api.runStates.map((entry) => entry.fields.status),
+      ["in-progress", "run-failed"]
+    )
+  })
+})
+
+test("worker restarts do not loop when the active run already has an automatic request", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    issue.hasUnpublishedAgentChanges = true
+    api.hasChanges = true
+    api.automaticPrPublishCreated = false
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+  })
+})
+
+test("publishes ready-for-review status when automatic publishing creates a PR", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    let sessionRuns = 0
+    deps.runAgentSession = async (input) => {
+      sessionRuns += 1
+      await input.onSessionId("session-1")
+      const next = await input.nextPrompt()
+      if (next) {
+        await input.onPromptProcessed?.(normalizeDelivery(next).messageIds)
+      }
+      assert.equal(await input.nextPrompt(), null)
+    }
+    deps.getPullRequestUrl = async () =>
+      sessionRuns >= 2 ? "https://github.com/acme/repo/pull/44" : null
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
+    assert.deepEqual(api.publishedRunStates.at(-1), "ready-for-review")
+  })
+})
+
 async function withHarness(
   run: (harness: {
     config: Config
@@ -281,6 +528,12 @@ function fakeDeps(
       return false
     },
     async runSetupScript() {},
+    async captureRepoBaseline() {
+      return { headSha: "baseline", worktreeFingerprint: "clean" }
+    },
+    async hasChangesSinceBaseline() {
+      return api.hasChanges
+    },
     async setRunState(agentApi, _channel, issueId, fields) {
       await agentApi.setRunState(issueId, fields)
     },
@@ -323,6 +576,15 @@ class FakeApi implements AgentApi {
   readonly runStates: { issueId: string; fields: RunStateFields }[] = []
   readonly finishedStatuses: string[] = []
   readonly publishedRunStates: string[] = []
+  readonly unpublishedChanges: {
+    issueId: string
+    activeRunId: string
+    hasUnpublishedAgentChanges: boolean
+  }[] = []
+  readonly automaticPrPublishRequests: {
+    issueId: string
+    activeRunId: string
+  }[] = []
   readonly attachmentDirs: {
     issueId: string
     messageId: string
@@ -334,6 +596,10 @@ class FakeApi implements AgentApi {
   cloneCalls = 0
   checkoutCalls = 0
   closedChannels = 0
+  hasChanges = false
+  automaticPrPublishCreated = true
+  automaticPrPublishError: Error | null = null
+  recordUnpublishedChangesError: Error | null = null
 
   addMessage(issueId: string, message: UserMessage): void {
     this.messages.set(issueId, [...(this.messages.get(issueId) ?? []), message])
@@ -386,6 +652,72 @@ class FakeApi implements AgentApi {
     }
     this.ackedIds.set(issueId, acked)
     this.acked.push({ issueId, runId, messageIds })
+  }
+
+  async recordUnpublishedAgentChanges(
+    issueId: string,
+    fields: {
+      active_run_id: string
+      has_unpublished_agent_changes: boolean
+    }
+  ): Promise<void> {
+    if (this.recordUnpublishedChangesError) {
+      throw this.recordUnpublishedChangesError
+    }
+    this.unpublishedChanges.push({
+      issueId,
+      activeRunId: fields.active_run_id,
+      hasUnpublishedAgentChanges: fields.has_unpublished_agent_changes,
+    })
+  }
+
+  async requestAutomaticPrPublish(
+    issueId: string,
+    activeRunId: string
+  ): Promise<{
+    requestId: string
+    messageId: string
+    created: boolean
+    status: "pending"
+    issue: {
+      id: string
+      code: string
+      title: string | null
+      activeRunId: string
+      createPrAutomatically: boolean
+      hasUnpublishedAgentChanges: boolean
+      prUrl: string | null
+    }
+  }> {
+    this.automaticPrPublishRequests.push({ issueId, activeRunId })
+    if (this.automaticPrPublishError) {
+      throw this.automaticPrPublishError
+    }
+    if (this.automaticPrPublishCreated) {
+      this.addMessage(
+        issueId,
+        message(
+          `auto-pr-${this.automaticPrPublishRequests.length}`,
+          "Automatic PR publishing is enabled. Please commit any remaining work and open a pull request now.",
+          this.automaticPrPublishRequests.length + 100
+        )
+      )
+    }
+    return {
+      requestId: "request-1",
+      messageId: "message-1",
+      created: this.automaticPrPublishCreated,
+      status: "pending",
+      issue: {
+        id: issueId,
+        code: "TEST-1",
+        title: null,
+        activeRunId,
+        createPrAutomatically: true,
+        hasUnpublishedAgentChanges: true,
+        prUrl: null,
+      },
+    }
   }
 
   async fetchAttachments() {
