@@ -28,7 +28,7 @@ function maskApiKey(apiKey: string): string {
 export async function runAuthLoginPrompt(): Promise<AuthLoginPromptResult> {
   const existing = getConfigInput()
   let apiUrl = existing.GENTIC_API_URL
-  let apiKeyConfigured = Boolean(existing.GENTIC_API_KEY)
+  let apiKeyConfigured = Boolean(existing.GENTIC_WORKER_CREDENTIAL)
 
   if (apiUrl === undefined) {
     const answer = await text({
@@ -47,9 +47,9 @@ export async function runAuthLoginPrompt(): Promise<AuthLoginPromptResult> {
 
   if (!apiKeyConfigured) {
     const apiKey = await password({
-      message: "Gentic API key",
+      message: "Gentic worker credential",
       validate: (value) =>
-        !value || value.length === 0 ? "API key is required" : undefined,
+        !value || value.length === 0 ? "worker credential is required" : undefined,
     })
     if (isCancel(apiKey)) {
       cancel("Cancelled.")
@@ -59,13 +59,13 @@ export async function runAuthLoginPrompt(): Promise<AuthLoginPromptResult> {
     log.warn(unvalidatedKeyNotice())
 
     writeConfigFile({
-      GENTIC_API_KEY: apiKey,
+      GENTIC_WORKER_CREDENTIAL: apiKey,
       GENTIC_API_URL: apiUrl,
     })
     apiKeyConfigured = true
   } else {
     log.info(
-      `Gentic API key already configured: ${maskApiKey(existing.GENTIC_API_KEY ?? "")}`
+      `Gentic worker credential already configured: ${maskApiKey(existing.GENTIC_WORKER_CREDENTIAL ?? "")}`
     )
   }
 

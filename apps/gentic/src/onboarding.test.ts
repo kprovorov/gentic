@@ -31,7 +31,7 @@ const missingTool = {
 test("getOnboardingStatus reports ready when credentials, gh, and all agents are authenticated", async () => {
   const status = await getOnboardingStatus({
     configInput: {
-      GENTIC_API_KEY: "test-key",
+      GENTIC_WORKER_CREDENTIAL: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
     },
     getTools: async (): Promise<ToolStatuses> => ({
@@ -64,10 +64,10 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
     "github-cli-authenticated",
     "agent-cli-authenticated",
   ])
-  assert.deepEqual(status.auth.missing, ["GENTIC_API_KEY"])
+  assert.deepEqual(status.auth.missing, ["GENTIC_WORKER_CREDENTIAL"])
   assert.ok(
     formatOnboardingUnmet(status).some((line) =>
-      line.includes("missing GENTIC_API_KEY")
+      line.includes("missing GENTIC_WORKER_CREDENTIAL")
     )
   )
 })
@@ -75,7 +75,7 @@ test("getOnboardingStatus reports unmet credentials, github auth, and agent auth
 test("getOnboardingStatus reports agent install when any agent CLI is missing", async () => {
   const status = await getOnboardingStatus({
     configInput: {
-      GENTIC_API_KEY: "test-key",
+      GENTIC_WORKER_CREDENTIAL: "test-key",
       GENTIC_API_URL: "https://gentic.example/api/v1",
     },
     getTools: async (): Promise<ToolStatuses> => ({
@@ -94,10 +94,10 @@ function makeStatus(authenticated: boolean): OnboardingStatus {
     auth: {
       authenticated,
       apiUrl: authenticated ? "https://gentic.example/api/v1" : undefined,
-      maskedApiKey: authenticated ? "tes...-key" : undefined,
+      maskedWorkerCredential: authenticated ? "tes...-key" : undefined,
       missing: authenticated
         ? []
-        : ["GENTIC_API_KEY", "GENTIC_API_URL"],
+        : ["GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
     },
     agentProviders: ["claude_code", "codex"],
     tools: {
@@ -597,7 +597,7 @@ test("ensureAgentCliForOnboarding returns live status when one agent is authenti
       auth: {
         authenticated: true,
         apiUrl: "https://gentic.example/api/v1",
-        maskedApiKey: "tes...-key",
+        maskedWorkerCredential: "tes...-key",
         missing: [],
       },
       agentProviders: ["claude_code", "codex"],
@@ -627,7 +627,7 @@ test("ensureAgentCliForOnboarding exits immediately when any agent is not authen
         auth: {
           authenticated: true,
           apiUrl: "https://gentic.example/api/v1",
-          maskedApiKey: "tes...-key",
+          maskedWorkerCredential: "tes...-key",
           missing: [],
         },
         agentProviders: ["claude_code", "codex"],

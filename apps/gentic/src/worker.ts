@@ -47,7 +47,7 @@ export async function runWorker(): Promise<void> {
   const config = loadConfig()
   const api = createAgentApi({
     apiUrl: config.GENTIC_API_URL,
-    apiKey: config.GENTIC_API_KEY,
+    apiKey: config.GENTIC_WORKER_CREDENTIAL,
   })
 
   let running = true

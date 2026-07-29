@@ -22,7 +22,7 @@ When you change an issue's status from **Draft** to **Todo**, Gentic records you
 
 ### The agent worker polls for queued issues
 
-Your deployed agent worker runs as a background process on a server you control. It polls the Gentic API on a fixed interval — **3,000 ms by default**, configurable via `POLL_INTERVAL_MS`. On each tick, it calls the API with your `GENTIC_API_KEY`, which the API uses to identify your account and return only issues that belong to your projects.
+Your deployed agent worker runs as a background process on a server you control. It polls the Gentic API on a fixed interval — **3,000 ms by default**, configurable via `POLL_INTERVAL_MS`. On each tick, it calls the API with your `GENTIC_WORKER_CREDENTIAL`, which the API uses to identify your account and return only issues that belong to your projects.
 
 <Note>
   The worker is an outbound-only polling process. It never exposes a port or accepts inbound connections. Keep it running on a private server or VM with access to your GitHub repositories — do not expose it as a public web service.

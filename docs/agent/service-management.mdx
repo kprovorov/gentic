@@ -137,7 +137,7 @@ gentic run
 
 | Field        | Description                                                                                                                                                                                                                                                                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auth**     | Whether credentials are configured, with the API key masked (first 3 and last 4 characters shown) and the API URL displayed in full.                                                                                                                                                                                                                 |
+| **Auth**     | Whether credentials are configured, with the worker credential masked (first 3 and last 4 characters shown) and the API URL displayed in full.                                                                                                                                                                                                       |
 | **Service**  | The service state (`running`, `stopped`, or `not-installed`), the backend name (e.g. `systemd`, `launchd`, or `fallback`), the process PID if running, and the uptime since the process started.                                                                                                                                                     |
 | **Boot**     | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`).                                                                                                                                                                                                                                                 |
 | **Last run** | Currently reports `unknown (no API support yet)`. The CLI does not yet receive a last-run timestamp from the API.                                                                                                                                                                                                                                    |
@@ -148,7 +148,7 @@ gentic run
 
 Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the issue's agent provider. The worker can claim issues for all supported providers, so `gentic status` checks both agent CLIs. Checking `gentic status` after installing the worker — and any time you rotate credentials — surfaces those problems before you queue a real issue.
 
-The `--json` flag returns the same information as a JSON object with the following top-level keys: `auth`, `apiUrl`, `maskedApiKey`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
+The `--json` flag returns the same information as a JSON object with the following top-level keys: `auth`, `apiUrl`, `maskedWorkerCredential`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
 
 ---
 
@@ -176,7 +176,7 @@ scp -r dist/linux-x64 deploy@prod-server:/opt/gentic
 
 # On the production server
 cd /opt/gentic
-./gentic auth login --api-url https://app.gentic.chat/api/v1 --api-key <your-key>
+./gentic auth login --api-url https://app.gentic.chat/api/v1 --worker-credential <your-worker-credential>
 ./gentic start
 
 # Verify it is running

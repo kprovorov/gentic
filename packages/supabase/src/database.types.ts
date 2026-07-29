@@ -472,6 +472,7 @@ export type Database = {
           banned_at: string | null
           configured_capacity: number
           created_at: string
+          credential_expires_at: string | null
           credential_hash: string
           display_name: string
           gentic_version: string | null
@@ -490,6 +491,7 @@ export type Database = {
           banned_at?: string | null
           configured_capacity?: number
           created_at?: string
+          credential_expires_at?: string | null
           credential_hash: string
           display_name: string
           gentic_version?: string | null
@@ -508,6 +510,7 @@ export type Database = {
           banned_at?: string | null
           configured_capacity?: number
           created_at?: string
+          credential_expires_at?: string | null
           credential_hash?: string
           display_name?: string
           gentic_version?: string | null
@@ -523,11 +526,50 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_enrollment_exchange_failures: {
+        Row: {
+          failed_count: number
+          locked_until: string | null
+          rate_limit_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      consume_worker_enrollment_code: {
+        Args: {
+          p_arch: string | null
+          p_code_hash: string
+          p_configured_capacity: number
+          p_credential_hash: string
+          p_display_name: string
+          p_gentic_version: string | null
+          p_now?: string
+          p_os: string | null
+          p_process_started_at: string | null
+          p_provider_capabilities: Json
+        }
+        Returns: Database["public"]["Tables"]["workers"]["Row"]
+      }
       delete_old_orphaned_attachments: {
         Args: { older_than?: string }
         Returns: {

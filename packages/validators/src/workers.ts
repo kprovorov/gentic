@@ -60,6 +60,11 @@ export const workerCapabilitiesSchema = z
 export type WorkerCapabilities = z.infer<typeof workerCapabilitiesSchema>
 
 export const workerEnrollmentCodeSchema = z.string().trim().min(16).max(256)
+export const workerCredentialSchema = z
+  .string()
+  .trim()
+  .regex(/^gtwc_[A-Za-z0-9_-]{32,}$/)
+  .max(256)
 
 export const createWorkerEnrollmentCodeInputSchema = z
   .object({
@@ -75,7 +80,6 @@ export type CreateWorkerEnrollmentCodeInput = z.infer<
 export const consumeWorkerEnrollmentCodeInputSchema = z
   .object({
     code: workerEnrollmentCodeSchema,
-    credential_hash: workerHashSchema,
     display_name: workerDisplayNameSchema,
     telemetry: z
       .object({

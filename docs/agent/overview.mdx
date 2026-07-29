@@ -44,7 +44,7 @@ Review these requirements before installing the agent worker. Which prerequisite
 
 ## Security note
 
-Run the agent worker on a **private** server or VM. It is a background polling process — not a web server. Do not expose it as a public HTTP endpoint. Keep your `GENTIC_API_KEY` and SSH credentials secret and limit access to the machine accordingly.
+Run the agent worker on a **private** server or VM. It is a background polling process — not a web server. Do not expose it as a public HTTP endpoint. Keep your `GENTIC_WORKER_CREDENTIAL` and SSH credentials secret and limit access to the machine accordingly.
 
 ## Next steps
 
@@ -53,7 +53,7 @@ Run the agent worker on a **private** server or VM. It is a background polling p
     Install the standalone binary or run from source, and set up Git authentication.
   </Card>
   <Card title="Configuration" icon="sliders" href="/agent/configuration">
-    Configure your API key, API URL, and other environment variables.
+    Configure your worker credential, API URL, and other environment variables.
   </Card>
   <Card title="Service Management" icon="server" href="/agent/service-management">
     Start, stop, and restart the worker as a managed system service.

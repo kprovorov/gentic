@@ -130,7 +130,7 @@ async function status(opts: StatusOptions): Promise<void> {
         JSON.stringify({
           auth: "configured",
           apiUrl: auth.apiUrl,
-          maskedApiKey: auth.maskedApiKey,
+          maskedWorkerCredential: auth.maskedWorkerCredential,
           agents: agentProviders,
           serviceError: describe(error),
           tools: toolsJson(tools),
@@ -153,7 +153,7 @@ async function status(opts: StatusOptions): Promise<void> {
       JSON.stringify({
         auth: "configured",
         apiUrl: auth.apiUrl,
-        maskedApiKey: auth.maskedApiKey,
+        maskedWorkerCredential: auth.maskedWorkerCredential,
         agents: agentProviders,
         service: serviceStatus.state,
         serviceBackend: backendName,
@@ -174,7 +174,7 @@ async function status(opts: StatusOptions): Promise<void> {
 
   note(
     [
-      `Auth:     configured (api key: ${auth.maskedApiKey}, url: ${auth.apiUrl})`,
+      `Auth:     configured (worker credential: ${auth.maskedWorkerCredential}, url: ${auth.apiUrl})`,
       `Agents:   ${formatAgentProviders([...agentProviders])}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,
