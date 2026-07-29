@@ -51,6 +51,7 @@ test("insertMessageInputSchema validates generated create PR metadata", () => {
   const input = insertMessageInputSchema.parse({
     id: messageId,
     role: "system",
+    run_id: runId,
     content: "Create a pull request.",
     author_type: "gentic",
     generated_action: "create_pr",
@@ -62,6 +63,7 @@ test("insertMessageInputSchema validates generated create PR metadata", () => {
     insertMessageInputSchema.parse({
       id: messageId,
       role: "assistant",
+      run_id: runId,
       content: "Invalid author.",
       author_type: "user",
     })
@@ -70,6 +72,7 @@ test("insertMessageInputSchema validates generated create PR metadata", () => {
     insertMessageInputSchema.parse({
       id: messageId,
       role: "system",
+      run_id: runId,
       content: "Create a pull request.",
       author_type: "agent",
       generated_action: "create_pr",

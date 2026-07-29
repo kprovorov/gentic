@@ -48,10 +48,17 @@ export type FinishRunResult = {
 
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
-  setRunState(issueId: string, fields: RunStateFields): Promise<void>
+  setRunState(
+    issueId: string,
+    activeRunId: string,
+    fields: Omit<RunStateFields, "active_run_id">
+  ): Promise<void>
   finishRun(issueId: string, fields: FinishRunFields): Promise<FinishRunResult>
   insertMessage(issueId: string, message: InsertMessageInput): Promise<string>
-  fetchPendingUserMessages(issueId: string): Promise<UserMessage[]>
+  fetchPendingUserMessages(
+    issueId: string,
+    activeRunId: string
+  ): Promise<UserMessage[]>
   ackUserMessages(
     issueId: string,
     runId: string,
@@ -65,8 +72,15 @@ export interface AgentApi {
     issueId: string,
     activeRunId: string
   ): Promise<AutomaticPrPublishResponse>
-  fetchAttachments(issueId: string, messageId: string): Promise<Attachment[]>
-  fetchRealtimeToken(): Promise<RealtimeTokenResponse>
+  fetchAttachments(
+    issueId: string,
+    activeRunId: string,
+    messageId: string
+  ): Promise<Attachment[]>
+  fetchRealtimeToken(
+    issueId: string,
+    activeRunId: string
+  ): Promise<RealtimeTokenResponse>
   sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void>
   markOffline(): Promise<void>
   fetchWorkerControl(): Promise<WorkerControlResponse>
@@ -125,13 +139,13 @@ export function createAgentApi(input: {
       )
       return data.issue
     },
-    async setRunState(issueId, fields) {
+    async setRunState(issueId, activeRunId, fields) {
       await request(
         `/agent/issues/${encodeURIComponent(issueId)}/run-state`,
         okResponseSchema,
         {
           method: "PATCH",
-          body: fields,
+          body: { active_run_id: activeRunId, ...fields },
         }
       )
     },
@@ -157,9 +171,10 @@ export function createAgentApi(input: {
       )
       return data.id
     },
-    async fetchPendingUserMessages(issueId) {
+    async fetchPendingUserMessages(issueId, activeRunId) {
+      const params = new URLSearchParams({ run_id: activeRunId })
       const data = await request(
-        `/agent/issues/${encodeURIComponent(issueId)}/messages`,
+        `/agent/issues/${encodeURIComponent(issueId)}/messages?${params}`,
         pendingUserMessagesResponseSchema
       )
       return data.messages
@@ -198,17 +213,21 @@ export function createAgentApi(input: {
         }
       )
     },
-    async fetchAttachments(issueId, messageId) {
-      const params = new URLSearchParams({ message_id: messageId })
+    async fetchAttachments(issueId, activeRunId, messageId) {
+      const params = new URLSearchParams({
+        message_id: messageId,
+        run_id: activeRunId,
+      })
       const data = await request(
         `/agent/issues/${encodeURIComponent(issueId)}/attachments?${params}`,
         attachmentsResponseSchema
       )
       return data.attachments
     },
-    async fetchRealtimeToken() {
+    async fetchRealtimeToken(issueId, activeRunId) {
       return request("/agent/realtime/token", realtimeTokenResponseSchema, {
         method: "POST",
+        body: { issue_id: issueId, active_run_id: activeRunId },
       })
     },
     async sendHeartbeat(telemetry) {

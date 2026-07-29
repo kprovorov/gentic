@@ -39,6 +39,7 @@ export const claimIssueResponseSchema = z.object({
 
 const runStateFieldsBaseSchema = z
   .object({
+    active_run_id: z.string().uuid(),
     status: realtimeRunStateStatusSchema.optional(),
     session_id: z.string().nullable().optional(),
     run_error: z.string().nullable().optional(),
@@ -49,8 +50,8 @@ const runStateFieldsBaseSchema = z
   })
   .strict()
 
-export const runStateFieldsSchema = runStateFieldsBaseSchema.refine(
-  (value) => Object.keys(value).length > 0
+export const runStateFieldsSchema = runStateFieldsBaseSchema.refine((value) =>
+  Object.keys(value).some((key) => key !== "active_run_id")
 )
 
 export type RunStateFields = z.infer<typeof runStateFieldsSchema>
@@ -106,6 +107,15 @@ export const realtimeTokenResponseSchema = z.object({
 
 export type RealtimeTokenResponse = z.infer<typeof realtimeTokenResponseSchema>
 
+export const realtimeTokenInputSchema = z
+  .object({
+    issue_id: z.string().uuid(),
+    active_run_id: z.string().uuid(),
+  })
+  .strict()
+
+export type RealtimeTokenInput = z.infer<typeof realtimeTokenInputSchema>
+
 export const insertMessageInputShape = {
   id: z.string().uuid(),
   role: z.enum(["assistant", "system"]),
@@ -115,7 +125,7 @@ export const insertMessageInputShape = {
   author_type: z.enum(["agent", "gentic"]).optional(),
   generated_action: z.enum(["create_pr"]).nullable().optional(),
   event_id: z.string().nullable().optional(),
-  run_id: z.string().nullable().optional(),
+  run_id: z.string().uuid(),
   event_type: chatEventTypeSchema.nullable().optional(),
   event_status: chatEventStatusSchema.nullable().optional(),
   event_ts: z.string().datetime().nullable().optional(),

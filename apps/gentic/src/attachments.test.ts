@@ -27,7 +27,7 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
     async requestAutomaticPrPublish() {
       throw new Error("not implemented")
     },
-    async fetchAttachments(_issueId: string, messageId: string) {
+    async fetchAttachments(_issueId: string, _runId: string, messageId: string) {
       return byMessageId[messageId] ?? []
     },
     async fetchRealtimeToken() {
@@ -77,6 +77,7 @@ test("buildAttachmentBlocks uses only the current message attachment set", async
         ],
       }),
       "issue-1",
+      "run-1",
       "message-1",
       dir
     )
@@ -109,6 +110,7 @@ test("buildAttachmentBlocks sends no files after current message attachments are
         "message-2": [],
       }),
       "issue-1",
+      "run-1",
       "message-2",
       dir
     )
@@ -145,6 +147,7 @@ test("buildAttachmentBlocks preserves duplicate filenames with stable resource u
         ],
       }),
       "issue-1",
+      "run-1",
       "message-1",
       dir
     )

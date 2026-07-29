@@ -32,7 +32,7 @@ export interface StructuredMessageFields {
   author_type?: "agent" | "gentic"
   generated_action?: "create_pr" | null
   event_id?: string | null
-  run_id?: string | null
+  run_id: string
   event_type?: EventType | null
   event_status?: EventStatus | null
   event_ts?: string | null
@@ -70,7 +70,7 @@ export class StreamingAssistantMessage {
     private readonly flushIntervalMs = 150,
     private readonly persistOptions: PersistOptions = {},
     id?: string,
-    private readonly runId?: string | null,
+    private readonly runId = "",
     private readonly eventId?: string | null
   ) {
     this.id = id ?? randomUUID()
@@ -131,7 +131,7 @@ export class StreamingAssistantMessage {
         status: "complete",
         author_type: "agent",
         event_id: this.eventId ?? this.id,
-        run_id: this.runId ?? null,
+        run_id: this.runId,
         event_type: this.kind === "thinking" ? "thought" : "text",
         event_status: "completed",
         event_ts: eventTs,
@@ -165,7 +165,7 @@ export class StreamingAssistantMessage {
         status: "error",
         author_type: "agent",
         event_id: this.eventId ?? this.id,
-        run_id: this.runId ?? null,
+        run_id: this.runId,
         event_type: this.kind === "thinking" ? "thought" : "text",
         event_status: "failed",
         event_ts: eventTs,
@@ -195,7 +195,7 @@ export class StreamingAssistantMessage {
       status,
       author_type: "agent",
       event_id: this.eventId ?? this.id,
-      run_id: this.runId ?? null,
+      run_id: this.runId,
       event_type: this.kind === "thinking" ? "thought" : "text",
       event_status:
         status === "streaming"
@@ -219,6 +219,7 @@ export async function publishMessage(
     kind?: "text" | "tool" | "thinking"
     content: string
     status?: "complete" | "error"
+    runId: string
     persistOptions?: PersistOptions
   }
 ): Promise<void> {
@@ -234,6 +235,7 @@ export async function publishMessage(
       content: fields.content,
       status,
       author_type: "agent",
+      run_id: fields.runId,
     },
     fields.persistOptions
   )
@@ -245,6 +247,7 @@ export async function publishMessage(
     content: fields.content,
     status,
     author_type: "agent",
+    run_id: fields.runId,
   })
 }
 
@@ -281,7 +284,7 @@ export async function publishStructuredMessage(
     author_type: message.author_type,
     generated_action: message.generated_action ?? null,
     event_id: message.event_id ?? null,
-    run_id: message.run_id ?? null,
+    run_id: message.run_id,
     event_type: message.event_type ?? null,
     event_status: message.event_status ?? null,
     event_ts: message.event_ts,
@@ -300,9 +303,10 @@ export async function setRunState(
   api: AgentApi,
   channel: IssueRealtimeChannel | null,
   issueId: string,
-  fields: RunStateFields
+  activeRunId: string,
+  fields: Omit<RunStateFields, "active_run_id">
 ): Promise<void> {
-  await api.setRunState(issueId, fields)
+  await api.setRunState(issueId, activeRunId, fields)
 
   if (channel && fields.status) {
     await channel.publishRunState({
@@ -337,7 +341,7 @@ async function persistMessageWithRetry(
     author_type?: "agent" | "gentic"
     generated_action?: "create_pr" | null
     event_id?: string | null
-    run_id?: string | null
+    run_id: string
     event_type?: EventType | null
     event_status?: EventStatus | null
     event_ts?: string | null

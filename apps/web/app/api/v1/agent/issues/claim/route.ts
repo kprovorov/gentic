@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto"
 
 import { getIssueCode } from "@gentic/services/issues"
+import { getWorker } from "@gentic/services/workers"
+import type { WorkerCompatibilityPolicy } from "@gentic/services/workers"
+import type { AgentProvider } from "@gentic/validators/issues"
 import { claimIssueInputSchema } from "@gentic/validators/agent"
 
 import {
@@ -34,14 +37,35 @@ export async function POST(request: Request) {
 export async function claimNextQueuedIssue(
   supabase: Supabase,
   userId: string,
-  workerId: string
+  workerId: string,
+  options: { compatibilityPolicy?: WorkerCompatibilityPolicy } = {}
 ) {
+  const worker = await getWorker(supabase, userId, workerId, {
+    compatibilityPolicy: options.compatibilityPolicy,
+  })
+  if (worker.primary_state !== "online") {
+    return null
+  }
+  if (worker.version_health === "unsupported") {
+    return null
+  }
+  if (worker.running_task_count >= worker.configured_capacity) {
+    return null
+  }
+
+  const eligibleProviders = getWorkerEligibleIssueProviders(worker.providers)
+  if (eligibleProviders.length === 0) {
+    return null
+  }
+
   const now = new Date().toISOString()
   const { data: candidate, error: candidateError } = await supabase
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
     .or(eligibleIssueFilter(now))
     .eq("projects.user_id", userId)
+    .in("agent_provider", eligibleProviders)
+    .is("active_run_id", null)
     .eq("unfinished_blockers.type", "blocks")
     .not(
       "unfinished_blockers.source_issue.status",
@@ -77,6 +101,8 @@ export async function claimNextQueuedIssue(
     })
     .eq("id", id)
     .or(eligibleIssueFilter(now))
+    .in("agent_provider", eligibleProviders)
+    .is("active_run_id", null)
     .select("id")
     .maybeSingle()
 
@@ -109,6 +135,27 @@ export async function claimNextQueuedIssue(
     createPrAutomatically: candidate.create_pr_automatically,
     hasUnpublishedAgentChanges: candidate.has_unpublished_agent_changes,
   }
+}
+
+function getWorkerEligibleIssueProviders(
+  providers: Awaited<ReturnType<typeof getWorker>>["providers"]
+): AgentProvider[] {
+  const result: AgentProvider[] = []
+  if (isProviderReady(providers.codex)) {
+    result.push("codex")
+  }
+  if (isProviderReady(providers.claude_code)) {
+    result.push("claude_code")
+  }
+  return result
+}
+
+function isProviderReady(
+  provider: Awaited<ReturnType<typeof getWorker>>["providers"]["codex"]
+): boolean {
+  return Boolean(
+    provider?.installed && provider.authenticated === true
+  )
 }
 
 export async function ensureTodoIssueHasPendingPrompt(

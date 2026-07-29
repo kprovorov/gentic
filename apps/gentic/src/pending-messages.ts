@@ -49,7 +49,10 @@ export function createPendingMessagePromptSource(input: {
   }
 
   async function fetchAndEnqueuePending(): Promise<void> {
-    const pending = await input.api.fetchPendingUserMessages(input.issueId)
+    const pending = await input.api.fetchPendingUserMessages(
+      input.issueId,
+      input.runId
+    )
     for (const message of pending) {
       enqueue(message)
     }
