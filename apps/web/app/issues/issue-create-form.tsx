@@ -1,11 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import type React from "react"
 import { useEffect, useRef, useState } from "react"
+import { useFormStatus } from "react-dom"
 import {
   IconCheck,
   IconChevronDown,
   IconDeviceFloppy,
+  IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
 
@@ -187,12 +190,7 @@ export function IssueCreateForm({
         </div>
       }
       footerEnd={
-        <Button
-          type="submit"
-          formAction={saveIssueDraft}
-          variant="ghost"
-          size="sm"
-          className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        <SaveDraftButton
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -200,19 +198,11 @@ export function IssueCreateForm({
             }
             clearStoredPrompt()
           }}
-        >
-          <IconDeviceFloppy />
-          Save draft
-        </Button>
+        />
       }
       submitButton={
-        <Button
-          type="submit"
-          formAction={runIssue}
-          size="icon"
-          aria-label="Run issue"
+        <RunIssueButton
           disabled={!prompt.trim()}
-          className="shrink-0"
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -220,9 +210,7 @@ export function IssueCreateForm({
             }
             clearStoredPrompt()
           }}
-        >
-          <IconSend />
-        </Button>
+        />
       }
     >
       <input type="hidden" name="project_id" value={projectId} />
@@ -232,5 +220,56 @@ export function IssueCreateForm({
         Prompt
       </label>
     </MessageComposer>
+  )
+}
+
+function SaveDraftButton({
+  onClick,
+}: {
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      formAction={saveIssueDraft}
+      variant="ghost"
+      size="sm"
+      disabled={pending}
+      className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+      onClick={onClick}
+    >
+      {pending ? (
+        <IconLoader2 className="animate-spin" />
+      ) : (
+        <IconDeviceFloppy />
+      )}
+      Save draft
+    </Button>
+  )
+}
+
+function RunIssueButton({
+  disabled,
+  onClick,
+}: {
+  disabled: boolean
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      formAction={runIssue}
+      size="icon"
+      aria-label="Run issue"
+      disabled={disabled || pending}
+      className="shrink-0"
+      onClick={onClick}
+    >
+      {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />}
+    </Button>
   )
 }
