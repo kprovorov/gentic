@@ -34,6 +34,8 @@ export const chatMessageSchema = z.object({
   kind: realtimeMessageKindSchema,
   content: z.string().nullable(),
   status: realtimeMessageStatusSchema,
+  author_type: z.enum(["user", "agent", "gentic"]).optional(),
+  generated_action: z.enum(["create_pr"]).nullable().optional(),
   created_at: z.string(),
   event_id: z.string().min(1).nullable().optional(),
   run_id: z.string().min(1).nullable().optional(),
@@ -55,6 +57,8 @@ export const messageEventSchema = z.object({
   kind: realtimeMessageKindSchema,
   content: z.string(),
   status: realtimeMessageStatusSchema,
+  author_type: z.enum(["agent", "gentic"]).optional(),
+  generated_action: z.enum(["create_pr"]).nullable().optional(),
   event_id: z.string().min(1).nullable().optional(),
   run_id: z.string().min(1).nullable().optional(),
   event_type: chatEventTypeSchema.nullable().optional(),
@@ -73,6 +77,8 @@ export type MessageEvent = {
   kind: z.infer<typeof realtimeMessageKindSchema>
   content: string
   status: z.infer<typeof realtimeMessageStatusSchema>
+  author_type?: "agent" | "gentic"
+  generated_action?: "create_pr" | null
   event_id?: string | null
   run_id?: string | null
   event_type?: z.infer<typeof chatEventTypeSchema> | null

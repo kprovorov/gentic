@@ -15,5 +15,8 @@ export type Updates<
 > = Database["public"]["Tables"][TableName]["Update"]
 
 export type IssuePriority = Database["public"]["Enums"]["issue_priority"]
+export type Issue = Tables<"issues">
+export type Message = Tables<"messages">
+export type IssueAutomaticPrRequest = Tables<"issue_automatic_pr_requests">
 export type Worker = Tables<"workers">
 export type WorkerEnrollmentCode = Tables<"worker_enrollment_codes">

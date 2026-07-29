@@ -425,6 +425,8 @@ function claimedIssue(id: string): ClaimedIssue {
     setupScript: null,
     sessionId: null,
     prUrl: null,
+    createPrAutomatically: false,
+    hasUnpublishedAgentChanges: false,
   }
 }
 

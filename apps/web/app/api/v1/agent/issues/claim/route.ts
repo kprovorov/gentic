@@ -12,7 +12,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, status, agent_provider, issue_model, session_id, pr_url, prompt, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, status, agent_provider, issue_model, session_id, pr_url, prompt, create_pr_automatically, has_unpublished_agent_changes, projects!inner(repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 function eligibleIssueFilter(now: string): string {
   return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
@@ -98,6 +98,8 @@ export async function claimNextQueuedIssue(supabase: Supabase, userId: string) {
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
     prUrl: candidate.pr_url,
+    createPrAutomatically: candidate.create_pr_automatically,
+    hasUnpublishedAgentChanges: candidate.has_unpublished_agent_changes,
   }
 }
 

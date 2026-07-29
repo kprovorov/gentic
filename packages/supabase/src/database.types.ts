@@ -121,6 +121,57 @@ export type Database = {
         }
         Relationships: []
       }
+      issue_automatic_pr_requests: {
+        Row: {
+          create_pr_automatically_snapshot: boolean
+          created_at: string
+          error: string | null
+          id: string
+          issue_id: string
+          requested_by_message_id: string | null
+          run_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          create_pr_automatically_snapshot?: boolean
+          created_at?: string
+          error?: string | null
+          id?: string
+          issue_id: string
+          requested_by_message_id?: string | null
+          run_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          create_pr_automatically_snapshot?: boolean
+          created_at?: string
+          error?: string | null
+          id?: string
+          issue_id?: string
+          requested_by_message_id?: string | null
+          run_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_automatic_pr_requests_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_automatic_pr_requests_requested_by_message_id_fkey"
+            columns: ["requested_by_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_events: {
         Row: {
           created_at: string
@@ -226,7 +277,9 @@ export type Database = {
           active_run_id: string | null
           active_worker_id: string | null
           agent_provider: string
+          create_pr_automatically: boolean
           created_at: string
+          has_unpublished_agent_changes: boolean
           id: string
           issue_model: string | null
           number: number
@@ -248,7 +301,9 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          create_pr_automatically?: boolean
           created_at?: string
+          has_unpublished_agent_changes?: boolean
           id?: string
           issue_model?: string | null
           number: number
@@ -270,7 +325,9 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          create_pr_automatically?: boolean
           created_at?: string
+          has_unpublished_agent_changes?: boolean
           id?: string
           issue_model?: string | null
           number?: number
@@ -307,6 +364,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          author_type: string
           consumed_at: string | null
           consumed_by_run_id: string | null
           content: string | null
@@ -316,6 +374,7 @@ export type Database = {
           event_status: string | null
           event_ts: string | null
           event_type: string | null
+          generated_action: string | null
           github_review_id: number | null
           id: string
           issue_id: string
@@ -329,6 +388,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          author_type?: string
           consumed_at?: string | null
           consumed_by_run_id?: string | null
           content?: string | null
@@ -338,6 +398,7 @@ export type Database = {
           event_status?: string | null
           event_ts?: string | null
           event_type?: string | null
+          generated_action?: string | null
           github_review_id?: number | null
           id?: string
           issue_id: string
@@ -351,6 +412,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          author_type?: string
           consumed_at?: string | null
           consumed_by_run_id?: string | null
           content?: string | null
@@ -360,6 +422,7 @@ export type Database = {
           event_status?: string | null
           event_ts?: string | null
           event_type?: string | null
+          generated_action?: string | null
           github_review_id?: number | null
           id?: string
           issue_id?: string
