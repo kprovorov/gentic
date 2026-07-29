@@ -76,6 +76,58 @@ export async function getPullRequestUrl(dir: string): Promise<string | null> {
   }
 }
 
+/** Snapshot of a repo's commit history, taken once repository setup has finished. */
+export interface RepoBaseline {
+  headSha: string
+}
+
+/**
+ * Records the repo's current commit so a later check can tell whether the
+ * agent changed anything afterward, as distinct from changes the clone or
+ * the project's setup script already introduced. Call this once, right after
+ * `runSetupScript` (or right after `cloneRepo` when there is no setup
+ * script), before handing the repo to the agent.
+ */
+export async function captureRepoBaseline(dir: string): Promise<RepoBaseline> {
+  const headSha = await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
+  return { headSha: headSha.trim() }
+}
+
+/**
+ * True when the working tree has uncommitted modifications or untracked
+ * files, i.e. `git status --porcelain` reports anything at all.
+ */
+export async function hasUncommittedChanges(dir: string): Promise<boolean> {
+  const status = await runCapture("git", ["status", "--porcelain"], {
+    cwd: dir,
+  })
+  return status.trim().length > 0
+}
+
+/** True when HEAD has moved past `baseline`, i.e. new commits were made. */
+export async function hasNewCommitsSince(
+  dir: string,
+  baseline: RepoBaseline
+): Promise<boolean> {
+  const headSha = await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
+  return headSha.trim() !== baseline.headSha
+}
+
+/**
+ * True when the repo has any change relative to `baseline`: an uncommitted
+ * or untracked change in the working tree, or a new commit on HEAD. Used to
+ * decide whether an issue run actually produced anything worth publishing.
+ */
+export async function hasChangesSinceBaseline(
+  dir: string,
+  baseline: RepoBaseline
+): Promise<boolean> {
+  if (await hasUncommittedChanges(dir)) {
+    return true
+  }
+  return hasNewCommitsSince(dir, baseline)
+}
+
 function run(
   command: string,
   args: string[],

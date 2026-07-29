@@ -30,6 +30,11 @@ export {
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { slugifyIssueTitle } from "./issues/slug"
 export {
+  formatPublishingRequest,
+  generateFirstPublishBranchName,
+  type PublishingRequestInput,
+} from "./issues/publish"
+export {
   attachIssuePullRequest,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,
