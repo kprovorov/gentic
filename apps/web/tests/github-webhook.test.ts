@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   getWorkflowRunPullNumbers,
+  isPullRequestIssue,
   isPendingCheckAction,
 } from "../app/api/integrations/github/webhook/route"
 
@@ -39,4 +40,12 @@ test("isPendingCheckAction rejects completed and unrelated webhook actions", () 
   assert.equal(isPendingCheckAction("check_suite", "completed"), false)
   assert.equal(isPendingCheckAction("check_run", "created"), false)
   assert.equal(isPendingCheckAction("workflow_run", "completed"), false)
+})
+
+test("isPullRequestIssue recognizes PR issue_comment payloads", () => {
+  assert.equal(
+    isPullRequestIssue({ issue: { number: 42, pull_request: {} } }),
+    true
+  )
+  assert.equal(isPullRequestIssue({ issue: { number: 1 } }), false)
 })

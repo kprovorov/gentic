@@ -94,10 +94,12 @@ If you have configured the [GitHub integration](/web/github-integration) with a 
 | `workflow_run.completed` | all suites completed and no suite failed | `ready-for-review` |
 | `pull_request_review.submitted` | `review.state: approved` | `approved` |
 | `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
+| `issue_comment.created` | comment was left on a pull request | queues a follow-up |
+| `pull_request_review_comment.created` | inline review comment was left on a pull request | queues a follow-up |
 
-Gentic matches pull request and review events to a stored pull-request URL on the issue. For check events, Gentic resolves the pull request from the check's commit SHA. Active checks can move `ready-for-review` issues back to `testing`, and completed checks only update issues still in `testing`, so late CI results do not overwrite review or merge statuses. Comment-only reviews and other event types are ignored.
+Gentic matches pull request, review, and comment events to a stored pull-request URL on the issue. For check events, Gentic resolves the pull request from the check's commit SHA. Active checks can move `ready-for-review` issues back to `testing`, and completed checks only update issues still in `testing`, so late CI results do not overwrite review or merge statuses. Unsupported event types are ignored.
 
-To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests**, **Pull request reviews**, **Check runs**, and **Check suites** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
+To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integrations/github/webhook`, subscribe to the **Pull requests**, **Pull request reviews**, **Pull request review comments**, **Issue comments**, **Check runs**, and **Check suites** events, and set the shared secret to match the `GITHUB_WEBHOOK_SECRET` configured on your Gentic deployment.
 
 ## Held status and usage limits
 

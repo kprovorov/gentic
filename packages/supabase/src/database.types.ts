@@ -375,6 +375,7 @@ export type Database = {
           event_ts: string | null
           event_type: string | null
           generated_action: string | null
+          github_comment_id: number | null
           github_review_id: number | null
           id: string
           issue_id: string
@@ -399,6 +400,7 @@ export type Database = {
           event_ts?: string | null
           event_type?: string | null
           generated_action?: string | null
+          github_comment_id?: number | null
           github_review_id?: number | null
           id?: string
           issue_id: string
@@ -423,6 +425,7 @@ export type Database = {
           event_ts?: string | null
           event_type?: string | null
           generated_action?: string | null
+          github_comment_id?: number | null
           github_review_id?: number | null
           id?: string
           issue_id?: string
