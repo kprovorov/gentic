@@ -151,6 +151,7 @@ export const updateIssueSchema = z.object({
   issue_model: issueModelSchema,
   type: issueTypeSchema,
   priority: issuePrioritySchema.default(defaultIssuePriority),
+  create_pr_automatically: z.boolean().optional(),
 })
 
 export type UpdateIssueValues = z.infer<typeof updateIssueSchema>

@@ -20,6 +20,7 @@ import {
 } from "@gentic/ui/dropdown-menu"
 import type { AgentProvider } from "@gentic/validators/issues"
 
+import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
 import { MessageComposer } from "./message-composer/message-composer"
 
 const ISSUE_CREATE_DRAFT_STORAGE_KEY = "gentic:issue-create-draft:v1"
@@ -100,7 +101,7 @@ export function IssueCreateForm({
   if (projects.length === 0) {
     return (
       <div className="mx-auto grid w-full max-w-md gap-4 rounded-3xl border border-dashed p-6 text-center">
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Create a project before adding issues.
         </p>
         <Button asChild variant="outline" className="mx-auto">
@@ -137,53 +138,56 @@ export function IssueCreateForm({
       onIssueModelChange={(model) => setIssueModel(model)}
       onSubmit={() => {}}
       footerStart={
-        <div className="flex min-w-0 flex-col gap-1">
-          <label className="sr-only" id={projectLabelId}>
-            Project
-          </label>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                ref={projectTriggerRef}
-                type="button"
-                aria-labelledby={projectLabelId}
-                aria-describedby={projectError ? projectErrorId : undefined}
-                data-invalid={projectError ? true : undefined}
-                className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
-              >
-                <span className="truncate">
-                  {selectedProject ? selectedProject.name : "Select project"}
-                </span>
-                <IconChevronDown className="size-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-56">
-              {projects.map((project) => (
-                <DropdownMenuItem
-                  key={project.id}
-                  onSelect={() => {
-                    setProjectId(project.id)
-                    setProjectError("")
-                  }}
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-col gap-1">
+            <label className="sr-only" id={projectLabelId}>
+              Project
+            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  ref={projectTriggerRef}
+                  type="button"
+                  aria-labelledby={projectLabelId}
+                  aria-describedby={projectError ? projectErrorId : undefined}
+                  data-invalid={projectError ? true : undefined}
+                  className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50 data-invalid:ring-1 data-invalid:ring-destructive sm:max-w-56"
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{project.name}</span>
-                    <span className="block truncate text-xs font-normal text-muted-foreground">
-                      {project.repo}
-                    </span>
+                  <span className="truncate">
+                    {selectedProject ? selectedProject.name : "Select project"}
                   </span>
-                  {project.id === projectId ? (
-                    <IconCheck className="ml-auto size-3.5" />
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {projectError ? (
-            <p id={projectErrorId} className="text-xs text-destructive">
-              {projectError}
-            </p>
-          ) : null}
+                  <IconChevronDown className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-56">
+                {projects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.id}
+                    onSelect={() => {
+                      setProjectId(project.id)
+                      setProjectError("")
+                    }}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{project.name}</span>
+                      <span className="block truncate text-xs font-normal text-muted-foreground">
+                        {project.repo}
+                      </span>
+                    </span>
+                    {project.id === projectId ? (
+                      <IconCheck className="ml-auto size-3.5" />
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {projectError ? (
+              <p id={projectErrorId} className="text-xs text-destructive">
+                {projectError}
+              </p>
+            ) : null}
+          </div>
+          <AutomaticPrPreferenceField defaultChecked />
         </div>
       }
       footerEnd={

@@ -55,6 +55,19 @@ test("createIssueSchema preserves explicit automatic PR opt-in", () => {
   assert.equal(createValues.create_pr_automatically, true)
 })
 
+test("updateIssueSchema preserves explicit automatic PR edits", () => {
+  const updateValues = updateIssueSchema.parse({
+    id: issueId,
+    title: "Refine issue workflow",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+    create_pr_automatically: false,
+  })
+
+  assert.equal(updateValues.create_pr_automatically, false)
+})
+
 test("issue priority contract exposes reusable metadata in priority order", () => {
   assert.deepEqual(
     issuePriorityOptions.map((option) => option.value),

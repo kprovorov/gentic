@@ -27,6 +27,8 @@ import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
+import { AutomaticPrPreferenceField } from "../../automatic-pr-preference-field"
+
 export function EditIssueView({
   issueId,
   initialData,
@@ -175,6 +177,12 @@ export function EditIssueView({
                   ))}
                 </NativeSelect>
               </div>
+
+              <AutomaticPrPreferenceField
+                key={`${issue.id}-${issue.create_pr_automatically}-${issue.has_attached_pull_request}`}
+                defaultChecked={issue.create_pr_automatically}
+                disabled={issue.has_attached_pull_request}
+              />
 
               <div className="flex justify-end gap-2">
                 <Button asChild variant="outline">

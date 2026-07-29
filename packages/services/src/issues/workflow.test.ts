@@ -377,25 +377,41 @@ test("createIssue persists the requested priority", async () => {
   assert.equal(db.issues[0]?.priority, "urgent")
 })
 
+test("createIssue persists explicit automatic PR preference", async () => {
+  const db = new EventLogDb()
+  db.projects.push({ id: "project-1", name: "Project", user_id: "user-1" })
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await createIssue(supabase as never, "user-1", {
+    project_id: "project-1",
+    title: "Automatic PR issue",
+    prompt: "Do the thing",
+    status: "draft",
+    priority: "medium",
+    create_pr_automatically: true,
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+  })) as unknown as Row
+
+  assert.equal(issue.create_pr_automatically, true)
+  assert.equal(db.issues[0]?.create_pr_automatically, true)
+})
+
 test("updateIssue persists priority and logs priority_changed payload", async () => {
   const db = new EventLogDb()
   db.issues.push(issueRow({ id: "issue-full", priority: "low" }))
   const supabase = new EventLogSupabase(db)
 
-  const issue = (await updateIssue(
-    supabase as never,
-    "user-1",
-    "issue-full",
-    {
-      id: "issue-full",
-      title: "Updated",
-      prompt: "Updated prompt",
-      agent_provider: "claude_code",
-      issue_model: null,
-      type: "bug",
-      priority: "high",
-    }
-  )) as unknown as Row
+  const issue = (await updateIssue(supabase as never, "user-1", "issue-full", {
+    id: "issue-full",
+    title: "Updated",
+    prompt: "Updated prompt",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "bug",
+    priority: "high",
+  })) as unknown as Row
 
   assert.equal(issue.priority, "high")
   assert.equal(db.issues[0]?.priority, "high")
@@ -413,6 +429,73 @@ test("updateIssue persists priority and logs priority_changed payload", async ()
       },
     ]
   )
+})
+
+test("updateIssue persists automatic PR preference before a PR is attached", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-automatic-pr",
+      create_pr_automatically: true,
+      pr_url: null,
+    })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssue(
+    supabase as never,
+    "user-1",
+    "issue-automatic-pr",
+    {
+      id: "issue-automatic-pr",
+      title: "Updated",
+      prompt: "Updated prompt",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "medium",
+      create_pr_automatically: false,
+    }
+  )) as unknown as Row
+
+  assert.equal(issue.create_pr_automatically, false)
+  assert.equal(db.issues[0]?.create_pr_automatically, false)
+})
+
+test("updateIssue leaves automatic PR preference historical after a PR is attached", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-attached-pr",
+      create_pr_automatically: true,
+      pr_url: null,
+    })
+  )
+  db.issue_pull_requests.push({
+    id: "pull-request-1",
+    issue_id: "issue-attached-pr",
+    url: "https://github.com/acme/widget/pull/1",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssue(
+    supabase as never,
+    "user-1",
+    "issue-attached-pr",
+    {
+      id: "issue-attached-pr",
+      title: "Updated",
+      prompt: "Updated prompt",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "medium",
+      create_pr_automatically: false,
+    }
+  )) as unknown as Row
+
+  assert.equal(issue.create_pr_automatically, true)
+  assert.equal(db.issues[0]?.create_pr_automatically, true)
 })
 
 test("updateIssue does not log priority_changed when priority is unchanged", async () => {

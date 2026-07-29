@@ -37,6 +37,9 @@ export const issueEditSchema = z.object({
   issue_model: z.string().nullable(),
   type: issueTypeSchema,
   priority: issuePrioritySchema,
+  create_pr_automatically: z.boolean(),
+  pr_url: z.string().nullable(),
+  issue_pull_requests: z.array(z.object({ id: z.string() })).optional(),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -53,6 +56,7 @@ export const issueDetailSchema = z.object({
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   pr_url: z.string().nullable(),
+  create_pr_automatically: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
   projects: projectOptionSchema.nullable(),
@@ -91,6 +95,7 @@ export type IssueDetail = {
   usage_limit_reset_at: string | null
   run_started_at: string | null
   pr_url: string | null
+  create_pr_automatically: boolean
   created_at: string
   updated_at: string
   projects: ProjectOption | null
@@ -107,8 +112,11 @@ export type IssueEdit = Pick<
   | "issue_model"
   | "type"
   | "priority"
+  | "create_pr_automatically"
   | "projects"
->
+> & {
+  has_attached_pull_request: boolean
+}
 
 export type IssueDetailRow = z.infer<typeof issueDetailSchema>
 export type IssueEditRow = z.infer<typeof issueEditSchema>
@@ -163,6 +171,7 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     usage_limit_reset_at: issue.usage_limit_reset_at,
     run_started_at: issue.run_started_at,
     pr_url: issue.pr_url,
+    create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,
     updated_at: issue.updated_at,
     projects: toProjectOption(issue.projects),
@@ -180,6 +189,9 @@ export function toIssueEdit(issue: IssueEditRow): IssueEdit {
     issue_model: issue.issue_model,
     type: issue.type,
     priority: issue.priority,
+    create_pr_automatically: issue.create_pr_automatically,
+    has_attached_pull_request:
+      Boolean(issue.pr_url) || (issue.issue_pull_requests?.length ?? 0) > 0,
     projects: toProjectOption(issue.projects),
   }
 }

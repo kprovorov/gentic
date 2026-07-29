@@ -104,7 +104,9 @@ export async function updateIssue(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider, issue_model, priority, projects!inner(user_id)")
+    .select(
+      "agent_provider, issue_model, priority, pr_url, projects!inner(user_id)"
+    )
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -116,6 +118,16 @@ export async function updateIssue(
     throw new ServiceError("not_found", "Issue not found")
   }
 
+  const { data: attachedPullRequests, error: pullRequestsError } =
+    await supabase.from("issue_pull_requests").select("id").eq("issue_id", id)
+
+  if (pullRequestsError) {
+    throw new ServiceError("internal", pullRequestsError.message)
+  }
+
+  const hasAttachedPullRequest =
+    Boolean(current.pr_url) || (attachedPullRequests?.length ?? 0) > 0
+
   const { data: issue, error: updateError } = await supabase
     .from("issues")
     .update({
@@ -125,6 +137,9 @@ export async function updateIssue(
       issue_model: input.issue_model,
       type: input.type,
       priority: input.priority,
+      ...(input.create_pr_automatically !== undefined && !hasAttachedPullRequest
+        ? { create_pr_automatically: input.create_pr_automatically }
+        : {}),
       ...(current.agent_provider !== input.agent_provider ||
       current.issue_model !== input.issue_model
         ? { session_id: null }
