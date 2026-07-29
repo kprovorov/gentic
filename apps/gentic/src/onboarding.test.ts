@@ -249,7 +249,7 @@ test("runOnboarding resumes setup-incomplete registration without another code",
   const { messages, ui } = createUiRecorder()
   let markReadyCalls = 0
   let startCalls = 0
-  const status: OnboardingStatus = {
+  let status: OnboardingStatus = {
     ...makeStatus(true),
     ready: false,
     auth: {
@@ -260,10 +260,12 @@ test("runOnboarding resumes setup-incomplete registration without another code",
   }
 
   await runOnboarding({
-    ...defaultRunOnboardingDeps(status),
     getStatus: async () => status,
+    setupAgentCLIs: async () => true,
+    ensureAgentCli: async () => status,
     markWorkerReady: async () => {
       markReadyCalls += 1
+      status = makeStatus(true)
     },
     confirm: async () => false,
     startWorker: async () => {
@@ -274,6 +276,8 @@ test("runOnboarding resumes setup-incomplete registration without another code",
   })
 
   assert.equal(markReadyCalls, 1)
+  assert.equal(status.ready, true)
+  assert.equal(status.auth.setupState, "ready")
   assert.equal(startCalls, 0)
   assert.ok(
     messages.includes(`info:Step 4/${ONBOARDING_STEPS.length}: Worker service`)

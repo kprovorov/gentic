@@ -45,6 +45,7 @@ Fill in these values:
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1
+GENTIC_WORKER_ID=worker-id-from-enrollment
 GENTIC_WORKER_CREDENTIAL=your-worker-credential
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
@@ -164,7 +165,7 @@ The output directory contains:
   per the Codex prerequisite above.
 
 Copy the whole output directory to the target machine and run
-`./gentic run` with `GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
+`./gentic run` with `GENTIC_WORKER_ID`/`GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
 no install step needed.
 
 Pushing a `v*` tag (e.g. `v0.0.1`) runs

@@ -48,7 +48,8 @@ export async function checkOnboardingGate(
   if (stdin.isTTY) {
     const { runOnboarding } = await import("./onboarding.js")
     await (deps.runOnboarding ?? runOnboarding)()
-    exit(0)
+    const nextStatus = await getStatus()
+    exit(nextStatus.ready ? 0 : 1)
   }
 
   const message = [

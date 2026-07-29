@@ -6,6 +6,7 @@ import { z } from "zod"
 import packageJson from "../package.json" with { type: "json" }
 import { getConfigInput } from "./config.js"
 import { writeConfigFile } from "./config-store.js"
+import { logError } from "./log.js"
 import { getToolStatuses, type ToolStatuses } from "./tools.js"
 
 export const DEFAULT_API_URL = "https://app.gentic.chat/api/v1"
@@ -18,11 +19,9 @@ const exchangeResponseSchema = z
         id: z.string().min(1),
         display_name: z.string().min(1).optional(),
         setup_state: z.string().optional(),
-      })
-      .strict(),
+      }),
     credential: workerCredentialSchema,
   })
-  .strict()
 
 export interface WorkerEnrollment {
   apiUrl: string
@@ -116,20 +115,27 @@ export async function markWorkerSetupReady(
   } = {}
 ): Promise<void> {
   const config = getConfigInput()
-  if (
-    !config.GENTIC_API_URL ||
-    !config.GENTIC_WORKER_CREDENTIAL ||
-    !config.GENTIC_WORKER_ID
-  ) {
+  const apiUrl = config.GENTIC_API_URL
+  const workerCredential = config.GENTIC_WORKER_CREDENTIAL
+  const workerId = config.GENTIC_WORKER_ID
+  const missing = [
+    apiUrl ? null : "GENTIC_API_URL",
+    workerCredential ? null : "GENTIC_WORKER_CREDENTIAL",
+    workerId ? null : "GENTIC_WORKER_ID",
+  ].filter((key): key is string => key !== null)
+  if (!apiUrl || !workerCredential || !workerId) {
+    logError(
+      `cannot mark worker setup ready: missing ${missing.join(" and ")}`
+    )
     return
   }
 
   const response = await (deps.fetch ?? fetch)(
-    `${config.GENTIC_API_URL.replace(/\/+$/, "")}/agent/worker/setup`,
+    `${apiUrl.replace(/\/+$/, "")}/agent/worker/setup`,
     {
       method: "PATCH",
       headers: {
-        authorization: `Bearer ${config.GENTIC_WORKER_CREDENTIAL}`,
+        authorization: `Bearer ${workerCredential}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ setup_state: "ready" }),

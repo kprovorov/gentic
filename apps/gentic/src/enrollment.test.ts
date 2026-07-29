@@ -44,11 +44,13 @@ test("connectWorkerWithCode exchanges code and persists stable worker identity",
       fetch: async (_url: string | URL | Request, init?: RequestInit) => {
         requestBody = JSON.parse(String(init?.body))
         return Response.json({
+          extra_field: "ignored",
           api_url: "https://tenant.example/api/v1",
           worker: {
             id: "worker-123",
             display_name: "build-host-1",
             setup_state: "enrolling",
+            extra_worker_field: "ignored",
           },
           credential: "gtwc_abcdefghijklmnopqrstuvwxyzABCDEFGH",
         })
@@ -131,5 +133,29 @@ test("markWorkerSetupReady keeps setup incomplete when API update fails", async 
   assert.equal(
     configStore.readConfigFile().GENTIC_WORKER_SETUP_STATE,
     "setup-incomplete"
+  )
+})
+
+test("markWorkerSetupReady logs missing config before returning", async () => {
+  const { enrollment } = await freshModules()
+  const originalError = console.error
+  const messages: string[] = []
+  console.error = (...args: unknown[]) => {
+    messages.push(args.map(String).join(" "))
+  }
+  try {
+    await enrollment.markWorkerSetupReady()
+  } finally {
+    console.error = originalError
+  }
+
+  assert.ok(
+    messages.some(
+      (message) =>
+        message.includes("cannot mark worker setup ready") &&
+        message.includes("GENTIC_API_URL") &&
+        message.includes("GENTIC_WORKER_CREDENTIAL") &&
+        message.includes("GENTIC_WORKER_ID")
+    )
   )
 })

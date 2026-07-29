@@ -390,14 +390,6 @@ export async function runOnboarding(
   if (hasOnlySetupIncomplete(status)) {
     await (deps.markWorkerReady ?? markWorkerSetupReady)()
     status = await getStatus()
-    if (hasOnlySetupIncomplete(status)) {
-      status = {
-        ...status,
-        ready: true,
-        auth: { ...status.auth, setupState: "ready" },
-        unmet: [],
-      }
-    }
   }
 
   if (!status.ready) {

@@ -8,7 +8,7 @@ import { readConfigFile, type ConfigFile } from "./config-store.js"
 const paths = envPaths("gentic", { suffix: "" })
 
 const configSchema = z.object({
-  GENTIC_WORKER_ID: z.string().min(1).optional(),
+  GENTIC_WORKER_ID: z.string().min(1),
   GENTIC_WORKER_CREDENTIAL: z.string().min(1),
   GENTIC_API_URL: z.string().url(),
   GENTIC_WORKER_SETUP_STATE: z

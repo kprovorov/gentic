@@ -71,6 +71,27 @@ test("checkOnboardingGate returns when onboarding is already satisfied", async (
 
 test("checkOnboardingGate runs onboarding and exits before dispatch for TTY stdin", async () => {
   let prompted = false
+  const statuses = [unmetStatus, readyStatus]
+  await assert.rejects(
+    checkOnboardingGate({
+      argv: ["node", "gentic", "run"],
+      stdin: { isTTY: true },
+      getStatus: async () => statuses.shift() ?? readyStatus,
+      runOnboarding: async () => {
+        prompted = true
+      },
+      exit: (code?: number): never => {
+        throw new Error(`exit:${code}`)
+      },
+    }),
+    /exit:0/
+  )
+  assert.equal(prompted, true)
+})
+
+test("checkOnboardingGate exits 1 for TTY stdin when onboarding remains incomplete", async () => {
+  let prompted = false
+
   await assert.rejects(
     checkOnboardingGate({
       argv: ["node", "gentic", "run"],
@@ -83,7 +104,7 @@ test("checkOnboardingGate runs onboarding and exits before dispatch for TTY stdi
         throw new Error(`exit:${code}`)
       },
     }),
-    /exit:0/
+    /exit:1/
   )
   assert.equal(prompted, true)
 })
