@@ -19,9 +19,9 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import type { AgentProvider } from "@gentic/validators/issues"
 import {
   defaultIssuePriority,
+  type AgentProvider,
   type IssuePriority,
 } from "@gentic/validators/issues"
 

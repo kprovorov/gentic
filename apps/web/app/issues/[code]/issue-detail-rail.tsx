@@ -287,6 +287,7 @@ function IssueDetailPriority({
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
         queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
+      setOptimisticPriority(null)
     },
   })
 

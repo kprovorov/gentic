@@ -105,7 +105,13 @@ describe("IssueDetailRail priority", () => {
   it("submits selected priority and applies optimistic detail/list updates", async () => {
     const user = userEvent.setup()
     const queryClient = renderRail()
-    updateIssuePriorityMock.mockResolvedValue({ id: issueId, priority: "high" })
+    let resolveMutation: () => void = () => {}
+    updateIssuePriorityMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMutation = resolve
+        })
+    )
 
     await user.click(screen.getByRole("menuitem", { name: "High" }))
 
@@ -126,6 +132,13 @@ describe("IssueDetailRail priority", () => {
         queryKeys.issues
       )?.issues[0]?.priority
     ).toBe("high")
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Change priority from Medium" })
+      ).not.toBeDisabled()
+    })
   })
 
   it("disables the priority dropdown while saving", async () => {
@@ -148,6 +161,11 @@ describe("IssueDetailRail priority", () => {
     })
 
     resolveMutation()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Change priority from Medium" })
+      ).not.toBeDisabled()
+    })
   })
 
   it("rolls back optimistic priority and shows an error toast when saving fails", async () => {
