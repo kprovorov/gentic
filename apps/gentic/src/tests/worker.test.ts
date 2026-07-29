@@ -7,13 +7,21 @@ import { test } from "node:test"
 import type {
   AgentApi,
   ClaimedIssue,
+  FinishRunFields,
   RunStateFields,
   UserMessage,
 } from "../api.js"
 import type { Config } from "../config.js"
 import type { IssueRealtimeChannel } from "../realtime.js"
 import type { PromptDelivery, PromptTurn, RunSessionInput } from "../session.js"
-import { processIssue, type ProcessIssueDeps } from "../worker.js"
+import type { ToolStatuses } from "../tools.js"
+import {
+  CONTROL_INTERVAL_MS,
+  processIssue,
+  runWorkerLoop,
+  type ProcessIssueDeps,
+  type WorkerLoopDeps,
+} from "../worker.js"
 
 test("consumes persisted prompts in order, dedupes in-flight fetches, and acks processed messages", async () => {
   await withHarness(async ({ config, issue, api, deps, realtimeWakes }) => {
@@ -229,6 +237,171 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
   })
 })
 
+test("worker loop sends heartbeat every 30s and checks control every 10s", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 61_000 },
+      runs: [],
+    })
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.deepEqual(
+      api.heartbeats.map((entry) => entry.last_seen_at),
+      [
+        "2026-07-29T08:30:00.000Z",
+        "2026-07-29T08:30:30.000Z",
+        "2026-07-29T08:31:00.000Z",
+      ]
+    )
+    assert.deepEqual(api.controlChecks, [
+      "2026-07-29T08:30:00.000Z",
+      "2026-07-29T08:30:10.000Z",
+      "2026-07-29T08:30:20.000Z",
+      "2026-07-29T08:30:30.000Z",
+      "2026-07-29T08:30:40.000Z",
+      "2026-07-29T08:30:50.000Z",
+      "2026-07-29T08:31:00.000Z",
+      "2026-07-29T08:31:10.000Z",
+    ])
+    assert.equal(api.providerCheckCalls, 1)
+    assert.equal(api.offlineCalls, 0)
+  })
+})
+
+test("worker loop marks graceful shutdown offline immediately", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    const stop = () => process.emit("SIGTERM")
+    clock.onSleep = stop
+    api.controlResponse = () => ({ worker: { banned: false }, runs: [] })
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.equal(api.offlineCalls, 1)
+  })
+})
+
+test("worker loop survives transient heartbeat and control failures", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.failNextHeartbeat = true
+    api.failNextControl = true
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 31_000 },
+      runs: [],
+    })
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.equal(api.heartbeats.length, 1)
+    assert.equal(api.controlChecks.length, 4)
+  })
+})
+
+test("worker control ban aborts active sessions without recording failures", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, issue, api, deps }) => {
+    config.MAX_CONCURRENT_ISSUES = 1
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.claims.push(issue)
+    api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= CONTROL_INTERVAL_MS },
+      runs: [
+        {
+          issue_id: issue.id,
+          active_run_id: issue.activeRunId,
+          status: "in-progress",
+        },
+      ],
+    })
+    deps.runAgentSession = async (input) => {
+      assert.ok(input.signal)
+      await input.onSessionId("session-1")
+      await waitForAbort(input.signal)
+      api.sessionAborted = true
+    }
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.equal(api.finishedStatuses.length, 0)
+    assert.equal(
+      api.runStates.some((entry) => entry.fields.status === "run-failed"),
+      false
+    )
+  })
+})
+
+test("worker control invalidates active runs and cancels their sessions", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, issue, api, deps }) => {
+    config.MAX_CONCURRENT_ISSUES = 1
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.claims.push(issue)
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 20_000 },
+      runs:
+        clock.elapsedMs < CONTROL_INTERVAL_MS
+          ? [
+              {
+                issue_id: issue.id,
+                active_run_id: issue.activeRunId,
+                status: "in-progress",
+              },
+            ]
+          : [],
+    })
+    deps.runAgentSession = async (input) => {
+      assert.ok(input.signal)
+      await input.onSessionId("session-1")
+      await waitForAbort(input.signal)
+      api.sessionAborted = true
+    }
+
+    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+    assert.equal(api.finishedStatuses.length, 0)
+  })
+})
+
+test("processIssue cancellation reaches an active agent session", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    const controller = new AbortController()
+    let enteredSession: (() => void) | null = null
+    const sessionStarted = new Promise<void>((resolve) => {
+      enteredSession = resolve
+    })
+
+    deps.runAgentSession = async (input) => {
+      assert.ok(input.signal)
+      await input.onSessionId("session-1")
+      enteredSession?.()
+      await waitForAbort(input.signal)
+      api.sessionAborted = true
+      throw new Error("should be replaced by cancellation")
+    }
+
+    const run = processIssue(api, config, issue, deps, {
+      signal: controller.signal,
+    }).catch((error) => error)
+
+    await sessionStarted
+    controller.abort()
+    await run
+
+    assert.equal(api.sessionAborted, true)
+    assert.equal(api.finishedStatuses.length, 0)
+    assert.equal(
+      api.runStates.some((entry) => entry.fields.status === "run-failed"),
+      false
+    )
+  })
+})
+
 async function withHarness(
   run: (harness: {
     config: Config
@@ -328,19 +501,30 @@ class FakeApi implements AgentApi {
     messageId: string
     attachmentsDir: string
   }[] = []
+  readonly heartbeats: import("@gentic/validators/workers").WorkerHeartbeatTelemetry[] =
+    []
+  readonly controlChecks: string[] = []
+  readonly claims: ClaimedIssue[] = []
   finishResults: boolean[] = [true]
   onFinishAttempt: ((attempt: number) => void) | null = null
+  controlResponse: () => import("@gentic/validators/workers").WorkerControlResponse =
+    () => ({ worker: { banned: true }, runs: [] })
+  failNextHeartbeat = false
+  failNextControl = false
   private finishAttempts = 0
   cloneCalls = 0
   checkoutCalls = 0
   closedChannels = 0
+  offlineCalls = 0
+  providerCheckCalls = 0
+  sessionAborted = false
 
   addMessage(issueId: string, message: UserMessage): void {
     this.messages.set(issueId, [...(this.messages.get(issueId) ?? []), message])
   }
 
   async claimNextQueuedIssue(): Promise<ClaimedIssue | null> {
-    return null
+    return this.claims.shift() ?? null
   }
 
   async setRunState(issueId: string, fields: RunStateFields): Promise<void> {
@@ -349,11 +533,7 @@ class FakeApi implements AgentApi {
 
   async finishRun(
     _issueId: string,
-    fields: RunStateFields & {
-      active_run_id: string
-      status: "ready-for-review" | "waiting-for-input"
-      run_finished_at: string
-    }
+    fields: FinishRunFields
   ): Promise<{ finished: boolean; status: typeof fields.status }> {
     this.finishAttempts += 1
     this.onFinishAttempt?.(this.finishAttempts)
@@ -400,6 +580,98 @@ class FakeApi implements AgentApi {
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     }
   }
+
+  async sendHeartbeat(
+    telemetry: import("@gentic/validators/workers").WorkerHeartbeatTelemetry
+  ): Promise<void> {
+    if (this.failNextHeartbeat) {
+      this.failNextHeartbeat = false
+      throw new Error("temporary heartbeat failure")
+    }
+    this.heartbeats.push(telemetry)
+  }
+
+  async markOffline(): Promise<void> {
+    this.offlineCalls += 1
+  }
+
+  async fetchWorkerControl(): Promise<
+    import("@gentic/validators/workers").WorkerControlResponse
+  > {
+    if (this.failNextControl) {
+      this.failNextControl = false
+      throw new Error("temporary control failure")
+    }
+    this.controlChecks.push(new Date(fakeNowMs).toISOString())
+    return this.controlResponse()
+  }
+}
+
+let fakeNowMs = Date.parse("2026-07-29T08:30:00.000Z")
+
+class FakeClock {
+  readonly startMs = Date.parse("2026-07-29T08:30:00.000Z")
+  nowMs = this.startMs
+  onSleep: (() => void) | null = null
+
+  get elapsedMs(): number {
+    return this.nowMs - this.startMs
+  }
+
+  now(): Date {
+    fakeNowMs = this.nowMs
+    return new Date(this.nowMs)
+  }
+
+  async sleep(ms: number): Promise<void> {
+    await flushMicrotasks()
+    this.nowMs += ms
+    fakeNowMs = this.nowMs
+    await flushMicrotasks()
+    this.onSleep?.()
+    this.onSleep = null
+  }
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 20; index += 1) {
+    await Promise.resolve()
+  }
+}
+
+function loopDeps(
+  deps: ProcessIssueDeps,
+  clock: FakeClock,
+  api: FakeApi
+): WorkerLoopDeps {
+  return {
+    ...deps,
+    sleep: (ms) => clock.sleep(ms),
+    now: () => clock.now(),
+    async getToolStatuses(): Promise<ToolStatuses> {
+      api.providerCheckCalls += 1
+      return {
+        github: { installed: true, authenticated: true, version: "2.0.0" },
+        claude: { installed: true, authenticated: true, version: "1.0.0" },
+        codex: { installed: true, authenticated: true, version: "0.1.0" },
+      }
+    },
+  }
+}
+
+function waitForAbort(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    signal.addEventListener(
+      "abort",
+      () => {
+        resolve()
+      },
+      { once: true }
+    )
+  })
 }
 
 async function consumePrompt(input: RunSessionInput): Promise<PromptTurn> {

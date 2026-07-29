@@ -105,12 +105,12 @@ test("enrollment inputs keep persisted secrets hashed", () => {
 
 test("heartbeat telemetry validates worker process state", () => {
   const telemetry = {
-    worker_id: workerId,
     process_started_at: now,
     gentic_version: "0.14.0",
     os: "linux",
     arch: "x64",
     configured_capacity: 3,
+    setup_completed: true,
     provider_capabilities: capabilities,
     last_seen_at: now,
   }

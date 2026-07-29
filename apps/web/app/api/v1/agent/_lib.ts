@@ -46,17 +46,34 @@ export const insertMessageSchema = z
 export async function getAgentContext(request: Request): Promise<{
   userId: string
   workerId: string
+  banned: boolean
+  supabase: Supabase
+}> {
+  return getAgentContextWithOptions(request)
+}
+
+export async function getAgentContextWithOptions(
+  request: Request,
+  options: {
+    allowBanned?: boolean
+  } = {}
+): Promise<{
+  userId: string
+  workerId: string
+  banned: boolean
   supabase: Supabase
 }> {
   const supabase = createServiceClient()
-  const { userId, workerId } = await authenticateWorkerRequest(
+  const { userId, workerId, banned } = await authenticateWorkerRequest(
     request,
-    supabase
+    supabase,
+    options
   )
 
   return {
     userId,
     workerId,
+    banned,
     supabase,
   }
 }
@@ -105,10 +122,14 @@ export class ApiError extends Error {
 
 async function authenticateWorkerRequest(
   request: Request,
-  supabase: Supabase
+  supabase: Supabase,
+  options: {
+    allowBanned?: boolean
+  } = {}
 ): Promise<{
   userId: string
   workerId: string
+  banned: boolean
 }> {
   const authorization = request.headers.get("authorization")
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
@@ -118,7 +139,7 @@ async function authenticateWorkerRequest(
   }
 
   try {
-    return await authenticateWorkerCredential(supabase, token)
+    return await authenticateWorkerCredential(supabase, token, options)
   } catch (error) {
     if (error instanceof ServiceError && error.code === "forbidden") {
       throw new ApiError(401, "Invalid worker credential")

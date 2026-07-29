@@ -13,6 +13,7 @@ import {
   workerSetupStateSchema,
   type ConsumeWorkerEnrollmentCodeInput,
   type WorkerCapabilities,
+  type WorkerHeartbeatTelemetry,
   type WorkerSetupState,
 } from "@gentic/validators/workers"
 
@@ -120,6 +121,18 @@ export type ExchangeWorkerEnrollmentCodeResult = {
 export type WorkerCredentialContext = {
   userId: string
   workerId: string
+  banned: boolean
+}
+
+export type WorkerControlState = {
+  worker: {
+    banned: boolean
+  }
+  runs: Array<{
+    issue_id: string
+    active_run_id: string | null
+    status: string
+  }>
 }
 
 export async function listWorkers(
@@ -334,6 +347,7 @@ export async function authenticateWorkerCredential(
   credential: string,
   options: {
     now?: Date
+    allowBanned?: boolean
   } = {}
 ): Promise<WorkerCredentialContext> {
   const parsed = workerCredentialSchema.safeParse(credential)
@@ -362,7 +376,7 @@ export async function authenticateWorkerCredential(
   if (!data) {
     throw new ServiceError("forbidden", "Invalid worker credential")
   }
-  if (data.banned_at) {
+  if (data.banned_at && !options.allowBanned) {
     throw new ServiceError("forbidden", "Invalid worker credential")
   }
   if (
@@ -373,7 +387,87 @@ export async function authenticateWorkerCredential(
     throw new ServiceError("forbidden", "Invalid worker credential")
   }
 
-  return { userId: data.user_id, workerId: data.id }
+  return { userId: data.user_id, workerId: data.id, banned: Boolean(data.banned_at) }
+}
+
+export async function recordWorkerHeartbeat(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  telemetry: WorkerHeartbeatTelemetry,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  } = {}
+): Promise<WorkerDomain> {
+  return updateWorker(
+    supabase,
+    userId,
+    workerId,
+    {
+      last_seen_at: telemetry.last_seen_at ?? (options.now ?? new Date()).toISOString(),
+      process_started_at: telemetry.process_started_at,
+      gentic_version: telemetry.gentic_version,
+      os: telemetry.os,
+      arch: telemetry.arch,
+      configured_capacity: telemetry.configured_capacity,
+      setup_state: telemetry.setup_completed ? "ready" : "enrolling",
+      provider_capabilities: sanitizeProviderCapabilities(
+        telemetry.provider_capabilities
+      ),
+    },
+    options
+  )
+}
+
+export async function markWorkerOffline(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  } = {}
+): Promise<WorkerDomain> {
+  return updateWorker(
+    supabase,
+    userId,
+    workerId,
+    {
+      last_seen_at: null,
+    },
+    options
+  )
+}
+
+export async function getWorkerControlState(
+  supabase: Supabase,
+  workerId: string,
+  banned: boolean
+): Promise<WorkerControlState> {
+  const rows = unwrap(
+    await supabase
+      .from("issues")
+      .select("id,active_run_id,status")
+      .eq("active_worker_id", workerId)
+      .not("status", "in", "(completed,cancelled)")
+      .returns<
+        Array<{
+          id: string
+          active_run_id: string | null
+          status: string
+        }>
+      >()
+  )
+
+  return {
+    worker: { banned },
+    runs: rows.map((row) => ({
+      issue_id: row.id,
+      active_run_id: row.active_run_id,
+      status: row.status,
+    })),
+  }
 }
 
 export async function updateWorker(
@@ -666,6 +760,25 @@ function deriveWorkerPrimaryState(row: WorkerRow, now: Date): WorkerPrimaryState
 function parseCapabilities(value: Json): WorkerCapabilities {
   const result = workerCapabilitiesSchema.safeParse(value)
   return result.success ? result.data : { providers: {} }
+}
+
+function sanitizeProviderCapabilities(
+  capabilities: WorkerCapabilities
+): WorkerCapabilities {
+  const sanitized: WorkerCapabilities = { providers: {} }
+  for (const key of ["claude_code", "codex"] as const) {
+    const capability = capabilities.providers[key]
+    if (!capability) continue
+    sanitized.providers[key] = {
+      enabled: capability.enabled,
+      available: capability.available,
+      authenticated: capability.authenticated,
+      version: capability.version,
+      models: [],
+      metadata: {},
+    }
+  }
+  return sanitized
 }
 
 function toProviderReadiness(

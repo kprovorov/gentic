@@ -725,11 +725,11 @@ test("authenticateWorkerCredential isolates credentials and rejects malformed, b
 
   assert.deepEqual(
     await authenticateWorkerCredential(supabase as never, credential1, { now }),
-    { userId: "user-1", workerId: "worker-1" }
+    { userId: "user-1", workerId: "worker-1", banned: false }
   )
   assert.deepEqual(
     await authenticateWorkerCredential(supabase as never, credential2, { now }),
-    { userId: "user-2", workerId: "worker-2" }
+    { userId: "user-2", workerId: "worker-2", banned: false }
   )
 
   for (const credential of [
@@ -743,6 +743,14 @@ test("authenticateWorkerCredential isolates credentials and rejects malformed, b
       (error) => error instanceof ServiceError && error.code === "forbidden"
     )
   }
+
+  assert.deepEqual(
+    await authenticateWorkerCredential(supabase as never, bannedCredential, {
+      now,
+      allowBanned: true,
+    }),
+    { userId: "user-1", workerId: "worker-3", banned: true }
+  )
 })
 
 function stateById(workers: WorkerDomain[], id: string) {
