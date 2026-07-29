@@ -45,10 +45,10 @@ test("worker state contracts expose setup and lifecycle values", () => {
     ["enrolling", "ready", "setup_failed"]
   )
   assert.deepEqual(
-    ["enrolling", "online", "offline", "banned", "setup_failed"].map(
+    ["setup-incomplete", "online", "offline", "banned"].map(
       (state) => workerLifecycleStateSchema.parse(state)
     ),
-    ["enrolling", "online", "offline", "banned", "setup_failed"]
+    ["setup-incomplete", "online", "offline", "banned"]
   )
 })
 
@@ -57,6 +57,7 @@ test("workerNormalizedNameSchema trims, compacts, and lowercases names", () => {
     workerNormalizedNameSchema.parse("  Alpha   Worker  "),
     "alpha worker"
   )
+  assert.throws(() => workerNormalizedNameSchema.parse("x".repeat(81)))
 })
 
 test("workerCapabilitiesSchema validates structured provider capabilities", () => {
@@ -140,10 +141,10 @@ test("management and lifecycle inputs reject empty updates", () => {
   assert.deepEqual(
     workerLifecycleEventSchema.parse({
       worker_id: workerId,
-      state: "online",
+      state: "setup-incomplete",
       agent_provider: "codex",
       observed_at: now,
     }).state,
-    "online"
+    "setup-incomplete"
   )
 })
