@@ -48,6 +48,7 @@ import {
 
 import type { TimelineItem } from "./build-timeline"
 import { groupTimelineItems, type TimelineDisplayItem } from "./timeline-items"
+import { getToolCallDiffs, ToolCallDiffView } from "./tool-call-diff"
 
 type TimelineRowData = {
   key: string
@@ -584,21 +585,48 @@ function ToolCallGroupContent({ messages }: { messages: ChatMessage[] }) {
       <CollapsibleContent>
         <div className="mt-2 min-w-0 space-y-2">
           {messages.map((message) => (
-            <pre
+            <ToolCallMessageContent
               key={message.clientKey ?? message.id}
-              className={cn(
-                "max-h-48 max-w-full overflow-auto rounded-lg border p-2 font-mono text-xs break-words whitespace-pre-wrap",
-                message.status === "error"
-                  ? "border-destructive/40 bg-destructive/5 text-destructive"
-                  : "bg-muted/40 text-muted-foreground"
-              )}
-            >
-              {message.content || "Tool call"}
-            </pre>
+              message={message}
+            />
           ))}
         </div>
       </CollapsibleContent>
     </Collapsible>
+  )
+}
+
+function ToolCallMessageContent({ message }: { message: ChatMessage }) {
+  const diffs = getToolCallDiffs(message)
+
+  if (diffs.length === 0) {
+    return (
+      <pre
+        className={cn(
+          "max-h-48 max-w-full overflow-auto rounded-lg border p-2 font-mono text-xs break-words whitespace-pre-wrap",
+          message.status === "error"
+            ? "border-destructive/40 bg-destructive/5 text-destructive"
+            : "bg-muted/40 text-muted-foreground"
+        )}
+      >
+        {message.content || "Tool call"}
+      </pre>
+    )
+  }
+
+  const label = firstLine(message.content ?? "")
+
+  return (
+    <div className="space-y-2">
+      {label ? (
+        <div className="px-1 font-mono text-xs text-muted-foreground">
+          {label}
+        </div>
+      ) : null}
+      {diffs.map((diff, index) => (
+        <ToolCallDiffView key={`${diff.path}-${index}`} diff={diff} />
+      ))}
+    </div>
   )
 }
 
