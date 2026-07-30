@@ -140,7 +140,6 @@ export function IssueCreateForm({
       rows={3}
       placeholder="Describe what you want built, fixed, or investigated."
       required
-      showCommandHint={false}
       submitAriaLabel="Run issue"
       submitDisabled={!prompt.trim()}
       agentProvider={agentProvider}

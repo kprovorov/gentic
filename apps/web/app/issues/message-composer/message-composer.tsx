@@ -34,7 +34,6 @@ export function MessageComposer({
   placeholder = "Message the agent…",
   submitDisabled,
   submitAriaLabel,
-  showCommandHint = true,
   invalidSlashCommand = false,
   slashCommands = [],
   selectedSlashCommandIndex = 0,
@@ -73,7 +72,6 @@ export function MessageComposer({
   placeholder?: string
   submitDisabled?: boolean
   submitAriaLabel?: string
-  showCommandHint?: boolean
   invalidSlashCommand?: boolean
   slashCommands?: SlashCommand[]
   selectedSlashCommandIndex?: number
@@ -122,19 +120,6 @@ export function MessageComposer({
             selectedIndex={selectedSlashCommandIndex}
             onSelect={(command) => onSelectSlashCommand?.(command)}
           />
-        ) : null}
-        {showCommandHint ? (
-          <span className="pointer-events-none absolute top-2.5 right-3.5 z-10 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-sm:hidden">
-            <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
-              /
-            </kbd>
-            for commands
-            <span aria-hidden="true">·</span>
-            <kbd className="rounded bg-background px-1 font-mono text-[10.5px] ring-1 ring-border">
-              ⌘↵
-            </kbd>
-            to send
-          </span>
         ) : null}
         <AttachmentPromptField
           id={id}
