@@ -38,6 +38,19 @@ test("route refreshes defer while the new issue parallel modal is active", () =>
     shouldDeferRouteRefresh("/issues/WEB-123", ["issues", "new"]),
     true
   )
+  assert.equal(
+    shouldDeferRouteRefresh("/issues/WEB-123", ["(.)issues", "new"]),
+    true
+  )
+  assert.equal(
+    shouldDeferRouteRefresh("/issues/WEB-123", [
+      "issues",
+      "[code]",
+      "(.)issues",
+      "new",
+    ]),
+    true
+  )
   assert.equal(shouldDeferRouteRefresh("/issues/WEB-123", ["issues"]), false)
   assert.equal(shouldDeferRouteRefresh("/issues/WEB-123", []), false)
 })
