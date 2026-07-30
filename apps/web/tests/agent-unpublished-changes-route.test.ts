@@ -207,3 +207,28 @@ test("records unpublished changes for the issue's active run", async () => {
   assert.deepEqual(result, { ok: true })
   assert.equal(supabase.issues[0]?.has_unpublished_agent_changes, true)
 })
+
+test("keeps an active run writable during the worker heartbeat grace period", async () => {
+  const supabase = new FakeSupabase(
+    [issue({ id: "issue-1", active_run_id: runId1 })],
+    [
+      {
+        id: workerId,
+        user_id: "user-1",
+        banned_at: null,
+        last_seen_at: new Date(Date.now() - 2 * 60_000).toISOString(),
+      },
+    ]
+  )
+
+  const result = await recordIssueUnpublishedChanges(
+    supabase as never,
+    "user-1",
+    workerId,
+    "issue-1",
+    { active_run_id: runId1, has_unpublished_agent_changes: true }
+  )
+
+  assert.deepEqual(result, { ok: true })
+  assert.equal(supabase.issues[0]?.has_unpublished_agent_changes, true)
+})
