@@ -11,6 +11,7 @@ import {
   deleteWorker,
   exchangeWorkerEnrollmentCode,
   getWorker,
+  getWorkerControlState,
   hashWorkerSecret,
   listWorkers,
   markWorkerOffline,
@@ -755,10 +756,36 @@ test("running task count is derived from active issue assignments", async () => 
     workerRow({ id: "worker-2", configured_capacity: 1 })
   )
   supabase.db.issues.push(
-    { id: "issue-1", active_worker_id: "worker-1", status: "queued" },
-    { id: "issue-2", active_worker_id: "worker-1", status: "in-progress" },
-    { id: "issue-3", active_worker_id: "worker-1", status: "completed" },
-    { id: "issue-4", active_worker_id: "worker-2", status: "cancelled" }
+    {
+      id: "issue-1",
+      active_worker_id: "worker-1",
+      active_run_id: "run-1",
+      status: "queued",
+    },
+    {
+      id: "issue-2",
+      active_worker_id: "worker-1",
+      active_run_id: "run-2",
+      status: "in-progress",
+    },
+    {
+      id: "issue-3",
+      active_worker_id: "worker-1",
+      active_run_id: null,
+      status: "completed",
+    },
+    {
+      id: "issue-4",
+      active_worker_id: "worker-2",
+      active_run_id: null,
+      status: "cancelled",
+    },
+    {
+      id: "issue-5",
+      active_worker_id: "worker-1",
+      active_run_id: null,
+      status: "todo",
+    }
   )
 
   const worker = await getWorker(supabase as never, "user-1", "worker-1", {
@@ -767,6 +794,38 @@ test("running task count is derived from active issue assignments", async () => 
 
   assert.equal(worker.configured_capacity, 4)
   assert.equal(worker.running_task_count, 2)
+})
+
+test("worker control ignores orphaned assignments without an active run", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.issues.push(
+    issueRow({
+      id: "active",
+      active_worker_id: "worker-1",
+      active_run_id: "run-1",
+      status: "in-progress",
+    }),
+    issueRow({
+      id: "orphan",
+      active_worker_id: "worker-1",
+      active_run_id: null,
+      status: "todo",
+    })
+  )
+
+  assert.deepEqual(
+    await getWorkerControlState(supabase as never, "worker-1", false),
+    {
+      worker: { banned: false },
+      runs: [
+        {
+          issue_id: "active",
+          active_run_id: "run-1",
+          status: "in-progress",
+        },
+      ],
+    }
+  )
 })
 
 test("ban revokes access and atomically requeues active work", async () => {
