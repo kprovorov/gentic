@@ -305,3 +305,61 @@ describe("IssueDetailRail priority", () => {
     ).toBe("medium")
   })
 })
+
+describe("IssueDetailRail relations", () => {
+  it("shows each related issue's status icon", () => {
+    renderRail(createQueryClient(), {
+      relations: [
+        {
+          id: "relation-1",
+          source_issue_id: issueId,
+          target_issue_id: "22222222-2222-4222-8222-222222222222",
+          created_at: "2026-07-30T12:00:00.000Z",
+          type: "blocks",
+          source_issue: {
+            id: issueId,
+            number: 1,
+            title: "Current issue",
+            status: "todo",
+            projects: { key: "GEN" },
+          },
+          target_issue: {
+            id: "22222222-2222-4222-8222-222222222222",
+            number: 2,
+            title: "Completed dependency",
+            status: "completed",
+            projects: { key: "GEN" },
+          },
+        },
+        {
+          id: "relation-2",
+          source_issue_id: "33333333-3333-4333-8333-333333333333",
+          target_issue_id: issueId,
+          created_at: "2026-07-30T12:00:00.000Z",
+          type: "blocks",
+          source_issue: {
+            id: "33333333-3333-4333-8333-333333333333",
+            number: 3,
+            title: "Failing blocker",
+            status: "tests-failed",
+            projects: { key: "GEN" },
+          },
+          target_issue: {
+            id: issueId,
+            number: 1,
+            title: "Current issue",
+            status: "todo",
+            projects: { key: "GEN" },
+          },
+        },
+      ],
+    })
+
+    expect(screen.getByLabelText("Completed status")).toHaveClass(
+      "text-emerald-600"
+    )
+    expect(screen.getByLabelText("Tests failed status")).toHaveClass(
+      "text-red-600"
+    )
+  })
+})

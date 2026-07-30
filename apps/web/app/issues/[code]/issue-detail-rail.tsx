@@ -501,17 +501,18 @@ function IssueDetailRelationRow({
   issueId,
   relation,
   relatedIssue,
-  icon,
-  iconClassName,
 }: {
   issueId: string
   relation: IssueRelation
   relatedIssue: IssueRelationIssue
-  icon: typeof IconClock
-  iconClassName: string
 }) {
   const queryClient = useQueryClient()
   const relatedIssueHref = getIssueHref(relatedIssue) ?? "/issues"
+  const relatedIssueStatus = relatedIssue.status as IssueStatus
+  const StatusIcon = statusIcons[relatedIssueStatus] ?? IconCircleDashed
+  const statusIconClassName =
+    statusIconStyles[relatedIssueStatus] ?? "text-muted-foreground"
+  const statusLabel = statusLabels[relatedIssueStatus] ?? relatedIssue.status
   const mutation = useMutation({
     mutationFn: deleteIssueRelation,
     onSuccess: async () => {
@@ -528,11 +529,12 @@ function IssueDetailRelationRow({
     mutation.mutate(new FormData(event.currentTarget))
   }
 
-  const Icon = icon
-
   return (
     <li className="flex items-center gap-2 rounded-xl bg-background px-2.5 py-2 ring-1 ring-border">
-      <Icon className={cn("size-3.5 shrink-0", iconClassName)} />
+      <StatusIcon
+        aria-label={`${statusLabel} status`}
+        className={cn("size-3.5 shrink-0", statusIconClassName)}
+      />
       <Link
         href={relatedIssueHref}
         className="min-w-0 flex-1 truncate text-[12.5px] font-medium hover:text-primary"
@@ -865,8 +867,6 @@ function IssueDetailRelations({
             issueId={issueId}
             relation={relation}
             relatedIssue={relation.target_issue}
-            icon={IconClock}
-            iconClassName="text-blue-700 dark:text-blue-300"
           />
         ))}
       </IssueDetailRelationGroup>
@@ -881,8 +881,6 @@ function IssueDetailRelations({
             issueId={issueId}
             relation={relation}
             relatedIssue={relation.source_issue}
-            icon={IconCircleDashed}
-            iconClassName="text-muted-foreground"
           />
         ))}
       </IssueDetailRelationGroup>
