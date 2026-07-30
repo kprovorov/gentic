@@ -1,0 +1,131 @@
+---
+title: "Manage Connected Workers from Settings"
+sidebarTitle: "Connected Workers"
+description: "Enroll, monitor, rename, ban, unban, and delete Gentic agent worker machines from Settings → Workspace, and understand online, offline, setup-incomplete, and banned states."
+---
+
+The **Connected workers** card in **Settings → Workspace** lists every worker machine enrolled in your Gentic workspace, its live status, and the actions you can take on it. Each worker is a separate identity with its own credential — there is no shared API key. This page covers the owner-facing side; see [Agent Worker](/agent/overview) for how to install and run the worker CLI itself.
+
+<Note>
+  This is a new, alpha feature. If you had a worker running before connected
+  workers shipped, it authenticated with a shared `GENTIC_API_KEY` that no
+  longer works. See [Re-enrolling an existing
+  worker](#re-enrolling-an-existing-worker-after-upgrading) below.
+</Note>
+
+## Connect a worker
+
+<Steps>
+  <Step title="Open Settings → Workspace">
+    Scroll to the **Connected workers** card.
+  </Step>
+  <Step title="Click Connect worker">
+    Gentic generates a single-use enrollment code and shows the exact command to run:
+
+    ```bash
+    gentic worker connect <code>
+    ```
+
+    The code expires **10 minutes** after it's generated. Only one code can be active per workspace at a time — generating a new one (**New code**) immediately invalidates any previous unused code.
+  </Step>
+  <Step title="Run the command on the worker machine">
+    Paste the command into the terminal on the server or VM that will run the worker. See [Installation](/agent/installation) if `gentic` isn't installed yet.
+
+    The exchange is single-use: once the code is consumed, it can't be reused, and it returns a worker-specific credential that is never shown again in the UI. `gentic worker connect` saves the worker id, API URL, and credential to a local config file, and that identity is what makes the worker survive process restarts, service restarts, and reboots — reconnecting with a new code always creates a **new** worker entry rather than reclaiming an old one.
+  </Step>
+  <Step title="Finish onboarding on the worker machine">
+    `gentic worker connect` runs interactive onboarding automatically unless you pass `--no-onboard`. If onboarding is interrupted (Ctrl-C, a missing `gh`/agent CLI, and so on), rerun it without generating another code:
+
+    ```bash
+    gentic onboard
+    ```
+
+    Onboarding only reports the worker as **ready** once it confirms GitHub CLI and at least one agent CLI are installed and authenticated, and offers to start the background service (`gentic start`) as its last step.
+  </Step>
+</Steps>
+
+## Worker states
+
+Each worker shows one status badge:
+
+| State | Meaning |
+| --- | --- |
+| **Setup incomplete** | The enrollment code was exchanged, but the worker hasn't finished onboarding (`gentic onboard`) yet, so it can't claim work. |
+| **Online** | The worker has sent a heartbeat within the last 90 seconds. |
+| **Offline** | Setup is complete, but no heartbeat has arrived in the last 90 seconds (or ever). A worker also reports itself offline immediately on a graceful stop (`gentic stop`, Ctrl-C). |
+| **Banned** | An owner banned the worker. It can't claim new work and its heartbeats are rejected until unbanned. |
+
+A worker's Gentic version is shown next to its status: **Current**, **Update available**, or **Unsupported** (an unsupported worker cannot claim new issues — update it to the latest release).
+
+The card refreshes automatically every 15 seconds, so status changes (a worker going online, finishing onboarding, or going offline) generally appear without a manual reload.
+
+### Metrics per worker
+
+- **Running** — active task count out of the worker's configured concurrency (`MAX_CONCURRENT_ISSUES`).
+- **Last seen** — time since the last heartbeat.
+- **OS / arch**, **Uptime**, **Connected** — platform and process telemetry reported at enrollment and on every heartbeat.
+- **Claude Code** / **Codex** — each provider shows **Ready**, **Needs auth**, or **Missing**, plus the detected CLI version, so you can see at a glance which issue types a worker is eligible to claim.
+
+<Note>
+  Gentic only stores whether a provider is enabled, installed, authenticated, and its version. Any local model lists or provider metadata a worker reports are discarded before they reach the database — they never leave the worker process.
+</Note>
+
+## Rename a worker
+
+Click the pencil icon next to a worker's name, edit it inline, and press **Save**. Names must be unique (case-insensitively) within your workspace and up to 80 characters; a duplicate name is rejected before the request is sent.
+
+## Ban and unban a worker
+
+Use the **⋮** menu on a worker row to **Ban** it. Banning:
+
+- Immediately requeues any active, non-terminal tasks assigned to that worker back to `Todo` so another worker (or the same one, once unbanned) can pick them up.
+- Blocks the worker from claiming new work and rejects its heartbeats.
+- Does **not** delete the worker or its credential — **Unban** from the same menu fully restores it, and it starts claiming work again once it heartbeats.
+
+If the worker process is actively running a task when you ban it, that in-process run is aborted on the worker's side within about 10 seconds (the worker polls a control endpoint on that interval to check whether it's been banned).
+
+## Delete a worker
+
+Open the **⋮** menu and choose **Delete**. Deleting permanently revokes the worker's credential and requeues any active tasks, exactly like a ban, but it cannot be undone — there is no "undelete." To confirm, type the worker's exact current name into the dialog; the **Delete worker** button stays disabled until it matches.
+
+<Warning>
+  Deletion is immediate and irreversible. The worker's credential stops
+  working right away; to reconnect that machine, generate a new enrollment
+  code and run `gentic worker connect <code>` again — it enrolls as a new
+  worker.
+</Warning>
+
+## What happens if a worker goes silent
+
+If a worker's process crashes or loses network connectivity without a chance to report itself offline, Gentic doesn't wait forever:
+
+- After 90 seconds without a heartbeat, the worker shows **Offline** in Settings, but its active tasks are left alone in case it's a brief blip.
+- After **5 minutes** without a heartbeat, a background job fails any task still assigned to that worker (moving it to `Run failed`) so it doesn't stay stuck indefinitely. This does **not** automatically requeue the task to `Todo` — use the retry action on the issue to start a fresh run once you've confirmed the worker is healthy again.
+- If the original worker process reconnects later, it cannot resume the run that was already failed out from under it; the issue needs an explicit retry.
+
+## Re-enrolling an existing worker after upgrading
+
+Connected worker management replaces the old shared `GENTIC_API_KEY` authentication model. This is an **intentional, alpha-stage breaking change** — the Gentic API no longer accepts a shared key at all, and there is no automatic migration or backfill of a previously running worker into the new `workers` table. If you already had a worker running against this API before this feature shipped, it will start failing every poll (401 Unauthorized) as soon as the new web app and API are deployed, and it must be **manually** re-enrolled. No live credentials are changed automatically as part of this migration.
+
+<Steps>
+  <Step title="Update the worker code or binary">
+    Pull/upgrade the `gentic` CLI on the existing worker machine to a version that supports `gentic worker connect` (any version documented on this site). See [Installation](/agent/installation) for upgrade instructions for your install method (Homebrew, package, tarball, or source).
+  </Step>
+  <Step title="Remove the old shared key">
+    Delete the `GENTIC_API_KEY` environment variable (and any reference to it in your process manager, systemd unit, or `.env` file) — it is no longer read by the worker.
+  </Step>
+  <Step title="Generate a code and connect">
+    In **Settings → Workspace → Connected workers**, click **Connect worker**, then run the resulting command on that same machine:
+
+    ```bash
+    gentic worker connect <code>
+    ```
+
+    This enrolls the machine as a **new** worker with its own id and credential — it does not reuse or restore the identity your old shared-key setup had, because that identity never existed as a row in the `workers` table.
+  </Step>
+  <Step title="Finish setup and restart the service">
+    Run `gentic onboard` if it didn't run automatically, then `gentic start` (or `gentic restart` if a service unit already exists) to bring the worker back online under its new credential. Confirm it shows **Online** in Settings within about 15–90 seconds.
+  </Step>
+</Steps>
+
+Any issues that were stuck mid-run under the old key are unaffected by this migration — they simply resume being claimable once a worker is enrolled and online again, the same as any other `Todo`/`Held` issue.
