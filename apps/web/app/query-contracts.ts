@@ -26,6 +26,13 @@ export const homeIssueSchema = z.object({
   type: issueTypeSchema,
   priority: issuePrioritySchema,
   created_at: z.string(),
+  issue_pull_requests: z.array(
+    z.object({
+      id: z.string(),
+      url: z.string(),
+      created_at: z.string(),
+    })
+  ),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -81,6 +88,10 @@ export type HomeIssue = {
   type: IssueType
   priority: IssuePriority
   created_at: string
+  pullRequests: {
+    id: string
+    url: string
+  }[]
   projects: ProjectOption | null
 }
 
@@ -157,6 +168,9 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
     type: issue.type,
     priority: issue.priority,
     created_at: issue.created_at,
+    pullRequests: issue.issue_pull_requests
+      .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(({ id, url }) => ({ id, url })),
     projects: toProjectOption(issue.projects),
   }
 }

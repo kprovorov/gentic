@@ -22,6 +22,7 @@ import {
   IconFileDescription,
   IconFlask,
   IconGitMerge,
+  IconGitPullRequest,
   IconLock,
   IconMessage2,
   IconMessageQuestion,
@@ -217,6 +218,58 @@ export const blockingBadgeStyles = {
   blocked: "bg-red-500/15 text-red-700 dark:text-red-300",
   blocking: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 } as const
+
+function getPullRequestLabel(url: string) {
+  try {
+    const [, owner, repo, resource, number] = new URL(url).pathname.split("/")
+    if (owner && repo && resource === "pull" && number) {
+      return {
+        short: `PR #${number}`,
+        full: `${owner}/${repo}#${number}`,
+      }
+    }
+  } catch {
+    // Fall back to a generic label for malformed historical data.
+  }
+
+  return { short: "PR", full: "Pull request" }
+}
+
+export function PullRequestPills({
+  pullRequests,
+}: {
+  pullRequests: HomeIssue["pullRequests"]
+}) {
+  if (pullRequests.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      {pullRequests.map((pullRequest) => {
+        const label = getPullRequestLabel(pullRequest.url)
+
+        return (
+          <Tooltip key={pullRequest.id}>
+            <TooltipTrigger asChild>
+              <Link
+                href={pullRequest.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${label.full}`}
+                className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 text-xs font-medium text-emerald-700 transition-[color,box-shadow,background-color] hover:bg-emerald-500/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none dark:text-emerald-300"
+              >
+                <IconGitPullRequest className="size-3.5" />
+                <span className="whitespace-nowrap">{label.short}</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="top">{label.full}</TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </div>
+  )
+}
 
 export const issueTypeOptions: { value: IssueType; label: string }[] = [
   { value: "issue", label: issueTypeLabels.issue },
@@ -700,6 +753,14 @@ export function getIssuesColumns(
             <IconArrowBarToRight className="size-3.5" />
           </IssueIndicatorBadge>
         ) : null,
+    },
+    {
+      id: "pullRequests",
+      header: "Pull requests",
+      cell: ({ row }) => (
+        <PullRequestPills pullRequests={row.original.pullRequests} />
+      ),
+      enableSorting: false,
     },
     {
       accessorKey: "created_at",

@@ -178,7 +178,7 @@ export async function getHomeData(
   const { data: issues, error } = await supabase
     .from("issues")
     .select(
-      "id,title,status,type,priority,number,created_at,projects(id,name,repo,key)"
+      "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at),projects(id,name,repo,key)"
     )
     .order("created_at", { ascending: false })
 

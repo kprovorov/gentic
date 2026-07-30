@@ -58,6 +58,7 @@ function issue(
     type: "feature",
     priority: "medium",
     created_at: "2026-07-01T00:00:00.000Z",
+    pullRequests: [],
     projects: project,
     ...overrides,
   } satisfies HomeIssue
@@ -309,5 +310,45 @@ describe("IssuesView priority triage", () => {
     const menu = screen.getByRole("menu")
     expect(within(menu).getByRole("menuitem", { name: "Urgent" })).toBeVisible()
     expect(within(menu).getByRole("menuitem", { name: "Low" })).toBeVisible()
+  })
+})
+
+describe("IssuesView pull request links", () => {
+  it.each([
+    ["list", false],
+    ["table", true],
+  ] as const)("shows every pull request in %s view", (view, hasColumn) => {
+    renderIssuesView({
+      view,
+      data: baseData([
+        issue({
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Issue with pull requests",
+          pullRequests: [
+            {
+              id: "pull-request-1",
+              url: "https://github.com/acme/gentic/pull/41",
+            },
+            {
+              id: "pull-request-2",
+              url: "https://github.com/acme/gentic/pull/42",
+            },
+          ],
+        }),
+      ]),
+    })
+
+    expect(
+      screen.getByRole("link", { name: "Open acme/gentic#41" })
+    ).toHaveAttribute("href", "https://github.com/acme/gentic/pull/41")
+    expect(
+      screen.getByRole("link", { name: "Open acme/gentic#42" })
+    ).toHaveAttribute("href", "https://github.com/acme/gentic/pull/42")
+
+    if (hasColumn) {
+      expect(
+        screen.getByRole("columnheader", { name: "Pull requests" })
+      ).toBeInTheDocument()
+    }
   })
 })
