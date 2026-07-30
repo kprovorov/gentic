@@ -1,23 +1,61 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import {
-  fallbackIssueType,
-  issueClassificationSchema,
-} from "./type-parser"
+import { fallbackIssueType, issueMetadataSchema } from "./type-parser"
 
-test("issueClassificationSchema accepts feature or bug", () => {
+test("issueMetadataSchema accepts a title, feature or bug type, and priority", () => {
+  const parsed = issueMetadataSchema.parse({
+    title: "Add saved filters",
+    type: "feature",
+    priority: "high",
+  })
+
+  assert.equal(parsed.title, "Add saved filters")
+  assert.equal(parsed.type, "feature")
+  assert.equal(parsed.priority, "high")
+
   assert.equal(
-    issueClassificationSchema.parse({ type: "feature" }).type,
-    "feature"
+    issueMetadataSchema.parse({
+      title: "Fix crash on save",
+      type: "bug",
+      priority: "urgent",
+    }).type,
+    "bug"
   )
-  assert.equal(issueClassificationSchema.parse({ type: "bug" }).type, "bug")
 })
 
-test("issueClassificationSchema rejects placeholder and retired types", () => {
-  assert.throws(() => issueClassificationSchema.parse({ type: "issue" }))
-  assert.throws(() => issueClassificationSchema.parse({ type: "idea" }))
-  assert.throws(() => issueClassificationSchema.parse({ type: "feedback" }))
+test("issueMetadataSchema rejects placeholder and retired types", () => {
+  assert.throws(() =>
+    issueMetadataSchema.parse({
+      title: "Something",
+      type: "issue",
+      priority: "medium",
+    })
+  )
+  assert.throws(() =>
+    issueMetadataSchema.parse({
+      title: "Something",
+      type: "idea",
+      priority: "medium",
+    })
+  )
+  assert.throws(() =>
+    issueMetadataSchema.parse({
+      title: "Something",
+      type: "feedback",
+      priority: "medium",
+    })
+  )
+})
+
+test("issueMetadataSchema rejects invalid priority", () => {
+  assert.throws(() =>
+    issueMetadataSchema.parse({
+      title: "Something",
+      type: "bug",
+      priority: "critical",
+    })
+  )
 })
 
 test("fallbackIssueType never returns the issue placeholder", () => {

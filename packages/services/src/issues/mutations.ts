@@ -1,5 +1,6 @@
 import type {
   CreateIssueValues,
+  IssuePriority,
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
@@ -93,6 +94,22 @@ export async function setIssueType(
     await supabase
       .from("issues")
       .update({ type, updated_at: new Date().toISOString() })
+      .eq("id", issueId)
+  )
+}
+
+// Called from the background metadata-generation step after an issue is
+// saved with the default priority. Ownership has already been established by
+// the request that created the issue.
+export async function setIssuePriority(
+  supabase: Supabase,
+  issueId: string,
+  priority: IssuePriority
+) {
+  unwrap(
+    await supabase
+      .from("issues")
+      .update({ priority, updated_at: new Date().toISOString() })
       .eq("id", issueId)
   )
 }
