@@ -363,15 +363,17 @@ export function IssueCreateForm({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <AutomaticPrPreferenceField
-            key={prSettingsVersion}
-            defaultChecked={createPrAutomatically}
-            onCheckedChange={(checked) => {
-              setCreatePrAutomatically(checked)
-              persistSettings({ createPrAutomatically: checked })
-            }}
-          />
         </div>
+      }
+      belowField={
+        <AutomaticPrPreferenceField
+          key={prSettingsVersion}
+          defaultChecked={createPrAutomatically}
+          onCheckedChange={(checked) => {
+            setCreatePrAutomatically(checked)
+            persistSettings({ createPrAutomatically: checked })
+          }}
+        />
       }
       footerEnd={
         <SaveDraftButton

@@ -53,6 +53,7 @@ export function MessageComposer({
   modelPickerDisabled,
   footerStart,
   footerEnd,
+  belowField,
   submitButton,
 }: {
   formRef?: React.Ref<HTMLFormElement>
@@ -97,6 +98,7 @@ export function MessageComposer({
   modelPickerDisabled?: boolean
   footerStart?: React.ReactNode
   footerEnd?: React.ReactNode
+  belowField?: React.ReactNode
   submitButton?: React.ReactNode
 }) {
   const isSubmitDisabled =
@@ -110,51 +112,54 @@ export function MessageComposer({
       id={formId}
       onSubmit={onSubmit}
       onInvalidCapture={onInvalidCapture}
-      className={cn("flex min-w-0 items-end gap-2.5", className)}
+      className={cn("flex min-w-0 items-start gap-2.5", className)}
     >
       {children}
-      <div className="relative min-w-0 flex-1">
-        {slashCommands.length > 0 ? (
-          <SlashCommandMenu
-            commands={slashCommands}
-            selectedIndex={selectedSlashCommandIndex}
-            onSelect={(command) => onSelectSlashCommand?.(command)}
+      <div className="min-w-0 flex-1">
+        <div className="relative min-w-0">
+          {slashCommands.length > 0 ? (
+            <SlashCommandMenu
+              commands={slashCommands}
+              selectedIndex={selectedSlashCommandIndex}
+              onSelect={(command) => onSelectSlashCommand?.(command)}
+            />
+          ) : null}
+          <AttachmentPromptField
+            id={id}
+            name={name}
+            value={draft}
+            onChange={onDraftChange}
+            files={draftFiles}
+            onFilesChange={onFilesChange}
+            onKeyDown={onKeyDown}
+            rows={rows}
+            placeholder={placeholder}
+            required={required}
+            disabled={disabled}
+            className={cn("min-w-0", fieldClassName)}
+            textareaClassName={cn("min-h-16 resize-none", textareaClassName)}
+            footerStart={
+              <>
+                <AgentProviderPicker
+                  agentProvider={agentProvider}
+                  hasMessages={hasMessages}
+                  disabled={disabled || agentPickerDisabled}
+                  onAgentProviderChange={onAgentProviderChange}
+                />
+                <AgentModelPicker
+                  agentProvider={agentProvider}
+                  issueModel={issueModel}
+                  hasMessages={hasMessages}
+                  disabled={disabled || modelPickerDisabled}
+                  onIssueModelChange={onIssueModelChange}
+                />
+                {footerStart}
+              </>
+            }
+            footerEnd={footerEnd}
           />
-        ) : null}
-        <AttachmentPromptField
-          id={id}
-          name={name}
-          value={draft}
-          onChange={onDraftChange}
-          files={draftFiles}
-          onFilesChange={onFilesChange}
-          onKeyDown={onKeyDown}
-          rows={rows}
-          placeholder={placeholder}
-          required={required}
-          disabled={disabled}
-          className={cn("min-w-0", fieldClassName)}
-          textareaClassName={cn("min-h-16 resize-none", textareaClassName)}
-          footerStart={
-            <>
-              <AgentProviderPicker
-                agentProvider={agentProvider}
-                hasMessages={hasMessages}
-                disabled={disabled || agentPickerDisabled}
-                onAgentProviderChange={onAgentProviderChange}
-              />
-              <AgentModelPicker
-                agentProvider={agentProvider}
-                issueModel={issueModel}
-                hasMessages={hasMessages}
-                disabled={disabled || modelPickerDisabled}
-                onIssueModelChange={onIssueModelChange}
-              />
-              {footerStart}
-            </>
-          }
-          footerEnd={footerEnd}
-        />
+        </div>
+        {belowField ? <div className="mt-2">{belowField}</div> : null}
       </div>
       {submitButton ?? (
         <Button
