@@ -34,6 +34,7 @@ test("consumes persisted prompts in order, dedupes in-flight fetches, and acks p
 
     const prompts: PromptTurn[] = []
     deps.runAgentSession = async (input) => {
+      assert.equal(input.activeRunId, issue.activeRunId)
       await input.onSessionId("session-1")
       prompts.push(await consumePrompt(input))
 

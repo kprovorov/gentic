@@ -165,12 +165,12 @@ test("runTurn maps text and thought chunks to structured stable events", async (
     },
   ])
 
-  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+  await runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt")
 
   assert.equal(api.inserted.length, 2)
   assert.equal(api.inserted[0]?.message.event_type, "text")
   assert.equal(api.inserted[0]?.message.event_id, "m1")
-  assert.equal(api.inserted[0]?.message.run_id, "session-1")
+  assert.equal(api.inserted[0]?.message.run_id, RUN_ID)
   assert.match(api.inserted[0]?.message.event_ts ?? "", ISO_DATE)
   assert.equal(api.inserted[1]?.message.event_type, "thought")
   assert.equal(api.inserted[1]?.message.event_id, "t1")
@@ -206,7 +206,7 @@ test("runTurn updates tool calls through real statuses with one stable id", asyn
     },
   ])
 
-  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+  await runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt")
 
   assert.equal(api.inserted.length, 3)
   assert.deepEqual(
@@ -244,7 +244,7 @@ test("runTurn surfaces terminal output from tool_call_update _meta", async () =>
     },
   ])
 
-  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+  await runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt")
 
   const last = api.inserted.at(-1)?.message
   assert.equal(last?.status, "error")
@@ -280,7 +280,7 @@ test("runTurn renders plan lifecycle events incrementally", async () => {
     },
   ])
 
-  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+  await runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt")
 
   assert.equal(api.inserted.length, 3)
   assert.deepEqual(
@@ -317,7 +317,7 @@ test("runTurn renders mode changes and available command updates", async () => {
     },
   ])
 
-  await runTurn(session as never, api, ISSUE_ID, channel, "prompt")
+  await runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt")
 
   assert.equal(api.inserted.length, 2)
   assert.equal(api.inserted[0]?.message.kind, "mode")
@@ -359,6 +359,7 @@ test("replayed ACP events use stable ids for dedupe", async () => {
     fakeSession(updates) as never,
     firstApi,
     ISSUE_ID,
+    RUN_ID,
     fakeChannel(),
     "prompt"
   )
@@ -366,6 +367,7 @@ test("replayed ACP events use stable ids for dedupe", async () => {
     fakeSession(updates) as never,
     secondApi,
     ISSUE_ID,
+    RUN_ID,
     fakeChannel(),
     "prompt"
   )
@@ -400,7 +402,7 @@ test("run error path best-effort persists the current partial", async () => {
   }
 
   await assert.rejects(
-    () => runTurn(session as never, api, ISSUE_ID, channel, "prompt"),
+    () => runTurn(session as never, api, ISSUE_ID, RUN_ID, channel, "prompt"),
     /agent crashed/
   )
 
