@@ -390,7 +390,7 @@ function manualPrIssue(overrides: Row = {}) {
     number: 12,
     title: "Publish this work",
     status: "ready-for-review",
-    active_run_id: "run-1",
+    active_run_id: null,
     has_unpublished_agent_changes: true,
     pr_url: null,
     projects: { key: "GEN", user_id: "user-1" },

@@ -64,7 +64,7 @@ export async function createManualFirstPrPublishMessage(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id, number, title, status, active_run_id, has_unpublished_agent_changes, pr_url, projects!inner(key)"
+      "id, number, title, status, has_unpublished_agent_changes, pr_url, projects!inner(key)"
     )
     .eq("id", issueId)
     .maybeSingle()
@@ -77,9 +77,6 @@ export async function createManualFirstPrPublishMessage(
   }
   if (!manualCreatePrFinishedStatuses.has(issue.status)) {
     throw new ServiceError("validation", "Agent is not idle after finishing")
-  }
-  if (!issue.active_run_id) {
-    throw new ServiceError("validation", "Issue has no finished agent run")
   }
   if (!issue.has_unpublished_agent_changes) {
     throw new ServiceError(
@@ -102,12 +99,16 @@ export async function createManualFirstPrPublishMessage(
     throw new ServiceError("validation", "Issue already has a pull request")
   }
 
+  // The run that requested this is already finished by the time a manual
+  // create-PR click reaches here (`finish_issue_run_if_no_pending` clears
+  // `active_run_id` in the same update that lands a finished status), so
+  // there is no current run id left to scope this by — check across all
+  // runs for the issue instead.
   const automaticRequests = unwrap(
     await supabase
       .from("issue_automatic_pr_requests")
       .select("id")
       .eq("issue_id", issueId)
-      .eq("run_id", issue.active_run_id)
       .in("status", ["pending", "claimed"])
       .limit(1)
   )
