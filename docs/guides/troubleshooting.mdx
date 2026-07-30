@@ -226,6 +226,19 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   </Warning>
 </Accordion>
 
+<Accordion title="Worker suddenly gets 401 Unauthorized / GENTIC_API_KEY no longer works">
+  Connected worker management replaced the old shared `GENTIC_API_KEY` bearer token with a worker-specific credential (`GENTIC_WORKER_CREDENTIAL`) issued per machine. This is an intentional, alpha-stage breaking change — the API no longer accepts the old shared key at all, and there is no automatic migration of a previously running worker into a connected-worker identity.
+
+  **If a worker that used to work now fails every poll with 401:**
+
+  1. Upgrade the `gentic` CLI on that machine to a version that supports `gentic worker connect` (see [Installation](/agent/installation)).
+  2. Remove `GENTIC_API_KEY` from its environment — it is no longer read.
+  3. In **Settings → Workspace → Connected workers**, click **Connect worker** to generate a code, then run `gentic worker connect <code>` on that machine.
+  4. Run `gentic onboard` if setup didn't finish automatically, then `gentic start` (or `gentic restart`).
+
+  This enrolls the machine as a new worker — no live credentials are changed automatically, and no prior worker identity is carried over. See [Connected Workers → Re-enrolling an existing worker](/web/connected-workers#re-enrolling-an-existing-worker-after-upgrading) for the full walkthrough.
+</Accordion>
+
 <Accordion title="Issue re-queues itself unexpectedly">
   If a completed, run-failed, or cancelled issue moves back to `todo` without you explicitly triggering it, a message was sent to the issue — either by you, a team member, or an automation.
 

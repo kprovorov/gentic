@@ -22,7 +22,9 @@ When you change an issue's status from **Draft** to **Todo**, Gentic records you
 
 ### The agent worker polls for queued issues
 
-Your deployed agent worker runs as a background process on a server you control. It polls the Gentic API on a fixed interval — **3,000 ms by default**, configurable via `POLL_INTERVAL_MS`. On each tick, it calls the API with your `GENTIC_WORKER_CREDENTIAL`, which the API uses to identify your account and return only issues that belong to your projects.
+Your deployed agent worker runs as a background process on a server you control. It polls the Gentic API on a fixed interval — **3,000 ms by default**, configurable via `POLL_INTERVAL_MS`. On each tick, it calls the API with its own worker-specific `GENTIC_WORKER_CREDENTIAL` (obtained once via `gentic worker connect <code>`), which the API uses to identify your account and return only issues that belong to your projects and match a provider the worker has installed and authenticated.
+
+Alongside polling, the worker sends a heartbeat every 30 seconds and checks a lightweight control endpoint every 10 seconds. The web app's **Settings → Workspace → Connected workers** card uses those heartbeats to show each worker as online, offline, setup-incomplete, or banned, and refreshes every 15 seconds — see [Connected Workers](/web/connected-workers) for the full state machine and what happens if a worker goes silent or is banned mid-task.
 
 <Note>
   The worker is an outbound-only polling process. It never exposes a port or accepts inbound connections. Keep it running on a private server or VM with access to your GitHub repositories — do not expose it as a public web service.
@@ -100,5 +102,8 @@ Every issue carries a single `status` field. The most common values are summaris
   </Card>
   <Card title="Agent Worker Setup" icon="server" href="/agent/overview">
     Deploy, configure, and manage the background worker process.
+  </Card>
+  <Card title="Connected Workers" icon="plug" href="/web/connected-workers">
+    Enroll, monitor, and manage worker machines from Settings.
   </Card>
 </CardGroup>
