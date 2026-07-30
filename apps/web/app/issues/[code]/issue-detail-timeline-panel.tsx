@@ -96,7 +96,7 @@ export function IssueDetailTimelinePanel({
         {chat.liveMessage}
       </div>
 
-      <MessageScrollerProvider>
+      <MessageScrollerProvider autoScroll>
         <ScrollToSubmittedMessage
           messageCount={chat.displayedMessages.length}
           sendTick={chat.sendTick}
