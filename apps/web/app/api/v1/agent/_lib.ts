@@ -1,9 +1,6 @@
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
-import {
-  WORKER_OFFLINE_AFTER_MS,
-  authenticateWorkerCredential,
-} from "@gentic/services/workers"
+import { authenticateWorkerCredential } from "@gentic/services/workers"
 import { createServiceClient } from "@gentic/supabase/service"
 import {
   ackMessagesInputSchema,
@@ -87,31 +84,9 @@ export async function ensureActiveWorkerRun(
     throw new ApiError(409, "Run is not active for this worker")
   }
 
-  const { data: worker, error: workerError } = await supabase
-    .from("workers")
-    .select("id,banned_at,last_seen_at")
-    .eq("id", workerId)
-    .eq("user_id", userId)
-    .maybeSingle()
-    .returns<{
-      id: string
-      banned_at: string | null
-      last_seen_at: string | null
-    } | null>()
-
-  if (workerError) {
-    throw new Error(workerError.message)
-  }
-  if (!worker || worker.banned_at || !isWorkerOnline(worker.last_seen_at)) {
-    throw new ApiError(409, "Run is not active for this worker")
-  }
-}
-
-function isWorkerOnline(lastSeenAt: string | null): boolean {
-  if (!lastSeenAt) {
-    return false
-  }
-  return Date.now() - new Date(lastSeenAt).getTime() <= WORKER_OFFLINE_AFTER_MS
+  // `last_seen_at` only drives the 90-second connected-worker display state.
+  // The issue lease remains authoritative during the five-minute heartbeat
+  // grace period; reconciliation clears it when the worker is truly stale.
 }
 
 export async function getAgentContext(request: Request): Promise<{
