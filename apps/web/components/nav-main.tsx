@@ -13,6 +13,8 @@ import {
   useSidebar,
 } from "@gentic/ui/sidebar"
 
+import { useNewIssueDialog } from "./new-issue-dialog-provider"
+
 export function NavMain({
   items,
 }: {
@@ -20,6 +22,7 @@ export function NavMain({
 }) {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
+  const { openDialog } = useNewIssueDialog()
 
   return (
     <SidebarGroup>
@@ -27,14 +30,15 @@ export function NavMain({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              asChild
               tooltip="New issue"
               className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+              onClick={() => {
+                setOpenMobile(false)
+                openDialog()
+              }}
             >
-              <Link href="/issues/new" onClick={() => setOpenMobile(false)}>
-                <IconCirclePlusFilled />
-                <span>New issue</span>
-              </Link>
+              <IconCirclePlusFilled />
+              <span>New issue</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HomeIssue, IssuesData } from "@/app/queries"
+import { NewIssueDialog } from "@/components/new-issue-dialog"
+import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssuesView } from "./issues-view"
@@ -32,6 +34,8 @@ vi.mock("./actions", () => ({
   bulkUpdateIssueStatus: vi.fn().mockResolvedValue(undefined),
   updateIssuePriority: vi.fn().mockResolvedValue(undefined),
   updateIssueStatus: vi.fn().mockResolvedValue(undefined),
+  runIssue: vi.fn().mockResolvedValue(undefined),
+  saveIssueDraft: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("sonner", () => ({
@@ -85,7 +89,10 @@ function renderIssuesView({
     ...render(
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <IssuesView initialData={data} />
+          <NewIssueDialogProvider>
+            <IssuesView initialData={data} />
+            <NewIssueDialog />
+          </NewIssueDialogProvider>
         </TooltipProvider>
       </QueryClientProvider>
     ),
@@ -350,5 +357,56 @@ describe("IssuesView pull request links", () => {
         screen.getByRole("columnheader", { name: "Pull requests" })
       ).toBeInTheDocument()
     }
+  })
+})
+
+class TestResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+describe("IssuesView new issue dialog", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    searchParams = new URLSearchParams()
+    vi.stubGlobal("ResizeObserver", TestResizeObserver)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            projects: [project],
+            defaultAgentProvider: "claude_code",
+          }),
+      })
+    )
+  })
+
+  it("opens a shadcn dialog instead of navigating to /issues/new", async () => {
+    const { user } = renderIssuesView({
+      data: baseData([issue({ id: "1", title: "Existing issue" })]),
+    })
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "New issue" }))
+
+    const dialog = await screen.findByRole("dialog")
+    expect(
+      within(dialog).getByRole("heading", { name: "New issue" })
+    ).toBeVisible()
+    expect(
+      await within(dialog).findByPlaceholderText(
+        "Describe what you want built, fixed, or investigated."
+      )
+    ).toBeVisible()
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    )
   })
 })
