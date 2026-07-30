@@ -21,6 +21,7 @@ export {
   bulkDeleteIssues,
   createIssue,
   deleteIssue,
+  setIssuePriority,
   setIssueTitle,
   setIssueType,
   startIssueFromDraft,

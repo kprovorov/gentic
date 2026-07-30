@@ -11,6 +11,7 @@ import {
   addIssueRelationSchema,
   agentProviderSchema,
   createIssueSchema,
+  defaultIssuePriority,
   deleteIssueRelationSchema,
   isIssueModelForAgent,
   issueModelSchema,
@@ -38,8 +39,7 @@ import {
   parseCreateIssueFormData,
   parseUpdateIssueFormData,
 } from "./form-values"
-import { generateIssueTitle } from "./title"
-import { generateIssueType } from "./type"
+import { generateIssueMetadata } from "./metadata"
 import { fallbackIssueType } from "./type-parser"
 import { getIssueHref } from "./urls"
 
@@ -71,13 +71,13 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   const fields = parseCreateIssueFormData(formData)
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
 
-  // Save the issue with no title and the placeholder "issue" type right away
-  // rather than blocking on the AI Gateway calls — title and final type are
-  // generated after
-  // the response is sent (via `after`), so they still complete even if the
-  // user closes the tab, and the service-role client is used since there's
-  // no request-scoped session by then. `issues` is realtime-enabled, so both
-  // fields fill in live for anyone still on the page.
+  // Save the issue with no title, the placeholder "issue" type, and the
+  // default priority right away rather than blocking on the AI Gateway call —
+  // the real title, type, and priority are generated after the response is
+  // sent (via `after`), so they still complete even if the user closes the
+  // tab, and the service-role client is used since there's no request-scoped
+  // session by then. `issues` is realtime-enabled, so all three fields fill
+  // in live for anyone still on the page.
   const created = await issuesService.createIssue(
     supabase,
     userId,
@@ -126,19 +126,19 @@ async function createIssue(status: IssueStatus, formData: FormData) {
   after(async () => {
     const serviceClient = createServiceClient()
 
-    const [title, type] = await Promise.all([
-      generateIssueTitle(fields.prompt).catch((error) => {
-        console.error(
-          `Failed to generate title for issue ${created.id}:`,
-          error
-        )
-        return formatGeneratedIssueTitle(fields.prompt)
-      }),
-      generateIssueType(fields.prompt).catch((error) => {
-        console.error(`Failed to generate type for issue ${created.id}:`, error)
-        return fallbackIssueType(fields.prompt)
-      }),
-    ])
+    const { title, type, priority } = await generateIssueMetadata(
+      fields.prompt
+    ).catch((error) => {
+      console.error(
+        `Failed to generate metadata for issue ${created.id}:`,
+        error
+      )
+      return {
+        title: formatGeneratedIssueTitle(fields.prompt),
+        type: fallbackIssueType(fields.prompt),
+        priority: defaultIssuePriority,
+      }
+    })
 
     await Promise.all([
       issuesService.setIssueTitle(serviceClient, created.id, title),
@@ -147,6 +147,14 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         .catch((error) => {
           console.error(
             `Failed to persist type for issue ${created.id}:`,
+            error
+          )
+        }),
+      issuesService
+        .setIssuePriority(serviceClient, created.id, priority)
+        .catch((error) => {
+          console.error(
+            `Failed to persist priority for issue ${created.id}:`,
             error
           )
         }),
