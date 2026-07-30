@@ -26,7 +26,18 @@ const issueRow = {
   has_unpublished_agent_changes: false,
   pr_url: null,
   create_pr_automatically: true,
-  issue_pull_requests: [],
+  issue_pull_requests: [
+    {
+      id: "pull-request-1",
+      url: "https://github.com/acme/gentic/pull/41",
+      created_at: "2026-07-29T12:01:00.000Z",
+    },
+    {
+      id: "pull-request-2",
+      url: "https://github.com/acme/gentic/pull/42",
+      created_at: "2026-07-29T12:02:00.000Z",
+    },
+  ],
   created_at: "2026-07-29T12:00:00.000Z",
   updated_at: "2026-07-29T12:05:00.000Z",
   projects: {
@@ -42,6 +53,16 @@ test("home issue query contract parses and maps priority", () => {
 
   assert.equal(issue.priority, "urgent")
   assert.equal(issue.code, "GEN-7")
+  assert.deepEqual(issue.pullRequests, [
+    {
+      id: "pull-request-2",
+      url: "https://github.com/acme/gentic/pull/42",
+    },
+    {
+      id: "pull-request-1",
+      url: "https://github.com/acme/gentic/pull/41",
+    },
+  ])
 })
 
 test("detail issue query contract parses and maps priority", () => {
@@ -52,7 +73,9 @@ test("detail issue query contract parses and maps priority", () => {
 })
 
 test("edit issue query contract parses and maps priority", () => {
-  const issue = toIssueEdit(issueEditSchema.parse(issueRow))
+  const issue = toIssueEdit(
+    issueEditSchema.parse({ ...issueRow, issue_pull_requests: [] })
+  )
 
   assert.equal(issue.priority, "urgent")
   assert.equal(issue.create_pr_automatically, true)
@@ -71,7 +94,13 @@ test("edit issue query contract marks attached pull requests as historical", () 
     issueEditSchema.parse({
       ...issueRow,
       pr_url: null,
-      issue_pull_requests: [{ id: "pull-request-1" }],
+      issue_pull_requests: [
+        {
+          id: "pull-request-1",
+          url: "https://github.com/acme/gentic/pull/1",
+          created_at: "2026-07-29T12:01:00.000Z",
+        },
+      ],
     })
   )
 

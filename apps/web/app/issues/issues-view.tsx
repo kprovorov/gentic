@@ -59,6 +59,7 @@ import {
   getIssuesColumns,
   IssuePriorityMenu,
   IssueStatusMenu,
+  PullRequestPills,
   issueTypeIcons,
   issueTypeLabels,
   issueTypeOptions,
@@ -278,6 +279,7 @@ function IssueRow({
             <IconArrowBarToRight className="size-3.5" />
           </IssueIndicatorBadge>
         ) : null}
+        <PullRequestPills pullRequests={issue.pullRequests} />
       </div>
       <div className="col-start-2 min-w-0 md:col-start-auto">
         <IssuePriorityMenu issue={issue} showLabel />
