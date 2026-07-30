@@ -367,6 +367,7 @@ export async function processIssue(
     await deps.runAgentSession({
       api,
       issueId: issue.id,
+      activeRunId: issue.activeRunId,
       channel,
       agentProvider: issue.agentProvider,
       issueModel: issue.issueModel,

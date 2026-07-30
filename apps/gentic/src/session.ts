@@ -85,6 +85,8 @@ export interface PromptDelivery {
 export interface RunSessionInput {
   api: AgentApi
   issueId: string
+  /** Claimed issue-run id used to attribute every durable transcript event. */
+  activeRunId: string
   channel: IssueRealtimeChannel
   agentProvider: AgentProvider
   issueModel: IssueModel
@@ -169,6 +171,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
           session,
           input.api,
           input.issueId,
+          input.activeRunId,
           input.channel,
           prompt,
           input.signal
@@ -317,13 +320,14 @@ export async function runTurn(
   session: ActiveSession,
   api: AgentApi,
   issueId: string,
+  activeRunId: string,
   channel: IssueRealtimeChannel,
   prompt: PromptTurn,
   signal?: AbortSignal
 ): Promise<void> {
   throwIfAborted(signal)
   const promptDone = session.prompt(prompt)
-  const runId = session.sessionId
+  const runId = activeRunId
 
   let current: StreamingAssistantMessage | null = null
   let currentKind: "text" | "thinking" | null = null
