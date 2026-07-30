@@ -30,6 +30,7 @@ import { fetchIssuesData } from "@/app/client-queries"
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
+import { useNewIssueDialog } from "@/components/new-issue-dialog-provider"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
@@ -401,6 +402,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { openDialog: openNewIssueDialog } = useNewIssueDialog()
   const view: IssuesViewMode =
     searchParams.get("view") === "table" ? "table" : "list"
   const { data } = useQuery({
@@ -706,11 +708,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
               Track agent work, blockers, and recent project activity.
             </p>
           </div>
-          <Button asChild>
-            <Link href="/issues/new">
-              <IconPlus />
-              New issue
-            </Link>
+          <Button onClick={openNewIssueDialog}>
+            <IconPlus />
+            New issue
           </Button>
         </header>
 
@@ -722,11 +722,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 Create an issue and attach it to one of your projects.
               </p>
             </div>
-            <Button asChild variant="outline">
-              <Link href="/issues/new">
-                <IconPlus />
-                Create issue
-              </Link>
+            <Button variant="outline" onClick={openNewIssueDialog}>
+              <IconPlus />
+              Create issue
             </Button>
           </section>
         ) : (

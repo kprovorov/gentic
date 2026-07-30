@@ -5,8 +5,9 @@ import { ClerkProvider, Show } from "@clerk/nextjs"
 import "./globals.css"
 import { Providers } from "./providers"
 import { AppSidebar } from "@/components/app-sidebar"
+import { NewIssueDialog } from "@/components/new-issue-dialog"
+import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { PublicHeader } from "@/components/public-header"
-import { RealtimeRouteRefreshBoundary } from "@/components/realtime-route-refresh-boundary"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@gentic/ui/sidebar"
 import { ThemeProvider } from "@gentic/ui/theme-provider"
@@ -50,10 +51,8 @@ const fontMono = Geist_Mono({
 
 export default function RootLayout({
   children,
-  modal,
 }: Readonly<{
   children: React.ReactNode
-  modal: React.ReactNode
 }>) {
   return (
     <ClerkProvider>
@@ -72,18 +71,18 @@ export default function RootLayout({
           <ThemeProvider>
             <TooltipProvider>
               <Providers>
-                <RealtimeRouteRefreshBoundary>
-                  <Show when="signed-in">
+                <Show when="signed-in">
+                  <NewIssueDialogProvider>
                     <SidebarProvider>
                       <AppSidebar variant="inset" />
                       <SidebarInset>
                         <SiteHeader />
                         {children}
                       </SidebarInset>
-                      {modal}
                     </SidebarProvider>
-                  </Show>
-                </RealtimeRouteRefreshBoundary>
+                    <NewIssueDialog />
+                  </NewIssueDialogProvider>
+                </Show>
                 <Show when="signed-out">
                   <PublicHeader />
                   {children}

@@ -12,6 +12,7 @@
     "./checkbox": "./src/ui/checkbox.tsx",
     "./collapsible": "./src/ui/collapsible.tsx",
     "./data-table": "./src/ui/data-table.tsx",
+    "./dialog": "./src/ui/dialog.tsx",
     "./dropdown-menu": "./src/ui/dropdown-menu.tsx",
     "./form": "./src/ui/form.tsx",
     "./input": "./src/ui/input.tsx",

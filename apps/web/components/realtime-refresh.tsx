@@ -9,10 +9,10 @@ import { useSupabaseClient } from "@gentic/supabase/client"
 import {
   getRealtimeRefreshMode,
   realtimeFallbackRefreshMs,
+  shouldDeferRouteRefresh,
   shouldUseRealtimeFallback,
   type RealtimeSubscribeStatus,
 } from "./realtime-refresh-mode"
-import { useShouldDeferRealtimeRouteRefresh } from "./realtime-route-refresh-boundary"
 
 /**
  * Subscribes to Postgres changes on the given tables (already scoped by RLS
@@ -33,7 +33,7 @@ export function RealtimeRefresh({
   const router = useRouter()
   const pathname = usePathname()
   const queryClient = useQueryClient()
-  const shouldDeferRefresh = useShouldDeferRealtimeRouteRefresh(pathname)
+  const shouldDeferRefresh = shouldDeferRouteRefresh(pathname)
   const tableKey = tables.join(",")
   // queryKey is often built inline (e.g. queryKeys.issue(id)), which produces
   // a new array reference every render. Read the latest value through a ref
