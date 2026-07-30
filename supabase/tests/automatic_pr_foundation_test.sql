@@ -169,8 +169,11 @@ SELECT throws_ok(
   'invalid generated action metadata is rejected'
 );
 
+-- An automatic PR is requested mid-run, so the issue has to be in a live run
+-- status to hold a run lease at all.
 UPDATE public.issues
    SET create_pr_automatically = true,
+       status = 'in-progress',
        active_run_id = '40000000-0000-4000-8000-000000000101'
  WHERE id = '20000000-0000-4000-8000-000000000101';
 

@@ -86,6 +86,10 @@ export async function PATCH(
       return json({ finished: data ?? false, status })
     }
 
+    // Statuses that end a run (`run-failed`, `held`) are written here like any
+    // other field. The `issues_release_run_lease` trigger clears
+    // `active_run_id`/`active_worker_id` for them, so a dead run stops counting
+    // against the worker's capacity and the issue stays re-claimable.
     const fields = runStateSchema.parse(body)
     await ensureActiveWorkerRun(
       supabase,
