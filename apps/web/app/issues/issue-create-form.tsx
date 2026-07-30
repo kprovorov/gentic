@@ -21,7 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
-import { cn } from "@gentic/ui/utils"
 import {
   defaultIssuePriority,
   type AgentProvider,
@@ -33,7 +32,6 @@ import {
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
-  issuePriorityStyles,
 } from "./issue-priority-meta"
 import { MessageComposer } from "./message-composer/message-composer"
 
@@ -213,10 +211,7 @@ export function IssueCreateForm({
               <button
                 type="button"
                 aria-labelledby={priorityLabelId}
-                className={cn(
-                  "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-                  issuePriorityStyles[priority]
-                )}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted"
               >
                 <PriorityIcon className="size-3.5" />
                 <span>{issuePriorityLabels[priority]}</span>
