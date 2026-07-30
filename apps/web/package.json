@@ -22,6 +22,7 @@
     "@gentic/validators": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
     "@modelcontextprotocol/sdk": "1.26.0",
+    "@pierre/diffs": "^1.2.12",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-devtools": "^5.101.2",

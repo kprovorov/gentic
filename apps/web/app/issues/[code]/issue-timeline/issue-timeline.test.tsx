@@ -317,6 +317,38 @@ describe("IssueTimeline", () => {
     expect(screen.getByText("Editing file B")).toBeVisible()
   })
 
+  it("renders a diff-shaped tool call with the diff viewer, not raw text", async () => {
+    const user = userEvent.setup()
+    render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "tool-diff",
+            kind: "tool",
+            content: "Completed: Edit file\nDiff: src/index.ts",
+            payload: {
+              content: [
+                {
+                  type: "diff",
+                  path: "src/index.ts",
+                  oldText: "const a = 1\n",
+                  newText: "const a = 2\n",
+                },
+              ],
+            },
+          }),
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+      />
+    )
+
+    await user.click(screen.getByRole("button", { name: "Completed: Edit file" }))
+    expect(screen.getAllByText("Completed: Edit file")[1]).toBeVisible()
+    expect(screen.queryByText("Diff: src/index.ts")).not.toBeInTheDocument()
+    expect(document.querySelector("diffs-container")).not.toBeNull()
+  })
+
   it("renders thinking as a collapsible block, collapsed by default", async () => {
     const user = userEvent.setup()
     render(
