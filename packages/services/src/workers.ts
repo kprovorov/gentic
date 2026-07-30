@@ -140,6 +140,10 @@ export type WorkerControlState = {
   }>
 }
 
+export type RenameWorkerInput = {
+  display_name: string
+}
+
 export async function listWorkers(
   supabase: Supabase,
   userId: string,
@@ -422,7 +426,7 @@ export async function recordWorkerHeartbeat(
         telemetry.provider_capabilities
       ),
     },
-    options
+    { ...options, requireUnbanned: true }
   )
 }
 
@@ -443,8 +447,88 @@ export async function markWorkerOffline(
       last_seen_at: null,
       offline_since_at: (options.now ?? new Date()).toISOString(),
     },
+    { ...options, requireUnbanned: true }
+  )
+}
+
+export async function renameWorker(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  input: RenameWorkerInput,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  } = {}
+): Promise<WorkerDomain> {
+  const displayName = parseWorkerName(input.display_name)
+  const { data, error } = await supabase
+    .rpc("rename_worker", {
+      p_user_id: userId,
+      p_worker_id: workerId,
+      p_display_name: displayName,
+      p_now: (options.now ?? new Date()).toISOString(),
+    })
+    .maybeSingle()
+    .returns<WorkerRow | null>()
+
+  const row = unwrapWorkerLifecycleRpc(data, error)
+  const counts = await listRunningTaskCounts(supabase, [workerId])
+  return toWorkerDomain(row, counts.get(workerId) ?? 0, options)
+}
+
+export async function banWorker(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  } = {}
+): Promise<WorkerDomain> {
+  return runWorkerLifecycleRpc(supabase, "ban_worker", userId, workerId, options)
+}
+
+export async function unbanWorker(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  } = {}
+): Promise<WorkerDomain> {
+  return runWorkerLifecycleRpc(
+    supabase,
+    "unban_worker",
+    userId,
+    workerId,
     options
   )
+}
+
+export async function deleteWorker(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  options: {
+    now?: Date
+  } = {}
+): Promise<void> {
+  const { data, error } = await supabase
+    .rpc("delete_worker", {
+      p_user_id: userId,
+      p_worker_id: workerId,
+      p_now: (options.now ?? new Date()).toISOString(),
+    })
+    .single<boolean>()
+
+  if (error) {
+    throwWorkerLifecycleRpcError(error)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Worker not found")
+  }
 }
 
 export async function getWorkerControlState(
@@ -485,6 +569,7 @@ export async function updateWorker(
   options: {
     now?: Date
     compatibilityPolicy?: WorkerCompatibilityPolicy
+    requireUnbanned?: boolean
   } = {}
 ): Promise<WorkerDomain> {
   if (Object.keys(input).length === 0) {
@@ -535,11 +620,17 @@ export async function updateWorker(
     ) as Json
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("workers")
     .update(values)
     .eq("id", id)
     .eq("user_id", userId)
+
+  if (options.requireUnbanned) {
+    query = query.is("banned_at", null)
+  }
+
+  const { data, error } = await query
     .select(workerSelect)
     .maybeSingle()
     .returns<WorkerRow | null>()
@@ -823,6 +914,67 @@ function unwrapWorkerWrite(result: {
     throw new ServiceError("internal", "Worker write returned no row")
   }
   return result.data
+}
+
+async function runWorkerLifecycleRpc(
+  supabase: Supabase,
+  name: "ban_worker" | "unban_worker",
+  userId: string,
+  workerId: string,
+  options: {
+    now?: Date
+    compatibilityPolicy?: WorkerCompatibilityPolicy
+  }
+): Promise<WorkerDomain> {
+  const { data, error } = await supabase
+    .rpc(name, {
+      p_user_id: userId,
+      p_worker_id: workerId,
+      p_now: (options.now ?? new Date()).toISOString(),
+    })
+    .maybeSingle()
+    .returns<WorkerRow | null>()
+
+  const row = unwrapWorkerLifecycleRpc(data, error)
+  const counts = await listRunningTaskCounts(supabase, [workerId])
+  return toWorkerDomain(row, counts.get(workerId) ?? 0, options)
+}
+
+function unwrapWorkerLifecycleRpc(
+  data: WorkerRow | null,
+  error: null | { message: string; code?: string }
+): WorkerRow {
+  if (error) {
+    throwWorkerLifecycleRpcError(error)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Worker not found")
+  }
+  return data
+}
+
+function throwWorkerLifecycleRpcError(error: {
+  message: string
+  code?: string
+}): never {
+  if (
+    error.code === "23505" ||
+    error.message.toLowerCase().includes("worker name is already in use") ||
+    error.message.toLowerCase().includes("workers_user_normalized_name_unique")
+  ) {
+    throw new ServiceError("validation", "Worker name is already in use")
+  }
+  if (
+    error.code === "22023" ||
+    error.message.toLowerCase().includes("worker name must be between")
+  ) {
+    throw new ServiceError(
+      "validation",
+      "Worker name must be between 1 and 80 characters"
+    )
+  }
+
+  throw new ServiceError("internal", error.message)
 }
 
 function throwWorkerWriteError(error: { message: string; code?: string }): never {

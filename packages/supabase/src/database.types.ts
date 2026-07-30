@@ -624,6 +624,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ban_worker: {
+        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+        Returns: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          offline_since_at: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       consume_worker_enrollment_code: {
         Args: {
           p_arch: string
@@ -674,6 +703,10 @@ export type Database = {
         Args: { older_than?: string }
         Returns: number
       }
+      delete_worker: {
+        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+        Returns: boolean
+      }
       finish_issue_run_if_no_pending: {
         Args: {
           p_issue_id: string
@@ -708,6 +741,40 @@ export type Database = {
           locked_until: string
         }[]
       }
+      rename_worker: {
+        Args: {
+          p_display_name: string
+          p_now?: string
+          p_user_id: string
+          p_worker_id: string
+        }
+        Returns: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          offline_since_at: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       request_automatic_pr_publish: {
         Args: { p_content: string; p_issue_id: string; p_run_id: string }
         Returns: {
@@ -716,6 +783,10 @@ export type Database = {
           request_id: string
           status: string
         }[]
+      }
+      requeue_worker_active_issues: {
+        Args: { p_now: string; p_worker_id: string }
+        Returns: number
       }
       reset_issue_run:
         | {
@@ -740,6 +811,35 @@ export type Database = {
       start_issue_from_draft: {
         Args: { p_issue_id: string }
         Returns: undefined
+      }
+      unban_worker: {
+        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+        Returns: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          offline_since_at: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {

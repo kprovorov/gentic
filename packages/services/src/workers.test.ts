@@ -7,12 +7,16 @@ import {
   classifyWorkerVersion,
   createWorker,
   createWorkerEnrollmentCode,
+  banWorker,
+  deleteWorker,
   exchangeWorkerEnrollmentCode,
   getWorker,
   hashWorkerSecret,
   listWorkers,
   markWorkerOffline,
   recordWorkerHeartbeat,
+  renameWorker,
+  unbanWorker,
   updateWorker,
   type WorkerDomain,
 } from "./workers"
@@ -21,6 +25,7 @@ type Row = Record<string, unknown>
 type TableName =
   | "workers"
   | "issues"
+  | "messages"
   | "worker_enrollment_codes"
   | "worker_enrollment_exchange_failures"
 
@@ -54,6 +59,7 @@ const capabilities = {
 class FakeDb {
   workers: Row[] = []
   issues: Row[] = []
+  messages: Row[] = []
   worker_enrollment_codes: Row[] = []
   worker_enrollment_exchange_failures: Row[] = []
 }
@@ -68,6 +74,18 @@ class FakeSupabase {
   rpc(name: string, args: Record<string, unknown>) {
     if (name === "record_worker_enrollment_exchange_failure") {
       return this.recordExchangeFailure(args)
+    }
+    if (name === "rename_worker") {
+      return this.renameWorker(args)
+    }
+    if (name === "ban_worker") {
+      return this.banWorker(args)
+    }
+    if (name === "unban_worker") {
+      return this.unbanWorker(args)
+    }
+    if (name === "delete_worker") {
+      return this.deleteWorker(args)
     }
 
     assert.equal(name, "consume_worker_enrollment_code")
@@ -162,12 +180,136 @@ class FakeSupabase {
 
     return new FakeRpcQuery(existing)
   }
+
+  private renameWorker(args: Record<string, unknown>) {
+    const userId = String(args.p_user_id)
+    const workerId = String(args.p_worker_id)
+    const displayName = normalizeNameForDisplay(String(args.p_display_name))
+    const nowValue = String(args.p_now)
+    const worker = this.db.workers.find(
+      (row) => row.id === workerId && row.user_id === userId
+    )
+
+    if (!worker) {
+      return new FakeRpcQuery(null)
+    }
+    if (
+      this.db.workers.some(
+        (row) =>
+          row.user_id === userId &&
+          row.id !== workerId &&
+          row.normalized_name === normalizeName(displayName)
+      )
+    ) {
+      return new FakeRpcQuery(null, {
+        code: "23505",
+        message: "Worker name is already in use",
+      })
+    }
+
+    worker.display_name = displayName
+    worker.normalized_name = normalizeName(displayName)
+    worker.updated_at = nowValue
+    return new FakeRpcQuery(worker)
+  }
+
+  private banWorker(args: Record<string, unknown>) {
+    const worker = this.findOwnedWorker(args)
+    if (!worker) {
+      return new FakeRpcQuery(null)
+    }
+
+    const nowValue = String(args.p_now)
+    worker.banned_at ??= nowValue
+    worker.last_seen_at = null
+    worker.updated_at = nowValue
+    this.requeueWorkerActiveIssues(String(args.p_worker_id), nowValue)
+    return new FakeRpcQuery(worker)
+  }
+
+  private unbanWorker(args: Record<string, unknown>) {
+    const worker = this.findOwnedWorker(args)
+    if (!worker) {
+      return new FakeRpcQuery(null)
+    }
+
+    const nowValue = String(args.p_now)
+    worker.banned_at = null
+    worker.last_seen_at = null
+    worker.updated_at = nowValue
+    return new FakeRpcQuery(worker)
+  }
+
+  private deleteWorker(args: Record<string, unknown>) {
+    const worker = this.findOwnedWorker(args)
+    if (!worker) {
+      return new FakeRpcQuery(false)
+    }
+
+    const nowValue = String(args.p_now)
+    worker.banned_at ??= nowValue
+    worker.last_seen_at = null
+    worker.credential_expires_at = nowValue
+    worker.updated_at = nowValue
+    this.requeueWorkerActiveIssues(String(args.p_worker_id), nowValue)
+    this.db.workers = this.db.workers.filter((row) => row !== worker)
+    return new FakeRpcQuery(true)
+  }
+
+  private findOwnedWorker(args: Record<string, unknown>) {
+    return this.db.workers.find(
+      (row) => row.id === args.p_worker_id && row.user_id === args.p_user_id
+    )
+  }
+
+  private requeueWorkerActiveIssues(workerId: string, nowValue: string) {
+    for (const issue of this.db.issues) {
+      if (issue.active_worker_id !== workerId || !issue.active_run_id) {
+        continue
+      }
+
+      const runId = issue.active_run_id
+      issue.active_worker_id = null
+      issue.active_run_id = null
+      issue.updated_at = nowValue
+
+      if (issue.status === "run-failed") {
+        continue
+      }
+
+      issue.status = "todo"
+      issue.run_error = null
+      issue.run_started_at = null
+      issue.run_finished_at = null
+      issue.usage_limit_reset_at = null
+      for (const message of this.db.messages) {
+        if (
+          message.issue_id === issue.id &&
+          message.role === "user" &&
+          message.consumed_by_run_id === runId
+        ) {
+          message.consumed_by_run_id = null
+          message.consumed_at = null
+          message.updated_at = nowValue
+        }
+      }
+    }
+  }
 }
 
-class FakeRpcQuery implements PromiseLike<{ data: unknown; error: null }> {
-  constructor(private readonly data: Row | null) {}
+class FakeRpcQuery
+  implements PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>
+{
+  constructor(
+    private readonly data: Row | boolean | null,
+    private readonly error: { message: string; code?: string } | null = null
+  ) {}
 
   maybeSingle() {
+    return this
+  }
+
+  single() {
     return this
   }
 
@@ -175,16 +317,16 @@ class FakeRpcQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this
   }
 
-  then<TResult1 = { data: unknown; error: null }, TResult2 = never>(
+  then<TResult1 = { data: unknown; error: { message: string; code?: string } | null }, TResult2 = never>(
     onfulfilled?:
       | ((value: {
           data: unknown
-          error: null
+          error: { message: string; code?: string } | null
         }) => TResult1 | PromiseLike<TResult1>)
       | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
-    return Promise.resolve({ data: this.data, error: null }).then(
+    return Promise.resolve({ data: this.data, error: this.error }).then(
       onfulfilled,
       onrejected
     )
@@ -454,6 +596,49 @@ test("createWorker and updateWorker validate unique case-insensitive names per u
   assert.equal(renamed.display_name, "Beta Worker")
 })
 
+test("renameWorker enforces owner scoped case-insensitive names", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.workers.push(
+    workerRow({ id: "worker-1", user_id: "user-1", display_name: "Build A" }),
+    workerRow({ id: "worker-2", user_id: "user-1", display_name: "Build B" }),
+    workerRow({ id: "worker-3", user_id: "user-2", display_name: "Build C" })
+  )
+
+  const renamed = await renameWorker(
+    supabase as never,
+    "user-1",
+    "worker-1",
+    { display_name: " Build   C " },
+    { now }
+  )
+  assert.equal(renamed.display_name, "Build C")
+
+  await assert.rejects(
+    renameWorker(
+      supabase as never,
+      "user-1",
+      "worker-1",
+      { display_name: "build b" },
+      { now }
+    ),
+    (error) =>
+      error instanceof ServiceError &&
+      error.code === "validation" &&
+      error.message === "Worker name is already in use"
+  )
+
+  await assert.rejects(
+    renameWorker(
+      supabase as never,
+      "user-1",
+      "worker-3",
+      { display_name: "Hidden" },
+      { now }
+    ),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+})
+
 test("primary state derives setup, heartbeat boundary, and banned precedence", async () => {
   const supabase = new FakeSupabase()
   supabase.db.workers.push(
@@ -582,6 +767,163 @@ test("running task count is derived from active issue assignments", async () => 
 
   assert.equal(worker.configured_capacity, 4)
   assert.equal(worker.running_task_count, 2)
+})
+
+test("ban revokes access and atomically requeues active work", async () => {
+  const supabase = new FakeSupabase()
+  const credential = `gtwc_${"a".repeat(43)}`
+  supabase.db.workers.push(
+    workerRow({
+      id: "worker-1",
+      credential_hash: hashWorkerSecret(credential),
+    })
+  )
+  supabase.db.issues.push(
+    issueRow({
+      id: "issue-1",
+      active_worker_id: "worker-1",
+      active_run_id: "11111111-1111-4111-8111-111111111111",
+      status: "in-progress",
+      pr_url: "https://github.com/acme/repo/pull/1",
+      session_id: "session-1",
+      run_error: "old",
+    })
+  )
+  supabase.db.messages.push({
+    id: "message-1",
+    issue_id: "issue-1",
+    role: "user",
+    consumed_by_run_id: "11111111-1111-4111-8111-111111111111",
+    consumed_at: now.toISOString(),
+  })
+
+  const banned = await banWorker(supabase as never, "user-1", "worker-1", {
+    now,
+  })
+
+  assert.equal(banned.primary_state, "banned")
+  await assert.rejects(
+    authenticateWorkerCredential(supabase as never, credential, { now }),
+    (error) => error instanceof ServiceError && error.code === "forbidden"
+  )
+  assert.equal(supabase.db.issues[0]?.status, "todo")
+  assert.equal(supabase.db.issues[0]?.active_worker_id, null)
+  assert.equal(supabase.db.issues[0]?.active_run_id, null)
+  assert.equal(
+    supabase.db.issues[0]?.pr_url,
+    "https://github.com/acme/repo/pull/1"
+  )
+  assert.equal(supabase.db.issues[0]?.session_id, "session-1")
+  assert.equal(supabase.db.issues[0]?.run_error, null)
+  assert.equal(supabase.db.messages[0]?.consumed_by_run_id, null)
+  assert.equal(supabase.db.messages[0]?.consumed_at, null)
+})
+
+test("stale worker writes after ban cannot restore online state", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.workers.push(workerRow({ id: "worker-1" }))
+
+  await banWorker(supabase as never, "user-1", "worker-1", { now })
+
+  await assert.rejects(
+    updateWorker(
+      supabase as never,
+      "user-1",
+      "worker-1",
+      { last_seen_at: now.toISOString() },
+      { now, requireUnbanned: true }
+    ),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+  assert.equal(supabase.db.workers[0]?.last_seen_at, null)
+})
+
+test("unban restores worker identity and credential without old leases", async () => {
+  const supabase = new FakeSupabase()
+  const credential = `gtwc_${"b".repeat(43)}`
+  supabase.db.workers.push(
+    workerRow({
+      id: "worker-1",
+      credential_hash: hashWorkerSecret(credential),
+    })
+  )
+  supabase.db.issues.push(
+    issueRow({
+      id: "issue-1",
+      active_worker_id: "worker-1",
+      active_run_id: "22222222-2222-4222-8222-222222222222",
+    })
+  )
+
+  await banWorker(supabase as never, "user-1", "worker-1", { now })
+  const unbanned = await unbanWorker(supabase as never, "user-1", "worker-1", {
+    now,
+  })
+
+  assert.equal(unbanned.id, "worker-1")
+  assert.equal(unbanned.banned_at, null)
+  assert.deepEqual(
+    await authenticateWorkerCredential(supabase as never, credential, { now }),
+    { userId: "user-1", workerId: "worker-1", banned: false }
+  )
+  assert.equal(supabase.db.issues[0]?.active_worker_id, null)
+  assert.equal(supabase.db.issues[0]?.active_run_id, null)
+})
+
+test("delete revokes credentials, hard deletes workers, and requeues online work", async () => {
+  const supabase = new FakeSupabase()
+  const credential = `gtwc_${"c".repeat(43)}`
+  supabase.db.workers.push(
+    workerRow({
+      id: "worker-1",
+      credential_hash: hashWorkerSecret(credential),
+    })
+  )
+  supabase.db.issues.push(
+    issueRow({
+      id: "issue-1",
+      active_worker_id: "worker-1",
+      active_run_id: "33333333-3333-4333-8333-333333333333",
+      status: "queued",
+    })
+  )
+
+  await deleteWorker(supabase as never, "user-1", "worker-1", { now })
+
+  assert.equal(supabase.db.workers.length, 0)
+  assert.equal(supabase.db.issues[0]?.status, "todo")
+  assert.equal(supabase.db.issues[0]?.active_worker_id, null)
+  assert.equal(supabase.db.issues[0]?.active_run_id, null)
+  await assert.rejects(
+    authenticateWorkerCredential(supabase as never, credential, { now }),
+    (error) => error instanceof ServiceError && error.code === "forbidden"
+  )
+})
+
+test("offline delete does not retry tasks already marked run-failed", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.workers.push(
+    workerRow({
+      id: "worker-1",
+      last_seen_at: new Date(now.getTime() - 120_000).toISOString(),
+    })
+  )
+  supabase.db.issues.push(
+    issueRow({
+      id: "issue-1",
+      active_worker_id: "worker-1",
+      active_run_id: "44444444-4444-4444-8444-444444444444",
+      status: "run-failed",
+      run_error: "failed",
+    })
+  )
+
+  await deleteWorker(supabase as never, "user-1", "worker-1", { now })
+
+  assert.equal(supabase.db.issues[0]?.status, "run-failed")
+  assert.equal(supabase.db.issues[0]?.run_error, "failed")
+  assert.equal(supabase.db.issues[0]?.active_worker_id, null)
+  assert.equal(supabase.db.issues[0]?.active_run_id, null)
 })
 
 test("createWorkerEnrollmentCode expires in 10 minutes and replaces active codes", async () => {
@@ -817,6 +1159,23 @@ function workerRow(overrides: Row = {}): Row {
     arch: "x64",
     configured_capacity: 1,
     provider_capabilities: { providers: {} },
+    ...overrides,
+  }
+}
+
+function issueRow(overrides: Row = {}): Row {
+  return {
+    id: "issue-1",
+    active_worker_id: null,
+    active_run_id: null,
+    status: "todo",
+    pr_url: null,
+    session_id: null,
+    run_error: null,
+    run_started_at: null,
+    run_finished_at: null,
+    usage_limit_reset_at: null,
+    updated_at: now.toISOString(),
     ...overrides,
   }
 }

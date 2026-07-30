@@ -94,7 +94,7 @@ export async function PATCH(
       id,
       fields.active_run_id
     )
-    const { error } = await supabase
+    const { data: updatedIssue, error } = await supabase
       .from("issues")
       .update({
         ...Object.fromEntries(
@@ -105,9 +105,18 @@ export async function PATCH(
       .eq("id", id)
       .eq("active_worker_id", workerId)
       .eq("active_run_id", fields.active_run_id)
+      .select("id")
+      .maybeSingle()
+      .returns<{ id: string } | null>()
 
     if (error) {
       throw new Error(error.message)
+    }
+    if (!updatedIssue) {
+      return json(
+        { error: "Run is not active for this worker" },
+        { status: 409 }
+      )
     }
 
     if (fields.pr_url) {
