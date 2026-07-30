@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { IconArrowDown } from "@tabler/icons-react"
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,
@@ -9,8 +8,9 @@ import {
   useMessageScrollerVisibility,
 } from "@shadcn/react/message-scroller"
 
-import { Button } from "./button"
 import { cn } from "../utils"
+import { Button } from "./button"
+import { IconArrowDown } from "@tabler/icons-react"
 
 function MessageScrollerProvider(
   props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
@@ -42,7 +42,7 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       className={cn(
-        "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent",
+        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent",
         className
       )}
       {...props}
@@ -72,7 +72,10 @@ function MessageScrollerItem({
     <MessageScrollerPrimitive.Item
       data-slot="message-scroller-item"
       scrollAnchor={scrollAnchor}
-      className={cn("min-w-0 shrink-0", className)}
+      className={cn(
+        "min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+        className
+      )}
       {...props}
     />
   )
@@ -104,7 +107,8 @@ function MessageScrollerButton({
     >
       {children ?? (
         <>
-          <IconArrowDown />
+          <IconArrowDown
+          />
           <span className="sr-only">
             {direction === "end" ? "Scroll to end" : "Scroll to start"}
           </span>

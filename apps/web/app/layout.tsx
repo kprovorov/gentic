@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Outfit } from "next/font/google"
+import { DM_Sans, Geist_Mono } from "next/font/google"
 import { ClerkProvider, Show } from "@clerk/nextjs"
 
 import "./globals.css"
@@ -39,9 +39,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 }
 
-const outfitHeading = Outfit({ subsets: ["latin"], variable: "--font-heading" })
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -64,8 +62,7 @@ export default function RootLayout({
           "antialiased",
           fontMono.variable,
           "font-sans",
-          inter.variable,
-          outfitHeading.variable
+          dmSans.variable
         )}
       >
         <body>
