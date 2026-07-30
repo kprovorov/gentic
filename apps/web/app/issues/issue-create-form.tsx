@@ -22,7 +22,10 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import {
+  agentProviderSchema,
   defaultIssuePriority,
+  issueModelSchema,
+  issuePrioritySchema,
   type AgentProvider,
   type IssuePriority,
 } from "@gentic/validators/issues"
@@ -57,6 +60,75 @@ function storeIssueDraft(prompt: string) {
   }
 }
 
+const ISSUE_CREATE_SETTINGS_STORAGE_KEY = "gentic:issue-create-settings:v1"
+
+type IssueCreateSettings = {
+  projectId?: string
+  priority?: IssuePriority
+  agentProvider?: AgentProvider
+  issueModel?: string | null
+  createPrAutomatically?: boolean
+}
+
+function loadStoredIssueSettings(): IssueCreateSettings {
+  try {
+    const raw = window.localStorage.getItem(ISSUE_CREATE_SETTINGS_STORAGE_KEY)
+
+    if (!raw) {
+      return {}
+    }
+
+    const parsed: unknown = JSON.parse(raw)
+
+    if (typeof parsed !== "object" || parsed === null) {
+      return {}
+    }
+
+    const candidate = parsed as Record<string, unknown>
+    const settings: IssueCreateSettings = {}
+
+    if (typeof candidate.projectId === "string") {
+      settings.projectId = candidate.projectId
+    }
+
+    const priority = issuePrioritySchema.safeParse(candidate.priority)
+    if (priority.success) {
+      settings.priority = priority.data
+    }
+
+    const agentProvider = agentProviderSchema.safeParse(
+      candidate.agentProvider
+    )
+    if (agentProvider.success) {
+      settings.agentProvider = agentProvider.data
+    }
+
+    const issueModel = issueModelSchema.safeParse(candidate.issueModel ?? null)
+    if (issueModel.success) {
+      settings.issueModel = issueModel.data
+    }
+
+    if (typeof candidate.createPrAutomatically === "boolean") {
+      settings.createPrAutomatically = candidate.createPrAutomatically
+    }
+
+    return settings
+  } catch {
+    return {}
+  }
+}
+
+function storeIssueSettings(settings: IssueCreateSettings) {
+  try {
+    window.localStorage.setItem(
+      ISSUE_CREATE_SETTINGS_STORAGE_KEY,
+      JSON.stringify(settings)
+    )
+  } catch {
+    return
+  }
+}
+
 export function IssueCreateForm({
   projects,
   defaultAgentProvider = "claude_code",
@@ -73,6 +145,8 @@ export function IssueCreateForm({
   const [issueModel, setIssueModel] = useState<string | null>(null)
   const [priority, setPriority] = useState<IssuePriority>(defaultIssuePriority)
   const [projectId, setProjectId] = useState("")
+  const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
+  const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
   const selectedProject = projects.find((project) => project.id === projectId)
@@ -93,6 +167,49 @@ export function IssueCreateForm({
 
     return () => window.clearTimeout(timeoutId)
   }, [])
+
+  useEffect(() => {
+    const storedSettings = loadStoredIssueSettings()
+
+    if (Object.keys(storedSettings).length === 0) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (storedSettings.agentProvider) {
+        setAgentProvider(storedSettings.agentProvider)
+      }
+      if (storedSettings.issueModel !== undefined) {
+        setIssueModel(storedSettings.issueModel)
+      }
+      if (storedSettings.priority) {
+        setPriority(storedSettings.priority)
+      }
+      if (
+        storedSettings.projectId &&
+        projects.some((project) => project.id === storedSettings.projectId)
+      ) {
+        setProjectId(storedSettings.projectId)
+      }
+      if (storedSettings.createPrAutomatically !== undefined) {
+        setCreatePrAutomatically(storedSettings.createPrAutomatically)
+        setPrSettingsVersion((version) => version + 1)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [projects])
+
+  const persistSettings = (overrides: Partial<IssueCreateSettings>) => {
+    storeIssueSettings({
+      projectId,
+      priority,
+      agentProvider,
+      issueModel,
+      createPrAutomatically,
+      ...overrides,
+    })
+  }
 
   const updatePrompt = (value: string) => {
     setPrompt(value)
@@ -149,8 +266,12 @@ export function IssueCreateForm({
       onAgentProviderChange={(provider) => {
         setAgentProvider(provider)
         setIssueModel(null)
+        persistSettings({ agentProvider: provider, issueModel: null })
       }}
-      onIssueModelChange={(model) => setIssueModel(model)}
+      onIssueModelChange={(model) => {
+        setIssueModel(model)
+        persistSettings({ issueModel: model })
+      }}
       onSubmit={() => {}}
       footerStart={
         <div className="flex min-w-0 flex-wrap items-start gap-2">
@@ -181,6 +302,7 @@ export function IssueCreateForm({
                     onSelect={() => {
                       setProjectId(project.id)
                       setProjectError("")
+                      persistSettings({ projectId: project.id })
                     }}
                   >
                     <span className="min-w-0 flex-1">
@@ -226,7 +348,10 @@ export function IssueCreateForm({
                 return (
                   <DropdownMenuItem
                     key={option.value}
-                    onSelect={() => setPriority(option.value)}
+                    onSelect={() => {
+                      setPriority(option.value)
+                      persistSettings({ priority: option.value })
+                    }}
                     className="gap-3"
                   >
                     <OptionIcon className="size-4" />
@@ -239,7 +364,14 @@ export function IssueCreateForm({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <AutomaticPrPreferenceField defaultChecked />
+          <AutomaticPrPreferenceField
+            key={prSettingsVersion}
+            defaultChecked={createPrAutomatically}
+            onCheckedChange={(checked) => {
+              setCreatePrAutomatically(checked)
+              persistSettings({ createPrAutomatically: checked })
+            }}
+          />
         </div>
       }
       footerEnd={

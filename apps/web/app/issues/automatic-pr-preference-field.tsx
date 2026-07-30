@@ -15,12 +15,14 @@ export function AutomaticPrPreferenceField({
   defaultChecked,
   disabled = false,
   className,
+  onCheckedChange,
 }: {
   // This is read only on mount. Callers showing refreshed persisted data should
   // change this component's key when the default value changes.
   defaultChecked: boolean
   disabled?: boolean
   className?: string
+  onCheckedChange?: (checked: boolean) => void
 }) {
   const [checked, setChecked] = useState(defaultChecked)
   const fieldId = useId()
@@ -41,7 +43,11 @@ export function AutomaticPrPreferenceField({
         checked={checked}
         disabled={disabled}
         aria-describedby={disabled ? historicalNoteId : undefined}
-        onCheckedChange={(value) => setChecked(value === true)}
+        onCheckedChange={(value) => {
+          const nextChecked = value === true
+          setChecked(nextChecked)
+          onCheckedChange?.(nextChecked)
+        }}
         className="mt-0.5"
       />
       <div className="grid min-w-0 gap-1">

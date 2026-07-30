@@ -235,6 +235,74 @@ describe("IssueCreateForm", () => {
     expect(formData.get("create_pr_automatically")).toBe("false")
   })
 
+  it("stores the selected project, priority, agent, model, and PR preference as settings", async () => {
+    const user = userEvent.setup()
+
+    renderForm(
+      <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
+    )
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Priority" }))
+    await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
+    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
+    await user.click(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    )
+
+    const stored = JSON.parse(
+      window.localStorage.getItem("gentic:issue-create-settings:v1") ?? "{}"
+    )
+
+    expect(stored).toMatchObject({
+      projectId: projects[0].id,
+      priority: "urgent",
+      agentProvider: "codex",
+      issueModel: "gpt-5.6-sol",
+      createPrAutomatically: false,
+    })
+  })
+
+  it("restores stored settings from browser storage on mount", async () => {
+    window.localStorage.setItem(
+      "gentic:issue-create-settings:v1",
+      JSON.stringify({
+        projectId: projects[0].id,
+        priority: "urgent",
+        agentProvider: "codex",
+        issueModel: "gpt-5.6-sol",
+        createPrAutomatically: false,
+      })
+    )
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Gentic")).toBeVisible()
+      expect(screen.getByText("Urgent")).toBeVisible()
+      expect(screen.getByText("Codex")).toBeVisible()
+      expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+      expect(
+        screen.getByRole("checkbox", { name: "Create PR automatically" })
+      ).not.toBeChecked()
+    })
+  })
+
+  it("does not restore a stored project that no longer exists", async () => {
+    window.localStorage.setItem(
+      "gentic:issue-create-settings:v1",
+      JSON.stringify({ projectId: "deleted-project-id" })
+    )
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Select project")).toBeVisible()
+    })
+  })
+
   it("exposes the automatic PR tooltip by hover and keyboard focus", async () => {
     const user = userEvent.setup()
 
