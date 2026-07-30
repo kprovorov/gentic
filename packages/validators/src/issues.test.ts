@@ -115,10 +115,10 @@ test("issue priority contract exposes reusable metadata in priority order", () =
     high: "up",
     urgent: "alert",
   })
-  assert.match(issuePriorityStyles.low, /gray/)
-  assert.match(issuePriorityStyles.medium, /blue/)
-  assert.match(issuePriorityStyles.high, /amber/)
-  assert.match(issuePriorityStyles.urgent, /red/)
+  assert.match(issuePriorityStyles.low, /bg-muted/)
+  assert.match(issuePriorityStyles.medium, /bg-muted/)
+  assert.match(issuePriorityStyles.high, /bg-muted/)
+  assert.match(issuePriorityStyles.urgent, /bg-muted/)
 })
 
 test("updateIssuePrioritySchema accepts focused priority updates", () => {

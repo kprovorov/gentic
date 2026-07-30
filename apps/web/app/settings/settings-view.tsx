@@ -185,8 +185,8 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
                 </div>
               </div>
               {githubIntegration?.status === "connected" ? (
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-green-600/30 bg-green-600/10 px-2.5 py-1 text-sm text-green-700 dark:text-green-400">
-                  <IconCheck className="size-4" />
+                <div className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm text-muted-foreground">
+                  <IconCheck className="size-4 text-green-600 dark:text-green-400" />
                   Connected
                 </div>
               ) : githubIntegration?.status === "pending" ? (
