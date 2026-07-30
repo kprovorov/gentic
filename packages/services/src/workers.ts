@@ -541,6 +541,7 @@ export async function getWorkerControlState(
       .from("issues")
       .select("id,active_run_id,status")
       .eq("active_worker_id", workerId)
+      .not("active_run_id", "is", null)
       .not("status", "in", "(completed,cancelled)")
       .returns<
         Array<{
@@ -789,6 +790,7 @@ async function listRunningTaskCounts(
       .select("active_worker_id")
       .in("active_worker_id", workerIds)
       .not("active_worker_id", "is", null)
+      .not("active_run_id", "is", null)
       .not("status", "in", "(completed,cancelled)")
       .returns<Array<{ active_worker_id: string | null }>>()
   )

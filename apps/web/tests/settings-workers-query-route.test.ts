@@ -284,12 +284,18 @@ function seededDb() {
     issueRow({
       id: "issue-1",
       active_worker_id: "online",
+      active_run_id: "run-1",
       title: "Task title",
       url: "https://github.com/acme/repo/issues/1",
       raw_log: "raw log",
     }),
-    issueRow({ id: "issue-2", active_worker_id: "online" }),
+    issueRow({
+      id: "issue-2",
+      active_worker_id: "online",
+      active_run_id: "run-2",
+    }),
     issueRow({ id: "issue-3", active_worker_id: "online", status: "completed" }),
+    issueRow({ id: "issue-orphan", active_worker_id: "online", status: "todo" }),
     issueRow({ id: "issue-4", active_worker_id: "theirs" })
   )
 
@@ -320,6 +326,7 @@ function issueRow(overrides: Row = {}): Row {
   return {
     id: "issue",
     active_worker_id: null,
+    active_run_id: null,
     status: "in-progress",
     ...overrides,
   }
