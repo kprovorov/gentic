@@ -59,10 +59,10 @@ export const issuePriorityIcons = {
 } as const satisfies Record<IssuePriority, "alert" | "down" | "minus" | "up">
 
 export const issuePriorityStyles = {
-  low: "border-gray-200 bg-gray-50 text-gray-700",
-  medium: "border-blue-200 bg-blue-50 text-blue-700",
-  high: "border-amber-200 bg-amber-50 text-amber-700",
-  urgent: "border-red-200 bg-red-50 text-red-700",
+  low: "border-border bg-muted text-foreground",
+  medium: "border-border bg-muted text-foreground",
+  high: "border-border bg-muted text-foreground",
+  urgent: "border-border bg-muted text-foreground",
 } as const satisfies Record<IssuePriority, string>
 
 export const issuePriorityOptions = issuePriorityValues.map((value) => ({

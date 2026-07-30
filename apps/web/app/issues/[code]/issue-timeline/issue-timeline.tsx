@@ -30,7 +30,13 @@ import {
   firstLine,
   isGenticAuthoredMessage,
 } from "../issue-chat/transcript-items"
-import { statusIcons, statusLabels, statusStyles } from "../issue-status-meta"
+import {
+  statusIconStyles,
+  statusIcons,
+  statusLabels,
+  statusStyles,
+} from "../issue-status-meta"
+import { priorityIconStyles } from "../../issues-columns"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
   Collapsible,
@@ -725,7 +731,9 @@ function StatusBadge({ status }: { status: string | null }) {
         statusStyles[knownStatus]
       )}
     >
-      <StatusIcon className="size-3.5" />
+      <StatusIcon
+        className={cn("size-3.5", statusIconStyles[knownStatus])}
+      />
       {statusLabels[knownStatus]}
     </span>
   )
@@ -771,7 +779,9 @@ function PriorityBadge({ priority }: { priority: string | null }) {
         issuePriorityStyles[knownPriority]
       )}
     >
-      <PriorityIcon className="size-3.5" />
+      <PriorityIcon
+        className={cn("size-3.5", priorityIconStyles[knownPriority])}
+      />
       {issuePriorityLabels[knownPriority]}
     </span>
   )

@@ -35,6 +35,7 @@ import {
   issuePriorityStyles,
 } from "@/app/issues/issue-priority-meta"
 import {
+  priorityIconStyles,
   statusIconStyles,
   statusIcons,
   statusLabels,
@@ -276,7 +277,12 @@ function IssueDetailPriority({
             issuePriorityStyles[displayedPriority]
           )}
         >
-          <PriorityIcon className="size-[15px] shrink-0" />
+          <PriorityIcon
+            className={cn(
+              "size-[15px] shrink-0",
+              priorityIconStyles[displayedPriority]
+            )}
+          />
           <span className="min-w-0 flex-1 truncate text-left">
             {issuePriorityLabels[displayedPriority]}
           </span>
@@ -295,7 +301,9 @@ function IssueDetailPriority({
               onSelect={() => selectPriority(option.value)}
               className="gap-3"
             >
-              <OptionIcon className="size-4" />
+              <OptionIcon
+                className={cn("size-4", priorityIconStyles[option.value])}
+              />
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
               {isSelected ? <IconCheck className="size-4" /> : null}
             </DropdownMenuItem>
@@ -363,7 +371,7 @@ function IssueDetailPullRequests({
                   stateMeta.className
                 )}
               >
-                <StateIcon className="size-4" />
+                <StateIcon className={cn("size-4", stateMeta.iconClassName)} />
               </span>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-[12.5px] leading-none font-medium">

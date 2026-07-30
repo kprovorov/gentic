@@ -43,7 +43,6 @@ import {
 } from "@gentic/ui/dropdown-menu"
 import { Input } from "@gentic/ui/input"
 import { Label } from "@gentic/ui/label"
-import { cn } from "@gentic/ui/utils"
 
 type EnrollmentCode = {
   code: string
@@ -622,36 +621,25 @@ function WorkerActions({
 
 function StatusBadge({ state }: { state: SettingsWorker["primaryState"] }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs",
-        state === "online" &&
-          "border-green-600/30 bg-green-600/10 text-green-700 dark:text-green-400",
-        state === "banned" &&
-          "border-destructive/30 bg-destructive/10 text-destructive",
-        state !== "online" && state !== "banned" && "text-muted-foreground",
-      )}
-    >
-      {state === "online" ? <IconCheck className="size-3" /> : null}
+    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+      {state === "online" ? (
+        <IconCheck className="size-3 text-green-600 dark:text-green-400" />
+      ) : state === "banned" ? (
+        <IconBan className="size-3 text-destructive" />
+      ) : null}
       {primaryStateLabels[state]}
     </span>
   )
 }
 
 function VersionBadge({ worker }: { worker: SettingsWorker }) {
-  const needsUpgrade = worker.genticVersionHealth !== "current"
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs",
-        needsUpgrade
-          ? "border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-400"
-          : "text-muted-foreground",
-      )}
-    >
+    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
       {versionHealthLabels[worker.genticVersionHealth]}
       {worker.genticVersion ? ` ${worker.genticVersion}` : ""}
-      {needsUpgrade ? " - install the latest Gentic worker locally" : null}
+      {worker.genticVersionHealth !== "current"
+        ? " - install the latest Gentic worker locally"
+        : null}
     </span>
   )
 }

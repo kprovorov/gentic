@@ -86,23 +86,23 @@ export const statusLabels: Record<IssueStatus, string> = {
 }
 
 export const statusStyles: Record<IssueStatus, string> = {
-  draft: "bg-muted/60 text-muted-foreground",
+  draft: "bg-muted text-muted-foreground",
   todo: "bg-muted text-muted-foreground",
-  queued: "bg-primary/15 text-primary-foreground",
-  held: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "in-progress": "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  "waiting-for-input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  testing: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  "tests-failed": "bg-red-500/15 text-red-700 dark:text-red-300",
-  "ready-for-review": "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  "changes-requested": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  approved: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
-  merged: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-  deploying: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  "deploy-failed": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  validating: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
-  "run-failed": "bg-destructive/15 text-destructive",
-  completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  queued: "bg-muted text-muted-foreground",
+  held: "bg-muted text-muted-foreground",
+  "in-progress": "bg-muted text-muted-foreground",
+  "waiting-for-input": "bg-muted text-muted-foreground",
+  testing: "bg-muted text-muted-foreground",
+  "tests-failed": "bg-muted text-muted-foreground",
+  "ready-for-review": "bg-muted text-muted-foreground",
+  "changes-requested": "bg-muted text-muted-foreground",
+  approved: "bg-muted text-muted-foreground",
+  merged: "bg-muted text-muted-foreground",
+  deploying: "bg-muted text-muted-foreground",
+  "deploy-failed": "bg-muted text-muted-foreground",
+  validating: "bg-muted text-muted-foreground",
+  "run-failed": "bg-muted text-muted-foreground",
+  completed: "bg-muted text-muted-foreground",
   cancelled: "bg-muted text-muted-foreground",
 }
 
@@ -208,15 +208,28 @@ export const issueTypeIcons = {
 
 export const issueTypeStyles: Record<IssueType, string> = {
   issue: "bg-muted text-muted-foreground",
-  feature: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  bug: "bg-red-500/15 text-red-700 dark:text-red-300",
-  feedback: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  idea: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  feature: "bg-muted text-muted-foreground",
+  bug: "bg-muted text-muted-foreground",
+  feedback: "bg-muted text-muted-foreground",
+  idea: "bg-muted text-muted-foreground",
+}
+
+export const issueTypeIconStyles: Record<IssueType, string> = {
+  issue: "text-muted-foreground",
+  feature: "text-violet-600 dark:text-violet-300",
+  bug: "text-red-600 dark:text-red-300",
+  feedback: "text-sky-600 dark:text-sky-300",
+  idea: "text-amber-600 dark:text-amber-300",
 }
 
 export const blockingBadgeStyles = {
-  blocked: "bg-red-500/15 text-red-700 dark:text-red-300",
-  blocking: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  blocked: "bg-muted text-muted-foreground",
+  blocking: "bg-muted text-muted-foreground",
+} as const
+
+export const blockingIconStyles = {
+  blocked: "text-red-600 dark:text-red-300",
+  blocking: "text-amber-600 dark:text-amber-300",
 } as const
 
 function getPullRequestLabel(url: string) {
@@ -264,7 +277,7 @@ export function PullRequestPills({
                   stateMeta.className
                 )}
               >
-                <StateIcon className="size-3.5" />
+                <StateIcon className={cn("size-3.5", stateMeta.iconClassName)} />
                 <span className="whitespace-nowrap">{label.short}</span>
               </Link>
             </TooltipTrigger>
@@ -451,7 +464,12 @@ export function IssueStatusMenu({
           )}
           onClick={(event) => event.stopPropagation()}
         >
-          <StatusIcon className="size-3.5 shrink-0" />
+          <StatusIcon
+            className={cn(
+              "size-3.5 shrink-0",
+              statusIconStyles[issue.status]
+            )}
+          />
           {showLabel ? (
             <span className="whitespace-nowrap">
               {statusLabels[issue.status]}
@@ -572,7 +590,12 @@ export function IssuePriorityMenu({
           )}
           onClick={(event) => event.stopPropagation()}
         >
-          <PriorityIcon className="size-3.5 shrink-0" />
+          <PriorityIcon
+            className={cn(
+              "size-3.5 shrink-0",
+              priorityIconStyles[issue.priority]
+            )}
+          />
           {showLabel ? (
             <span className="whitespace-nowrap">
               {issuePriorityLabels[issue.priority]}
@@ -685,7 +708,9 @@ export function getIssuesColumns(
             label={issueTypeLabels[issue.type]}
             className={issueTypeStyles[issue.type]}
           >
-            <TypeIcon className="size-3.5" />
+            <TypeIcon
+              className={cn("size-3.5", issueTypeIconStyles[issue.type])}
+            />
           </IssueIndicatorBadge>
         )
       },
@@ -741,7 +766,7 @@ export function getIssuesColumns(
             label="Blocked"
             className={blockingBadgeStyles.blocked}
           >
-            <IconLock className="size-3.5" />
+            <IconLock className={cn("size-3.5", blockingIconStyles.blocked)} />
           </IssueIndicatorBadge>
         ) : null,
     },
@@ -757,7 +782,9 @@ export function getIssuesColumns(
             label="Blocking"
             className={blockingBadgeStyles.blocking}
           >
-            <IconArrowBarToRight className="size-3.5" />
+            <IconArrowBarToRight
+              className={cn("size-3.5", blockingIconStyles.blocking)}
+            />
           </IssueIndicatorBadge>
         ) : null,
     },

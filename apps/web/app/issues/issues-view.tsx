@@ -55,12 +55,14 @@ import {
 import { BulkActionsToolbar } from "./bulk-actions-toolbar"
 import {
   blockingBadgeStyles,
+  blockingIconStyles,
   formatDate,
   getIssuesColumns,
   IssuePriorityMenu,
   IssueStatusMenu,
   PullRequestPills,
   issueTypeIcons,
+  issueTypeIconStyles,
   issueTypeLabels,
   issueTypeOptions,
   issueTypeStyles,
@@ -95,11 +97,11 @@ const blockingFilterOptions = [
   "non-blocking",
 ] as const
 const activeFilterCountBadgeStyles =
-  "ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-medium text-foreground"
+  "ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground"
 
 const blockingFilterBadgeStyles: Partial<Record<BlockingFilter, string>> = {
   blocked: blockingBadgeStyles.blocked,
-  "non-blocked": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "non-blocked": "bg-muted text-muted-foreground",
   blocking: blockingBadgeStyles.blocking,
   "non-blocking": "bg-muted text-muted-foreground",
 }
@@ -261,14 +263,16 @@ function IssueRow({
           label={issueTypeLabels[issue.type]}
           className={issueTypeStyles[issue.type]}
         >
-          <TypeIcon className="size-3.5" />
+          <TypeIcon
+            className={cn("size-3.5", issueTypeIconStyles[issue.type])}
+          />
         </IssueIndicatorBadge>
         {isBlocked ? (
           <IssueIndicatorBadge
             label="Blocked"
             className={blockingBadgeStyles.blocked}
           >
-            <IconLock className="size-3.5" />
+            <IconLock className={cn("size-3.5", blockingIconStyles.blocked)} />
           </IssueIndicatorBadge>
         ) : null}
         {isBlocking ? (
@@ -276,7 +280,9 @@ function IssueRow({
             label="Blocking"
             className={blockingBadgeStyles.blocking}
           >
-            <IconArrowBarToRight className="size-3.5" />
+            <IconArrowBarToRight
+              className={cn("size-3.5", blockingIconStyles.blocking)}
+            />
           </IssueIndicatorBadge>
         ) : null}
         <PullRequestPills pullRequests={issue.pullRequests} />

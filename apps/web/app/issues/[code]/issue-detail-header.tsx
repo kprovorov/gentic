@@ -48,11 +48,11 @@ const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
 
 const issueTypeBadgeStyles: Record<IssueDetailData["issue"]["type"], string> =
   {
-    issue: "bg-muted-foreground/14",
-    feature: "bg-violet-500/14",
-    bug: "bg-red-500/14",
-    feedback: "bg-sky-500/14",
-    idea: "bg-amber-500/14",
+    issue: "bg-muted",
+    feature: "bg-muted",
+    bug: "bg-muted",
+    feedback: "bg-muted",
+    idea: "bg-muted",
   }
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
