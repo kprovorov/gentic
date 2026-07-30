@@ -137,10 +137,10 @@ function parseGithubPullRequestUrl(url: string) {
   return null
 }
 
-async function attachPullRequestStates(
-  pullRequests: issuesService.IssuePullRequest[],
+async function attachPullRequestStates<T extends { url: string }>(
+  pullRequests: T[],
   installationId: string | null | undefined
-): Promise<IssuePullRequest[]> {
+): Promise<(T & { state?: GithubPullRequestState })[]> {
   if (!installationId || pullRequests.length === 0) {
     return pullRequests
   }
@@ -174,7 +174,7 @@ async function attachPullRequestStates(
 export async function getHomeData(
   context?: AuthenticatedContext
 ): Promise<HomeData> {
-  const { supabase } = await resolveContext(context)
+  const { supabase, userId } = await resolveContext(context)
   const { data: issues, error } = await supabase
     .from("issues")
     .select(
@@ -188,13 +188,25 @@ export async function getHomeData(
 
   const parsedIssues = z.array(homeIssueSchema).parse(issues).map(toHomeIssue)
   const issueIds = parsedIssues.map((issue) => issue.id)
-  const [blockedIssueIds, blockingIssueIds] = await Promise.all([
-    issuesService.listBlockedIssueIds(supabase, issueIds),
-    issuesService.listBlockingIssueIds(supabase, issueIds),
-  ])
+  const [blockedIssueIds, blockingIssueIds, githubIntegration] =
+    await Promise.all([
+      issuesService.listBlockedIssueIds(supabase, issueIds),
+      issuesService.listBlockingIssueIds(supabase, issueIds),
+      githubIntegrationsService.getGithubIntegration(supabase, userId),
+    ])
+
+  const issuesWithPullRequestStates = await Promise.all(
+    parsedIssues.map(async (issue) => ({
+      ...issue,
+      pullRequests: await attachPullRequestStates(
+        issue.pullRequests,
+        githubIntegration?.installation_id
+      ),
+    }))
+  )
 
   return {
-    issues: parsedIssues,
+    issues: issuesWithPullRequestStates,
     blockedIssueIds: Array.from(blockedIssueIds),
     blockingIssueIds: Array.from(blockingIssueIds),
   }

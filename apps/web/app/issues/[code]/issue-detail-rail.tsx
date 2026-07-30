@@ -12,12 +12,8 @@ import {
   IconCheck,
   IconChevronDown,
   IconCircleDashed,
-  IconClock,
   IconExternalLink,
-  IconGitMerge,
   IconGitPullRequest,
-  IconGitPullRequestClosed,
-  IconGitPullRequestDraft,
   IconLink,
   IconPlus,
   IconTrash,
@@ -44,6 +40,7 @@ import {
   statusLabels,
   statusOptions,
 } from "@/app/issues/issues-columns"
+import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
 import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import type { HomeData, IssueDetailData, IssuePullRequest } from "@/app/queries"
@@ -74,46 +71,6 @@ function parsePullRequestUrl(url: string) {
 
   return { repo: "Pull request", number: null }
 }
-
-const pullRequestStateMeta = {
-  draft: {
-    label: "draft",
-    icon: IconGitPullRequestDraft,
-    className: "bg-muted text-muted-foreground",
-  },
-  open: {
-    label: "open",
-    icon: IconGitPullRequest,
-    className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  },
-  merged: {
-    label: "merged",
-    icon: IconGitMerge,
-    className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-  },
-  closed: {
-    label: "closed",
-    icon: IconGitPullRequestClosed,
-    className: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  },
-  queued: {
-    label: "queued",
-    icon: IconClock,
-    className: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  },
-  unknown: {
-    label: "status unavailable",
-    icon: IconCircleDashed,
-    className: "bg-muted text-muted-foreground",
-  },
-} satisfies Record<
-  NonNullable<IssuePullRequest["state"]>,
-  {
-    label: string
-    icon: typeof IconClock
-    className: string
-  }
->
 
 function IssueDetailStatus({
   issueId,
