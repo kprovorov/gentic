@@ -22,7 +22,6 @@ import {
   IconFileDescription,
   IconFlask,
   IconGitMerge,
-  IconGitPullRequest,
   IconLock,
   IconMessage2,
   IconMessageQuestion,
@@ -41,6 +40,7 @@ import { toast } from "sonner"
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
+import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -248,6 +248,8 @@ export function PullRequestPills({
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       {pullRequests.map((pullRequest) => {
         const label = getPullRequestLabel(pullRequest.url)
+        const stateMeta = pullRequestStateMeta[pullRequest.state ?? "unknown"]
+        const StateIcon = stateMeta.icon
 
         return (
           <Tooltip key={pullRequest.id}>
@@ -257,13 +259,18 @@ export function PullRequestPills({
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`Open ${label.full}`}
-                className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 text-xs font-medium text-emerald-700 transition-[color,box-shadow,background-color] hover:bg-emerald-500/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none dark:text-emerald-300"
+                className={cn(
+                  "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
+                  stateMeta.className
+                )}
               >
-                <IconGitPullRequest className="size-3.5" />
+                <StateIcon className="size-3.5" />
                 <span className="whitespace-nowrap">{label.short}</span>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="top">{label.full}</TooltipContent>
+            <TooltipContent side="top">
+              {label.full} · {stateMeta.label}
+            </TooltipContent>
           </Tooltip>
         )
       })}

@@ -11,6 +11,8 @@ import {
 } from "@gentic/validators/issues"
 import { z } from "zod"
 
+import type { GithubPullRequestState } from "@/lib/github-app"
+
 const projectOptionSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -91,6 +93,7 @@ export type HomeIssue = {
   pullRequests: {
     id: string
     url: string
+    state?: GithubPullRequestState
   }[]
   projects: ProjectOption | null
 }
