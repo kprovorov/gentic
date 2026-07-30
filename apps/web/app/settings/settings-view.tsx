@@ -21,6 +21,7 @@ import {
   updateDefaultAgent,
   updateProject,
 } from "@/app/settings/actions"
+import { ConnectedWorkersSection } from "@/app/settings/connected-workers-section"
 import {
   agentProviderLabels,
   agentProviderOptions,
@@ -284,6 +285,17 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
             </form>
           </CardContent>
         </Card>
+
+        <ConnectedWorkersSection
+          data={workersQuery.data}
+          isLoading={workersQuery.isLoading}
+          isError={workersQuery.isError}
+          onRefresh={() =>
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.settingsWorkers,
+            })
+          }
+        />
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
           <Card>
