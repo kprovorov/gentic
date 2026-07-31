@@ -236,7 +236,7 @@ function getPullRequestLabel(url: string) {
     const [, owner, repo, resource, number] = new URL(url).pathname.split("/")
     if (owner && repo && resource === "pull" && number) {
       return {
-        short: `PR #${number}`,
+        short: `#${number}`,
         full: `${owner}/${repo}#${number}`,
       }
     }
@@ -244,7 +244,7 @@ function getPullRequestLabel(url: string) {
     // Fall back to a generic label for malformed historical data.
   }
 
-  return { short: "PR", full: "Pull request" }
+  return { short: "#", full: "Pull request" }
 }
 
 export function PullRequestPills({
