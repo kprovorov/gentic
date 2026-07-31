@@ -238,9 +238,9 @@ function IssueRow({
         aria-label={`Select ${issue.code ?? issue.title ?? "issue"}`}
         className="mt-1"
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(8rem,11rem)_minmax(10rem,14rem)_7rem] md:items-center md:gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 md:contents">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem] md:items-center md:gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <IssueStatusMenu issue={issue} />
             <Link
               href={issueHref}
@@ -260,6 +260,8 @@ function IssueRow({
                 {issue.title ?? "Generating title..."}
               </span>
             </Link>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <IssueTypeBadge type={issue.type} />
             {isBlocked ? (
               <IssueIndicatorBadge
@@ -282,8 +284,8 @@ function IssueRow({
               </IssueIndicatorBadge>
             ) : null}
             <PullRequestPills pullRequests={issue.pullRequests} />
+            <IssuePriorityMenu issue={issue} showLabel />
           </div>
-          <IssuePriorityMenu issue={issue} showLabel />
         </div>
         <div className="min-w-0">
           {issue.projects?.repo ? (

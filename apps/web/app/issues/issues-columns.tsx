@@ -599,7 +599,7 @@ export function IssuePriorityMenu({
             issuePriorityLabels[issue.priority]
           }`}
           className={cn(
-            "inline-flex h-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex h-6 shrink-0 items-center justify-center self-start rounded-full bg-muted text-muted-foreground transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
             showLabel ? "gap-1 px-2 text-xs font-medium" : "w-6"
           )}
           onClick={(event) => event.stopPropagation()}
