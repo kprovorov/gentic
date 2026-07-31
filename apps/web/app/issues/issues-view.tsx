@@ -61,12 +61,10 @@ import {
   getIssuesColumns,
   IssuePriorityMenu,
   IssueStatusMenu,
+  IssueTypeBadge,
   PullRequestPills,
   issueTypeIcons,
-  issueTypeIconStyles,
-  issueTypeLabels,
   issueTypeOptions,
-  issueTypeStyles,
   priorityIconStyles,
   priorityIcons,
   statusIconStyles,
@@ -223,7 +221,6 @@ function IssueRow({
   isSelected: boolean
   onSelectedChange: (selected: boolean) => void
 }) {
-  const TypeIcon = issueTypeIcons[issue.type]
   const issueHref = getIssueHref(issue) ?? "/issues"
 
   return (
@@ -262,14 +259,7 @@ function IssueRow({
                 {issue.title ?? "Generating title..."}
               </span>
             </Link>
-            <IssueIndicatorBadge
-              label={issueTypeLabels[issue.type]}
-              className={issueTypeStyles[issue.type]}
-            >
-              <TypeIcon
-                className={cn("size-3.5", issueTypeIconStyles[issue.type])}
-              />
-            </IssueIndicatorBadge>
+            <IssueTypeBadge type={issue.type} />
             {isBlocked ? (
               <IssueIndicatorBadge
                 label="Blocked"
