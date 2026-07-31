@@ -184,11 +184,11 @@ describe("IssuesView priority triage", () => {
       ]),
     })
 
-    await user.click(screen.getByRole("button", { name: /^Priority$/ }))
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.click(screen.getByRole("menuitem", { name: "Priority" }))
     await user.click(screen.getByRole("menuitemcheckbox", { name: "Urgent" }))
     await user.click(screen.getByRole("menuitemcheckbox", { name: "High" }))
 
-    expect(screen.getByRole("menu", { name: "Priority (2)" })).toBeVisible()
     expect(screen.getByText("Urgent issue")).toBeVisible()
     expect(screen.getByText("High issue")).toBeVisible()
     expect(screen.queryByText("Low issue")).not.toBeInTheDocument()
@@ -196,7 +196,6 @@ describe("IssuesView priority triage", () => {
     await user.click(screen.getByRole("menuitem", { name: "Clear filter" }))
 
     expect(screen.getByText("Low issue")).toBeVisible()
-    expect(screen.getByRole("button", { name: "Priority" })).toBeVisible()
   })
 
   it("optimistically updates an inline list priority and rolls back on error", async () => {
