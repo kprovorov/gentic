@@ -229,7 +229,7 @@ function IssueRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[1rem_minmax(0,1fr)] gap-3 px-4 py-3 transition-colors hover:bg-muted/45 md:grid-cols-[1rem_minmax(0,1fr)_minmax(8rem,11rem)_minmax(10rem,14rem)_7rem]",
+        "flex gap-3 px-4 py-3 transition-colors hover:bg-muted/45",
         isSelected && "bg-primary/5"
       )}
     >
@@ -240,70 +240,73 @@ function IssueRow({
         aria-label={`Select ${issue.code ?? issue.title ?? "issue"}`}
         className="mt-1"
       />
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <IssueStatusMenu issue={issue} />
-        <Link
-          href={issueHref}
-          className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-        >
-          {issue.code ? (
-            <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
-              {issue.code}
-            </span>
-          ) : null}
-          <span
-            className={cn(
-              "truncate font-medium",
-              !issue.title && "text-muted-foreground italic"
-            )}
-          >
-            {issue.title ?? "Generating title..."}
-          </span>
-        </Link>
-        <IssueIndicatorBadge
-          label={issueTypeLabels[issue.type]}
-          className={issueTypeStyles[issue.type]}
-        >
-          <TypeIcon
-            className={cn("size-3.5", issueTypeIconStyles[issue.type])}
-          />
-        </IssueIndicatorBadge>
-        {isBlocked ? (
-          <IssueIndicatorBadge
-            label="Blocked"
-            className={blockingBadgeStyles.blocked}
-          >
-            <IconLock className={cn("size-3.5", blockingIconStyles.blocked)} />
-          </IssueIndicatorBadge>
-        ) : null}
-        {isBlocking ? (
-          <IssueIndicatorBadge
-            label="Blocking"
-            className={blockingBadgeStyles.blocking}
-          >
-            <IconArrowBarToRight
-              className={cn("size-3.5", blockingIconStyles.blocking)}
-            />
-          </IssueIndicatorBadge>
-        ) : null}
-        <PullRequestPills pullRequests={issue.pullRequests} />
-        <div className="md:hidden">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(8rem,11rem)_minmax(10rem,14rem)_7rem] md:items-center md:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 md:contents">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <IssueStatusMenu issue={issue} />
+            <Link
+              href={issueHref}
+              className="inline-flex min-w-0 items-baseline gap-2 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              {issue.code ? (
+                <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+                  {issue.code}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "truncate font-medium",
+                  !issue.title && "text-muted-foreground italic"
+                )}
+              >
+                {issue.title ?? "Generating title..."}
+              </span>
+            </Link>
+            <IssueIndicatorBadge
+              label={issueTypeLabels[issue.type]}
+              className={issueTypeStyles[issue.type]}
+            >
+              <TypeIcon
+                className={cn("size-3.5", issueTypeIconStyles[issue.type])}
+              />
+            </IssueIndicatorBadge>
+            {isBlocked ? (
+              <IssueIndicatorBadge
+                label="Blocked"
+                className={blockingBadgeStyles.blocked}
+              >
+                <IconLock
+                  className={cn("size-3.5", blockingIconStyles.blocked)}
+                />
+              </IssueIndicatorBadge>
+            ) : null}
+            {isBlocking ? (
+              <IssueIndicatorBadge
+                label="Blocking"
+                className={blockingBadgeStyles.blocking}
+              >
+                <IconArrowBarToRight
+                  className={cn("size-3.5", blockingIconStyles.blocking)}
+                />
+              </IssueIndicatorBadge>
+            ) : null}
+            <PullRequestPills pullRequests={issue.pullRequests} />
+          </div>
           <IssuePriorityMenu issue={issue} showLabel />
         </div>
-      </div>
-      <div className="col-start-2 hidden min-w-0 md:col-start-auto md:block">
-        <IssuePriorityMenu issue={issue} showLabel />
-      </div>
-      <div className="col-start-2 min-w-0 text-sm text-muted-foreground md:col-start-auto">
-        <span className="block truncate">
-          {issue.projects?.name ?? "Unknown project"}
-        </span>
-        {issue.projects?.repo ? (
-          <span className="block truncate text-xs">{issue.projects.repo}</span>
-        ) : null}
-      </div>
-      <div className="col-start-2 text-sm text-muted-foreground md:col-start-auto md:text-right">
-        {formatDate(issue.created_at)}
+        <div className="min-w-0 text-sm text-muted-foreground">
+          <span className="block truncate">
+            {issue.projects?.name ?? "Unknown project"}
+          </span>
+          {issue.projects?.repo ? (
+            <span className="block truncate text-xs">
+              {issue.projects.repo}
+            </span>
+          ) : null}
+        </div>
+        <div className="text-sm text-muted-foreground md:text-right">
+          {formatDate(issue.created_at)}
+        </div>
       </div>
     </div>
   )
