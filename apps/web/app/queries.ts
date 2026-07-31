@@ -6,6 +6,7 @@ import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
 import * as workersService from "@gentic/services/workers"
 import { ServiceError } from "@gentic/services/errors"
+import type { Supabase } from "@gentic/services/types"
 import {
   chatMessageSchema,
   issueEventSchema,
@@ -66,7 +67,10 @@ export type GithubRepositoryOption = {
   private: boolean
 }
 
-export type IssuePullRequest = issuesService.IssuePullRequest & {
+export type IssuePullRequest = Omit<
+  issuesService.IssuePullRequest,
+  "state"
+> & {
   state?: GithubPullRequestState
 }
 
@@ -137,19 +141,43 @@ function parseGithubPullRequestUrl(url: string) {
   return null
 }
 
-async function attachPullRequestStates<T extends { url: string }>(
+// Persisted state (`issue_pull_requests.state`) is a plain `text` column, so
+// narrow it back to `GithubPullRequestState` rather than trusting it blindly.
+function normalizePersistedState(
+  state: string | null | undefined
+): GithubPullRequestState | undefined {
+  return state === "draft" ||
+    state === "open" ||
+    state === "merged" ||
+    state === "closed" ||
+    state === "queued"
+    ? state
+    : undefined
+}
+
+// The live GitHub API call is the source of truth, but it's best-effort: a
+// rate limit, network blip, or missing GitHub App installation throws or is
+// skipped entirely. Rather than surface "unknown" on every such hiccup, fall
+// back to the last state we successfully resolved, and write back any newly
+// resolved state so future failures have a fresher fallback to use.
+async function attachPullRequestStates<
+  T extends { id: string; url: string; state?: string | null }
+>(
+  supabase: Supabase,
   pullRequests: T[],
   installationId: string | null | undefined
-): Promise<(T & { state?: GithubPullRequestState })[]> {
-  if (!installationId || pullRequests.length === 0) {
-    return pullRequests
-  }
-
+): Promise<(Omit<T, "state"> & { state?: GithubPullRequestState })[]> {
   return Promise.all(
     pullRequests.map(async (pullRequest) => {
+      const persistedState = normalizePersistedState(pullRequest.state)
+
+      if (!installationId) {
+        return { ...pullRequest, state: persistedState }
+      }
+
       const parsed = parseGithubPullRequestUrl(pullRequest.url)
       if (!parsed) {
-        return pullRequest
+        return { ...pullRequest, state: persistedState }
       }
 
       try {
@@ -159,13 +187,25 @@ async function attachPullRequestStates<T extends { url: string }>(
           parsed.repo,
           parsed.pullNumber
         )
+
+        if (state !== "unknown" && state !== persistedState) {
+          issuesService
+            .updatePullRequestState(supabase, pullRequest.id, state)
+            .catch((error) => {
+              console.error(
+                "[issue-detail] failed to persist pull request state:",
+                error
+              )
+            })
+        }
+
         return { ...pullRequest, state }
       } catch (error) {
         console.error(
           "[issue-detail] failed to fetch pull request state:",
           error
         )
-        return pullRequest
+        return { ...pullRequest, state: persistedState }
       }
     })
   )
@@ -178,7 +218,7 @@ export async function getHomeData(
   const { data: issues, error } = await supabase
     .from("issues")
     .select(
-      "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at),projects(id,name,repo,key)"
+      "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at,state),projects(id,name,repo,key)"
     )
     .order("created_at", { ascending: false })
 
@@ -199,6 +239,7 @@ export async function getHomeData(
     parsedIssues.map(async (issue) => ({
       ...issue,
       pullRequests: await attachPullRequestStates(
+        supabase,
         issue.pullRequests,
         githubIntegration?.installation_id
       ),
@@ -508,6 +549,7 @@ async function getIssueDetailDataForIssue(
     messages: messagesWithAttachments,
     attachments,
     pullRequests: await attachPullRequestStates(
+      supabase,
       pullRequests,
       githubIntegration?.installation_id
     ),

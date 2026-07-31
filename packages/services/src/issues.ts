@@ -42,6 +42,7 @@ export {
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
+  type PersistedPullRequestState,
   recordUnpublishedAgentChanges,
   requestAutomaticPrPublish,
   resetIssueAgent,
@@ -50,6 +51,7 @@ export {
   updateIssueStatus,
   updateIssueStatusByPrUrl,
   updateIssueStatusByPrUrlIfStatus,
+  updatePullRequestState,
 } from "./issues/workflow"
 export {
   applyPullRequestComment,

@@ -486,6 +486,32 @@ export async function attachIssuePullRequest(
   return result
 }
 
+export type PersistedPullRequestState =
+  | "draft"
+  | "open"
+  | "merged"
+  | "closed"
+  | "queued"
+
+// Best-effort cache write-back, called after a page load successfully
+// resolves a PR's live state from the GitHub API. Lets a later request fall
+// back to this value instead of showing "unknown" when the live fetch fails
+// (rate limit, network blip) or no GitHub App installation is connected.
+// Safe to call with the caller's own RLS-scoped client — the update policy
+// on `issue_pull_requests` enforces ownership.
+export async function updatePullRequestState(
+  supabase: Supabase,
+  pullRequestId: string,
+  state: PersistedPullRequestState
+) {
+  unwrap(
+    await supabase
+      .from("issue_pull_requests")
+      .update({ state })
+      .eq("id", pullRequestId)
+  )
+}
+
 // Called from the worker-facing `/agent/issues/[id]/unpublished-changes`
 // route whenever the agent commits work without opening a PR itself. Scoped
 // to `active_run_id` (a single conditional `UPDATE`, so the check-and-write
