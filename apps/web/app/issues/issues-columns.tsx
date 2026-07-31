@@ -221,6 +221,22 @@ export const issueTypeIconStyles: Record<IssueType, string> = {
   idea: "text-amber-600 dark:text-amber-300",
 }
 
+export function IssueTypeBadge({ type }: { type: IssueType }) {
+  const TypeIcon = issueTypeIcons[type]
+
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium",
+        issueTypeStyles[type]
+      )}
+    >
+      <TypeIcon className={cn("size-3.5", issueTypeIconStyles[type])} />
+      <span className="whitespace-nowrap">{issueTypeLabels[type]}</span>
+    </span>
+  )
+}
+
 export const blockingBadgeStyles = {
   blocked: "bg-muted text-muted-foreground",
   blocking: "bg-muted text-muted-foreground",
@@ -697,21 +713,7 @@ export function getIssuesColumns(
       id: "type",
       accessorFn: (issue) => issueTypeLabels[issue.type],
       header: ({ column }) => <SortableHeader label="Type" column={column} />,
-      cell: ({ row }) => {
-        const issue = row.original
-        const TypeIcon = issueTypeIcons[issue.type]
-
-        return (
-          <IssueIndicatorBadge
-            label={issueTypeLabels[issue.type]}
-            className={issueTypeStyles[issue.type]}
-          >
-            <TypeIcon
-              className={cn("size-3.5", issueTypeIconStyles[issue.type])}
-            />
-          </IssueIndicatorBadge>
-        )
-      },
+      cell: ({ row }) => <IssueTypeBadge type={row.original.type} />,
     },
     {
       id: "project",
