@@ -287,8 +287,11 @@ function IssueRow({
           </IssueIndicatorBadge>
         ) : null}
         <PullRequestPills pullRequests={issue.pullRequests} />
+        <div className="md:hidden">
+          <IssuePriorityMenu issue={issue} showLabel />
+        </div>
       </div>
-      <div className="col-start-2 min-w-0 md:col-start-auto">
+      <div className="col-start-2 hidden min-w-0 md:col-start-auto md:block">
         <IssuePriorityMenu issue={issue} showLabel />
       </div>
       <div className="col-start-2 min-w-0 text-sm text-muted-foreground md:col-start-auto">
