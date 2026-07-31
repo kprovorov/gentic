@@ -78,6 +78,7 @@ import {
 type IssuesViewMode = "list" | "table"
 type BlockingFilter =
   "all" | "blocked" | "non-blocked" | "blocking" | "non-blocking"
+type FilterSection = "status" | "priority" | "type" | "blocking" | "project"
 
 const pageSize = 20
 
@@ -178,6 +179,40 @@ function compareIssues(issueA: HomeIssue, issueB: HomeIssue) {
   return (
     new Date(issueB.created_at).getTime() -
     new Date(issueA.created_at).getTime()
+  )
+}
+
+function FilterMenuSection({
+  label,
+  badge,
+  expanded,
+  onToggle,
+  children,
+}: {
+  label: string
+  badge?: ReactNode
+  expanded: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <>
+      <DropdownMenuItem
+        onSelect={(event) => event.preventDefault()}
+        onClick={onToggle}
+        className="justify-between gap-3"
+      >
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {badge}
+        <IconChevronDown
+          className={cn(
+            "size-3.5 shrink-0 transition-transform",
+            expanded && "rotate-180"
+          )}
+        />
+      </DropdownMenuItem>
+      {expanded ? <div className="grid gap-0.5 pb-1">{children}</div> : null}
+    </>
   )
 }
 
@@ -439,13 +474,15 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
-  const hasActiveFilters =
-    globalFilter.length > 0 ||
-    statusFilter.size > 0 ||
-    typeFilter.size > 0 ||
-    priorityFilter.size > 0 ||
-    blockingFilter !== "all" ||
-    projectFilter.size > 0
+  const [expandedFilterSection, setExpandedFilterSection] =
+    useState<FilterSection | null>(null)
+  const activeFilterCount =
+    statusFilter.size +
+    priorityFilter.size +
+    typeFilter.size +
+    (blockingFilter !== "all" ? 1 : 0) +
+    projectFilter.size
+  const hasActiveFilters = globalFilter.length > 0 || activeFilterCount > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
 
@@ -595,6 +632,12 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setRowSelection({})
   }
 
+  function toggleFilterSection(section: FilterSection) {
+    setExpandedFilterSection((current) =>
+      current === section ? null : section
+    )
+  }
+
   function clearStatusFilter() {
     setStatusFilter(new Set())
     setPageIndex(0)
@@ -741,13 +784,19 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     className="pl-9"
                   />
                 </div>
-                <DropdownMenu>
+                <DropdownMenu
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setExpandedFilterSection(null)
+                    }
+                  }}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
-                      Status
-                      {statusFilter.size > 0 ? (
+                      Filters
+                      {activeFilterCount > 0 ? (
                         <span className={activeFilterCountBadgeStyles}>
-                          {statusFilter.size}
+                          {activeFilterCount}
                         </span>
                       ) : null}
                       <IconChevronDown className="size-3.5" />
@@ -755,244 +804,227 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
-                    className="w-60 rounded-lg bg-popover before:hidden"
+                    className="w-64 rounded-lg bg-popover before:hidden"
                   >
-                    {statusFilter.size > 0 ? (
-                      <>
+                    <FilterMenuSection
+                      label="Status"
+                      badge={
+                        statusFilter.size > 0 ? (
+                          <span className={activeFilterCountBadgeStyles}>
+                            {statusFilter.size}
+                          </span>
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "status"}
+                      onToggle={() => toggleFilterSection("status")}
+                    >
+                      {statusFilter.size > 0 ? (
                         <DropdownMenuItem onSelect={clearStatusFilter}>
                           Clear filter
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {statusOptions.map((option) => {
-                      const OptionIcon = statusIcons[option.value]
-
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={option.value}
-                          checked={statusFilter.has(option.value)}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() =>
-                            toggleStatusFilter(option.value)
-                          }
-                          className="gap-3"
-                        >
-                          <OptionIcon
-                            className={cn(
-                              "size-4",
-                              statusIconStyles[option.value]
-                            )}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {option.label}
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      aria-label={
-                        priorityFilter.size > 0
-                          ? `Priority (${priorityFilter.size})`
-                          : "Priority"
-                      }
-                    >
-                      Priority
-                      {priorityFilter.size > 0 ? (
-                        <span className={activeFilterCountBadgeStyles}>
-                          {priorityFilter.size}
-                        </span>
                       ) : null}
-                      <IconChevronDown className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-52 rounded-lg bg-popover before:hidden"
-                  >
-                    {priorityFilter.size > 0 ? (
-                      <>
+                      {statusOptions.map((option) => {
+                        const OptionIcon = statusIcons[option.value]
+
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={statusFilter.has(option.value)}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              toggleStatusFilter(option.value)
+                            }
+                            className="gap-3"
+                          >
+                            <OptionIcon
+                              className={cn(
+                                "size-4",
+                                statusIconStyles[option.value]
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {option.label}
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                    </FilterMenuSection>
+                    <DropdownMenuSeparator />
+                    <FilterMenuSection
+                      label="Priority"
+                      badge={
+                        priorityFilter.size > 0 ? (
+                          <span className={activeFilterCountBadgeStyles}>
+                            {priorityFilter.size}
+                          </span>
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "priority"}
+                      onToggle={() => toggleFilterSection("priority")}
+                    >
+                      {priorityFilter.size > 0 ? (
                         <DropdownMenuItem onSelect={clearPriorityFilter}>
                           Clear filter
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {issuePriorityOptions.map((option) => {
-                      const OptionIcon = priorityIcons[option.value]
-
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={option.value}
-                          checked={priorityFilter.has(option.value)}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() =>
-                            togglePriorityFilter(option.value)
-                          }
-                          className="gap-3"
-                        >
-                          <OptionIcon
-                            className={cn(
-                              "size-4",
-                              priorityIconStyles[option.value]
-                            )}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {issuePriorityLabels[option.value]}
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Type
-                      {typeFilter.size > 0 ? (
-                        <span className={activeFilterCountBadgeStyles}>
-                          {typeFilter.size}
-                        </span>
                       ) : null}
-                      <IconChevronDown className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-60 rounded-lg bg-popover before:hidden"
-                  >
-                    {typeFilter.size > 0 ? (
-                      <>
+                      {issuePriorityOptions.map((option) => {
+                        const OptionIcon = priorityIcons[option.value]
+
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={priorityFilter.has(option.value)}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              togglePriorityFilter(option.value)
+                            }
+                            className="gap-3"
+                          >
+                            <OptionIcon
+                              className={cn(
+                                "size-4",
+                                priorityIconStyles[option.value]
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {issuePriorityLabels[option.value]}
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                    </FilterMenuSection>
+                    <DropdownMenuSeparator />
+                    <FilterMenuSection
+                      label="Type"
+                      badge={
+                        typeFilter.size > 0 ? (
+                          <span className={activeFilterCountBadgeStyles}>
+                            {typeFilter.size}
+                          </span>
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "type"}
+                      onToggle={() => toggleFilterSection("type")}
+                    >
+                      {typeFilter.size > 0 ? (
                         <DropdownMenuItem onSelect={clearTypeFilter}>
                           Clear filter
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {issueTypeOptions.map((option) => {
-                      const OptionIcon = issueTypeIcons[option.value]
-
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={option.value}
-                          checked={typeFilter.has(option.value)}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() => toggleTypeFilter(option.value)}
-                          className="gap-3"
-                        >
-                          <OptionIcon className="size-4" />
-                          <span className="min-w-0 flex-1 truncate">
-                            {option.label}
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Blocking
-                      {blockingFilter !== "all" ? (
-                        <span
-                          className={cn(
-                            "ml-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium",
-                            blockingFilterBadgeStyles[blockingFilter]
-                          )}
-                        >
-                          {blockingFilterLabels[blockingFilter]}
-                        </span>
                       ) : null}
-                      <IconChevronDown className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-60 rounded-lg bg-popover before:hidden"
-                  >
-                    {blockingFilterOptions.map((option) => {
-                      const OptionIcon =
-                        option === "all"
-                          ? IconList
-                          : option === "blocked"
-                            ? IconLock
-                            : option === "non-blocked"
-                              ? IconLockOpen
-                              : option === "non-blocking"
-                                ? IconX
-                                : IconArrowBarToRight
+                      {issueTypeOptions.map((option) => {
+                        const OptionIcon = issueTypeIcons[option.value]
 
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={option}
-                          checked={blockingFilter === option}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() => updateBlockingFilter(option)}
-                          className="gap-3"
-                        >
-                          <OptionIcon
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={typeFilter.has(option.value)}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              toggleTypeFilter(option.value)
+                            }
+                            className="gap-3"
+                          >
+                            <OptionIcon className="size-4" />
+                            <span className="min-w-0 flex-1 truncate">
+                              {option.label}
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                    </FilterMenuSection>
+                    <DropdownMenuSeparator />
+                    <FilterMenuSection
+                      label="Blocking"
+                      badge={
+                        blockingFilter !== "all" ? (
+                          <span
                             className={cn(
-                              "size-4",
-                              blockingFilterIconStyles[option] ??
-                                "text-muted-foreground"
+                              "ml-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium",
+                              blockingFilterBadgeStyles[blockingFilter]
                             )}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {blockingFilterLabels[option]}
+                          >
+                            {blockingFilterLabels[blockingFilter]}
                           </span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Project
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "blocking"}
+                      onToggle={() => toggleFilterSection("blocking")}
+                    >
+                      {blockingFilterOptions.map((option) => {
+                        const OptionIcon =
+                          option === "all"
+                            ? IconList
+                            : option === "blocked"
+                              ? IconLock
+                              : option === "non-blocked"
+                                ? IconLockOpen
+                                : option === "non-blocking"
+                                  ? IconX
+                                  : IconArrowBarToRight
+
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={option}
+                            checked={blockingFilter === option}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              updateBlockingFilter(option)
+                            }
+                            className="gap-3"
+                          >
+                            <OptionIcon
+                              className={cn(
+                                "size-4",
+                                blockingFilterIconStyles[option] ??
+                                  "text-muted-foreground"
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {blockingFilterLabels[option]}
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                    </FilterMenuSection>
+                    <DropdownMenuSeparator />
+                    <FilterMenuSection
+                      label="Project"
+                      badge={
+                        projectFilter.size > 0 ? (
+                          <span className={activeFilterCountBadgeStyles}>
+                            {projectFilter.size}
+                          </span>
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "project"}
+                      onToggle={() => toggleFilterSection("project")}
+                    >
                       {projectFilter.size > 0 ? (
-                        <span className={activeFilterCountBadgeStyles}>
-                          {projectFilter.size}
-                        </span>
-                      ) : null}
-                      <IconChevronDown className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-60 rounded-lg bg-popover before:hidden"
-                  >
-                    {projectFilter.size > 0 ? (
-                      <>
                         <DropdownMenuItem onSelect={clearProjectFilter}>
                           Clear filter
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {availableProjects.length === 0 ? (
-                      <DropdownMenuItem disabled>No projects</DropdownMenuItem>
-                    ) : (
-                      availableProjects.map((project) => (
-                        <DropdownMenuCheckboxItem
-                          key={project.id}
-                          checked={projectFilter.has(project.id)}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={() =>
-                            toggleProjectFilter(project.id)
-                          }
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {project.name}
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      ))
-                    )}
+                      ) : null}
+                      {availableProjects.length === 0 ? (
+                        <DropdownMenuItem disabled>
+                          No projects
+                        </DropdownMenuItem>
+                      ) : (
+                        availableProjects.map((project) => (
+                          <DropdownMenuCheckboxItem
+                            key={project.id}
+                            checked={projectFilter.has(project.id)}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              toggleProjectFilter(project.id)
+                            }
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {project.name}
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        ))
+                      )}
+                    </FilterMenuSection>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 {hasActiveFilters ? (
