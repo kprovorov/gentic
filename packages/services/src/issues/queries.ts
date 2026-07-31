@@ -123,7 +123,7 @@ export async function listIssuePullRequests(
   return unwrap(
     await supabase
       .from("issue_pull_requests")
-      .select("id,issue_id,url,created_at")
+      .select("id,issue_id,url,created_at,state")
       .eq("issue_id", issueId)
       .order("created_at", { ascending: false })
       .returns<IssuePullRequest[]>()

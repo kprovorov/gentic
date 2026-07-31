@@ -31,11 +31,13 @@ const issueRow = {
       id: "pull-request-1",
       url: "https://github.com/acme/gentic/pull/41",
       created_at: "2026-07-29T12:01:00.000Z",
+      state: null,
     },
     {
       id: "pull-request-2",
       url: "https://github.com/acme/gentic/pull/42",
       created_at: "2026-07-29T12:02:00.000Z",
+      state: "open",
     },
   ],
   created_at: "2026-07-29T12:00:00.000Z",
@@ -57,10 +59,12 @@ test("home issue query contract parses and maps priority", () => {
     {
       id: "pull-request-2",
       url: "https://github.com/acme/gentic/pull/42",
+      state: "open",
     },
     {
       id: "pull-request-1",
       url: "https://github.com/acme/gentic/pull/41",
+      state: undefined,
     },
   ])
 })

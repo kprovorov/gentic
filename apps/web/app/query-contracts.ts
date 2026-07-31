@@ -33,6 +33,7 @@ export const homeIssueSchema = z.object({
       id: z.string(),
       url: z.string(),
       created_at: z.string(),
+      state: z.string().nullable(),
     })
   ),
   projects: projectOptionSchema.nullable(),
@@ -150,6 +151,21 @@ export function getDisplayIssueCode(issue: {
     : null
 }
 
+// `issue_pull_requests.state` is a plain `text` column (not an enum), so
+// narrow it back to `GithubPullRequestState` rather than trusting the value
+// unconditionally.
+function normalizePersistedPullRequestState(
+  state: string | null
+): GithubPullRequestState | undefined {
+  return state === "draft" ||
+    state === "open" ||
+    state === "merged" ||
+    state === "closed" ||
+    state === "queued"
+    ? state
+    : undefined
+}
+
 export function toProjectOption(project: ProjectOption | null) {
   return project
     ? {
@@ -173,7 +189,11 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
     created_at: issue.created_at,
     pullRequests: issue.issue_pull_requests
       .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
-      .map(({ id, url }) => ({ id, url })),
+      .map(({ id, url, state }) => ({
+        id,
+        url,
+        state: normalizePersistedPullRequestState(state),
+      })),
     projects: toProjectOption(issue.projects),
   }
 }
