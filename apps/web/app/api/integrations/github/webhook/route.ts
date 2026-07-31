@@ -453,12 +453,20 @@ async function resolveCompletedChecksForRef(
     return
   }
 
+  // The commit is pushed before the PR is opened, so the very first
+  // check_suite/workflow_run "requested" event can arrive before any PR
+  // exists for the ref — `markPendingChecksForRef` then has no PR to move to
+  // `testing`, and the run can finish and land straight on `ready-for-review`
+  // (see `resolvePrFinishStatus`) before the checks it raced against
+  // complete. Accept those statuses here too so the completed event still
+  // corrects them instead of no-op'ing against a `testing` guard that was
+  // never set.
   for (const pullNumber of pullNumbers) {
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
     const result = await issuesService.updateIssueStatusByPrUrlIfStatus(
       supabase,
       prUrl,
-      "testing",
+      ["testing", "ready-for-review", "tests-failed"],
       status
     )
 
