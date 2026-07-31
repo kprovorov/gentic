@@ -6,6 +6,7 @@ import {
   IconArrowRight,
   IconBrain,
   IconCheck,
+  IconChecks,
   IconChevronDown,
   IconFilePlus,
   IconFileText,
@@ -493,6 +494,33 @@ function MessageBody({
           <AttachmentPreviews attachments={message.attachments} />
         </BubbleContent>
       </Bubble>
+      {isUser ? <MessageDeliveryStatus message={message} /> : null}
+    </div>
+  )
+}
+
+function MessageDeliveryStatus({ message }: { message: ChatMessage }) {
+  if (message.pending === "failed") {
+    return (
+      <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-destructive">
+        <IconAlertCircle className="size-3" />
+        Failed to send
+      </div>
+    )
+  }
+
+  const isDelivered = message.pending !== "sending"
+
+  return (
+    <div
+      className="mt-1 flex items-center justify-end gap-1 text-muted-foreground/70"
+      title={isDelivered ? "Delivered" : "Sending"}
+    >
+      {isDelivered ? (
+        <IconChecks className="size-3.5" />
+      ) : (
+        <IconCheck className="size-3.5" />
+      )}
     </div>
   )
 }
