@@ -386,12 +386,12 @@ describe("IssuesView new issue dialog", () => {
 
   it("opens a shadcn dialog instead of navigating to /issues/new", async () => {
     const { user } = renderIssuesView({
-      data: baseData([issue({ id: "1", title: "Existing issue" })]),
+      data: baseData([]),
     })
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "New issue" }))
+    await user.click(screen.getByRole("button", { name: "Create issue" }))
 
     const dialog = await screen.findByRole("dialog")
     expect(
