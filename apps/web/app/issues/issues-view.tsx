@@ -30,6 +30,7 @@ import { fetchIssuesData } from "@/app/client-queries"
 import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
+import { BrandIcon } from "@/components/agent-provider-icon"
 import { useNewIssueDialog } from "@/components/new-issue-dialog-provider"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
@@ -294,13 +295,11 @@ function IssueRow({
           </div>
           <IssuePriorityMenu issue={issue} showLabel />
         </div>
-        <div className="min-w-0 text-sm text-muted-foreground">
-          <span className="block truncate">
-            {issue.projects?.name ?? "Unknown project"}
-          </span>
+        <div className="min-w-0">
           {issue.projects?.repo ? (
-            <span className="block truncate text-xs">
-              {issue.projects.repo}
+            <span className="inline-flex h-6 max-w-full items-center justify-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+              <BrandIcon name="github" className="size-3.5 shrink-0" />
+              <span className="min-w-0 truncate">{issue.projects.repo}</span>
             </span>
           ) : null}
         </div>
