@@ -746,20 +746,6 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         queryKey={queryKeys.issues}
       />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-end md:justify-between">
-          <div className="grid gap-2">
-            <p className="text-sm font-medium text-muted-foreground">Issues</p>
-            <h1 className="text-3xl">All issues</h1>
-            <p className="text-sm text-muted-foreground">
-              Track agent work, blockers, and recent project activity.
-            </p>
-          </div>
-          <Button onClick={openNewIssueDialog}>
-            <IconPlus />
-            New issue
-          </Button>
-        </header>
-
         {data.issues.length === 0 ? (
           <section className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8 text-center">
             <div className="grid gap-1">
