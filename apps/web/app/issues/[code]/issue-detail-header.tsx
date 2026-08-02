@@ -29,6 +29,10 @@ import { cn } from "@gentic/ui/utils"
 import { BrandIcon } from "@/components/agent-provider-icon"
 
 import { useIssueDelete } from "./issue-delete-button"
+import {
+  IssueDetailPriority,
+  IssueDetailStatus,
+} from "./issue-detail-status-priority"
 
 const issueTypeIcons = {
   issue: IconFileDescription,
@@ -175,7 +179,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
           }
         }}
         className={cn(
-          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
+          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
           !currentTitleState.draft && "text-muted-foreground italic"
         )}
       />
@@ -191,7 +195,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
         setIsEditing(true)
       }}
       className={cn(
-        "block w-full cursor-text border-0 bg-transparent p-0 text-left text-2xl leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-default disabled:opacity-70",
+        "block w-full cursor-text border-0 bg-transparent p-0 text-left text-lg leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-default disabled:opacity-70",
         !displayTitle && "text-muted-foreground italic"
       )}
     >
@@ -210,18 +214,24 @@ export function IssueDetailHeader({
   const { isPending, handleDelete } = useIssueDelete(issue.id)
 
   return (
-    <header className="flex min-w-0 flex-none flex-col gap-2 px-6 py-5">
-      <div className="flex min-w-0 items-start gap-3.5">
+    <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
+      <div className="flex min-w-0 items-start gap-3">
         <span
           className={cn(
-            "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl",
             issueTypeBadgeStyles[issue.type]
           )}
         >
-          <TypeIcon className={cn("size-4.5", issueTypeStyles[issue.type])} />
+          <TypeIcon className={cn("size-4", issueTypeStyles[issue.type])} />
         </span>
 
         <div className="min-w-0 flex-1">
+          {issue.code ? (
+            <p className="font-mono text-xs font-semibold text-muted-foreground">
+              {issue.code}
+            </p>
+          ) : null}
+
           <h1>
             <EditableIssueTitle issue={issue} />
           </h1>
@@ -272,6 +282,19 @@ export function IssueDetailHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 xl:hidden">
+        <IssueDetailStatus
+          issueId={issue.id}
+          status={issue.status}
+          variant="pill"
+        />
+        <IssueDetailPriority
+          issueId={issue.id}
+          priority={issue.priority}
+          variant="pill"
+        />
       </div>
     </header>
   )
