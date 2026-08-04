@@ -27,7 +27,7 @@ import {
   throwIfAborted,
 } from "./session.js"
 import { getToolStatuses, type ToolStatuses } from "./tools.js"
-import { getUsageLimitResetAt } from "./usage-limits.js"
+import { describeAgentError, getUsageLimitResetAt } from "./usage-limits.js"
 import type {
   WorkerCapabilities,
   WorkerControlResponse,
@@ -471,7 +471,7 @@ export async function processIssue(
     if (options.signal?.aborted || isSessionCancelled(error)) {
       throw error
     }
-    const message = describe(error)
+    const message = describeAgentError(error)
     const usageLimitResetAt = getUsageLimitResetAt(error)
     if (usageLimitResetAt) {
       logInfo(
