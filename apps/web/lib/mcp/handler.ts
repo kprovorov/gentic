@@ -12,11 +12,18 @@ import {
   updateIssueSchema,
   updateIssueStatusSchema,
 } from "@gentic/validators/issues"
+import {
+  createLabelSchema,
+  labelColorSchema,
+  labelNameSchema,
+  updateLabelSchema,
+} from "@gentic/validators/labels"
 import { projectSchema } from "@gentic/validators/projects"
 import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
 
 import * as issuesService from "@gentic/services/issues"
+import * as labelsService from "@gentic/services/labels"
 import * as projectsService from "@gentic/services/projects"
 
 import { resolveMcpUserId, tool } from "./lib"
@@ -42,6 +49,29 @@ const projectsOutputSchema = {
   projects: z
     .array(jsonObjectSchema)
     .describe("Projects owned by the authenticated account."),
+}
+
+const labelObjectOutputSchema = z.object({
+  id: z.string().uuid().describe("Stable Gentic label id."),
+  name: z.string().describe("Display label name with preserved casing."),
+  color: labelColorSchema.describe("Canonical #RRGGBB label color."),
+  assignment_count: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of issues assigned this label across every status."),
+})
+
+const labelOutputSchema = {
+  label: labelObjectOutputSchema.describe(
+    "An active account-owned Gentic label."
+  ),
+}
+
+const labelsOutputSchema = {
+  labels: z
+    .array(labelObjectOutputSchema)
+    .describe("Active account-owned Gentic labels."),
 }
 
 const issueOutputSchema = {
@@ -102,12 +132,14 @@ type McpServer = Parameters<Parameters<typeof createMcpHandler>[0]>[0]
 
 interface McpToolDependencies {
   issuesService: typeof issuesService
+  labelsService: typeof labelsService
   projectsService: typeof projectsService
   tool: typeof tool
 }
 
 const defaultMcpToolDependencies: McpToolDependencies = {
   issuesService,
+  labelsService,
   projectsService,
   tool,
 }
@@ -136,6 +168,96 @@ export function registerGenticMcpTools(
         structuredContent: { userId },
       }
     }
+  )
+
+  server.registerTool(
+    "list_labels",
+    {
+      title: "List Labels",
+      description:
+        "List active Gentic labels owned by the authenticated account, ordered alphabetically. Optionally search label names case-insensitively.",
+      inputSchema: {
+        search: z
+          .string()
+          .trim()
+          .max(50)
+          .optional()
+          .describe("Optional case-insensitive label name search."),
+      },
+      outputSchema: labelsOutputSchema,
+    },
+    deps.tool(async ({ supabase, userId }, input: { search?: string }) => {
+      const labels = await deps.labelsService.listLabels(supabase, userId, {
+        search: input.search,
+      })
+      return { labels }
+    })
+  )
+
+  server.registerTool(
+    "create_label",
+    {
+      title: "Create Label",
+      description:
+        "Create an active account-owned Gentic label. Omitting color chooses one of the least-used preset colors; labels do not change issue workflow state or scheduling.",
+      inputSchema: {
+        name: labelNameSchema.describe(
+          "Display label name, 1-50 characters after trimming."
+        ),
+        color: labelColorSchema
+          .optional()
+          .describe("Optional canonical #RRGGBB color."),
+      },
+      outputSchema: labelOutputSchema,
+    },
+    deps.tool(
+      async (
+        { supabase, userId },
+        input: { name: string; color?: string }
+      ) => {
+        const label = await deps.labelsService.createLabel(
+          supabase,
+          userId,
+          createLabelSchema.parse(input)
+        )
+        return { label }
+      }
+    )
+  )
+
+  server.registerTool(
+    "update_label",
+    {
+      title: "Update Label",
+      description:
+        "Rename and/or recolor an active Gentic label using its stable label id. Name collisions are rejected without merging label identities.",
+      inputSchema: {
+        id: z
+          .string()
+          .uuid()
+          .describe("The stable label id from list_labels or create_label."),
+        name: labelNameSchema
+          .optional()
+          .describe("Updated display label name."),
+        color: labelColorSchema
+          .optional()
+          .describe("Updated canonical #RRGGBB label color."),
+      },
+      outputSchema: labelOutputSchema,
+    },
+    deps.tool(
+      async (
+        { supabase, userId },
+        input: { id: string; name?: string; color?: string }
+      ) => {
+        const label = await deps.labelsService.updateLabel(
+          supabase,
+          userId,
+          updateLabelSchema.parse(input)
+        )
+        return { label }
+      }
+    )
   )
 
   server.registerTool(

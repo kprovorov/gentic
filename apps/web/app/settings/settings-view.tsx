@@ -11,6 +11,7 @@ import {
   IconPlugConnected,
   IconPlus,
   IconSearch,
+  IconTag,
   IconTrash,
 } from "@tabler/icons-react"
 
@@ -157,7 +158,17 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2 border-b pb-6">
           <p className="text-sm font-medium text-muted-foreground">Settings</p>
-          <h1 className="text-3xl">Workspace</h1>
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="text-3xl">Workspace</h1>
+            </div>
+            <Button asChild variant="outline" size="sm" className="w-fit">
+              <Link href="/settings/labels">
+                <IconTag />
+                Labels
+              </Link>
+            </Button>
+          </div>
           {workersQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading worker status...

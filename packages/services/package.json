@@ -8,6 +8,7 @@
     "./errors": "./src/errors.ts",
     "./github-integrations": "./src/github-integrations.ts",
     "./issues": "./src/issues.ts",
+    "./labels": "./src/labels.ts",
     "./projects": "./src/projects.ts",
     "./user-settings": "./src/user-settings.ts",
     "./types": "./src/types.ts",

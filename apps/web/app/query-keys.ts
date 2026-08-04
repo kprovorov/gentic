@@ -2,6 +2,7 @@ export const queryKeys = {
   home: ["home"] as const,
   issues: ["issues"] as const,
   settings: ["settings"] as const,
+  settingsLabels: (search = "") => ["settings", "labels", search] as const,
   settingsWorkers: ["settings", "workers"] as const,
   newIssue: ["issues", "new"] as const,
   issue: (id: string) => ["issues", id] as const,

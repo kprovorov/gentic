@@ -16,6 +16,8 @@ export type Updates<
 
 export type IssuePriority = Database["public"]["Enums"]["issue_priority"]
 export type Issue = Tables<"issues">
+export type Label = Tables<"labels">
+export type IssueLabel = Tables<"issue_labels">
 export type Message = Tables<"messages">
 export type IssueAutomaticPrRequest = Tables<"issue_automatic_pr_requests">
 export type Worker = Tables<"workers">

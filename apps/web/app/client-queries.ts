@@ -5,6 +5,7 @@ import type {
   IssuesData,
   NewIssueData,
   SettingsData,
+  SettingsLabelsData,
   SettingsWorkersData,
 } from "./queries"
 
@@ -72,6 +73,17 @@ export const fetchSettingsData = () =>
 
 export const fetchSettingsWorkersData = () =>
   getJson<SettingsWorkersData>("/api/app/settings/workers")
+
+export const fetchSettingsLabelsData = (search?: string) => {
+  const params = new URLSearchParams()
+  if (search) {
+    params.set("search", search)
+  }
+  const query = params.toString()
+  return getJson<SettingsLabelsData>(
+    `/api/app/settings/labels${query ? `?${query}` : ""}`
+  )
+}
 
 export const fetchNewIssueData = () =>
   getJson<NewIssueData>("/api/app/issues/new")

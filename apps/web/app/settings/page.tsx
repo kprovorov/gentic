@@ -6,7 +6,7 @@ import { SettingsView } from "./settings-view"
 
 export const metadata: Metadata = {
   title: "Projects",
-  description: "Configure the repositories Gentic can assign coding agents to.",
+  description: "Configure account settings.",
 }
 
 export default async function SettingsPage() {

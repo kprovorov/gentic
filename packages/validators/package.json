@@ -7,6 +7,7 @@
     "./agent": "./src/agent.ts",
     "./chat-events": "./src/chat-events.ts",
     "./issues": "./src/issues.ts",
+    "./labels": "./src/labels.ts",
     "./projects": "./src/projects.ts",
     "./realtime": "./src/realtime.ts",
     "./workers": "./src/workers.ts"
