@@ -34,26 +34,43 @@ export function getUsageLimitResetAt(
     : null
 }
 
+/**
+ * Renders an error for logs/persistence, unwrapping ACP `RequestError`s whose
+ * `.message` is a generic JSON-RPC string (e.g. "Internal error") by
+ * appending the real text the agent process put in `.data`. Unlike the full
+ * `describe()` used for usage-limit marker matching, this omits the stack
+ * trace since it's meant to be read directly (log lines, persisted
+ * `run_error`).
+ */
+export function describeAgentError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error)
+  }
+  return [error.message, ...acpErrorDetails(error)].filter(Boolean).join(": ")
+}
+
 function describe(error: unknown): string {
   if (error instanceof Error) {
-    const parts = [error.message, error.stack]
-
-    // ACP errors (e.g. codex-acp) carry the real error text in a JSON-RPC
-    // `data` payload instead of `.message`, which is often just "Internal
-    // error" for usage-limit failures.
-    const data = (error as { data?: unknown }).data
-    if (data && typeof data === "object") {
-      const { message, additionalDetails } = data as {
-        message?: unknown
-        additionalDetails?: unknown
-      }
-      if (typeof message === "string") parts.push(message)
-      if (typeof additionalDetails === "string") parts.push(additionalDetails)
-    }
-
+    const parts = [error.message, error.stack, ...acpErrorDetails(error)]
     return parts.filter(Boolean).join("\n")
   }
   return String(error)
+}
+
+// ACP errors (e.g. codex-acp) carry the real error text in a JSON-RPC `data`
+// payload instead of `.message`, which is often just "Internal error".
+function acpErrorDetails(error: Error): string[] {
+  const data = (error as { data?: unknown }).data
+  if (!data || typeof data !== "object") {
+    return []
+  }
+  const { message, additionalDetails } = data as {
+    message?: unknown
+    additionalDetails?: unknown
+  }
+  return [message, additionalDetails].filter(
+    (value): value is string => typeof value === "string"
+  )
 }
 
 function parseRelativeReset(message: string, now: Date): Date | null {
