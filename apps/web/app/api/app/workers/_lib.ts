@@ -1,14 +1,14 @@
 import { ServiceError } from "@gentic/services/errors"
 import { z } from "zod"
 
-import { getOptionalAuthenticatedContext } from "@/app/_lib/auth-context"
+import { getOptionalAuthenticatedServiceContext } from "@/app/_lib/auth-context"
 
 export const workerMutationNoStoreHeaders = {
   "Cache-Control": "private, no-store",
 } as const
 
 type AuthenticatedContext = NonNullable<
-  Awaited<ReturnType<typeof getOptionalAuthenticatedContext>>
+  Awaited<ReturnType<typeof getOptionalAuthenticatedServiceContext>>
 >
 
 type WorkerMutationContext = {
@@ -24,7 +24,7 @@ export function workerMutationRoute<T>(
     request: Request,
     routeContext: { params?: Promise<Record<string, string>> } = {}
   ) {
-    const context = await getOptionalAuthenticatedContext()
+    const context = await getOptionalAuthenticatedServiceContext()
     if (!context) {
       return Response.json(
         { error: { code: "unauthorized", message: "Unauthorized" } },
