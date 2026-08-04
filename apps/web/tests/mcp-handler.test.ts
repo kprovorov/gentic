@@ -27,12 +27,14 @@ class FakeServer {
 }
 
 function registerTools(
-  issuesService: Record<string, unknown> = {}
+  issuesService: Record<string, unknown> = {},
+  labelsService: Record<string, unknown> = {}
 ): Map<string, RegisteredTool> {
   const server = new FakeServer()
 
   registerGenticMcpTools(server as never, {
     issuesService: issuesService as never,
+    labelsService: labelsService as never,
     projectsService: {} as never,
     tool: ((
         run: (ctx: unknown, input: unknown) => Promise<Record<string, unknown>>
@@ -43,6 +45,104 @@ function registerTools(
 
   return server.tools
 }
+
+test("label MCP tools expose the active catalog contract", () => {
+  const tools = registerTools()
+
+  for (const name of ["list_labels", "create_label", "update_label"]) {
+    const outputSchema = tools.get(name)?.config.outputSchema
+    assert.ok(outputSchema, `${name} is registered`)
+
+    const field =
+      name === "list_labels" ? outputSchema.labels : outputSchema.label
+    assert.match(field.description ?? "", /label/i)
+
+    const candidate =
+      name === "list_labels"
+        ? [
+            {
+              id: projectId,
+              name: "Ready",
+              color: "#2563EB",
+              assignment_count: 2,
+            },
+          ]
+        : {
+            id: projectId,
+            name: "Ready",
+            color: "#2563EB",
+            assignment_count: 2,
+          }
+    assert.equal(
+      (field.safeParse as (value: unknown) => { success: boolean })(candidate)
+        .success,
+      true
+    )
+  }
+})
+
+test("create_label and update_label route through the label service", async () => {
+  const calls: Record<string, unknown>[] = []
+  const tools = registerTools(
+    {},
+    {
+      createLabel: async (
+        supabase: unknown,
+        userId: string,
+        input: Record<string, unknown>
+      ) => {
+        calls.push({ op: "create", supabase, userId, ...input })
+        return {
+          id: projectId,
+          name: input.name,
+          color: input.color,
+          assignment_count: 0,
+        }
+      },
+      updateLabel: async (
+        supabase: unknown,
+        userId: string,
+        input: Record<string, unknown>
+      ) => {
+        calls.push({ op: "update", supabase, userId, ...input })
+        return {
+          id: input.id,
+          name: input.name,
+          color: input.color,
+          assignment_count: 0,
+        }
+      },
+    }
+  )
+
+  await tools.get("create_label")?.handler({
+    name: " Ready ",
+    color: "#2563eb",
+  })
+  await tools.get("update_label")?.handler({
+    id: projectId,
+    name: "Done",
+    color: "#1d4ed8",
+  })
+
+  assert.deepEqual(calls, [
+    {
+      op: "create",
+      supabase: "supabase",
+      userId: "user_1",
+      name: "Ready",
+      color: "#2563EB",
+    },
+    {
+      op: "update",
+      supabase: "supabase",
+      userId: "user_1",
+      id: projectId,
+      name: "Done",
+      color: "#1D4ED8",
+    },
+  ])
+})
 
 test("issue MCP tools document and return priority in their output contracts", () => {
   const tools = registerTools()

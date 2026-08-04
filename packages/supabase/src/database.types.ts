@@ -204,6 +204,39 @@ export type Database = {
           },
         ]
       }
+      issue_labels: {
+        Row: {
+          created_at: string
+          issue_id: string
+          label_id: string
+        }
+        Insert: {
+          created_at?: string
+          issue_id: string
+          label_id: string
+        }
+        Update: {
+          created_at?: string
+          issue_id?: string
+          label_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_labels_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_pull_requests: {
         Row: {
           created_at: string
@@ -364,6 +397,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      labels: {
+        Row: {
+          archived_at: string | null
+          color: string
+          created_at: string
+          id: string
+          name: string
+          name_key: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          name_key?: string
+          state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          name_key?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       messages: {
         Row: {

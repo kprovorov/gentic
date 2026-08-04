@@ -2,8 +2,13 @@
 
 import { revalidatePath } from "next/cache"
 import { agentProviderSchema } from "@gentic/validators/issues"
+import {
+  createLabelSchema,
+  updateLabelSchema,
+} from "@gentic/validators/labels"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
+import * as labelsService from "@gentic/services/labels"
 import * as projectsService from "@gentic/services/projects"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as userSettingsService from "@gentic/services/user-settings"
@@ -90,4 +95,32 @@ export async function updateDefaultAgent(formData: FormData) {
 
   revalidatePath("/settings")
   revalidatePath("/issues/new")
+}
+
+export async function createLabel(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const rawColor = getString(formData, "color")
+  const label = createLabelSchema.parse({
+    name: getString(formData, "name"),
+    ...(rawColor ? { color: rawColor } : {}),
+  })
+
+  await labelsService.createLabel(supabase, userId, label)
+
+  revalidatePath("/settings/labels")
+}
+
+export async function updateLabel(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const rawName = getString(formData, "name")
+  const rawColor = getString(formData, "color")
+  const label = updateLabelSchema.parse({
+    id: getString(formData, "id"),
+    ...(rawName ? { name: rawName } : {}),
+    ...(rawColor ? { color: rawColor } : {}),
+  })
+
+  await labelsService.updateLabel(supabase, userId, label)
+
+  revalidatePath("/settings/labels")
 }

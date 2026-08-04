@@ -2,6 +2,7 @@ import "server-only"
 
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
+import * as labelsService from "@gentic/services/labels"
 import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
 import * as workersService from "@gentic/services/workers"
@@ -92,6 +93,10 @@ export type SettingsData = {
   githubAppConfigured: boolean
   githubRepositories: GithubRepositoryOption[]
   githubRepositoriesError: string | null
+}
+
+export type SettingsLabelsData = {
+  labels: labelsService.LabelCatalogItem[]
 }
 
 export type { SettingsWorker, SettingsWorkersData }
@@ -311,6 +316,16 @@ export async function getSettingsWorkersData(
 ): Promise<SettingsWorkersData> {
   const { supabase, userId } = await resolveContext(context)
   return listSettingsWorkersData(supabase, userId)
+}
+
+export async function getSettingsLabelsData(
+  context?: AuthenticatedContext,
+  filters?: { search?: string }
+): Promise<SettingsLabelsData> {
+  const { supabase, userId } = await resolveContext(context)
+  return {
+    labels: await labelsService.listLabels(supabase, userId, filters),
+  }
 }
 
 export async function getNewIssueData(

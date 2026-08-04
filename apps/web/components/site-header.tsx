@@ -9,6 +9,7 @@ import { SidebarTrigger } from "@gentic/ui/sidebar"
 function pageHeading(pathname: string): React.ReactNode {
   if (pathname === "/issues") return "Issues"
   if (pathname === "/settings") return "Projects"
+  if (pathname === "/settings/labels") return "Labels"
   if (pathname === "/issues/new") return "New issue"
   if (/^\/issues\/[^/]+\/edit$/.test(pathname)) return "Edit issue"
 
