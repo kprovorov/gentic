@@ -29,6 +29,7 @@ export {
   updateIssueTitle,
 } from "./issues/mutations"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
+export { addIssueLabels, removeIssueLabels } from "./issues/labels"
 export { slugifyIssueTitle } from "./issues/slug"
 export {
   formatPublishingRequest,

@@ -145,6 +145,38 @@ test("issueEventSchema rejects malformed priority_changed payloads", () => {
   )
 })
 
+test("issueEventSchema parses labels_changed payloads", () => {
+  const row = {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+    type: "labels_changed",
+    payload: {
+      added: [
+        { id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3", name: "bug", color: "#FF0000" },
+      ],
+      removed: [],
+    },
+    created_at: "2026-07-26T12:00:00.000Z",
+  }
+
+  assert.deepEqual(issueEventSchema.parse(row), row)
+})
+
+test("issueEventSchema rejects malformed labels_changed payloads", () => {
+  assert.throws(() =>
+    issueEventSchema.parse({
+      id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+      issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+      type: "labels_changed",
+      payload: {
+        added: [{ id: "not-a-uuid", name: "bug" }],
+        removed: [],
+      },
+      created_at: "2026-07-26T12:00:00.000Z",
+    })
+  )
+})
+
 test("issueEventSchema rejects rows missing required fields", () => {
   assert.throws(() =>
     issueEventSchema.parse({

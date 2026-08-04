@@ -21,10 +21,13 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { toast } from "sonner"
 
 import {
+  addIssueLabels,
   addIssueRelation,
   createManualIssuePullRequest,
   deleteIssueRelation,
+  removeIssueLabels,
 } from "@/app/issues/actions"
+import { IssueLabelsField } from "@/app/issues/issue-labels-field"
 import {
   statusIconStyles,
   statusIcons,
@@ -43,6 +46,7 @@ import type {
   IssueRelationIssue,
 } from "@gentic/services/issues"
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
+import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 import {
@@ -602,6 +606,91 @@ function IssueDetailRelations({
   )
 }
 
+function LabelChip({ label }: { label: LabelSnapshot }) {
+  return (
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-background px-2 text-[12.5px] font-medium ring-1 ring-border">
+      <span
+        aria-hidden
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: label.color }}
+      />
+      {label.name}
+    </span>
+  )
+}
+
+function IssueDetailLabels({
+  issueId,
+  labels,
+}: {
+  issueId: string
+  labels: LabelSnapshot[]
+}) {
+  const queryClient = useQueryClient()
+  const [optimisticIds, setOptimisticIds] = useState<string[] | null>(null)
+  const currentIds = optimisticIds ?? labels.map((label) => label.id)
+  const displayedLabels = optimisticIds
+    ? labels.filter((label) => optimisticIds.includes(label.id))
+    : labels
+
+  async function onSettled() {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+    setOptimisticIds(null)
+  }
+
+  const addMutation = useMutation({
+    mutationFn: addIssueLabels,
+    onError: () => {
+      toast.error("Failed to add label")
+    },
+    onSettled,
+  })
+  const removeMutation = useMutation({
+    mutationFn: removeIssueLabels,
+    onError: () => {
+      toast.error("Failed to remove label")
+    },
+    onSettled,
+  })
+
+  function handleSelectedIdsChange(nextIds: string[]) {
+    const addedIds = nextIds.filter((id) => !currentIds.includes(id))
+    const removedIds = currentIds.filter((id) => !nextIds.includes(id))
+    setOptimisticIds(nextIds)
+
+    if (addedIds.length > 0) {
+      const formData = new FormData()
+      formData.set("issue_id", issueId)
+      for (const id of addedIds) formData.append("label_id", id)
+      addMutation.mutate(formData)
+    }
+    if (removedIds.length > 0) {
+      const formData = new FormData()
+      formData.set("issue_id", issueId)
+      for (const id of removedIds) formData.append("label_id", id)
+      removeMutation.mutate(formData)
+    }
+  }
+
+  return (
+    <div className="grid gap-2">
+      {displayedLabels.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {displayedLabels.map((label) => (
+            <LabelChip key={label.id} label={label} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-[12.5px] text-muted-foreground">No labels yet.</p>
+      )}
+      <IssueLabelsField
+        selectedIds={currentIds}
+        onSelectedIdsChange={handleSelectedIdsChange}
+      />
+    </div>
+  )
+}
+
 function RailSection({
   title,
   action,
@@ -636,6 +725,7 @@ export function IssueDetailRail({
   pullRequests,
   relations,
   relationCandidates,
+  labels,
 }: {
   issueId: string
   issueCode: string | null
@@ -646,6 +736,7 @@ export function IssueDetailRail({
   pullRequests: IssuePullRequest[]
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
+  labels: LabelSnapshot[]
 }) {
   const queryClient = useQueryClient()
   const addRelationMutation = useMutation({
@@ -666,6 +757,10 @@ export function IssueDetailRail({
           <IssueDetailStatus issueId={issueId} status={status} />
           <IssueDetailPriority issueId={issueId} priority={priority} />
         </div>
+      </RailSection>
+
+      <RailSection title="Labels">
+        <IssueDetailLabels issueId={issueId} labels={labels} />
       </RailSection>
 
       <RailSection title="Pull requests">

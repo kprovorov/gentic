@@ -9,6 +9,8 @@ const updateIssueStatusMock = vi.fn()
 const addIssueRelationMock = vi.fn()
 const createManualIssuePullRequestMock = vi.fn()
 const deleteIssueRelationMock = vi.fn()
+const addIssueLabelsMock = vi.fn()
+const removeIssueLabelsMock = vi.fn()
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
 
@@ -21,6 +23,43 @@ vi.mock("@/app/issues/actions", () => ({
   updateIssuePriority: (formData: FormData) =>
     updateIssuePriorityMock(formData),
   updateIssueStatus: (formData: FormData) => updateIssueStatusMock(formData),
+  addIssueLabels: (formData: FormData) => addIssueLabelsMock(formData),
+  removeIssueLabels: (formData: FormData) => removeIssueLabelsMock(formData),
+}))
+
+// The real field fetches the label catalog over the network for its search
+// popover, which isn't available in this render-only suite; a minimal fake
+// exposes the add/remove affordances IssueDetailLabels actually drives.
+vi.mock("@/app/issues/issue-labels-field", () => ({
+  IssueLabelsField: ({
+    selectedIds,
+    onSelectedIdsChange,
+  }: {
+    selectedIds: string[]
+    onSelectedIdsChange: (ids: string[]) => void
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelectedIdsChange([...selectedIds, "new-label"])}
+      >
+        Add label
+      </button>
+      {selectedIds.map((id) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() =>
+            onSelectedIdsChange(
+              selectedIds.filter((selectedId) => selectedId !== id)
+            )
+          }
+        >
+          Remove {id}
+        </button>
+      ))}
+    </div>
+  ),
 }))
 
 vi.mock("sonner", () => ({
@@ -100,6 +139,7 @@ function renderRail(
         pullRequests={[]}
         relations={[]}
         relationCandidates={[]}
+        labels={[]}
         {...props}
       />
     </QueryClientProvider>
@@ -303,6 +343,51 @@ describe("IssueDetailRail priority", () => {
         queryKeys.issue(issueId)
       )?.issue.priority
     ).toBe("medium")
+  })
+})
+
+describe("IssueDetailRail labels", () => {
+  it("shows a placeholder when no labels are assigned", () => {
+    renderRail(createQueryClient(), { labels: [] })
+
+    expect(screen.getByText("No labels yet.")).toBeInTheDocument()
+  })
+
+  it("shows assigned label chips", () => {
+    renderRail(createQueryClient(), {
+      labels: [{ id: "label-1", name: "Bug", color: "#FF0000" }],
+    })
+
+    expect(screen.getByText("Bug")).toBeInTheDocument()
+    expect(screen.queryByText("No labels yet.")).not.toBeInTheDocument()
+  })
+
+  it("adds a label through the multi-select field", async () => {
+    const user = userEvent.setup()
+    renderRail(createQueryClient(), { labels: [] })
+
+    await user.click(screen.getByRole("button", { name: "Add label" }))
+
+    expect(addIssueLabelsMock).toHaveBeenCalledTimes(1)
+    const formData = addIssueLabelsMock.mock.calls[0][0] as FormData
+    expect(formData.get("issue_id")).toBe(issueId)
+    expect(formData.getAll("label_id")).toEqual(["new-label"])
+    expect(removeIssueLabelsMock).not.toHaveBeenCalled()
+  })
+
+  it("removes a label through the multi-select field", async () => {
+    const user = userEvent.setup()
+    renderRail(createQueryClient(), {
+      labels: [{ id: "label-1", name: "Bug", color: "#FF0000" }],
+    })
+
+    await user.click(screen.getByRole("button", { name: "Remove label-1" }))
+
+    expect(removeIssueLabelsMock).toHaveBeenCalledTimes(1)
+    const formData = removeIssueLabelsMock.mock.calls[0][0] as FormData
+    expect(formData.get("issue_id")).toBe(issueId)
+    expect(formData.getAll("label_id")).toEqual(["label-1"])
+    expect(addIssueLabelsMock).not.toHaveBeenCalled()
   })
 })
 

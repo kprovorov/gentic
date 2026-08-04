@@ -8,6 +8,7 @@ import {
   issueRelationDirectionSchema,
   issueStatusSchema,
   issueTypeSchema,
+  mutateIssueLabelsSchema,
   updateIssuePrioritySchema,
   updateIssueSchema,
   updateIssueStatusSchema,
@@ -118,6 +119,43 @@ const relationsOutputSchema = {
   relations: z
     .array(jsonObjectSchema)
     .describe("Blocking relations involving the given issue."),
+}
+
+const mutatedIssueLabelsInputSchema = {
+  issue_ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(100)
+    .describe(
+      "Issue ids owned by the authenticated account, from list_issues, create_issue, or get_issue. Up to 100 per call."
+    ),
+  label_ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(20)
+    .describe(
+      "Active label ids owned by the authenticated account, from list_labels or create_label. Up to 20 per call."
+    ),
+}
+
+const addedIssueLabelsOutputSchema = {
+  issue_ids: z
+    .array(z.string().uuid())
+    .describe("The issue ids passed as issue_ids."),
+  label_ids: z
+    .array(z.string().uuid())
+    .describe("The label ids passed as label_ids."),
+  added: z.literal(true).describe("True when the call completed."),
+}
+
+const removedIssueLabelsOutputSchema = {
+  issue_ids: z
+    .array(z.string().uuid())
+    .describe("The issue ids passed as issue_ids."),
+  label_ids: z
+    .array(z.string().uuid())
+    .describe("The label ids passed as label_ids."),
+  removed: z.literal(true).describe("True when the call completed."),
 }
 
 const relationCandidatesOutputSchema = {
@@ -803,6 +841,66 @@ export function registerGenticMcpTools(
           values.issue_id
         )
         return { id: values.id, deleted: true as const }
+      }
+    )
+  )
+
+  server.registerTool(
+    "add_issue_labels",
+    {
+      title: "Add Issue Labels",
+      description:
+        "Assign one or more active Gentic labels to one or more issues owned by the authenticated account. Every issue id and label id must be valid and owned by the caller or the whole call is rejected; already-assigned pairs are no-ops. An issue accepts at most 20 labels.",
+      inputSchema: mutatedIssueLabelsInputSchema,
+      outputSchema: addedIssueLabelsOutputSchema,
+    },
+    deps.tool(
+      async (
+        { supabase, userId },
+        input: { issue_ids: string[]; label_ids: string[] }
+      ) => {
+        const values = mutateIssueLabelsSchema.parse(input)
+        await deps.issuesService.addIssueLabels(
+          supabase,
+          userId,
+          values.issue_ids,
+          values.label_ids
+        )
+        return {
+          issue_ids: values.issue_ids,
+          label_ids: values.label_ids,
+          added: true as const,
+        }
+      }
+    )
+  )
+
+  server.registerTool(
+    "remove_issue_labels",
+    {
+      title: "Remove Issue Labels",
+      description:
+        "Remove one or more active Gentic labels from one or more issues owned by the authenticated account. Every issue id and label id must be valid and owned by the caller or the whole call is rejected; pairs that aren't assigned are no-ops. Removal works at every issue status, including when an issue already has 20 labels.",
+      inputSchema: mutatedIssueLabelsInputSchema,
+      outputSchema: removedIssueLabelsOutputSchema,
+    },
+    deps.tool(
+      async (
+        { supabase, userId },
+        input: { issue_ids: string[]; label_ids: string[] }
+      ) => {
+        const values = mutateIssueLabelsSchema.parse(input)
+        await deps.issuesService.removeIssueLabels(
+          supabase,
+          userId,
+          values.issue_ids,
+          values.label_ids
+        )
+        return {
+          issue_ids: values.issue_ids,
+          label_ids: values.label_ids,
+          removed: true as const,
+        }
       }
     )
   )

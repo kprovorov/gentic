@@ -176,13 +176,38 @@ export const issuePriorityChangedPayloadSchema = z.object({
   to: issuePrioritySchema,
 })
 
-const knownIssueEventTypeSchema = z.enum(["priority_changed"])
+export const labelSnapshotSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  color: z.string(),
+})
+
+export type LabelSnapshot = z.infer<typeof labelSnapshotSchema>
+
+export const issueLabelsChangedPayloadSchema = z.object({
+  added: z.array(labelSnapshotSchema),
+  removed: z.array(labelSnapshotSchema),
+})
+
+export type IssueLabelsChangedPayload = z.infer<
+  typeof issueLabelsChangedPayloadSchema
+>
+
+const knownIssueEventTypeSchema = z.enum(["priority_changed", "labels_changed"])
 
 const priorityChangedIssueEventSchema = z.object({
   id: z.string().uuid(),
   issue_id: z.string().uuid(),
   type: z.literal("priority_changed"),
   payload: issuePriorityChangedPayloadSchema,
+  created_at: z.string(),
+})
+
+const labelsChangedIssueEventSchema = z.object({
+  id: z.string().uuid(),
+  issue_id: z.string().uuid(),
+  type: z.literal("labels_changed"),
+  payload: issueLabelsChangedPayloadSchema,
   created_at: z.string(),
 })
 
@@ -196,6 +221,7 @@ const genericIssueEventSchema = z.object({
 
 export const issueEventSchema = z.union([
   priorityChangedIssueEventSchema,
+  labelsChangedIssueEventSchema,
   genericIssueEventSchema,
 ])
 

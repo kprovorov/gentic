@@ -447,6 +447,50 @@ describe("IssueTimeline", () => {
     expect(screen.getByText("Urgent")).toBeInTheDocument()
   })
 
+  it("renders added and removed label chips for a labels milestone", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "labels-milestone",
+            key: "evt-labels",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            added: [{ id: "label-1", name: "Bug", color: "#FF0000" }],
+            removed: [{ id: "label-2", name: "Feature", color: "#00FF00" }],
+          },
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+      />
+    )
+
+    expect(screen.getByText("Added")).toBeInTheDocument()
+    expect(screen.getByText("Bug")).toBeInTheDocument()
+    expect(screen.getByText("Removed")).toBeInTheDocument()
+    expect(screen.getByText("Feature")).toBeInTheDocument()
+  })
+
+  it("renders only the added group when nothing was removed", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "labels-milestone",
+            key: "evt-labels-added-only",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            added: [{ id: "label-1", name: "Bug", color: "#FF0000" }],
+            removed: [],
+          },
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+      />
+    )
+
+    expect(screen.getByText("Added")).toBeInTheDocument()
+    expect(screen.queryByText("Removed")).not.toBeInTheDocument()
+  })
+
   it("renders pr-opened and pr-merged nodes with links", () => {
     render(
       <IssueTimeline

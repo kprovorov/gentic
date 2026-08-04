@@ -1,4 +1,7 @@
-import type { IssueEventContract } from "@gentic/validators/realtime"
+import type {
+  IssueEventContract,
+  LabelSnapshot,
+} from "@gentic/validators/realtime"
 
 import type { ChatMessage } from "../issue-chat-state"
 
@@ -18,6 +21,13 @@ export type TimelineItem =
       timestamp: string
       from: string | null
       to: string | null
+    }
+  | {
+      kind: "labels-milestone"
+      key: string
+      timestamp: string
+      added: LabelSnapshot[]
+      removed: LabelSnapshot[]
     }
   | { kind: "pr-opened"; key: string; timestamp: string; prUrl: string | null }
   | { kind: "pr-merged"; key: string; timestamp: string; prUrl: string | null }
@@ -82,6 +92,14 @@ function eventToTimelineItem(event: IssueEventContract): TimelineItem {
         from: readStringField(event.payload, "from"),
         to: readStringField(event.payload, "to"),
       }
+    case "labels_changed":
+      return {
+        kind: "labels-milestone",
+        key,
+        timestamp,
+        added: readLabelSnapshotArrayField(event.payload, "added"),
+        removed: readLabelSnapshotArrayField(event.payload, "removed"),
+      }
     // `status_changed` is the default for any unrecognized future event
     // type too, so the timeline degrades gracefully instead of dropping it.
     case "status_changed":
@@ -102,6 +120,14 @@ function readStringField(
 ): string | null {
   const value = payload[key]
   return typeof value === "string" ? value : null
+}
+
+function readLabelSnapshotArrayField(
+  payload: Record<string, unknown>,
+  key: string
+): LabelSnapshot[] {
+  const value = payload[key]
+  return Array.isArray(value) ? (value as LabelSnapshot[]) : []
 }
 
 // Timestamps are compared as strings (ISO 8601 sorts lexicographically), the
