@@ -61,6 +61,20 @@ The **agent API** authenticates with a **worker-specific credential** (`Authoriz
 
 Each worker is a row in `public.workers`, obtained by exchanging a single-use, 10-minute enrollment code (`gentic worker connect <code>`, generated from the web Settings page) for a stable worker id and credential — there is no shared key and no automatic backfill of a prior single-worker setup. Workers report heartbeats every 30s (`last_seen_at`) and are considered `online` for `WORKER_OFFLINE_AFTER_MS` (90s) after the last one; the Settings UI polls every 15s. A worker also polls a lightweight control endpoint every 10s to learn if it's been banned, so a banned worker's process self-terminates within ~10s. Banning or deleting a worker (`ban_worker`/`delete_worker` RPCs) atomically requeues its active, non-terminal issues back to `todo`; deleting additionally force-expires the credential immediately. A separate `pg_cron` job (`reconcile_offline_worker_runs`, every 30s) fails — but does **not** requeue — runs whose worker has gone silent for 5 minutes, so a crashed/partitioned worker's issues surface as `run-failed` for manual retry rather than looping forever. See `packages/services/src/workers.ts`, `supabase/migrations/20260729*_*worker*.sql`, and `docs/web/connected-workers.mdx`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in the Gentic app itself (project "Gentic", `kprovorov/gentic`), managed via the `mcp__gentic__*` MCP tools — this repo dogfoods its own product. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Gentic has no native labels; the five canonical triage roles map to its `status` field plus a title-prefix convention. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
 ## Conventions
 
 - Prettier: **no semicolons**, double quotes, 2-space, `printWidth` 80, `trailingComma: es5`. Tailwind classes are auto-sorted; `cn`/`cva` are registered Tailwind functions.
