@@ -105,9 +105,11 @@ export async function createLabel(formData: FormData) {
     ...(rawColor ? { color: rawColor } : {}),
   })
 
-  await labelsService.createLabel(supabase, userId, label)
+  const created = await labelsService.createLabel(supabase, userId, label)
 
   revalidatePath("/settings/labels")
+
+  return created
 }
 
 export async function updateLabel(formData: FormData) {

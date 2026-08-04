@@ -225,8 +225,65 @@ test("create_issue defaults priority to medium without changing other defaults",
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    label_ids: [],
   })
   assert.deepEqual(result, { issue: { id: issueId, priority: "medium" } })
+})
+
+test("create_issue passes deduped label_ids through to the issue service", async () => {
+  let createInput: Record<string, unknown> | null = null
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const tools = registerTools({
+    createIssue: async (
+      supabase: unknown,
+      userId: string,
+      input: Record<string, unknown>
+    ) => {
+      createInput = { supabase, userId, ...input }
+      return { id: issueId, priority: input.priority }
+    },
+  })
+
+  await tools.get("create_issue")?.handler({
+    project_id: projectId,
+    title: "Labeled issue",
+    label_ids: [labelId, labelId],
+  })
+
+  assert.deepEqual(createInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    project_id: projectId,
+    title: "Labeled issue",
+    status: "draft",
+    priority: "medium",
+    create_pr_automatically: false,
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+    label_ids: [labelId],
+  })
+})
+
+test("create_issue surfaces a stale label id error instead of swallowing it", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({
+    createIssue: async () => {
+      throw new ServiceError("not_found", "Label not found.")
+    },
+  })
+  const handler = tools.get("create_issue")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () =>
+      handler({
+        project_id: projectId,
+        title: "Labeled issue",
+        label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
+      }),
+    (error: unknown) => error instanceof ServiceError && error.code === "not_found"
+  )
 })
 
 test("update_issue passes priority through the ownership-checked update service", async () => {

@@ -56,6 +56,41 @@ test("createIssueSchema preserves explicit automatic PR opt-in", () => {
   assert.equal(createValues.create_pr_automatically, true)
 })
 
+test("createIssueSchema defaults label_ids to an empty array", () => {
+  const createValues = createIssueSchema.parse({
+    project_id: projectId,
+    status: "draft",
+  })
+
+  assert.deepEqual(createValues.label_ids, [])
+})
+
+test("createIssueSchema dedupes repeated label_ids", () => {
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const createValues = createIssueSchema.parse({
+    project_id: projectId,
+    status: "draft",
+    label_ids: [labelId, labelId],
+  })
+
+  assert.deepEqual(createValues.label_ids, [labelId])
+})
+
+test("createIssueSchema rejects more than 20 unique label_ids", () => {
+  const labelIds = Array.from(
+    { length: 21 },
+    (_, index) => `6f14e45f-ceea-467e-b7ea-05a3e2b3${index.toString().padStart(4, "0")}`
+  )
+
+  assert.throws(() =>
+    createIssueSchema.parse({
+      project_id: projectId,
+      status: "draft",
+      label_ids: labelIds,
+    })
+  )
+})
+
 test("updateIssueSchema preserves explicit automatic PR edits", () => {
   const updateValues = updateIssueSchema.parse({
     id: issueId,

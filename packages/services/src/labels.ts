@@ -178,6 +178,29 @@ export async function createLabel(
   return (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
 }
 
+// Verifies every id refers to an active label owned by `userId` in one query
+// — covers stale ids, cross-account ids, and archived labels alike. Callers
+// that pass an empty array should skip this check themselves.
+export async function ensureLabelsAssignable(
+  supabase: Supabase,
+  userId: string,
+  labelIds: string[]
+): Promise<void> {
+  const rows = unwrap(
+    await supabase
+      .from("labels")
+      .select("id")
+      .in("id", labelIds)
+      .eq("user_id", userId)
+      .eq("state", "active")
+      .returns<Array<{ id: string }>>()
+  )
+
+  if (rows.length !== labelIds.length) {
+    throw new ServiceError("not_found", "Label not found.")
+  }
+}
+
 export async function updateLabel(
   supabase: Supabase,
   userId: string,

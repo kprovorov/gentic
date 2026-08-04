@@ -459,6 +459,7 @@ test("createIssue persists the requested priority", async () => {
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    label_ids: [],
   })) as unknown as Row
 
   assert.equal(issue.priority, "urgent")
@@ -480,6 +481,7 @@ test("createIssue persists explicit automatic PR preference", async () => {
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    label_ids: [],
   })) as unknown as Row
 
   assert.equal(issue.create_pr_automatically, true)

@@ -139,6 +139,13 @@ export const createIssueSchema = z.object({
   // classified in the background after the issue is saved, so it defaults
   // to the "issue" placeholder until then.
   type: issueTypeSchema.default("issue"),
+  label_ids: z
+    .array(z.string().uuid())
+    .default([])
+    .transform((ids) => Array.from(new Set(ids)))
+    .refine((ids) => ids.length <= 20, {
+      message: "An issue accepts at most 20 labels.",
+    }),
 })
 
 export type CreateIssueValues = z.infer<typeof createIssueSchema>
