@@ -7,6 +7,7 @@ import type {
 import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
+import { ensureLabelsAssignable } from "../labels"
 import type { Supabase } from "../types"
 import { logIssueEvent } from "./events"
 import {
@@ -23,6 +24,10 @@ export async function createIssue(
   input: CreateIssueValues
 ) {
   await ensureProjectOwned(supabase, userId, input.project_id)
+
+  if (input.label_ids.length > 0) {
+    await ensureLabelsAssignable(supabase, userId, input.label_ids)
+  }
 
   const number = unwrap(
     await supabase.rpc("next_issue_number_for_project", {
@@ -48,6 +53,26 @@ export async function createIssue(
     .single()
 
   const issue = unwrap(result)
+
+  if (input.label_ids.length > 0) {
+    // The ownership/active-state check above already ran, but a label can
+    // still be archived or deleted in the race window between that check and
+    // this insert (account-scope and 20-per-issue triggers guard against
+    // that too) — if assignment fails, delete the issue we just created
+    // rather than leaving a labelless issue behind, so creation stays
+    // all-or-nothing for callers.
+    const assignmentResult = await supabase.from("issue_labels").insert(
+      input.label_ids.map((labelId) => ({
+        issue_id: issue.id,
+        label_id: labelId,
+      }))
+    )
+
+    if (assignmentResult.error) {
+      await supabase.from("issues").delete().eq("id", issue.id)
+      throw new ServiceError("internal", assignmentResult.error.message)
+    }
+  }
 
   if (input.status !== "todo") {
     return issue

@@ -1,9 +1,12 @@
 import type React from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import { createLabel } from "@/app/settings/actions"
+import type { SettingsLabelsData } from "@/app/queries"
 import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssueCreateForm } from "./issue-create-form"
@@ -11,6 +14,10 @@ import { IssueCreateForm } from "./issue-create-form"
 vi.mock("@/app/issues/actions", () => ({
   runIssue: vi.fn(),
   saveIssueDraft: vi.fn(),
+}))
+
+vi.mock("@/app/settings/actions", () => ({
+  createLabel: vi.fn(),
 }))
 
 const projects = [
@@ -22,6 +29,34 @@ const projects = [
   },
 ]
 
+function label(overrides: Partial<SettingsLabelsData["labels"][number]>) {
+  return {
+    id: "label-bug",
+    name: "Bug",
+    color: "#2563EB",
+    state: "active" as const,
+    created_at: "2026-08-04T00:00:00.000Z",
+    updated_at: "2026-08-04T00:00:00.000Z",
+    assignment_count: 0,
+    ...overrides,
+  }
+}
+
+const defaultLabels = [
+  label({ id: "label-bug", name: "Bug" }),
+  label({ id: "label-feature", name: "Feature", color: "#16A34A" }),
+]
+
+function stubLabelsFetch(labels: SettingsLabelsData["labels"]) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ labels }),
+    })
+  )
+}
+
 class TestResizeObserver {
   observe() {}
   unobserve() {}
@@ -29,15 +64,32 @@ class TestResizeObserver {
 }
 
 function renderForm(ui: React.ReactElement) {
-  return render(<TooltipProvider>{ui}</TooltipProvider>)
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+
+  return {
+    queryClient,
+    user: userEvent.setup(),
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>{ui}</TooltipProvider>
+      </QueryClientProvider>
+    ),
+  }
 }
 
 describe("IssueCreateForm", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", TestResizeObserver)
+    stubLabelsFetch(defaultLabels)
     window.localStorage.clear()
     vi.mocked(runIssue).mockClear()
     vi.mocked(saveIssueDraft).mockClear()
+    vi.mocked(createLabel).mockReset()
   })
 
   it("restores the saved prompt from browser storage", async () => {
@@ -326,5 +378,138 @@ describe("IssueCreateForm", () => {
         screen.getAllByText(/ready-for-review pull request/)[0]
       ).toBeVisible()
     })
+  })
+
+  it("filters the label picker by search", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+    expect(screen.getByRole("checkbox", { name: "Feature" })).toBeVisible()
+
+    await user.type(screen.getByPlaceholderText("Search labels"), "bu")
+
+    expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    expect(
+      screen.queryByRole("checkbox", { name: "Feature" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("selects and deselects a label, toggling its hidden input", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+
+    await user.click(screen.getByRole("checkbox", { name: "Bug" }))
+
+    expect(screen.getByDisplayValue("label-bug")).toHaveAttribute(
+      "name",
+      "label_id"
+    )
+    expect(screen.getByRole("button", { name: "1 label" })).toBeVisible()
+
+    await user.click(screen.getByRole("checkbox", { name: "Bug" }))
+
+    expect(screen.queryByDisplayValue("label-bug")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Labels" })).toBeVisible()
+  })
+
+  it("creates a label inline, auto-selects it, and shows no color chooser", async () => {
+    vi.mocked(createLabel).mockResolvedValue(
+      label({ id: "label-chore", name: "Chore" })
+    )
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+    await user.type(screen.getByPlaceholderText("Search labels"), "Chore")
+
+    expect(screen.queryByLabelText(/color/i)).not.toBeInTheDocument()
+    expect(
+      document.querySelector('input[type="color"]')
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /Create.*Chore/ }))
+
+    await waitFor(() => {
+      expect(createLabel).toHaveBeenCalledTimes(1)
+    })
+    const formData = vi.mocked(createLabel).mock.calls[0][0] as FormData
+    expect(formData.get("name")).toBe("Chore")
+    expect(formData.get("color")).toBeNull()
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("label-chore")).toHaveAttribute(
+        "name",
+        "label_id"
+      )
+    })
+  })
+
+  it("caps selection at 20 labels, disabling unselected rows and inline create while keeping selections removable", async () => {
+    const manyLabels = Array.from({ length: 21 }, (_, index) =>
+      label({
+        id: `label-${String(index + 1).padStart(2, "0")}`,
+        name: `Label ${String(index + 1).padStart(2, "0")}`,
+      })
+    )
+    stubLabelsFetch(manyLabels)
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await waitFor(() => {
+      expect(
+        screen.getByRole("checkbox", { name: "Label 01" })
+      ).toBeVisible()
+    })
+
+    for (let index = 1; index <= 20; index += 1) {
+      const name = `Label ${String(index).padStart(2, "0")}`
+      await user.click(screen.getByRole("checkbox", { name }))
+    }
+
+    expect(screen.getByText("20/20")).toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Label 21" })).toBeDisabled()
+
+    await user.type(screen.getByPlaceholderText("Search labels"), "New one")
+    expect(
+      screen.getByRole("button", { name: /Create.*New one/ })
+    ).toBeDisabled()
+
+    await user.clear(screen.getByPlaceholderText("Search labels"))
+    const firstSelected = screen.getByRole("checkbox", { name: "Label 01" })
+    expect(firstSelected).not.toBeDisabled()
+    await user.click(firstSelected)
+
+    expect(screen.getByText("19/20")).toBeVisible()
+  })
+
+  it("keeps selected labels selected when the project changes", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+    await user.click(screen.getByRole("checkbox", { name: "Bug" }))
+    expect(screen.getByDisplayValue("label-bug")).toHaveAttribute(
+      "name",
+      "label_id"
+    )
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+
+    expect(screen.getByDisplayValue("label-bug")).toHaveAttribute(
+      "name",
+      "label_id"
+    )
   })
 })

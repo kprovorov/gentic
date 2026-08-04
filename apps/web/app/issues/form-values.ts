@@ -27,6 +27,7 @@ export function parseCreateIssueFormData(formData: FormData) {
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getString(formData, "issue_model") || null,
     priority: getString(formData, "priority") || undefined,
+    label_ids: formData.getAll("label_id").map(String),
   })
 }
 

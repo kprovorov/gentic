@@ -497,6 +497,13 @@ export function registerGenticMcpTools(
           .describe(
             "Issue type: feature, bug, feedback, or idea. Defaults to feature."
           ),
+        label_ids: z
+          .array(z.string().uuid())
+          .max(20)
+          .optional()
+          .describe(
+            "Optional stable label ids to assign at creation, from list_labels or create_label. An issue accepts at most 20 labels; every id must be an active label owned by the authenticated account or the whole call is rejected and no issue is created."
+          ),
       },
       outputSchema: issueOutputSchema,
     },
@@ -511,6 +518,7 @@ export function registerGenticMcpTools(
           priority?: z.infer<typeof issuePrioritySchema>
           agent_provider?: z.infer<typeof agentProviderSchema>
           type?: z.infer<typeof issueTypeSchema>
+          label_ids?: string[]
         }
       ) => {
         const issue = await deps.issuesService.createIssue(
@@ -522,6 +530,7 @@ export function registerGenticMcpTools(
             priority: input.priority ?? "medium",
             agent_provider: input.agent_provider ?? "claude_code",
             type: input.type ?? "feature",
+            label_ids: input.label_ids ?? [],
           })
         )
         return { issue }

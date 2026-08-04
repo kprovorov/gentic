@@ -31,6 +31,7 @@ import {
 } from "@gentic/validators/issues"
 
 import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
+import { IssueLabelsField } from "./issue-labels-field"
 import {
   issuePriorityIcons,
   issuePriorityLabels,
@@ -145,6 +146,7 @@ export function IssueCreateForm({
   const [issueModel, setIssueModel] = useState<string | null>(null)
   const [priority, setPriority] = useState<IssuePriority>(defaultIssuePriority)
   const [projectId, setProjectId] = useState("")
+  const [labelIds, setLabelIds] = useState<string[]>([])
   const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
   const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
@@ -363,6 +365,11 @@ export function IssueCreateForm({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <IssueLabelsField
+            selectedIds={labelIds}
+            onSelectedIdsChange={setLabelIds}
+          />
         </div>
       }
       belowField={
@@ -403,6 +410,9 @@ export function IssueCreateForm({
       <input type="hidden" name="priority" value={priority} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <input type="hidden" name="issue_model" value={issueModel ?? ""} />
+      {labelIds.map((id) => (
+        <input key={id} type="hidden" name="label_id" value={id} />
+      ))}
       <label className="sr-only" htmlFor="issue-prompt">
         Prompt
       </label>
