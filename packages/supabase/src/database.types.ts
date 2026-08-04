@@ -416,7 +416,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
-          name_key?: never
+          name_key?: string
           state?: string
           updated_at?: string
           user_id: string
@@ -427,7 +427,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
-          name_key?: never
+          name_key?: string
           state?: string
           updated_at?: string
           user_id?: string

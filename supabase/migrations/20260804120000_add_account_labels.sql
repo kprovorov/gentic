@@ -2,7 +2,7 @@ create table public.labels (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
   name text not null,
-  name_key text generated always as (lower(name)) stored,
+  name_key text generated always as (lower(name)) stored not null,
   color text not null,
   state text not null default 'active',
   archived_at timestamptz,
