@@ -240,6 +240,10 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
   Accepted values: `feature`, `bug`, `feedback`, `idea`
 </ParamField>
 
+<ParamField body="create_pr_automatically" type="boolean">
+  Whether Gentic automatically opens a pull request when the agent finishes. Defaults to `true`. Set to `false` to have the agent stop before publishing a PR.
+</ParamField>
+
 <Expandable title="Output fields">
   <ResponseField name="issue" type="object">
     The newly created issue object.
@@ -284,6 +288,10 @@ Updates the title, body, agent provider, issue model, type, and priority for an 
   Updated issue priority.
 
   Accepted values: `low`, `medium`, `high`, `urgent`
+</ParamField>
+
+<ParamField body="create_pr_automatically" type="boolean">
+  Whether Gentic automatically opens a pull request when the agent finishes. Omit to leave the current value unchanged. Ignored once the issue already has an attached pull request.
 </ParamField>
 
 <Expandable title="Output fields">

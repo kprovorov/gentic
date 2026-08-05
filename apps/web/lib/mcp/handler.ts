@@ -734,6 +734,13 @@ export function registerGenticMcpTools(
           .describe(
             "Issue type: feature, bug, feedback, or idea. Defaults to feature."
           ),
+        create_pr_automatically: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe(
+            "Whether Gentic automatically opens a pull request when the agent finishes. Defaults to true."
+          ),
         label_ids: z
           .array(z.string().uuid())
           .max(20)
@@ -755,6 +762,7 @@ export function registerGenticMcpTools(
           priority?: z.infer<typeof issuePrioritySchema>
           agent_provider?: z.infer<typeof agentProviderSchema>
           type?: z.infer<typeof issueTypeSchema>
+          create_pr_automatically?: boolean
           label_ids?: string[]
         }
       ) => {
@@ -767,6 +775,7 @@ export function registerGenticMcpTools(
             priority: input.priority ?? "medium",
             agent_provider: input.agent_provider ?? "claude_code",
             type: input.type ?? "feature",
+            create_pr_automatically: input.create_pr_automatically ?? true,
             label_ids: input.label_ids ?? [],
           })
         )
@@ -811,6 +820,12 @@ export function registerGenticMcpTools(
         type: issueTypeSchema.describe(
           "Issue type: feature, bug, feedback, or idea."
         ),
+        create_pr_automatically: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether Gentic automatically opens a pull request when the agent finishes. Omit to leave unchanged."
+          ),
       },
       outputSchema: issueOutputSchema,
     },
@@ -825,6 +840,7 @@ export function registerGenticMcpTools(
           issue_model?: z.infer<typeof issueModelSchema>
           priority: z.infer<typeof issuePrioritySchema>
           type: z.infer<typeof issueTypeSchema>
+          create_pr_automatically?: boolean
         }
       ) => {
         const { id, ...values } = input
