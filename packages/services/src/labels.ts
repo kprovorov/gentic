@@ -178,27 +178,33 @@ export async function createLabel(
   return (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
 }
 
+export type LabelSnapshot = { id: string; name: string; color: string }
+
 // Verifies every id refers to an active label owned by `userId` in one query
 // — covers stale ids, cross-account ids, and archived labels alike. Callers
-// that pass an empty array should skip this check themselves.
+// that pass an empty array should skip this check themselves. Returns the
+// matched labels' name/color so callers can build event snapshots without a
+// second query.
 export async function ensureLabelsAssignable(
   supabase: Supabase,
   userId: string,
   labelIds: string[]
-): Promise<void> {
+): Promise<LabelSnapshot[]> {
   const rows = unwrap(
     await supabase
       .from("labels")
-      .select("id")
+      .select("id,name,color")
       .in("id", labelIds)
       .eq("user_id", userId)
       .eq("state", "active")
-      .returns<Array<{ id: string }>>()
+      .returns<LabelSnapshot[]>()
   )
 
   if (rows.length !== labelIds.length) {
     throw new ServiceError("not_found", "Label not found.")
   }
+
+  return rows
 }
 
 export async function updateLabel(

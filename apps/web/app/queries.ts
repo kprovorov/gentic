@@ -11,6 +11,7 @@ import type { Supabase } from "@gentic/services/types"
 import {
   chatMessageSchema,
   issueEventSchema,
+  type LabelSnapshot,
 } from "@gentic/validators/realtime"
 import { z } from "zod"
 
@@ -115,6 +116,7 @@ export type IssueDetailData = {
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
   events: IssueEvent[]
+  labels: LabelSnapshot[]
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
@@ -482,6 +484,7 @@ async function getIssueDetailDataForIssue(
     { data: messages, error: messagesError },
     { data: attachmentRows, error: attachmentsError },
     { data: eventRows, error: eventsError },
+    { data: issueLabelRows, error: issueLabelsError },
     pullRequests,
     { data: automaticPrRequestRows, error: automaticPrRequestsError },
     relations,
@@ -507,6 +510,12 @@ async function getIssueDetailDataForIssue(
       .select("id,issue_id,type,payload,created_at")
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("issue_labels")
+      .select("labels!inner(id,name,color,state)")
+      .eq("issue_id", id)
+      .eq("labels.state", "active")
+      .returns<Array<{ labels: LabelSnapshot & { state: string } }>>(),
     issuesService.listIssuePullRequests(supabase, userId, id),
     supabase
       .from("issue_automatic_pr_requests")
@@ -527,9 +536,17 @@ async function getIssueDetailDataForIssue(
   if (eventsError) {
     throw new Error(eventsError.message)
   }
+  if (issueLabelsError) {
+    throw new Error(issueLabelsError.message)
+  }
   if (automaticPrRequestsError) {
     throw new Error(automaticPrRequestsError.message)
   }
+
+  const labels = (issueLabelRows ?? [])
+    .map((row) => row.labels)
+    .map(({ id: labelId, name, color }) => ({ id: labelId, name, color }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
 
   const events = z.array(issueEventSchema).parse(eventRows ?? [])
 
@@ -572,6 +589,7 @@ async function getIssueDetailDataForIssue(
     relations,
     relationCandidates,
     events,
+    labels,
   }
 }
 

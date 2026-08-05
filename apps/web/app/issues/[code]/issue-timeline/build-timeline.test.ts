@@ -156,6 +156,44 @@ test("maps priority_changed events to priority-milestone items with from/to", ()
   })
 })
 
+test("maps labels_changed events to labels-milestone items with added/removed snapshots", () => {
+  const added = [{ id: "label-1", name: "Bug", color: "#FF0000" }]
+  const removed = [{ id: "label-2", name: "Feature", color: "#00FF00" }]
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "labels_changed",
+        payload: { added, removed },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "labels-milestone",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    added,
+    removed,
+  })
+})
+
+test("does not fall back to status-milestone for labels_changed events", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "labels_changed",
+        payload: { added: [], removed: [] },
+      }),
+    ],
+  })
+
+  assert.notEqual(item.kind, "status-milestone")
+})
+
 test("maps pr_opened events to pr-opened items carrying the PR url", () => {
   const [, item] = buildIssueTimeline({
     issue,

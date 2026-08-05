@@ -11,6 +11,7 @@ import {
   issuePriorityOrder,
   issuePrioritySchema,
   issuePriorityStyles,
+  mutateIssueLabelsSchema,
   updateIssuePrioritySchema,
   updateIssueSchema,
 } from "./issues.js"
@@ -183,5 +184,52 @@ test("issue priority validators reject unknown values", () => {
       id: issueId,
       priority: "normal",
     })
+  )
+})
+
+test("mutateIssueLabelsSchema dedupes issue_ids and label_ids", () => {
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const values = mutateIssueLabelsSchema.parse({
+    issue_ids: [issueId, issueId],
+    label_ids: [labelId, labelId],
+  })
+
+  assert.deepEqual(values.issue_ids, [issueId])
+  assert.deepEqual(values.label_ids, [labelId])
+})
+
+test("mutateIssueLabelsSchema rejects empty issue_ids or label_ids", () => {
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+
+  assert.throws(() =>
+    mutateIssueLabelsSchema.parse({ issue_ids: [], label_ids: [labelId] })
+  )
+  assert.throws(() =>
+    mutateIssueLabelsSchema.parse({ issue_ids: [issueId], label_ids: [] })
+  )
+})
+
+test("mutateIssueLabelsSchema rejects more than 100 unique issue_ids", () => {
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const issueIds = Array.from(
+    { length: 101 },
+    (_, index) =>
+      `7f14e45f-ceea-467e-b7ea-${index.toString().padStart(12, "0")}`
+  )
+
+  assert.throws(() =>
+    mutateIssueLabelsSchema.parse({ issue_ids: issueIds, label_ids: [labelId] })
+  )
+})
+
+test("mutateIssueLabelsSchema rejects more than 20 unique label_ids", () => {
+  const labelIds = Array.from(
+    { length: 21 },
+    (_, index) =>
+      `6f14e45f-ceea-467e-b7ea-05a3e2b3${index.toString().padStart(4, "0")}`
+  )
+
+  assert.throws(() =>
+    mutateIssueLabelsSchema.parse({ issue_ids: [issueId], label_ids: labelIds })
   )
 })

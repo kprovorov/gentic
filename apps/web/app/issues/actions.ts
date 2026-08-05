@@ -17,6 +17,7 @@ import {
   issueModelSchema,
   issuePrioritySchema,
   issueStatusSchema,
+  mutateIssueLabelsSchema,
   sendIssueMessageSchema,
   updateIssueAgentProviderSchema,
   updateIssuePrioritySchema,
@@ -375,6 +376,30 @@ export async function deleteIssueRelation(formData: FormData) {
   await issuesService.deleteIssueRelation(supabase, userId, id, issue_id)
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, issue_id)
+}
+
+export async function addIssueLabels(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_ids, label_ids } = mutateIssueLabelsSchema.parse({
+    issue_ids: [getString(formData, "issue_id")],
+    label_ids: formData.getAll("label_id"),
+  })
+
+  await issuesService.addIssueLabels(supabase, userId, issue_ids, label_ids)
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, issue_ids[0])
+}
+
+export async function removeIssueLabels(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_ids, label_ids } = mutateIssueLabelsSchema.parse({
+    issue_ids: [getString(formData, "issue_id")],
+    label_ids: formData.getAll("label_id"),
+  })
+
+  await issuesService.removeIssueLabels(supabase, userId, issue_ids, label_ids)
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, issue_ids[0])
 }
 
 export async function sendIssueMessage(formData: FormData) {

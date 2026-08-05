@@ -6,6 +6,7 @@ import type { Supabase } from "../types"
 export type IssueEventType =
   | "status_changed"
   | "priority_changed"
+  | "labels_changed"
   | "pr_opened"
   | "pr_merged"
 

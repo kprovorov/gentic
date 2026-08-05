@@ -19,6 +19,7 @@ import {
   IconArrowUp,
   IconMinus,
   IconSparkles,
+  IconTag,
   IconTool,
   IconUserCircle,
 } from "@tabler/icons-react"
@@ -52,6 +53,7 @@ import {
   type IssuePriority,
   type IssueStatus,
 } from "@gentic/validators/issues"
+import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import type { TimelineItem } from "./build-timeline"
 import { groupTimelineItems, type TimelineDisplayItem } from "./timeline-items"
@@ -250,6 +252,16 @@ function buildTimelineRows(
         })
         break
       }
+      case "labels-milestone":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconTag />,
+          content: (
+            <LabelsMilestoneContent added={item.added} removed={item.removed} />
+          ),
+        })
+        break
       case "pr-opened":
         rows.push({
           key: item.key,
@@ -811,6 +823,81 @@ function PriorityBadge({ priority }: { priority: string | null }) {
         className={cn("size-3.5", priorityIconStyles[knownPriority])}
       />
       {issuePriorityLabels[knownPriority]}
+    </span>
+  )
+}
+
+const LABEL_CHIP_DISPLAY_LIMIT = 4
+
+function LabelsMilestoneContent({
+  added,
+  removed,
+}: {
+  added: LabelSnapshot[]
+  removed: LabelSnapshot[]
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {added.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Added</span>
+          <LabelChipGroup labels={added} />
+        </div>
+      ) : null}
+      {removed.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Removed</span>
+          <LabelChipGroup labels={removed} muted />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function LabelChipGroup({
+  labels,
+  muted,
+}: {
+  labels: LabelSnapshot[]
+  muted?: boolean
+}) {
+  const visible = labels.slice(0, LABEL_CHIP_DISPLAY_LIMIT)
+  const remaining = labels.length - visible.length
+
+  return (
+    <>
+      {visible.map((label) => (
+        <LabelChip key={label.id} label={label} muted={muted} />
+      ))}
+      {remaining > 0 ? (
+        <span className="text-xs text-muted-foreground">
+          +{remaining} more
+        </span>
+      ) : null}
+    </>
+  )
+}
+
+function LabelChip({
+  label,
+  muted,
+}: {
+  label: LabelSnapshot
+  muted?: boolean
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 rounded-full bg-muted px-2 text-xs font-medium",
+        muted ? "text-muted-foreground line-through" : "text-foreground"
+      )}
+    >
+      <span
+        aria-hidden
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: label.color }}
+      />
+      {label.name}
     </span>
   )
 }

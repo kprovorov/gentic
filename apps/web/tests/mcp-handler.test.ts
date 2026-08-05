@@ -321,6 +321,110 @@ test("update_issue passes priority through the ownership-checked update service"
   assert.deepEqual(result, { issue: { id: issueId, priority: "high" } })
 })
 
+test("add_issue_labels dedupes ids and routes through the issue service", async () => {
+  let addInput: Record<string, unknown> | null = null
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const tools = registerTools({
+    addIssueLabels: async (
+      supabase: unknown,
+      userId: string,
+      issueIds: string[],
+      labelIds: string[]
+    ) => {
+      addInput = { supabase, userId, issueIds, labelIds }
+    },
+  })
+
+  const result = await tools.get("add_issue_labels")?.handler({
+    issue_ids: [issueId, issueId],
+    label_ids: [labelId, labelId],
+  })
+
+  assert.deepEqual(addInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    issueIds: [issueId],
+    labelIds: [labelId],
+  })
+  assert.deepEqual(result, {
+    issue_ids: [issueId],
+    label_ids: [labelId],
+    added: true,
+  })
+})
+
+test("add_issue_labels surfaces a limit error instead of swallowing it", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({
+    addIssueLabels: async () => {
+      throw new ServiceError("validation", "Adding these labels would exceed the 20-label limit.")
+    },
+  })
+  const handler = tools.get("add_issue_labels")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () =>
+      handler({
+        issue_ids: [issueId],
+        label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
+      }),
+    (error: unknown) => error instanceof ServiceError && error.code === "validation"
+  )
+})
+
+test("remove_issue_labels dedupes ids and routes through the issue service", async () => {
+  let removeInput: Record<string, unknown> | null = null
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const tools = registerTools({
+    removeIssueLabels: async (
+      supabase: unknown,
+      userId: string,
+      issueIds: string[],
+      labelIds: string[]
+    ) => {
+      removeInput = { supabase, userId, issueIds, labelIds }
+    },
+  })
+
+  const result = await tools.get("remove_issue_labels")?.handler({
+    issue_ids: [issueId, issueId],
+    label_ids: [labelId, labelId],
+  })
+
+  assert.deepEqual(removeInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    issueIds: [issueId],
+    labelIds: [labelId],
+  })
+  assert.deepEqual(result, {
+    issue_ids: [issueId],
+    label_ids: [labelId],
+    removed: true,
+  })
+})
+
+test("remove_issue_labels surfaces a not_found error instead of swallowing it", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({
+    removeIssueLabels: async () => {
+      throw new ServiceError("not_found", "Issue not found")
+    },
+  })
+  const handler = tools.get("remove_issue_labels")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () =>
+      handler({
+        issue_ids: [issueId],
+        label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
+      }),
+    (error: unknown) => error instanceof ServiceError && error.code === "not_found"
+  )
+})
+
 test("update_issue_priority routes to the priority workflow mutation", async () => {
   let updatePriorityInput: Record<string, unknown> | null = null
   const tools = registerTools({

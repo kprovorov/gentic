@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(28);
+SELECT plan(33);
 
 SELECT has_table('public', 'labels', 'labels table exists');
 SELECT has_table('public', 'issue_labels', 'issue label assignment table exists');
@@ -183,6 +183,31 @@ SELECT throws_ok(
   'a 21st label assignment on the same issue is rejected'
 );
 
+DELETE FROM public.issue_labels
+ WHERE issue_id = '20000000-0000-4000-8000-000000000501'
+   AND label_id = '30000000-0000-4000-8000-000000000501';
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+      FROM public.issue_labels
+     WHERE issue_id = '20000000-0000-4000-8000-000000000501'
+       AND label_id = '30000000-0000-4000-8000-000000000501'
+  ),
+  0,
+  'a direct delete removes exactly the targeted assignment'
+);
+SELECT is(
+  (
+    SELECT count(*)::integer
+      FROM public.issue_labels
+     WHERE issue_id = '20000000-0000-4000-8000-000000000502'
+       AND label_id = '30000000-0000-4000-8000-000000000501'
+  ),
+  1,
+  'a direct delete preserves an unrelated assignment on a different issue'
+);
+
 SELECT policies_are(
   'public',
   'labels',
@@ -204,6 +229,45 @@ SELECT policies_are(
     'Users can delete labels from their own issues'
   ],
   'issue_labels have account RLS policies'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub":"user_alpha"}', true);
+
+WITH removed AS (
+  DELETE FROM public.issue_labels
+   WHERE issue_id = '20000000-0000-4000-8000-000000000504'
+     AND label_id = '40000000-0000-4000-8000-000000000001'
+  RETURNING 1
+)
+SELECT is(
+  (SELECT count(*)::integer FROM removed),
+  0,
+  'RLS blocks a non-owner from deleting another account''s issue label assignment'
+);
+
+SELECT set_config('request.jwt.claims', '{"sub":"limit_issue_user"}', true);
+
+WITH removed AS (
+  DELETE FROM public.issue_labels
+   WHERE issue_id = '20000000-0000-4000-8000-000000000504'
+     AND label_id = '40000000-0000-4000-8000-000000000001'
+  RETURNING 1
+)
+SELECT is(
+  (SELECT count(*)::integer FROM removed),
+  1,
+  'the issue owner can remove one of 20 assigned labels through RLS'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+      FROM public.issue_labels
+     WHERE issue_id = '20000000-0000-4000-8000-000000000504'
+  ),
+  19,
+  'removal still works once an issue was at the 20-label limit'
 );
 
 ROLLBACK;

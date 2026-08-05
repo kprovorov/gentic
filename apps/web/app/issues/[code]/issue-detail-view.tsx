@@ -16,6 +16,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     relations,
     relationCandidates,
     events,
+    labels,
   } = data
   const displayedPullRequests =
     pullRequests.length > 0
@@ -41,6 +42,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           "issue_relations",
           "attachments",
           "issue_events",
+          "issue_labels",
         ]}
       />
       <IssueSlugUrlSync issue={issue} />
@@ -73,6 +75,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             pullRequests={displayedPullRequests}
             relations={relations}
             relationCandidates={relationCandidates}
+            labels={labels}
           />
         </aside>
       </div>

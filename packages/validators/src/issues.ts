@@ -225,3 +225,18 @@ export const deleteIssueRelationSchema = z.object({
 export type DeleteIssueRelationValues = z.infer<
   typeof deleteIssueRelationSchema
 >
+
+export const mutateIssueLabelsSchema = z.object({
+  issue_ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(100)
+    .transform((ids) => Array.from(new Set(ids))),
+  label_ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(20)
+    .transform((ids) => Array.from(new Set(ids))),
+})
+
+export type MutateIssueLabelsValues = z.infer<typeof mutateIssueLabelsSchema>
