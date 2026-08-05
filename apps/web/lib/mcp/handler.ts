@@ -40,6 +40,20 @@ const issueObjectOutputSchema = z
   })
   .passthrough()
 
+const assignedIssueLabelOutputSchema = z.object({
+  id: z.string().uuid().describe("Stable Gentic label id."),
+  name: z.string().describe("Display label name with preserved casing."),
+  color: labelColorSchema.describe("Canonical #RRGGBB label color."),
+})
+
+const issueWithLabelsObjectOutputSchema = issueObjectOutputSchema.extend({
+  labels: z
+    .array(assignedIssueLabelOutputSchema)
+    .describe(
+      "Active Labels assigned to this issue, ordered case-insensitively by name."
+    ),
+})
+
 const projectOutputSchema = {
   project: jsonObjectSchema.describe(
     "A Gentic project owned by the authenticated account."
@@ -83,8 +97,16 @@ const issueOutputSchema = {
 
 const issuesOutputSchema = {
   issues: z
-    .array(issueObjectOutputSchema)
-    .describe("Issues owned by the authenticated account, including priority."),
+    .array(issueWithLabelsObjectOutputSchema)
+    .describe(
+      "Issues owned by the authenticated account, including priority and assigned Labels."
+    ),
+}
+
+const issueWithLabelsOutputSchema = {
+  issue: issueWithLabelsObjectOutputSchema.describe(
+    "A Gentic issue owned by the authenticated account, including priority and assigned Labels."
+  ),
 }
 
 const deletedOutputSchema = {
@@ -249,10 +271,7 @@ export function registerGenticMcpTools(
       outputSchema: labelOutputSchema,
     },
     deps.tool(
-      async (
-        { supabase, userId },
-        input: { name: string; color?: string }
-      ) => {
+      async ({ supabase, userId }, input: { name: string; color?: string }) => {
         const label = await deps.labelsService.createLabel(
           supabase,
           userId,
@@ -452,7 +471,7 @@ export function registerGenticMcpTools(
     {
       title: "List Issues",
       description:
-        "List Gentic issues owned by the authenticated account, including priority. Optionally filter by a project id from list_projects. Returned issue ids can be used with get_issue, update_issue, update_issue_priority, update_issue_status, or delete_issue.",
+        "List Gentic issues owned by the authenticated account, including priority and assigned Labels. Optionally filter by project, match every requested Label, or find issues with no Labels. Returned issue ids can be used with get_issue, update_issue, update_issue_priority, update_issue_status, or delete_issue.",
       inputSchema: {
         project_id: z
           .string()
@@ -461,13 +480,40 @@ export function registerGenticMcpTools(
           .describe(
             "Optional project id from list_projects to list only that project's issues."
           ),
+        label_ids: z
+          .array(z.string().uuid())
+          .max(20)
+          .optional()
+          .describe(
+            "Optional active account-owned Label ids. Issues must carry every supplied Label. Cannot be combined with unlabeled."
+          ),
+        unlabeled: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            "When true, return only issues with no active Labels. Cannot be combined with label_ids."
+          ),
       },
       outputSchema: issuesOutputSchema,
     },
     deps.tool(
-      async ({ supabase, userId }, { project_id }: { project_id?: string }) => {
+      async (
+        { supabase, userId },
+        {
+          project_id,
+          label_ids,
+          unlabeled,
+        }: {
+          project_id?: string
+          label_ids?: string[]
+          unlabeled?: boolean
+        }
+      ) => {
         const issues = await deps.issuesService.listIssues(supabase, userId, {
           projectId: project_id,
+          labelIds: Array.from(new Set(label_ids ?? [])),
+          unlabeled: unlabeled ?? false,
         })
         return { issues }
       }
@@ -481,7 +527,7 @@ export function registerGenticMcpTools(
       description:
         "Get full details for one Gentic issue owned by the authenticated account, including priority. Use the issue id from list_issues or create_issue.",
       inputSchema: issueIdInputSchema,
-      outputSchema: issueOutputSchema,
+      outputSchema: issueWithLabelsOutputSchema,
     },
     deps.tool(async ({ supabase, userId }, { id }: { id: string }) => {
       const issue = await deps.issuesService.getIssue(supabase, userId, id)

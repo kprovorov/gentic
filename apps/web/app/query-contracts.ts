@@ -20,6 +20,16 @@ const projectOptionSchema = z.object({
   key: z.string(),
 })
 
+export const assignedIssueLabelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+})
+
+const issueLabelJoinSchema = z.object({
+  labels: assignedIssueLabelSchema.extend({ state: z.string() }),
+})
+
 export const homeIssueSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
@@ -36,6 +46,7 @@ export const homeIssueSchema = z.object({
       state: z.string().nullable(),
     })
   ),
+  issue_labels: z.array(issueLabelJoinSchema),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -72,6 +83,7 @@ export const issueDetailSchema = z.object({
   create_pr_automatically: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
+  labels: z.array(assignedIssueLabelSchema),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -96,8 +108,11 @@ export type HomeIssue = {
     url: string
     state?: GithubPullRequestState
   }[]
+  labels: AssignedIssueLabel[]
   projects: ProjectOption | null
 }
+
+export type AssignedIssueLabel = z.infer<typeof assignedIssueLabelSchema>
 
 export type IssueDetail = {
   id: string
@@ -118,6 +133,7 @@ export type IssueDetail = {
   create_pr_automatically: boolean
   created_at: string
   updated_at: string
+  labels: AssignedIssueLabel[]
   projects: ProjectOption | null
 }
 
@@ -194,6 +210,13 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
         url,
         state: normalizePersistedPullRequestState(state),
       })),
+    labels: issue.issue_labels
+      .map((assignment) => assignment.labels)
+      .filter((label) => label.state === "active")
+      .map(({ id, name, color }) => ({ id, name, color }))
+      .toSorted((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      ),
     projects: toProjectOption(issue.projects),
   }
 }
@@ -218,6 +241,9 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,
     updated_at: issue.updated_at,
+    labels: issue.labels.toSorted((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    ),
     projects: toProjectOption(issue.projects),
   }
 }

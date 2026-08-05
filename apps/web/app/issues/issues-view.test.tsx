@@ -65,6 +65,7 @@ function issue(
     pullRequests: [],
     projects: project,
     ...overrides,
+    labels: overrides.labels ?? [],
   } satisfies HomeIssue
 }
 
@@ -100,8 +101,16 @@ function renderIssuesView({
 }
 
 function baseData(issues: HomeIssue[]): IssuesData {
+  const labels = Array.from(
+    new Map(
+      issues.flatMap((currentIssue) =>
+        currentIssue.labels.map((label) => [label.id, label] as const)
+      )
+    ).values()
+  )
   return {
     issues,
+    labels,
     blockedIssueIds: [],
     blockingIssueIds: [],
   }
@@ -122,6 +131,14 @@ describe("IssuesView priority triage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     searchParams = new URLSearchParams()
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    )
   })
 
   it("orders issues by workflow status, urgent-to-low priority, then newest", () => {
@@ -356,6 +373,165 @@ describe("IssuesView pull request links", () => {
         screen.getByRole("columnheader", { name: "Pull requests" })
       ).toBeInTheDocument()
     }
+  })
+})
+
+describe("IssuesView Label discovery", () => {
+  const alpha = { id: "label-alpha", name: "Alpha", color: "#2563EB" }
+  const beta = { id: "label-beta", name: "Beta", color: "#DC2626" }
+  const gamma = { id: "label-gamma", name: "Gamma", color: "#16A34A" }
+  const delta = { id: "label-delta", name: "Delta", color: "#9333EA" }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    searchParams = new URLSearchParams()
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    )
+  })
+
+  it.each(["list", "table"] as const)(
+    "renders three accessible chips and keyboard-accessible overflow in %s view",
+    async (view) => {
+      const { user } = renderIssuesView({
+        view,
+        data: baseData([
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Four Labels",
+            labels: [alpha, beta, delta, gamma],
+          }),
+        ]),
+      })
+
+      expect(
+        screen.getByRole("button", { name: "Filter by Label Alpha" })
+      ).toBeVisible()
+      expect(
+        screen.getByRole("button", { name: "Filter by Label Beta" })
+      ).toBeVisible()
+      expect(
+        screen.getByRole("button", { name: "Filter by Label Delta" })
+      ).toBeVisible()
+      expect(
+        screen.queryByRole("button", { name: "Filter by Label Gamma" })
+      ).not.toBeInTheDocument()
+
+      const overflow = screen.getByLabelText(
+        "1 more Labels. All Labels: Alpha, Beta, Delta, Gamma"
+      )
+      overflow.focus()
+      expect(overflow).toHaveFocus()
+      await user.hover(overflow)
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        "Alpha, Beta, Delta, Gamma"
+      )
+    }
+  )
+
+  it.each(["list", "table"] as const)(
+    "activates a Label chip without navigation in %s view",
+    async (view) => {
+      const { user } = renderIssuesView({
+        view,
+        data: baseData([
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Alpha issue",
+            labels: [alpha],
+          }),
+          issue({
+            id: "22222222-2222-4222-8222-222222222222",
+            title: "Unlabeled issue",
+          }),
+        ]),
+      })
+
+      const chip = screen.getByRole("button", {
+        name: "Filter by Label Alpha",
+      })
+      chip.focus()
+      await user.keyboard("{Enter}")
+
+      expect(screen.getByText("Alpha issue")).toBeVisible()
+      expect(screen.queryByText("Unlabeled issue")).not.toBeInTheDocument()
+      expect(
+        screen.getByRole("button", { name: "Filter by Label Alpha" })
+      ).toHaveAttribute("aria-pressed", "true")
+      expect(replace).not.toHaveBeenCalled()
+    }
+  )
+
+  it("searches Label names and combines Label filters with match-all semantics", async () => {
+    const { user } = renderIssuesView({
+      data: baseData([
+        issue({
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Both",
+          labels: [alpha, beta],
+        }),
+        issue({
+          id: "22222222-2222-4222-8222-222222222222",
+          title: "Alpha only",
+          labels: [alpha],
+        }),
+        issue({
+          id: "33333333-3333-4333-8333-333333333333",
+          title: "No classification",
+        }),
+      ]),
+    })
+
+    await user.type(screen.getByPlaceholderText("Search issues…"), "bEtA")
+    expect(screen.getByText("Both")).toBeVisible()
+    expect(screen.queryByText("Alpha only")).not.toBeInTheDocument()
+
+    await user.clear(screen.getByPlaceholderText("Search issues…"))
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.click(screen.getByRole("menuitem", { name: "Labels" }))
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Alpha" }))
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Beta" }))
+
+    expect(screen.getByText("Both")).toBeVisible()
+    expect(screen.queryByText("Alpha only")).not.toBeInTheDocument()
+    expect(screen.queryByText("No classification")).not.toBeInTheDocument()
+  })
+
+  it("makes No labels mutually exclusive with specific Labels", async () => {
+    const { user } = renderIssuesView({
+      data: baseData([
+        issue({
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Labeled",
+          labels: [alpha],
+        }),
+        issue({
+          id: "22222222-2222-4222-8222-222222222222",
+          title: "Unlabeled",
+        }),
+      ]),
+    })
+
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.click(screen.getByRole("menuitem", { name: "Labels" }))
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Alpha" }))
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: "No labels" })
+    )
+
+    expect(screen.queryByText("Labeled")).not.toBeInTheDocument()
+    expect(screen.getByText("Unlabeled")).toBeVisible()
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Alpha" })
+    ).toHaveAttribute("data-state", "unchecked")
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "No labels" })
+    ).toHaveAttribute("data-state", "checked")
   })
 })
 
