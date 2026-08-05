@@ -699,6 +699,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_label: {
+        Args: { p_label_id: string; p_now?: string; p_user_id: string }
+        Returns: {
+          affected_issue_count: number
+          id: string
+        }[]
+      }
       ban_worker: {
         Args: { p_now?: string; p_user_id: string; p_worker_id: string }
         Returns: {

@@ -165,6 +165,77 @@ test("create_label and update_label route through the label service", async () =
   ])
 })
 
+test("archive_label reports the affected issue count for zero, one, and many assignments", async () => {
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+
+  for (const affectedIssueCount of [0, 1, 137]) {
+    const calls: Record<string, unknown>[] = []
+    const tools = registerTools(
+      {},
+      {
+        archiveLabel: async (supabase: unknown, userId: string, id: string) => {
+          calls.push({ supabase, userId, id })
+          return {
+            archived: true as const,
+            affected_issue_count: affectedIssueCount,
+          }
+        },
+      }
+    )
+
+    const result = await tools.get("archive_label")?.handler({ id: labelId })
+
+    assert.deepEqual(calls, [
+      { supabase: "supabase", userId: "user_1", id: labelId },
+    ])
+    assert.deepEqual(result, {
+      id: labelId,
+      archived: true,
+      affected_issue_count: affectedIssueCount,
+    })
+
+    const outputSchema = tools.get("archive_label")?.config.outputSchema
+    assert.ok(outputSchema)
+    assert.equal(
+      (
+        outputSchema.affected_issue_count.safeParse as (value: unknown) => {
+          success: boolean
+        }
+      )(affectedIssueCount).success,
+      true
+    )
+  }
+})
+
+test("archive_label has no permanent-delete or restore counterpart", () => {
+  const tools = registerTools()
+
+  for (const name of ["delete_label", "restore_label", "list_archived_labels"]) {
+    assert.equal(tools.has(name), false, `${name} is not registered`)
+  }
+  assert.equal(tools.has("archive_label"), true)
+})
+
+test("archive_label surfaces a failed transaction instead of reporting success", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools(
+    {},
+    {
+      archiveLabel: async () => {
+        throw new ServiceError("internal", "could not serialize access")
+      },
+    }
+  )
+  const handler = tools.get("archive_label")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () => handler({ id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3" }),
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "internal"
+  )
+})
+
 test("issue MCP tools document and return priority in their output contracts", () => {
   const tools = registerTools()
 

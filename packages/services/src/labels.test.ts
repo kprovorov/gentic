@@ -2,17 +2,97 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { ServiceError } from "./errors"
-import { createLabel, listLabels, updateLabel } from "./labels"
+import {
+  archiveLabel,
+  createLabel,
+  listArchivedLabelIds,
+  listLabels,
+  updateLabel,
+} from "./labels"
 
 type Row = Record<string, unknown>
-type TableName = "labels" | "issue_labels"
+type TableName = "labels" | "issue_labels" | "issue_events"
 
 class FakeSupabase {
   labels: Row[] = []
   issue_labels: Row[] = []
+  issue_events: Row[] = []
+  // Set to model the RPC's transaction aborting: because `archive_label`
+  // does all its work in one statement, a failure must leave every table
+  // exactly as it was.
+  rpcError: { message: string } | null = null
 
   from(table: TableName) {
     return new FakeQuery(table, this)
+  }
+
+  rpc(name: string, args: Record<string, unknown>) {
+    assert.equal(name, "archive_label")
+
+    if (this.rpcError) {
+      return new FakeRpcQuery(null, this.rpcError)
+    }
+
+    const label = this.labels.find(
+      (row) =>
+        row.id === args.p_label_id &&
+        row.user_id === args.p_user_id &&
+        row.state === "active"
+    )
+    if (!label) {
+      return new FakeRpcQuery(null)
+    }
+
+    const affectedIssueIds = this.issue_labels
+      .filter((row) => row.label_id === args.p_label_id)
+      .map((row) => row.issue_id)
+    this.issue_labels = this.issue_labels.filter(
+      (row) => row.label_id !== args.p_label_id
+    )
+    for (const issueId of affectedIssueIds) {
+      this.issue_events.push({
+        issue_id: issueId,
+        type: "labels_changed",
+        payload: {
+          added: [],
+          removed: [{ id: label.id, name: label.name, color: label.color }],
+        },
+      })
+    }
+
+    label.state = "archived"
+    label.archived_at = args.p_now ?? new Date().toISOString()
+    label.updated_at = label.archived_at
+
+    return new FakeRpcQuery({
+      id: label.id,
+      affected_issue_count: affectedIssueIds.length,
+    })
+  }
+}
+
+class FakeRpcQuery implements PromiseLike<unknown> {
+  constructor(
+    private readonly data: Row | null,
+    private readonly error: { message: string } | null = null
+  ) {}
+
+  maybeSingle() {
+    return this
+  }
+
+  returns() {
+    return this
+  }
+
+  then<TResult1 = unknown, TResult2 = never>(
+    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ) {
+    return Promise.resolve({ data: this.data, error: this.error }).then(
+      onfulfilled,
+      onrejected
+    )
   }
 }
 
@@ -266,6 +346,174 @@ test("updateLabel renames and recolors only active labels for the owner", async 
       }),
     (error) => error instanceof ServiceError && error.code === "not_found"
   )
+})
+
+test("updateLabel never writes per-issue timeline events for rename/recolor", async () => {
+  const db = seededDb()
+
+  await updateLabel(db as never, "user_alpha", {
+    id: "label-alpha",
+    name: "Alpha Renamed",
+  })
+
+  assert.equal(db.issue_events.length, 0)
+})
+
+test("archiveLabel with zero assignments archives the label and reports zero affected issues", async () => {
+  const db = seededDb()
+  db.labels.push(activeLabel("label-unused", "user_alpha", "Unused"))
+
+  const result = await archiveLabel(db as never, "user_alpha", "label-unused")
+
+  assert.deepEqual(result, { archived: true, affected_issue_count: 0 })
+  assert.equal(
+    db.labels.find((label) => label.id === "label-unused")?.state,
+    "archived"
+  )
+  assert.equal(db.issue_events.length, 0)
+})
+
+test("archiveLabel with one assignment removes it and records one grouped event", async () => {
+  const db = seededDb()
+
+  const result = await archiveLabel(db as never, "user_alpha", "label-beta")
+
+  assert.deepEqual(result, { archived: true, affected_issue_count: 1 })
+  assert.equal(
+    db.issue_labels.some((row) => row.label_id === "label-beta"),
+    false
+  )
+  assert.equal(db.issue_events.length, 1)
+  assert.deepEqual(db.issue_events[0], {
+    issue_id: "issue-3",
+    type: "labels_changed",
+    payload: {
+      added: [],
+      removed: [{ id: "label-beta", name: "beta", color: "#2563EB" }],
+    },
+  })
+})
+
+test("archiveLabel with a high assignment count removes every assignment and groups one event per issue", async () => {
+  const db = seededDb()
+  db.labels.push(activeLabel("label-popular", "user_alpha", "Popular"))
+  for (let index = 0; index < 250; index++) {
+    db.issue_labels.push({
+      issue_id: `bulk-issue-${index}`,
+      label_id: "label-popular",
+    })
+  }
+
+  const result = await archiveLabel(db as never, "user_alpha", "label-popular")
+
+  assert.deepEqual(result, { archived: true, affected_issue_count: 250 })
+  assert.equal(
+    db.issue_labels.some((row) => row.label_id === "label-popular"),
+    false
+  )
+  // Exactly one grouped removal event per affected issue — not one per
+  // assignment, and none for issues that never carried the label.
+  assert.equal(db.issue_events.length, 250)
+  assert.equal(
+    new Set(db.issue_events.map((event) => event.issue_id)).size,
+    250
+  )
+})
+
+test("archiveLabel frees a slot in the 100-active-label limit", async () => {
+  const db = new FakeSupabase()
+  for (let index = 0; index < 100; index++) {
+    db.labels.push(activeLabel(`active-${index}`, "user_alpha", `A${index}`))
+  }
+
+  await archiveLabel(db as never, "user_alpha", "active-0")
+  const label = await createLabel(db as never, "user_alpha", {
+    name: "Now fits",
+    color: "#2563EB",
+  })
+
+  assert.equal(label.name, "Now fits")
+})
+
+test("archiveLabel surfaces a failed transaction instead of reporting partial success", async () => {
+  const db = seededDb()
+  db.rpcError = { message: "could not serialize access" }
+
+  await assert.rejects(
+    () => archiveLabel(db as never, "user_alpha", "label-alpha"),
+    (error) => error instanceof ServiceError && error.code === "internal"
+  )
+  // The RPC is one transaction: a failure leaves the label active, every
+  // assignment in place, and no removal events behind.
+  assert.equal(
+    db.labels.find((label) => label.id === "label-alpha")?.state,
+    "active"
+  )
+  assert.equal(
+    db.issue_labels.filter((row) => row.label_id === "label-alpha").length,
+    2
+  )
+  assert.equal(db.issue_events.length, 0)
+})
+
+test("archiveLabel rejects a label owned by another account without side effects", async () => {
+  const db = seededDb()
+
+  await assert.rejects(
+    () => archiveLabel(db as never, "user_alpha", "label-gamma"),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+  assert.equal(
+    db.labels.find((label) => label.id === "label-gamma")?.state,
+    "active"
+  )
+  assert.equal(
+    db.issue_labels.some((row) => row.label_id === "label-gamma"),
+    true
+  )
+})
+
+test("archiveLabel rejects an already-archived label instead of restoring it", async () => {
+  const db = seededDb()
+
+  await assert.rejects(
+    () => archiveLabel(db as never, "user_alpha", "label-archived"),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+})
+
+test("archiveLabel rejects a nonexistent label id", async () => {
+  const db = seededDb()
+
+  await assert.rejects(
+    () => archiveLabel(db as never, "user_alpha", "label-missing"),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+})
+
+test("listArchivedLabelIds returns only archived ids owned by the caller", async () => {
+  const db = seededDb()
+  db.labels.push({
+    ...activeLabel("label-other-archived", "user_beta", "Other archived"),
+    state: "archived",
+  })
+
+  const archivedIds = await listArchivedLabelIds(db as never, "user_alpha", [
+    "label-alpha",
+    "label-archived",
+    "label-other-archived",
+    "label-gamma",
+  ])
+
+  assert.deepEqual(Array.from(archivedIds).sort(), ["label-archived"])
+})
+
+test("listArchivedLabelIds returns an empty set without querying for an empty input", async () => {
+  const db = seededDb()
+
+  const archivedIds = await listArchivedLabelIds(db as never, "user_alpha", [])
+
+  assert.deepEqual(archivedIds, new Set())
 })
 
 function activeLabel(id: string, userId: string, name: string): Row {

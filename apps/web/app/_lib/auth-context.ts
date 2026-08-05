@@ -36,3 +36,16 @@ export async function getAuthenticatedContext() {
 
   return context
 }
+
+// Redirect-wrapped counterpart to getOptionalAuthenticatedServiceContext,
+// for Server Actions that call SECURITY DEFINER RPCs the same way the
+// worker mutation API routes do.
+export async function getAuthenticatedServiceContext() {
+  const context = await getOptionalAuthenticatedServiceContext()
+
+  if (!context) {
+    redirect("/login")
+  }
+
+  return context
+}

@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { createLabel, updateLabel } from "@/app/settings/actions"
+import { archiveLabel, createLabel, updateLabel } from "@/app/settings/actions"
 import type { SettingsLabelsData } from "@/app/queries"
 
 import { SettingsLabelsView } from "./settings-labels-view"
@@ -11,6 +11,9 @@ import { SettingsLabelsView } from "./settings-labels-view"
 vi.mock("@/app/settings/actions", () => ({
   createLabel: vi.fn().mockResolvedValue(undefined),
   updateLabel: vi.fn().mockResolvedValue(undefined),
+  archiveLabel: vi
+    .fn()
+    .mockResolvedValue({ archived: true, affected_issue_count: 0 }),
 }))
 
 function renderLabelsView(data: SettingsLabelsData = labelsData()) {
@@ -116,7 +119,117 @@ describe("SettingsLabelsView", () => {
     expect(formData.get("name")).toBe("Done")
     expect(formData.get("color")).toBe("#1D4ED8")
   })
+
+  it("confirms a nonzero assignment count before archiving", async () => {
+    const { user } = renderLabelsView()
+
+    const alphaInput = screen.getByDisplayValue("Alpha")
+    const alphaCard = alphaInput.closest("form")
+    expect(alphaCard).not.toBeNull()
+    await user.click(
+      within(alphaCard as HTMLFormElement).getByRole("button", {
+        name: "Archive",
+      })
+    )
+
+    expect(screen.getByText("Archive Alpha?")).toBeInTheDocument()
+    expect(
+      screen.getByText(/removes it from 2 assigned issues/)
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Archive label" }))
+
+    await waitFor(() => {
+      expect(archiveLabel).toHaveBeenCalledTimes(1)
+    })
+    const formData = vi.mocked(archiveLabel).mock.calls[0][0] as FormData
+    expect(formData.get("id")).toBe("label-alpha")
+  })
+
+  it("confirms a zero assignment count before archiving an unused label", async () => {
+    const { user } = renderLabelsView()
+
+    const zeroInput = screen.getByDisplayValue("Zero count")
+    const zeroCard = zeroInput.closest("form")
+    expect(zeroCard).not.toBeNull()
+    await user.click(
+      within(zeroCard as HTMLFormElement).getByRole("button", {
+        name: "Archive",
+      })
+    )
+
+    expect(screen.getByText("Archive Zero count?")).toBeInTheDocument()
+    expect(
+      screen.getByText(/isn't assigned to any issues/)
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Archive label" }))
+
+    await waitFor(() => {
+      expect(archiveLabel).toHaveBeenCalledTimes(1)
+    })
+    const formData = vi.mocked(archiveLabel).mock.calls[0][0] as FormData
+    expect(formData.get("id")).toBe("label-zero")
+  })
+
+  it("confirms a single assignment in the singular", async () => {
+    const { user } = renderLabelsView()
+
+    await openArchiveDialog(user, "beta")
+
+    expect(screen.getByText("Archive beta?")).toBeInTheDocument()
+    expect(
+      screen.getByText(/removes it from 1 assigned issue\./)
+    ).toBeInTheDocument()
+  })
+
+  it("confirms a high assignment count before archiving", async () => {
+    const { user } = renderLabelsView()
+
+    await openArchiveDialog(user, "Widely used")
+
+    expect(
+      screen.getByText(/removes it from 137 assigned issues/)
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Archive label" }))
+
+    await waitFor(() => {
+      expect(archiveLabel).toHaveBeenCalledTimes(1)
+    })
+    const formData = vi.mocked(archiveLabel).mock.calls[0][0] as FormData
+    expect(formData.get("id")).toBe("label-many")
+  })
+
+  it("keeps the label listed and surfaces the error when the archive transaction fails", async () => {
+    vi.mocked(archiveLabel).mockRejectedValueOnce(
+      new Error("could not serialize access")
+    )
+    const { user } = renderLabelsView()
+
+    await openArchiveDialog(user, "Alpha")
+    await user.click(screen.getByRole("button", { name: "Archive label" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "could not serialize access"
+    )
+    expect(
+      screen.getByRole("button", { name: "Archive label" })
+    ).toBeInTheDocument()
+    expect(screen.getByDisplayValue("Alpha")).toBeVisible()
+  })
 })
+
+async function openArchiveDialog(
+  user: ReturnType<typeof userEvent.setup>,
+  labelName: string
+) {
+  const card = screen.getByDisplayValue(labelName).closest("form")
+  expect(card).not.toBeNull()
+  await user.click(
+    within(card as HTMLFormElement).getByRole("button", { name: "Archive" })
+  )
+}
 
 function labelsData(): SettingsLabelsData {
   return {
@@ -138,6 +251,24 @@ function labelsData(): SettingsLabelsData {
         created_at: "2026-08-04T00:00:00.000Z",
         updated_at: "2026-08-04T00:00:00.000Z",
         assignment_count: 1,
+      },
+      {
+        id: "label-zero",
+        name: "Zero count",
+        color: "#059669",
+        state: "active",
+        created_at: "2026-08-04T00:00:00.000Z",
+        updated_at: "2026-08-04T00:00:00.000Z",
+        assignment_count: 0,
+      },
+      {
+        id: "label-many",
+        name: "Widely used",
+        color: "#EA580C",
+        state: "active",
+        created_at: "2026-08-04T00:00:00.000Z",
+        updated_at: "2026-08-04T00:00:00.000Z",
+        assignment_count: 137,
       },
     ],
   }

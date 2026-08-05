@@ -14,6 +14,7 @@ import { ServiceError } from "@gentic/services/errors"
 import {
   chatMessageSchema,
   issueEventSchema,
+  issueLabelsChangedPayloadSchema,
 } from "@gentic/validators/realtime"
 import { z } from "zod"
 
@@ -118,6 +119,7 @@ export type IssueDetailData = {
   relationCandidates: issuesService.IssueRelationIssue[]
   events: IssueEvent[]
   labels: AssignedIssueLabel[]
+  archivedLabelIds: string[]
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
@@ -465,6 +467,13 @@ async function getIssueDetailDataForIssue(
   }
 
   const events = z.array(issueEventSchema).parse(eventRows ?? [])
+  const archivedLabelIds = Array.from(
+    await labelsService.listArchivedLabelIds(
+      supabase,
+      userId,
+      collectEventLabelIds(events)
+    )
+  )
 
   // The two ownerships are surfaced separately: durable Issue Attachments
   // stand on their own, Message Attachments hang off the turn they were sent
@@ -501,7 +510,31 @@ async function getIssueDetailDataForIssue(
     relationCandidates,
     events,
     labels: parsedIssue.labels,
+    archivedLabelIds,
   }
+}
+
+// Historical `labels_changed` snapshots keep a label's name and color even
+// after it is archived, but the timeline still needs to mark those references
+// as no longer part of the active catalog — so collect every label id the
+// timeline could render and let the caller resolve which are archived.
+function collectEventLabelIds(events: IssueEvent[]): string[] {
+  const ids = new Set<string>()
+  for (const event of events) {
+    if (event.type !== "labels_changed") {
+      continue
+    }
+    // `issueEventSchema` already validated this branch's payload, but its
+    // generic fallback member keeps `type` a plain string, so narrowing
+    // alone doesn't reach the label snapshots.
+    const { added, removed } = issueLabelsChangedPayloadSchema.parse(
+      event.payload
+    )
+    for (const label of [...added, ...removed]) {
+      ids.add(label.id)
+    }
+  }
+  return Array.from(ids)
 }
 
 async function signAttachment(
