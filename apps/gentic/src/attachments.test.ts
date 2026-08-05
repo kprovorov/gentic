@@ -7,7 +7,11 @@ import { join } from "node:path"
 import { buildAttachmentBlocks } from "./attachments.js"
 import type { AgentApi, Attachment } from "./api.js"
 
-function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi {
+const ISSUE_ATTACHMENTS_KEY = "__issue__"
+
+function apiWithAttachments(
+  byMessageId: Record<string, Attachment[]>
+): AgentApi {
   return {
     async claimNextQueuedIssue() {
       return null
@@ -27,8 +31,12 @@ function apiWithAttachments(byMessageId: Record<string, Attachment[]>): AgentApi
     async requestAutomaticPrPublish() {
       throw new Error("not implemented")
     },
-    async fetchAttachments(_issueId: string, _runId: string, messageId: string) {
-      return byMessageId[messageId] ?? []
+    async fetchAttachments(
+      _issueId: string,
+      _runId: string,
+      messageId: string | null
+    ) {
+      return byMessageId[messageId ?? ISSUE_ATTACHMENTS_KEY] ?? []
     },
     async fetchRealtimeToken() {
       return {
@@ -158,6 +166,73 @@ test("buildAttachmentBlocks preserves duplicate filenames with stable resource u
         block.type === "resource" ? block.resource.uri : null
       ),
       ["attachment:///notes.txt", "attachment:///notes-1.txt"]
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("buildAttachmentBlocks adds the issue's own attachments to the first prompt of a run", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gentic-attachments-"))
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input) =>
+    new Response(`body:${String(input)}`, {
+      headers: { "content-type": "text/plain" },
+    })
+  const api = apiWithAttachments({
+    [ISSUE_ATTACHMENTS_KEY]: [
+      {
+        id: "att-issue",
+        fileName: "spec.txt",
+        contentType: "text/plain",
+        sizeBytes: 12,
+        url: "https://example.test/spec",
+      },
+    ],
+    "message-1": [
+      {
+        id: "att-1",
+        fileName: "current.txt",
+        contentType: "text/plain",
+        sizeBytes: 12,
+        url: "https://example.test/current",
+      },
+    ],
+  })
+
+  try {
+    const firstTurn = await buildAttachmentBlocks(
+      api,
+      "issue-1",
+      "run-1",
+      "message-1",
+      dir,
+      { includeIssueAttachments: true }
+    )
+
+    assert.deepEqual(
+      firstTurn.map((block: (typeof firstTurn)[number]) =>
+        block.type === "resource" ? block.resource.uri : null
+      ),
+      ["attachment:///spec.txt", "attachment:///current.txt"]
+    )
+
+    // Follow-up turns carry only that turn's own uploads: the issue's files
+    // were already handed over at the start of the run.
+    const followUp = await buildAttachmentBlocks(
+      api,
+      "issue-1",
+      "run-1",
+      "message-1",
+      dir
+    )
+
+    assert.deepEqual(
+      followUp.map((block: (typeof followUp)[number]) =>
+        block.type === "resource" ? block.resource.uri : null
+      ),
+      ["attachment:///current.txt"]
     )
   } finally {
     globalThis.fetch = originalFetch

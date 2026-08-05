@@ -10,6 +10,23 @@ Attachments let you hand the AI agent more than words. Images and text files bec
 
 Every file you attach to an issue is forwarded to the AI agent as part of its first run. The agent receives the attachments alongside your issue body, giving it richer context before it touches a single line of code.
 
+## Two kinds of attachment
+
+Gentic keeps issue files and chat files apart, because they are useful for different things:
+
+<CardGroup cols={2}>
+  <Card title="Issue attachments" icon="paperclip">
+    Files added on the **New issue** page or from the **Files** card on an issue. They belong to the issue itself, appear in the Files card, and **survive an agent or conversation reset**. Adding one writes no chat message and does not requeue or wake the agent — the agent picks them up at the start of its next run.
+  </Card>
+  <Card title="Message attachments" icon="message">
+    Files sent with the message composer under an existing issue's activity. They belong to that one message, are shown inline with it in the transcript, and are delivered with that prompt turn — which also wakes the agent, exactly as sending a message does.
+  </Card>
+</CardGroup>
+
+<Note>
+  Files attached before this split stay message attachments; they are not reclassified.
+</Note>
+
 ## How attachments are delivered to the agent
 
 Gentic handles different file types differently to give the agent the most useful representation of each file:
@@ -30,7 +47,7 @@ Gentic handles different file types differently to give the agent the most usefu
 </CardGroup>
 
 <Note>
-  Attachments are fetched when a worker prepares the prompt. Files added to a follow-up message are delivered on the next prompt turn. To rebuild an issue from its original body and current attachments, use **Retry with...** on the issue detail page.
+  Attachments are fetched when a worker prepares the prompt. The issue's own files are handed over on the first prompt of each run, so a reset session sees them again; files added to a follow-up message are delivered on that message's prompt turn. To rebuild an issue from its original body and current attachments, use **Retry with...** on the issue detail page.
 </Note>
 
 ## How to upload attachments
@@ -41,23 +58,23 @@ Gentic handles different file types differently to give the agent the most usefu
 
 Navigate to the issue you want to attach files to from the **Issues** list.
 
-### Use a message composer
+### Pick where the files belong
 
-Use the composer on the **New issue** page or the message composer under **Agent activity** on an existing issue.
+Use the composer on the **New issue** page or the **Files** card on an issue for files that belong to the issue. Use the message composer under the issue's activity for files that belong to one message.
 
 ### Upload your files
 
-Drag files onto the composer or click the paperclip button. You can select multiple files. The files upload when you save, run, or send the accompanying text.
+Drag files onto the composer or click the paperclip button — or, in the **Files** card, choose files and select **Upload**. You can select multiple files. Composer files upload when you save, run, or send the accompanying text.
 
 ### Confirm the files are listed
 
-After submission, confirm that each file appears in the issue's **Attachments** card with the correct name and size.
+Issue files appear in the issue's **Files** card with the correct name and size; message files appear inline with the message you sent them with.
 
 </Steps>
 
 ## How to delete an attachment
 
-Open the issue and find the file in the **Attachments** card. Click the delete button next to the file name and confirm. Gentic removes the file from storage and from the issue. Deleting it does not remove content already delivered to an agent session; use **Retry with...** if you need a fresh session built from the remaining files.
+Open the issue and find the file in the **Files** card. Click the delete button next to the file name and confirm. Gentic removes the file from storage and from the issue. Deleting it does not remove content already delivered to an agent session; use **Retry with...** if you need a fresh session built from the remaining files.
 
 ## Good use cases for attachments
 

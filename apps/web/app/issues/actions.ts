@@ -26,6 +26,8 @@ import {
 } from "@gentic/validators/issues"
 
 import {
+  attachmentOwnerColumns,
+  attachmentOwnerForMessage,
   rollbackMessageAttachmentUpload,
   validateAttachmentBatch,
 } from "@gentic/services/attachments"
@@ -94,10 +96,13 @@ async function createIssue(status: IssueStatus, formData: FormData) {
       fields.body
     )
 
+    // Files picked in the creation form belong to the issue, not to the
+    // message that carries its body: they stay available across agent and
+    // conversation resets, which wipe that message.
     await uploadIssueAttachments(
       supabase,
       created.id,
-      message.id,
+      null,
       getAttachmentFiles(formData)
     )
 
@@ -116,6 +121,16 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         }
       )
     }
+    // The issue's own attachments outlive its messages now, so deleting the
+    // issue below would leave their blobs behind without this.
+    await cleanupIssueAttachments(supabase, created.id).catch(
+      (cleanupError) => {
+        console.error(
+          `Failed to clean up attachments for issue ${created.id}:`,
+          cleanupError
+        )
+      }
+    )
     await issuesService
       .deleteIssue(supabase, userId, created.id)
       .catch((cleanupError) => {
@@ -500,6 +515,9 @@ export async function createManualIssuePullRequest(formData: FormData) {
   }
 }
 
+// The standalone attachment panel adds durable Issue Attachments: no chat
+// message is written and the agent is neither requeued nor woken, so parking a
+// spec next to an issue is not a way to (re)start a run.
 export async function uploadAttachments(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
@@ -511,26 +529,7 @@ export async function uploadAttachments(formData: FormData) {
     return
   }
 
-  const message = await issuesService.createIssueUserMessage(
-    supabase,
-    issueId,
-    "Attached files."
-  )
-
-  try {
-    await uploadIssueAttachments(supabase, issueId, message.id, files)
-    await issuesService.requeueIssueForUserMessage(supabase, issueId)
-  } catch (error) {
-    await cleanupFailedMessage(supabase, issueId, message.id).catch(
-      (cleanupError) => {
-        console.error(
-          `Failed to clean up message ${message.id} after upload failure:`,
-          cleanupError
-        )
-      }
-    )
-    throw error
-  }
+  await uploadIssueAttachments(supabase, issueId, null, files)
 
   await revalidateIssuePathById(supabase, userId, issueId)
 }
@@ -558,10 +557,15 @@ function validateIssueModelForAgent(
   }
 }
 
+/**
+ * Uploads a batch of files for one owner: a message id makes them Message
+ * Attachments delivered with that prompt turn, `null` makes them durable Issue
+ * Attachments owned by the issue itself.
+ */
 async function uploadIssueAttachments(
   supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
   issueId: string,
-  messageId: string,
+  messageId: string | null,
   files: File[]
 ): Promise<
   Array<{
@@ -573,6 +577,7 @@ async function uploadIssueAttachments(
   }>
 > {
   validateAttachmentFiles(files)
+  const owner = attachmentOwnerColumns(attachmentOwnerForMessage(messageId))
   const uploadedPaths: string[] = []
   const attachmentIds: string[] = []
   const attachments: Array<{
@@ -590,7 +595,7 @@ async function uploadIssueAttachments(
       .from("attachments")
       .insert({
         issue_id: issueId,
-        message_id: messageId,
+        ...owner,
         file_name: file.name,
         content_type: file.type || null,
         size_bytes: file.size,
@@ -666,6 +671,24 @@ async function cleanupUploadedAttachments(
       })
       .in("id", attachmentIds)
   }
+}
+
+async function cleanupIssueAttachments(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  issueId: string
+) {
+  const { data } = await supabase
+    .from("attachments")
+    .select("id,storage_path")
+    .eq("issue_id", issueId)
+    .is("deleted_at", null)
+    .returns<Array<{ id: string; storage_path: string }>>()
+
+  await cleanupUploadedAttachments(
+    supabase,
+    (data ?? []).map((attachment) => attachment.storage_path),
+    (data ?? []).map((attachment) => attachment.id)
+  )
 }
 
 async function cleanupFailedMessage(

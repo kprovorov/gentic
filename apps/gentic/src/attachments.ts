@@ -67,15 +67,28 @@ async function downloadBytes(url: string, fileName: string): Promise<Uint8Array>
  * `attachmentsDir` and referenced by its local path instead. That directory
  * is a sibling of the repo clone, not inside it, so it can never end up
  * swept into the commit the agent is instructed to make.
+ *
+ * `includeIssueAttachments` additionally pulls in the issue's own durable
+ * attachments, which have no message of their own. The worker asks for them on
+ * the first prompt of a run so a fresh session (including one started by a
+ * reset) still sees the files attached to the issue, without re-sending them
+ * on every follow-up turn.
  */
 export async function buildAttachmentBlocks(
   api: AgentApi,
   issueId: string,
   runId: string,
   messageId: string,
-  attachmentsDir: string
+  attachmentsDir: string,
+  options: { includeIssueAttachments?: boolean } = {}
 ): Promise<ContentBlock[]> {
-  const attachments = await api.fetchAttachments(issueId, runId, messageId)
+  const [issueAttachments, messageAttachments] = await Promise.all([
+    options.includeIssueAttachments
+      ? api.fetchAttachments(issueId, runId, null)
+      : Promise.resolve<Attachment[]>([]),
+    api.fetchAttachments(issueId, runId, messageId),
+  ])
+  const attachments = [...issueAttachments, ...messageAttachments]
   if (attachments.length === 0) {
     return []
   }
