@@ -43,7 +43,7 @@ const issueObjectOutputSchema = z
 const assignedIssueLabelOutputSchema = z.object({
   id: z.string().uuid().describe("Stable Gentic label id."),
   name: z.string().describe("Display label name with preserved casing."),
-  color: labelColorSchema.describe("Canonical #RRGGBB label color."),
+  color: labelColorFormatSchema.describe("Canonical #RRGGBB label color."),
 })
 
 const issueWithLabelsObjectOutputSchema = issueObjectOutputSchema.extend({
