@@ -178,3 +178,11 @@ The worker merges all configuration sources in the following order, with later s
 3. **Shell environment variables** — exported in the process environment at runtime
 
 This means you can enroll the worker once with `gentic worker connect <code>` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.
+
+After editing the config file, apply runtime settings without interrupting active issues:
+
+```bash
+gentic reload
+```
+
+Changes to `MAX_CONCURRENT_ISSUES`, `POLL_INTERVAL_MS`, `WORKDIR`, `GIT_REMOTE_BASE`, and setup state apply to subsequent worker activity. If the new concurrency limit is below the number of issues already running, those issues continue and the worker waits before claiming more. Worker identity, credential, and API URL changes require `gentic restart` because they belong to the existing API connection.

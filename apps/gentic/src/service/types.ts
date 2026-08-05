@@ -21,6 +21,7 @@ export interface ServiceBackend {
   uninstall(): Promise<void>
   start(): Promise<void>
   stop(): Promise<void>
+  reload(): Promise<void>
   restart(): Promise<void>
   status(): Promise<ServiceStatus>
   isEnabledOnBoot(): Promise<boolean>

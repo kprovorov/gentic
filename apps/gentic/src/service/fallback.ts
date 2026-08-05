@@ -107,6 +107,14 @@ export class FallbackBackend implements ServiceBackend {
     await this.start()
   }
 
+  async reload(): Promise<void> {
+    const pid = await readPid()
+    if (!pid || !isAlive(pid)) {
+      throw new Error("gentic is not running")
+    }
+    process.kill(pid, "SIGHUP")
+  }
+
   async status(): Promise<ServiceStatus> {
     const pid = await readPid()
     if (!pid) return { state: "not-installed" }

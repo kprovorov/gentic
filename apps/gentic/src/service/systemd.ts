@@ -142,6 +142,10 @@ WantedBy=default.target
     await this.systemctl("restart", SERVICE_NAME)
   }
 
+  async reload(): Promise<void> {
+    await this.systemctl("kill", "--signal=HUP", "--kill-who=main", SERVICE_NAME)
+  }
+
   async status(): Promise<ServiceStatus> {
     if (!existsSync(this.unitPath())) {
       return { state: "not-installed" }

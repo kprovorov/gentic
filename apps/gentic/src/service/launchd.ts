@@ -149,6 +149,17 @@ ${programArguments}
     await this.start()
   }
 
+  async reload(): Promise<void> {
+    if (!(await this.isLoaded())) {
+      throw new Error("gentic service is not running")
+    }
+    try {
+      await execFile("launchctl", ["kill", "SIGHUP", serviceTarget()])
+    } catch (error) {
+      throw new Error(`launchctl kill failed: ${describe(error)}`)
+    }
+  }
+
   async status(): Promise<ServiceStatus> {
     if (!existsSync(plistPath())) return { state: "not-installed" }
 

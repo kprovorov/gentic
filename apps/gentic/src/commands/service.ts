@@ -86,6 +86,24 @@ export function registerServiceCommands(program: Command): void {
     },
   )
 
+  addScopeOption(
+    program
+      .command("reload")
+      .description("Reload worker configuration without interrupting active issues"),
+  ).action(async (opts: ScopeOptions) => {
+    const backend = getServiceBackend({ scope: resolveScope(opts) })
+    const s = spinner()
+    s.start(`Reloading gentic configuration (${backend.name})`)
+    try {
+      await backend.reload()
+      s.stop("gentic configuration reloaded")
+    } catch (error) {
+      s.stop("Failed to reload gentic configuration")
+      log.error(describe(error))
+      process.exitCode = 1
+    }
+  })
+
   addScopeOption(program.command("restart").description("Restart the gentic background service")).action(
     async (opts: ScopeOptions) => {
       const backend = getServiceBackend({ scope: resolveScope(opts) })
