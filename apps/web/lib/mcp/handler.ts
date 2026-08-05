@@ -15,7 +15,7 @@ import {
 } from "@gentic/validators/issues"
 import {
   createLabelSchema,
-  labelColorSchema,
+  labelColorFormatSchema,
   labelNameSchema,
   updateLabelSchema,
 } from "@gentic/validators/labels"
@@ -69,7 +69,7 @@ const projectsOutputSchema = {
 const labelObjectOutputSchema = z.object({
   id: z.string().uuid().describe("Stable Gentic label id."),
   name: z.string().describe("Display label name with preserved casing."),
-  color: labelColorSchema.describe("Canonical #RRGGBB label color."),
+  color: labelColorFormatSchema.describe("Canonical #RRGGBB label color."),
   assignment_count: z
     .number()
     .int()
@@ -264,7 +264,7 @@ export function registerGenticMcpTools(
         name: labelNameSchema.describe(
           "Display label name, 1-50 characters after trimming."
         ),
-        color: labelColorSchema
+        color: labelColorFormatSchema
           .optional()
           .describe("Optional canonical #RRGGBB color."),
       },
@@ -296,7 +296,7 @@ export function registerGenticMcpTools(
         name: labelNameSchema
           .optional()
           .describe("Updated display label name."),
-        color: labelColorSchema
+        color: labelColorFormatSchema
           .optional()
           .describe("Updated canonical #RRGGBB label color."),
       },
