@@ -36,7 +36,10 @@ export const CONFIG_KEYS = [
 function pickPresentEnvKeys(env: NodeJS.ProcessEnv): Partial<ConfigFile> {
   const present: Partial<Record<string, string>> = {}
   for (const key of CONFIG_KEYS) {
-    if (env[key] !== undefined) {
+    // A blank env var (e.g. an uncommented `GENTIC_WORKER_ID=` placeholder
+    // left over from .env.example) must not clobber a real, persisted
+    // config-file value — treat "" the same as unset.
+    if (env[key] !== undefined && env[key] !== "") {
       present[key] = env[key]
     }
   }

@@ -85,6 +85,22 @@ test("loadConfig prefers env over the config file for the same key", () => {
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
 })
 
+test("loadConfig ignores blank env vars in favor of the config file", () => {
+  writeConfigFile({
+    GENTIC_WORKER_ID: "file-worker",
+    GENTIC_WORKER_CREDENTIAL: "file-key",
+    GENTIC_API_URL: "https://file.example.com",
+  })
+  // Mirrors a stray `.env` copied from .env.example, where these keys are
+  // left as blank placeholders rather than removed.
+  process.env.GENTIC_WORKER_ID = ""
+  process.env.GENTIC_WORKER_CREDENTIAL = ""
+
+  const loaded = loadConfig()
+  assert.equal(loaded.GENTIC_WORKER_ID, "file-worker")
+  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "file-key")
+})
+
 test("loadConfig accepts a concurrent-issue limit", () => {
   process.env.GENTIC_WORKER_ID = "env-worker"
   process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
