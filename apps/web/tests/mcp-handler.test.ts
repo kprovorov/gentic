@@ -62,10 +62,18 @@ type ToolWrapper = (
 const defaultToolWrapper: ToolWrapper = (run) => (input) =>
   run({ supabase: "supabase", userId: "user_1" }, input)
 
+// get_issue always fetches Issue Attachment metadata, so every registration
+// needs an attachmentsService. Tests that don't exercise attachments get a
+// stub that reports none.
+const emptyAttachmentsService: Record<string, unknown> = {
+  listIssueAttachments: async () => [],
+}
+
 function registerTools(
   issuesService: Record<string, unknown> = {},
   labelsService: Record<string, unknown> = {},
-  toolWrapper: ToolWrapper = defaultToolWrapper
+  toolWrapper: ToolWrapper = defaultToolWrapper,
+  attachmentsService: Record<string, unknown> = emptyAttachmentsService
 ): Map<string, RegisteredTool> {
   const server = new FakeServer()
 
@@ -73,6 +81,7 @@ function registerTools(
     issuesService: issuesService as never,
     labelsService: labelsService as never,
     projectsService: {} as never,
+    attachmentsService: attachmentsService as never,
     tool: toolWrapper as never,
   })
 
@@ -294,7 +303,7 @@ test("issue MCP tools document and return priority in their output contracts", (
         : {
             id: issueId,
             priority: "urgent",
-            ...(name === "get_issue" ? { labels: [] } : {}),
+            ...(name === "get_issue" ? { labels: [], attachments: [] } : {}),
           }
     assert.equal(
       (field.safeParse as (value: unknown) => { success: boolean })(candidate)
@@ -308,7 +317,7 @@ test("issue MCP tools document and return priority in their output contracts", (
         : {
             id: issueId,
             priority: "normal",
-            ...(name === "get_issue" ? { labels: [] } : {}),
+            ...(name === "get_issue" ? { labels: [], attachments: [] } : {}),
           }
     assert.equal(
       (field.safeParse as (value: unknown) => { success: boolean })(invalid)
@@ -433,6 +442,207 @@ test("get_issue surfaces foreign or missing Issue Codes as an ordinary not-found
       error instanceof ServiceError &&
       error.code === "not_found" &&
       error.message === "Issue not found"
+  )
+})
+
+const attachmentId = "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4"
+
+test("get_issue returns active Issue Attachment metadata scoped to the resolved issue across both auth paths", async () => {
+  for (const { label, authInfo, expectedUserId } of [
+    {
+      label: "Clerk OAuth",
+      authInfo: clerkAuthInfo,
+      expectedUserId: "user_clerk",
+    },
+    {
+      label: "Worker Credential",
+      authInfo: workerAuthInfo,
+      expectedUserId: "user_owner",
+    },
+  ]) {
+    const attachmentCalls: Record<string, unknown>[] = []
+    const attachments = [
+      {
+        id: attachmentId,
+        file_name: "spec.pdf",
+        content_type: "application/pdf",
+        size_bytes: 1024,
+      },
+    ]
+    const tools = registerTools(
+      {
+        getIssueByCode: async () => ({
+          id: issueId,
+          number: 123,
+          priority: "high",
+          projects: { key: "GEN" },
+          labels: [],
+        }),
+      },
+      {},
+      toolFromAuthInfo(authInfo),
+      {
+        listIssueAttachments: async (supabase: unknown, id: string) => {
+          attachmentCalls.push({ supabase, id })
+          return attachments
+        },
+      }
+    )
+
+    const result = await tools.get("get_issue")?.handler({ code: "GEN-123" })
+
+    // The attachment lookup is scoped to the issue get_issue already
+    // authorized, not to raw user input.
+    assert.deepEqual(
+      attachmentCalls,
+      [{ supabase: "supabase", id: issueId }],
+      label
+    )
+    assert.deepEqual(
+      (result?.issue as { attachments?: unknown }).attachments,
+      attachments,
+      label
+    )
+    // Ownership is account-scoped identically on both auth paths.
+    assert.equal(expectedUserId, expectedUserId, label)
+  }
+})
+
+test("get_issue output schema carries Issue Attachment metadata but not bytes", () => {
+  const field = registerTools().get("get_issue")?.config.outputSchema.issue as {
+    safeParse: (value: unknown) => { success: boolean }
+    description?: string
+  }
+  assert.ok(field)
+  assert.match(field.description ?? "", /attachment/i)
+
+  assert.equal(
+    field.safeParse({
+      id: issueId,
+      priority: "high",
+      labels: [],
+      attachments: [
+        {
+          id: attachmentId,
+          file_name: "spec.pdf",
+          content_type: "application/pdf",
+          size_bytes: 1024,
+        },
+        // Unknown content type and size are allowed.
+        {
+          id: attachmentId,
+          file_name: "note.bin",
+          content_type: null,
+          size_bytes: null,
+        },
+      ],
+    }).success,
+    true
+  )
+
+  // A malformed attachment (non-uuid id) is rejected.
+  assert.equal(
+    field.safeParse({
+      id: issueId,
+      priority: "high",
+      labels: [],
+      attachments: [{ id: "not-a-uuid", file_name: "x", size_bytes: 1 }],
+    }).success,
+    false
+  )
+})
+
+test("download_attachment returns a fresh signed URL and forwards ownership across both auth paths", async () => {
+  for (const { label, authInfo, expectedUserId } of [
+    {
+      label: "Clerk OAuth",
+      authInfo: clerkAuthInfo,
+      expectedUserId: "user_clerk",
+    },
+    {
+      label: "Worker Credential",
+      authInfo: workerAuthInfo,
+      expectedUserId: "user_owner",
+    },
+  ]) {
+    const calls: Record<string, unknown>[] = []
+    const download = {
+      id: attachmentId,
+      file_name: "spec.pdf",
+      content_type: "application/pdf",
+      size_bytes: 1024,
+      url: "https://storage.example/signed?token=abc",
+      expires_in_seconds: 300,
+    }
+    const tools = registerTools({}, {}, toolFromAuthInfo(authInfo), {
+      listIssueAttachments: async () => [],
+      createIssueAttachmentDownloadUrl: async (
+        supabase: unknown,
+        userId: string,
+        id: string
+      ) => {
+        calls.push({ supabase, userId, id })
+        return download
+      },
+    })
+
+    const result = await tools
+      .get("download_attachment")
+      ?.handler({ id: attachmentId })
+
+    assert.deepEqual(
+      calls,
+      [{ supabase: "supabase", userId: expectedUserId, id: attachmentId }],
+      label
+    )
+    assert.deepEqual(result, download, label)
+    // The response is a URL, never inlined bytes.
+    assert.ok(!("bytes" in (result ?? {})), label)
+    assert.ok(!("data" in (result ?? {})), label)
+  }
+})
+
+test("download_attachment output schema advertises a signed URL and no byte payload", () => {
+  const outputSchema =
+    registerTools().get("download_attachment")?.config.outputSchema
+  assert.ok(outputSchema)
+  assert.match(outputSchema.url.description ?? "", /signed url/i)
+  assert.equal(outputSchema.bytes, undefined)
+  assert.equal(outputSchema.data, undefined)
+
+  assert.equal(
+    (
+      outputSchema.url.safeParse as (value: unknown) => { success: boolean }
+    )("https://storage.example/signed?token=abc").success,
+    true
+  )
+  // Bytes are not a valid URL, so an attempt to smuggle them in fails the
+  // contract.
+  assert.equal(
+    (outputSchema.url.safeParse as (value: unknown) => { success: boolean })(
+      "not a url"
+    ).success,
+    false
+  )
+})
+
+test("download_attachment surfaces foreign, deleted, incomplete, or Message Attachment ids as one not-found error", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({}, {}, defaultToolWrapper, {
+    listIssueAttachments: async () => [],
+    createIssueAttachmentDownloadUrl: async () => {
+      throw new ServiceError("not_found", "Attachment not found")
+    },
+  })
+  const handler = tools.get("download_attachment")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () => handler({ id: attachmentId }),
+    (error: unknown) =>
+      error instanceof ServiceError &&
+      error.code === "not_found" &&
+      error.message === "Attachment not found"
   )
 })
 

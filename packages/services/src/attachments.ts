@@ -1,4 +1,6 @@
 import { ServiceError } from "./errors"
+import { ensureIssueOwned } from "./issues/ownership"
+import type { Supabase } from "./types"
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 export const MAX_PROMPT_ATTACHMENT_BYTES = 50 * 1024 * 1024
@@ -141,6 +143,132 @@ export function validateAttachmentBatch(files: AttachmentFileLike[]) {
       "validation",
       "Attachments for one prompt cannot exceed 50MB"
     )
+  }
+}
+
+const ATTACHMENTS_BUCKET = "attachments"
+
+/**
+ * How long a Coding Agent's download link stays valid. Kept short: the URL is
+ * minted on demand from `download_attachment`, so a fresh one is always a
+ * single call away, and a leaked link goes stale quickly.
+ */
+export const ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS = 300
+
+/**
+ * Metadata for one active Issue Attachment — never any bytes. This is what a
+ * Coding Agent sees inline in `get_issue`; fetching the actual file is a
+ * separate, explicit `download_attachment` step.
+ */
+export type IssueAttachmentSummary = {
+  id: string
+  file_name: string
+  content_type: string | null
+  size_bytes: number | null
+}
+
+export type IssueAttachmentDownload = IssueAttachmentSummary & {
+  url: string
+  expires_in_seconds: number
+}
+
+/**
+ * Metadata for the active durable Issue Attachments an issue owns, oldest
+ * first. Only Issue Attachments qualify: Message Attachments (`kind =
+ * 'message'`), deleted rows, and uploads that never completed are all
+ * excluded, mirroring {@link selectIssueAttachments}. Callers must have
+ * already authorized the issue — `get_issue` does so via `getIssueByCode`.
+ */
+export async function listIssueAttachments(
+  supabase: Supabase,
+  issueId: string
+): Promise<IssueAttachmentSummary[]> {
+  const { data, error } = await supabase
+    .from("attachments")
+    .select("id,file_name,content_type,size_bytes")
+    .eq("issue_id", issueId)
+    .eq("kind", ISSUE_ATTACHMENT_KIND)
+    .is("message_id", null)
+    .is("deleted_at", null)
+    .not("upload_completed_at", "is", null)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return (data ?? []).map(({ id, file_name, content_type, size_bytes }) => ({
+    id,
+    file_name,
+    content_type,
+    size_bytes,
+  }))
+}
+
+/**
+ * Mint a fresh, short-lived signed download URL for one active Issue
+ * Attachment the caller owns. The row must be an Issue Attachment whose upload
+ * finished and which has not been deleted, and its issue must belong to the
+ * caller's account — foreign, deleted, incomplete, and Message Attachment ids
+ * all collapse to the same "Attachment not found" error so none of them leak
+ * whether the id exists or where its bytes live. The bytes themselves are
+ * never read here; only a URL to fetch them is returned.
+ */
+export async function createIssueAttachmentDownloadUrl(
+  supabase: Supabase,
+  userId: string,
+  attachmentId: string
+): Promise<IssueAttachmentDownload> {
+  const { data, error } = await supabase
+    .from("attachments")
+    .select("id,file_name,content_type,size_bytes,storage_path,issue_id")
+    .eq("id", attachmentId)
+    .eq("kind", ISSUE_ATTACHMENT_KIND)
+    .is("message_id", null)
+    .is("deleted_at", null)
+    .not("upload_completed_at", "is", null)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Attachment not found")
+  }
+
+  try {
+    await ensureIssueOwned(supabase, userId, data.issue_id)
+  } catch (ownershipError) {
+    // A foreign issue is not-found for the caller; reword it so the response
+    // is indistinguishable from a missing or wrong-kind attachment. A genuine
+    // internal failure still propagates untouched.
+    if (
+      ownershipError instanceof ServiceError &&
+      ownershipError.code === "not_found"
+    ) {
+      throw new ServiceError("not_found", "Attachment not found")
+    }
+    throw ownershipError
+  }
+
+  const { data: signed, error: signError } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .createSignedUrl(data.storage_path, ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS)
+
+  if (signError || !signed) {
+    throw new ServiceError(
+      "internal",
+      signError?.message ?? "Could not sign attachment download URL"
+    )
+  }
+
+  return {
+    id: data.id,
+    file_name: data.file_name,
+    content_type: data.content_type,
+    size_bytes: data.size_bytes,
+    url: signed.signedUrl,
+    expires_in_seconds: ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS,
   }
 }
 

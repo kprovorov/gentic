@@ -23,6 +23,7 @@ import { projectSchema } from "@gentic/validators/projects"
 import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
 
+import * as attachmentsService from "@gentic/services/attachments"
 import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
 import * as labelsService from "@gentic/services/labels"
@@ -54,6 +55,35 @@ const issueWithLabelsObjectOutputSchema = issueObjectOutputSchema.extend({
       "Active Labels assigned to this issue, ordered case-insensitively by name."
     ),
 })
+
+const issueAttachmentOutputSchema = z.object({
+  id: z
+    .string()
+    .uuid()
+    .describe(
+      "Stable Gentic attachment id. Pass to download_attachment for a fresh signed download URL."
+    ),
+  file_name: z.string().describe("Original file name of the Issue Attachment."),
+  content_type: z
+    .string()
+    .nullable()
+    .describe("MIME content type, or null when it is unknown."),
+  size_bytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .describe("File size in bytes, or null when it is unknown."),
+})
+
+const issueWithAttachmentsObjectOutputSchema =
+  issueWithLabelsObjectOutputSchema.extend({
+    attachments: z
+      .array(issueAttachmentOutputSchema)
+      .describe(
+        "Active durable Issue Attachments, oldest first, as metadata only (id, file name, content type, size). Message Attachments are excluded. Fetch the bytes with download_attachment; they are never inlined here."
+      ),
+  })
 
 const projectOutputSchema = {
   project: jsonObjectSchema.describe(
@@ -116,10 +146,36 @@ const issuesOutputSchema = {
     ),
 }
 
-const issueWithLabelsOutputSchema = {
-  issue: issueWithLabelsObjectOutputSchema.describe(
-    "A Gentic issue owned by the authenticated account, including priority and assigned Labels."
+const issueWithAttachmentsOutputSchema = {
+  issue: issueWithAttachmentsObjectOutputSchema.describe(
+    "A Gentic issue owned by the authenticated account, including priority, assigned Labels, and active Issue Attachment metadata."
   ),
+}
+
+const downloadAttachmentOutputSchema = {
+  id: z.string().uuid().describe("The attachment id passed as id."),
+  file_name: z.string().describe("Original file name of the attachment."),
+  content_type: z
+    .string()
+    .nullable()
+    .describe("MIME content type, or null when it is unknown."),
+  size_bytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .describe("File size in bytes, or null when it is unknown."),
+  url: z
+    .string()
+    .url()
+    .describe(
+      "Fresh, short-lived signed URL. Fetch it directly to download the file; the response never inlines the file bytes."
+    ),
+  expires_in_seconds: z
+    .number()
+    .int()
+    .positive()
+    .describe("Seconds until the signed URL expires."),
 }
 
 const deletedOutputSchema = {
@@ -217,6 +273,7 @@ interface McpToolDependencies {
   issuesService: typeof issuesService
   labelsService: typeof labelsService
   projectsService: typeof projectsService
+  attachmentsService: typeof attachmentsService
   tool: typeof tool
 }
 
@@ -224,6 +281,7 @@ const defaultMcpToolDependencies: McpToolDependencies = {
   issuesService,
   labelsService,
   projectsService,
+  attachmentsService,
   tool,
 }
 
@@ -572,9 +630,9 @@ export function registerGenticMcpTools(
     {
       title: "Get Issue",
       description:
-        "Get full details for one Gentic issue owned by the authenticated account, including its current body, priority, and assigned Labels. Identify the issue by its human-readable Issue Code such as GEN-123, built from the project key and issue number returned by list_issues or create_issue.",
+        "Get full details for one Gentic issue owned by the authenticated account, including its current body, priority, assigned Labels, and active Issue Attachment metadata. Identify the issue by its human-readable Issue Code such as GEN-123, built from the project key and issue number returned by list_issues or create_issue. Attachment bytes are not included; fetch them with download_attachment.",
       inputSchema: issueCodeInputSchema,
-      outputSchema: issueWithLabelsOutputSchema,
+      outputSchema: issueWithAttachmentsOutputSchema,
     },
     deps.tool(async ({ supabase, userId }, { code }: { code: string }) => {
       const parsed = issuesService.parseIssueCode(code)
@@ -588,7 +646,34 @@ export function registerGenticMcpTools(
         parsed.projectKey,
         parsed.issueNumber
       )
-      return { issue }
+      const attachments = await deps.attachmentsService.listIssueAttachments(
+        supabase,
+        issue.id
+      )
+      return { issue: { ...issue, attachments } }
+    })
+  )
+
+  server.registerTool(
+    "download_attachment",
+    {
+      title: "Download Attachment",
+      description:
+        "Return a fresh, short-lived signed download URL for one active durable Issue Attachment owned by the authenticated account. Identify the attachment by the id listed on get_issue. Only Issue Attachments are downloadable: Message Attachments, deleted or incomplete uploads, and attachments on other accounts' issues are all rejected as not found without leaking storage details. The response carries a URL to fetch the bytes, never the bytes themselves.",
+      inputSchema: {
+        id: z
+          .string()
+          .uuid()
+          .describe("The Issue Attachment id, from get_issue."),
+      },
+      outputSchema: downloadAttachmentOutputSchema,
+    },
+    deps.tool(async ({ supabase, userId }, { id }: { id: string }) => {
+      return deps.attachmentsService.createIssueAttachmentDownloadUrl(
+        supabase,
+        userId,
+        id
+      )
     })
   )
 
