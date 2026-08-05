@@ -43,7 +43,7 @@ With the repository cloned, the worker spawns the chosen agent through the **Age
 - **Claude Code** issues run through `@agentclientprotocol/claude-agent-acp`, using Claude Code credentials already present in the worker environment.
 - **Codex** issues run through `@agentclientprotocol/codex-acp`, which shells out to the `codex` CLI already installed and authenticated in the worker environment.
 
-The agent receives the issue body (plus any attachment content) as its first user message. Gentic does not append hidden commit, push, or pull-request instructions to the agent's system prompt.
+The agent's first user message is a short kickoff line — `Work on Gentic issue {Issue Code}.` — plus any attachment content. The agent reads the issue body itself through the Gentic MCP `get_issue` tool. Gentic does not append hidden commit, push, or pull-request instructions to the agent's system prompt.
 
 As the agent works, its output streams back into the issue's transcript in real time so you can follow along in the web app.
 

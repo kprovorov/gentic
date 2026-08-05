@@ -352,7 +352,7 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 </ParamField>
 
 <Note>
-  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue body, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message `Work on Gentic issue {Issue Code}.` (the agent reads the body itself via `get_issue`), and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
 </Note>
 
 <Expandable title="Output fields">

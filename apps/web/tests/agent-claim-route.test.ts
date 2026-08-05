@@ -437,20 +437,17 @@ function toClaimCandidate(issue: FakeIssue) {
   }
 }
 
-test("claim backfills the issue body for todo issues without pending user messages", async () => {
+test("claim backfills the Gentic-authored kickoff message for todo issues without pending user messages", async () => {
   const supabase = new FakeSupabase()
 
-  await ensureTodoIssueHasPendingPrompt(
-    supabase as never,
-    "issue-1",
-    "Implement the task"
-  )
+  await ensureTodoIssueHasPendingPrompt(supabase as never, "issue-1", "GEN-1")
 
   assert.deepEqual(supabase.inserts, [
     {
       issue_id: "issue-1",
       role: "user",
-      content: "Implement the task",
+      author_type: "gentic",
+      content: "Work on Gentic issue GEN-1.",
     },
   ])
 })
@@ -465,11 +462,7 @@ test("claim keeps existing pending user messages intact", async () => {
     },
   ])
 
-  await ensureTodoIssueHasPendingPrompt(
-    supabase as never,
-    "issue-1",
-    "Implement the task"
-  )
+  await ensureTodoIssueHasPendingPrompt(supabase as never, "issue-1", "GEN-1")
 
   assert.deepEqual(supabase.inserts, [])
 })

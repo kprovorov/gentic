@@ -46,7 +46,10 @@ export async function resetIssueAgent(
     await supabase.rpc("reset_issue_run", {
       p_issue_id: id,
       p_agent_provider: agentProvider,
-      p_issue_model: issueModel,
+      // `null` clears the model; the RPC's `p_issue_model` defaults to null, so
+      // an absent value is equivalent — `undefined` satisfies the generated
+      // optional-argument type where `null` does not.
+      p_issue_model: issueModel ?? undefined,
     })
   )
 
