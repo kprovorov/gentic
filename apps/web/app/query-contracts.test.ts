@@ -14,7 +14,7 @@ const issueRow = {
   id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
   number: 7,
   title: "Propagate priority",
-  prompt: "Keep priority in web queries.",
+  body: "Keep priority in web queries.",
   status: "todo",
   type: "feature",
   priority: "urgent",

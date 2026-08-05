@@ -32,14 +32,14 @@ INSERT INTO public.issues (
   id,
   project_id,
   title,
-  prompt,
+  body,
   status,
   number
 ) VALUES (
   '20000000-0000-4000-8000-400000000001',
   '10000000-0000-4000-8000-400000000001',
   'Attachment issue',
-  'Prompt',
+  'Issue body',
   'todo',
   1
 );

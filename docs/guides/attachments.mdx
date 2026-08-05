@@ -4,11 +4,11 @@ sidebarTitle: "Attachments"
 description: "Upload images, text files, and documents to Gentic issues to give the AI coding agent additional context like screenshots, logs, or spec files."
 ---
 
-Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded to the worker and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the prompt.
+Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded to the worker and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the issue body.
 
 ## What attachments do
 
-Every file you attach to an issue is forwarded to the AI agent as part of its first run. The agent receives the attachments alongside your prompt text, giving it richer context before it touches a single line of code.
+Every file you attach to an issue is forwarded to the AI agent as part of its first run. The agent receives the attachments alongside your issue body, giving it richer context before it touches a single line of code.
 
 ## Two kinds of attachment
 
@@ -47,7 +47,7 @@ Gentic handles different file types differently to give the agent the most usefu
 </CardGroup>
 
 <Note>
-  Attachments are fetched when a worker prepares the prompt. The issue's own files are handed over on the first prompt of each run, so a reset session sees them again; files added to a follow-up message are delivered on that message's prompt turn. To rebuild an issue from its original prompt and current attachments, use **Retry with...** on the issue detail page.
+  Attachments are fetched when a worker prepares the prompt. The issue's own files are handed over on the first prompt of each run, so a reset session sees them again; files added to a follow-up message are delivered on that message's prompt turn. To rebuild an issue from its original body and current attachments, use **Retry with...** on the issue detail page.
 </Note>
 
 ## How to upload attachments
@@ -64,7 +64,7 @@ Use the composer on the **New issue** page or the **Files** card on an issue for
 
 ### Upload your files
 
-Drag files onto the composer or click the paperclip button — or, in the **Files** card, choose files and select **Upload**. You can select multiple files. Composer files upload when you save, run, or send the accompanying prompt text.
+Drag files onto the composer or click the paperclip button — or, in the **Files** card, choose files and select **Upload**. You can select multiple files. Composer files upload when you save, run, or send the accompanying text.
 
 ### Confirm the files are listed
 
@@ -85,7 +85,7 @@ Open the issue and find the file in the **Files** card. Click the delete button 
 </Accordion>
 
 <Accordion title="Log files showing errors">
-  Paste long stack traces or server logs as a `.txt` or `.log` file rather than cramming them into the prompt. The agent receives the full log as an inline text block.
+  Paste long stack traces or server logs as a `.txt` or `.log` file rather than cramming them into the issue body. The agent receives the full log as an inline text block.
 
   **Supported formats:** `.txt`, `.log`, `.csv` (any `text/*` MIME type)
 </Accordion>
@@ -97,7 +97,7 @@ Open the issue and find the file in the **Files** card. Click the delete button 
 </Accordion>
 
 <Accordion title="Specification documents">
-  Upload a spec or RFC document to keep the prompt short while still giving the agent the full requirements. Markdown and plain text files are embedded inline; PDFs are downloaded alongside the repo and read from disk.
+  Upload a spec or RFC document to keep the issue body short while still giving the agent the full requirements. Markdown and plain text files are embedded inline; PDFs are downloaded alongside the repo and read from disk.
 
   **Supported formats:** `.md`, `.txt`, `.pdf`
 </Accordion>

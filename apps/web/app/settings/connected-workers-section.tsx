@@ -6,6 +6,7 @@ import {
   IconBan,
   IconCheck,
   IconClock,
+  IconCopy,
   IconDotsVertical,
   IconPencil,
   IconPlayerPlay,
@@ -228,8 +229,15 @@ function ConnectionDialog({
         </AlertDialogHeader>
         <div className="grid gap-3">
           <Label htmlFor="worker-connect-command">Command</Label>
-          <div className="rounded-md border bg-muted p-3 font-mono text-sm break-all">
-            <code id="worker-connect-command">{command}</code>
+          <div className="flex items-center gap-2 rounded-md border bg-muted p-3 font-mono text-sm">
+            <code id="worker-connect-command" className="flex-1 break-all">
+              {command}
+            </code>
+            <CopyButton
+              value={command}
+              disabled={!enrollmentCode}
+              label="Copy command"
+            />
           </div>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <IconClock className="size-4" />
@@ -257,6 +265,55 @@ function ConnectionDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+function CopyButton({
+  value,
+  label,
+  disabled = false,
+}: {
+  value: string
+  label: string
+  disabled?: boolean
+}) {
+  const [copied, setCopied] = React.useState(false)
+  const resetTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current)
+    }
+  }, [])
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current)
+      resetTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Ignore clipboard failures (e.g. permission denied); the command
+      // text remains visible and selectable for manual copying.
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="shrink-0"
+      disabled={disabled}
+      aria-label={copied ? "Copied" : label}
+      onClick={() => void copy()}
+    >
+      {copied ? (
+        <IconCheck className="text-green-600 dark:text-green-400" />
+      ) : (
+        <IconCopy />
+      )}
+    </Button>
   )
 }
 

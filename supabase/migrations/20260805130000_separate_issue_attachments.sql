@@ -39,10 +39,20 @@ create index if not exists attachments_issue_kind_active_idx
   on public.attachments(issue_id, created_at)
   where kind = 'issue' and deleted_at is null;
 
--- `kind` is intentionally absent from the update grant: a client may finish or
--- delete its own upload, but it may not reclassify an attachment after the
--- fact. Inserts still carry it (the table-level insert grant covers all
--- columns), which is where ownership is decided.
+-- Supabase's default privileges hand `authenticated` table-wide UPDATE on
+-- every new table in `public`, and a column-level grant only ever adds to
+-- that — it cannot narrow it. `attachments` has carried that blanket UPDATE
+-- since it was created, so the column list below was decorative. Revoke it
+-- first (the same shape `20260714120000_durable_issue_message_consumption`
+-- already uses for `messages`), then re-grant only the columns a client
+-- legitimately writes.
+--
+-- `kind` is deliberately absent: a client may finish or delete its own
+-- upload, but it may not reclassify an attachment after the fact. Inserts
+-- still carry `kind` (the table-level insert grant covers all columns), which
+-- is where ownership is decided.
+revoke update on public.attachments from authenticated;
+
 grant update(message_id, upload_completed_at, deleted_at, storage_deleted_at)
   on public.attachments
   to authenticated;

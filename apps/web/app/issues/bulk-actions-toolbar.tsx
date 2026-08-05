@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import type { IssuesData } from "@/app/queries"
+import type { AssignedIssueLabel } from "@/app/query-contracts"
 import { queryKeys } from "@/app/query-keys"
 import {
   AlertDialog,
@@ -36,11 +37,14 @@ import {
 } from "@gentic/validators/issues"
 
 import {
+  bulkAddIssueLabels,
   bulkDeleteIssues,
+  bulkRemoveIssueLabels,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
 } from "./actions"
+import { BulkLabelPicker } from "./bulk-label-picker"
 import {
   priorityIconStyles,
   priorityIcons,
@@ -70,9 +74,11 @@ function pluralize(count: number, noun: string) {
 
 export function BulkActionsToolbar({
   selectedIds,
+  labels,
   onDone,
 }: {
   selectedIds: string[]
+  labels: AssignedIssueLabel[]
   onDone: () => void
 }) {
   const queryClient = useQueryClient()
@@ -83,6 +89,17 @@ export function BulkActionsToolbar({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+    ])
+  }
+
+  // Label assignment counts live only on the Settings > Labels page, driven
+  // by a live join query — invalidating this prefix (rather than a single
+  // key) covers every cached search variant so counts stay correct there
+  // too if it's open in another tab/pane.
+  async function invalidateLabelQueries() {
+    await Promise.all([
+      invalidateQueries(),
+      queryClient.invalidateQueries({ queryKey: ["settings", "labels"] }),
     ])
   }
 
@@ -193,11 +210,37 @@ export function BulkActionsToolbar({
     },
   })
 
+  const addLabelsMutation = useMutation({
+    mutationFn: bulkAddIssueLabels,
+    onSuccess: async () => {
+      await invalidateLabelQueries()
+      onDone()
+      toast.success(`Added labels to ${pluralize(count, "issue")}`)
+    },
+    onError: () => {
+      toast.error(`Failed to add labels to ${pluralize(count, "issue")}`)
+    },
+  })
+
+  const removeLabelsMutation = useMutation({
+    mutationFn: bulkRemoveIssueLabels,
+    onSuccess: async () => {
+      await invalidateLabelQueries()
+      onDone()
+      toast.success(`Removed labels from ${pluralize(count, "issue")}`)
+    },
+    onError: () => {
+      toast.error(`Failed to remove labels from ${pluralize(count, "issue")}`)
+    },
+  })
+
   const isPending =
     statusMutation.isPending ||
     priorityMutation.isPending ||
     agentMutation.isPending ||
-    deleteMutation.isPending
+    deleteMutation.isPending ||
+    addLabelsMutation.isPending ||
+    removeLabelsMutation.isPending
 
   function setStatus(status: IssueStatus) {
     if (count === 0 || statusMutation.isPending) {
@@ -248,6 +291,23 @@ export function BulkActionsToolbar({
       formData.append("id", id)
     }
     deleteMutation.mutate(formData)
+  }
+
+  // Add and remove submit the identical payload — the whole selection plus
+  // the chosen label ids — so the only difference is which mutation runs.
+  function mutateLabels(mutation: typeof addLabelsMutation, labelIds: string[]) {
+    if (count === 0 || labelIds.length === 0 || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    for (const id of selectedIds) {
+      formData.append("issue_id", id)
+    }
+    for (const labelId of labelIds) {
+      formData.append("label_id", labelId)
+    }
+    mutation.mutate(formData)
   }
 
   if (count === 0) {
@@ -355,6 +415,26 @@ export function BulkActionsToolbar({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
+        <BulkLabelPicker
+          idPrefix="add"
+          triggerLabel="Add labels"
+          emptyLabel={labels.length === 0 ? "No labels yet." : "No matches."}
+          applyLabel={(n) => `Add ${pluralize(n, "label")}`}
+          labels={labels}
+          disabled={isPending}
+          pending={addLabelsMutation.isPending}
+          onApply={(labelIds) => mutateLabels(addLabelsMutation, labelIds)}
+        />
+        <BulkLabelPicker
+          idPrefix="remove"
+          triggerLabel="Remove labels"
+          emptyLabel={labels.length === 0 ? "No labels yet." : "No matches."}
+          applyLabel={(n) => `Remove ${pluralize(n, "label")}`}
+          labels={labels}
+          disabled={isPending}
+          pending={removeLabelsMutation.isPending}
+          onApply={(labelIds) => mutateLabels(removeLabelsMutation, labelIds)}
+        />
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm" disabled={isPending}>

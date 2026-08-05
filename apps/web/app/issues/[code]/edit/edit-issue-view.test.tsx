@@ -22,7 +22,7 @@ const baseIssue: IssueEdit = {
   code: "GEN-7",
   number: 7,
   title: "Edit automatic PR setting",
-  prompt: "Keep this issue editable.",
+  body: "Keep this issue editable.",
   agent_provider: "claude_code",
   issue_model: null,
   type: "feature",
