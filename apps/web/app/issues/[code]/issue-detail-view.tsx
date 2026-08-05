@@ -44,6 +44,10 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           "attachments",
           "issue_events",
           "issue_labels",
+          // Definition edits (rename/recolor/archive/restore) touch `labels`
+          // only; refresh so assigned chips, counts, and the timeline's
+          // archived styling stay current without a reload.
+          "labels",
         ]}
       />
       <IssueSlugUrlSync issue={issue} />

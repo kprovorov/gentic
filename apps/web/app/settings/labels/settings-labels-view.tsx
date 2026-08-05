@@ -17,6 +17,7 @@ import { archiveLabel, createLabel, updateLabel } from "@/app/settings/actions"
 import { fetchSettingsLabelsData } from "@/app/client-queries"
 import type { SettingsLabelsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import { RealtimeRefresh } from "@/components/realtime-refresh"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,6 +118,14 @@ export function SettingsLabelsView({
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
+      {/* Catalog edits change `labels`; assignment counts change `issue_labels`
+          (e.g. archiving elsewhere removes assignments). Refresh on both so the
+          list, counts, and empty state stay current across tabs. */}
+      <RealtimeRefresh
+        channelName="settings-labels"
+        tables={["labels", "issue_labels"]}
+        queryKey={queryKeys.settingsLabelsRoot}
+      />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6">
           <Button asChild variant="ghost" size="sm" className="w-fit">

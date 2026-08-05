@@ -1,10 +1,11 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   getCoreRowModel,
   getPaginationRowModel,
@@ -506,6 +507,66 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   )
   const [labelFilter, setLabelFilter] = useState<Set<string>>(() => new Set())
   const [unlabeledFilter, setUnlabeledFilter] = useState(false)
+  const activeLabelIds = useMemo(
+    () => new Set(data.labels.map((label) => label.id)),
+    [data.labels]
+  )
+  // When a label we're filtering by is archived in another tab, realtime
+  // refetches the catalog without it. Ignore any such stale ids everywhere the
+  // filter is read, so the label drops out of the list, count, and results
+  // without touching unrelated filter state or the URL. `labelFilter` stays the
+  // raw record of user intent; this is the effective, still-active view.
+  const effectiveLabelFilter = useMemo(() => {
+    if (labelFilter.size === 0) {
+      return labelFilter
+    }
+    const active = new Set<string>()
+    for (const id of labelFilter) {
+      if (activeLabelIds.has(id)) {
+        active.add(id)
+      }
+    }
+    return active.size === labelFilter.size ? labelFilter : active
+  }, [labelFilter, activeLabelIds])
+  // Remember each active label's name so an archived label can still be named
+  // in the notice below, even though realtime has already dropped it from the
+  // catalog by the time we react.
+  const labelNamesRef = useRef(new Map<string, string>())
+  useEffect(() => {
+    for (const label of data.labels) {
+      labelNamesRef.current.set(label.id, label.name)
+    }
+  }, [data.labels])
+  // Announce archive-driven filter removals exactly once. This effect only
+  // fires the notice (an external side effect); the removal itself is derived
+  // above, so no filter state is mutated here. Re-arm ids that become active
+  // again so a later archival still notifies.
+  const notifiedArchivedRef = useRef(new Set<string>())
+  useEffect(() => {
+    const notified = notifiedArchivedRef.current
+    for (const id of notified) {
+      if (activeLabelIds.has(id)) {
+        notified.delete(id)
+      }
+    }
+    const newlyArchived = Array.from(labelFilter).filter(
+      (id) => !activeLabelIds.has(id) && !notified.has(id)
+    )
+    if (newlyArchived.length === 0) {
+      return
+    }
+    for (const id of newlyArchived) {
+      notified.add(id)
+    }
+    const names = newlyArchived.map(
+      (id) => labelNamesRef.current.get(id) ?? "a label"
+    )
+    toast.info(
+      names.length === 1
+        ? `Removed archived label “${names[0]}” from your filter.`
+        : `Removed ${names.length} archived labels from your filter.`
+    )
+  }, [labelFilter, activeLabelIds])
   const [expandedFilterSection, setExpandedFilterSection] =
     useState<FilterSection | null>(null)
   const activeFilterCount =
@@ -514,7 +575,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     typeFilter.size +
     (blockingFilter !== "all" ? 1 : 0) +
     projectFilter.size +
-    labelFilter.size +
+    effectiveLabelFilter.size +
     (unlabeledFilter ? 1 : 0)
   const hasActiveFilters = globalFilter.length > 0 || activeFilterCount > 0
   const availableProjects = useMemo(() => {
@@ -561,7 +622,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         .filter((issue) => {
           if (unlabeledFilter) return issue.labels.length === 0
           const assignedIds = new Set(issue.labels.map((label) => label.id))
-          return Array.from(labelFilter).every((id) => assignedIds.has(id))
+          return Array.from(effectiveLabelFilter).every((id) =>
+            assignedIds.has(id)
+          )
         })
         .toSorted(compareIssues),
     [
@@ -574,7 +637,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       blockedIssueIds,
       blockingIssueIds,
       projectFilter,
-      labelFilter,
+      effectiveLabelFilter,
       unlabeledFilter,
     ]
   )
@@ -585,7 +648,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     Array.from(priorityFilter).sort().join(","),
     blockingFilter,
     Array.from(projectFilter).sort().join(","),
-    Array.from(labelFilter).sort().join(","),
+    Array.from(effectiveLabelFilter).sort().join(","),
     unlabeledFilter ? "unlabeled" : "",
   ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
@@ -913,16 +976,16 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     <FilterMenuSection
                       label="Labels"
                       badge={
-                        labelFilter.size > 0 || unlabeledFilter ? (
+                        effectiveLabelFilter.size > 0 || unlabeledFilter ? (
                           <span className={activeFilterCountBadgeStyles}>
-                            {unlabeledFilter ? 1 : labelFilter.size}
+                            {unlabeledFilter ? 1 : effectiveLabelFilter.size}
                           </span>
                         ) : null
                       }
                       expanded={expandedFilterSection === "labels"}
                       onToggle={() => toggleFilterSection("labels")}
                     >
-                      {labelFilter.size > 0 || unlabeledFilter ? (
+                      {effectiveLabelFilter.size > 0 || unlabeledFilter ? (
                         <DropdownMenuItem onSelect={clearLabelFilter}>
                           Clear filter
                         </DropdownMenuItem>
@@ -937,7 +1000,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                       {data.labels.map((label) => (
                         <DropdownMenuCheckboxItem
                           key={label.id}
-                          checked={labelFilter.has(label.id)}
+                          checked={effectiveLabelFilter.has(label.id)}
                           onSelect={(event) => event.preventDefault()}
                           onCheckedChange={() => toggleLabelFilter(label.id)}
                           className="gap-2"
@@ -1158,7 +1221,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 filterKey={filterKey}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
-                selectedLabelIds={labelFilter}
+                selectedLabelIds={effectiveLabelFilter}
                 onLabelSelect={addLabelFilter}
                 labels={data.labels}
               />
@@ -1253,7 +1316,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                                 onSelectedChange={(selected) =>
                                   toggleIssueSelected(issue.id, selected)
                                 }
-                                selectedLabelIds={labelFilter}
+                                selectedLabelIds={effectiveLabelFilter}
                                 onLabelSelect={addLabelFilter}
                               />
                             ))}
