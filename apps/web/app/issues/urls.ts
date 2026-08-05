@@ -1,4 +1,10 @@
-import { getIssueCode, slugifyIssueTitle } from "@gentic/services/issues"
+import {
+  getIssueCode,
+  parseIssueCode,
+  slugifyIssueTitle,
+} from "@gentic/services/issues"
+
+export { parseIssueCode }
 
 export type IssueUrlParts = {
   number: number
@@ -6,19 +12,6 @@ export type IssueUrlParts = {
   projects: {
     key: string
   } | null
-}
-
-export function parseIssueCode(code: string) {
-  const match = /^([A-Z][A-Z0-9]*)-(\d+)$/.exec(code.toUpperCase())
-  if (!match) return null
-
-  const issueNumber = Number.parseInt(match[2], 10)
-  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1) return null
-
-  return {
-    projectKey: match[1],
-    issueNumber,
-  }
 }
 
 export function getIssueHref(issue: IssueUrlParts) {

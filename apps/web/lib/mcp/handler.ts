@@ -23,6 +23,7 @@ import { projectSchema } from "@gentic/validators/projects"
 import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
 
+import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
 import * as labelsService from "@gentic/services/labels"
 import * as projectsService from "@gentic/services/projects"
@@ -138,6 +139,16 @@ const issueIdInputSchema = {
     .string()
     .uuid()
     .describe("The issue id, from list_issues, create_issue, or get_issue."),
+}
+
+const issueCodeInputSchema = {
+  code: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "The issue's human-readable Issue Code such as GEN-123, built from the project key and issue number returned by list_issues or create_issue."
+    ),
 }
 
 const addedRelationOutputSchema = {
@@ -507,7 +518,7 @@ export function registerGenticMcpTools(
     {
       title: "List Issues",
       description:
-        "List Gentic issues owned by the authenticated account, including priority and assigned Labels. Optionally filter by project, match every requested Label, or find issues with no Labels. Returned issue ids can be used with get_issue, update_issue, update_issue_priority, update_issue_status, or delete_issue.",
+        "List Gentic issues owned by the authenticated account, including priority and assigned Labels. Optionally filter by project, match every requested Label, or find issues with no Labels. Each returned issue carries its project key and number for building an Issue Code such as GEN-123 to fetch full details with get_issue; returned issue ids can be used with update_issue, update_issue_priority, update_issue_status, or delete_issue.",
       inputSchema: {
         project_id: z
           .string()
@@ -561,12 +572,22 @@ export function registerGenticMcpTools(
     {
       title: "Get Issue",
       description:
-        "Get full details for one Gentic issue owned by the authenticated account, including priority. Use the issue id from list_issues or create_issue.",
-      inputSchema: issueIdInputSchema,
+        "Get full details for one Gentic issue owned by the authenticated account, including its current body, priority, and assigned Labels. Identify the issue by its human-readable Issue Code such as GEN-123, built from the project key and issue number returned by list_issues or create_issue.",
+      inputSchema: issueCodeInputSchema,
       outputSchema: issueWithLabelsOutputSchema,
     },
-    deps.tool(async ({ supabase, userId }, { id }: { id: string }) => {
-      const issue = await deps.issuesService.getIssue(supabase, userId, id)
+    deps.tool(async ({ supabase, userId }, { code }: { code: string }) => {
+      const parsed = issuesService.parseIssueCode(code)
+      if (!parsed) {
+        throw new ServiceError("not_found", "Issue not found")
+      }
+
+      const issue = await deps.issuesService.getIssueByCode(
+        supabase,
+        userId,
+        parsed.projectKey,
+        parsed.issueNumber
+      )
       return { issue }
     })
   )
