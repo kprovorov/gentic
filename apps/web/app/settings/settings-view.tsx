@@ -49,7 +49,13 @@ import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { Textarea } from "@gentic/ui/textarea"
 import { cn } from "@gentic/ui/utils"
 
-export function SettingsView({ initialData }: { initialData: SettingsData }) {
+export function SettingsView({
+  initialData,
+  githubConnectionConflict = false,
+}: {
+  initialData: SettingsData
+  githubConnectionConflict?: boolean
+}) {
   const queryClient = useQueryClient()
   const [selectedRepo, setSelectedRepo] = React.useState("")
   const [repoQuery, setRepoQuery] = React.useState("")
@@ -179,6 +185,24 @@ export function SettingsView({ initialData }: { initialData: SettingsData }) {
             </p>
           ) : null}
         </header>
+
+        {githubConnectionConflict ? (
+          <div
+            role="alert"
+            className="flex gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
+          >
+            <IconAlertCircle className="mt-0.5 size-5 shrink-0" />
+            <div>
+              <p className="font-medium">
+                GitHub installation already connected
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                This installation belongs to another Gentic account. That
+                account remains connected, and no changes were made here.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <Card>
           <CardHeader>
