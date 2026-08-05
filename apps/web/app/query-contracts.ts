@@ -5,6 +5,7 @@ import {
   issueStatusSchema,
   issueTypeSchema,
   hasAttachedIssuePullRequest,
+  type AgentProvider,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
@@ -20,6 +21,16 @@ const projectOptionSchema = z.object({
   key: z.string(),
 })
 
+export const assignedIssueLabelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+})
+
+const issueLabelJoinSchema = z.object({
+  labels: assignedIssueLabelSchema.extend({ state: z.string() }),
+})
+
 export const homeIssueSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
@@ -27,6 +38,7 @@ export const homeIssueSchema = z.object({
   status: issueStatusSchema,
   type: issueTypeSchema,
   priority: issuePrioritySchema,
+  agent_provider: agentProviderSchema,
   created_at: z.string(),
   issue_pull_requests: z.array(
     z.object({
@@ -36,6 +48,7 @@ export const homeIssueSchema = z.object({
       state: z.string().nullable(),
     })
   ),
+  issue_labels: z.array(issueLabelJoinSchema),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -72,6 +85,7 @@ export const issueDetailSchema = z.object({
   create_pr_automatically: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
+  labels: z.array(assignedIssueLabelSchema),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -90,14 +104,18 @@ export type HomeIssue = {
   status: IssueStatus
   type: IssueType
   priority: IssuePriority
+  agent_provider: AgentProvider
   created_at: string
   pullRequests: {
     id: string
     url: string
     state?: GithubPullRequestState
   }[]
+  labels: AssignedIssueLabel[]
   projects: ProjectOption | null
 }
+
+export type AssignedIssueLabel = z.infer<typeof assignedIssueLabelSchema>
 
 export type IssueDetail = {
   id: string
@@ -118,6 +136,7 @@ export type IssueDetail = {
   create_pr_automatically: boolean
   created_at: string
   updated_at: string
+  labels: AssignedIssueLabel[]
   projects: ProjectOption | null
 }
 
@@ -186,6 +205,7 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
     status: issue.status,
     type: issue.type,
     priority: issue.priority,
+    agent_provider: issue.agent_provider,
     created_at: issue.created_at,
     pullRequests: issue.issue_pull_requests
       .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
@@ -194,6 +214,13 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
         url,
         state: normalizePersistedPullRequestState(state),
       })),
+    labels: issue.issue_labels
+      .map((assignment) => assignment.labels)
+      .filter((label) => label.state === "active")
+      .map(({ id, name, color }) => ({ id, name, color }))
+      .toSorted((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      ),
     projects: toProjectOption(issue.projects),
   }
 }
@@ -218,6 +245,9 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,
     updated_at: issue.updated_at,
+    labels: issue.labels.toSorted((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    ),
     projects: toProjectOption(issue.projects),
   }
 }

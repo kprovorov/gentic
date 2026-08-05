@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { z } from "zod"
+
 const { registerGenticMcpTools } = await import("../lib/mcp/handler")
 
 const projectId = "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2"
@@ -77,6 +79,25 @@ test("label MCP tools expose the active catalog contract", () => {
       (field.safeParse as (value: unknown) => { success: boolean })(candidate)
         .success,
       true
+    )
+  }
+})
+
+test("every tool's input/output schema converts to JSON Schema", () => {
+  // The MCP SDK converts each tool's inputSchema/outputSchema to JSON Schema
+  // for tools/list; a ZodEffects (e.g. from .transform()) throws there
+  // ("Transforms cannot be represented in JSON Schema"), which fails the
+  // whole tools/list call for a connected client, not just one tool.
+  const tools = registerTools()
+
+  for (const [name, { config }] of tools) {
+    assert.doesNotThrow(
+      () => z.toJSONSchema(z.object(config.inputSchema)),
+      `${name} inputSchema`
+    )
+    assert.doesNotThrow(
+      () => z.toJSONSchema(z.object(config.outputSchema)),
+      `${name} outputSchema`
     )
   }
 })
@@ -163,8 +184,12 @@ test("issue MCP tools document and return priority in their output contracts", (
 
     const candidate =
       name === "list_issues"
-        ? [{ id: issueId, priority: "urgent" }]
-        : { id: issueId, priority: "urgent" }
+        ? [{ id: issueId, priority: "urgent", labels: [] }]
+        : {
+            id: issueId,
+            priority: "urgent",
+            ...(name === "get_issue" ? { labels: [] } : {}),
+          }
     assert.equal(
       (field.safeParse as (value: unknown) => { success: boolean })(candidate)
         .success,
@@ -173,14 +198,81 @@ test("issue MCP tools document and return priority in their output contracts", (
 
     const invalid =
       name === "list_issues"
-        ? [{ id: issueId, priority: "normal" }]
-        : { id: issueId, priority: "normal" }
+        ? [{ id: issueId, priority: "normal", labels: [] }]
+        : {
+            id: issueId,
+            priority: "normal",
+            ...(name === "get_issue" ? { labels: [] } : {}),
+          }
     assert.equal(
       (field.safeParse as (value: unknown) => { success: boolean })(invalid)
         .success,
       false
     )
   }
+})
+
+test("list_issues passes deduped match-all Label filters and unlabeled mode", async () => {
+  const calls: Record<string, unknown>[] = []
+  const labelId = "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"
+  const tools = registerTools({
+    listIssues: async (
+      supabase: unknown,
+      userId: string,
+      filters: Record<string, unknown>
+    ) => {
+      calls.push({ supabase, userId, ...filters })
+      return []
+    },
+  })
+
+  await tools.get("list_issues")?.handler({
+    project_id: projectId,
+    label_ids: [labelId, labelId],
+  })
+  await tools.get("list_issues")?.handler({ unlabeled: true })
+
+  assert.deepEqual(calls, [
+    {
+      supabase: "supabase",
+      userId: "user_1",
+      projectId,
+      labelIds: [labelId],
+      unlabeled: false,
+    },
+    {
+      supabase: "supabase",
+      userId: "user_1",
+      projectId: undefined,
+      labelIds: [],
+      unlabeled: true,
+    },
+  ])
+})
+
+test("list_issues surfaces invalid Label filter errors", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({
+    listIssues: async () => {
+      throw new ServiceError(
+        "not_found",
+        "One or more Label filter IDs are missing, archived, or not owned by this account."
+      )
+    },
+  })
+  const handler = tools.get("list_issues")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () =>
+      handler({
+        label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
+      }),
+    (error: unknown) =>
+      error instanceof ServiceError &&
+      error.code === "not_found" &&
+      /missing, archived, or not owned/.test(error.message)
+  )
 })
 
 test("priority MCP inputs document the four accepted values", () => {
@@ -282,7 +374,8 @@ test("create_issue surfaces a stale label id error instead of swallowing it", as
         title: "Labeled issue",
         label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
       }),
-    (error: unknown) => error instanceof ServiceError && error.code === "not_found"
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "not_found"
   )
 })
 
@@ -357,7 +450,10 @@ test("add_issue_labels surfaces a limit error instead of swallowing it", async (
   const { ServiceError } = await import("@gentic/services/errors")
   const tools = registerTools({
     addIssueLabels: async () => {
-      throw new ServiceError("validation", "Adding these labels would exceed the 20-label limit.")
+      throw new ServiceError(
+        "validation",
+        "Adding these labels would exceed the 20-label limit."
+      )
     },
   })
   const handler = tools.get("add_issue_labels")?.handler
@@ -369,7 +465,8 @@ test("add_issue_labels surfaces a limit error instead of swallowing it", async (
         issue_ids: [issueId],
         label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
       }),
-    (error: unknown) => error instanceof ServiceError && error.code === "validation"
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "validation"
   )
 })
 
@@ -421,7 +518,8 @@ test("remove_issue_labels surfaces a not_found error instead of swallowing it", 
         issue_ids: [issueId],
         label_ids: ["5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3"],
       }),
-    (error: unknown) => error instanceof ServiceError && error.code === "not_found"
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "not_found"
   )
 })
 

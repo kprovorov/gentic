@@ -4,6 +4,34 @@ import type { ChatMessageContract } from "@gentic/validators/realtime"
 export const ISSUE_WITH_PROJECT_SELECT =
   "*, projects!inner(id,name,repo,user_id,key)"
 
+export const ISSUE_WITH_PROJECT_AND_LABELS_SELECT =
+  "*, projects!inner(id,name,repo,user_id,key), issue_labels(labels!inner(id,name,color,state))"
+
+export type AssignedIssueLabel = {
+  id: string
+  name: string
+  color: string
+}
+
+type IssueLabelJoin = {
+  labels: AssignedIssueLabel & { state: string }
+}
+
+export function withActiveAssignedLabels<
+  T extends { issue_labels?: IssueLabelJoin[] },
+>(row: T): Omit<T, "issue_labels"> & { labels: AssignedIssueLabel[] } {
+  const { issue_labels: issueLabelRows = [], ...issue } = row
+  const labels = issueLabelRows
+    .map((assignment) => assignment.labels)
+    .filter((label) => label.state === "active")
+    .map(({ id, name, color }) => ({ id, name, color }))
+    .toSorted((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    )
+
+  return { ...issue, labels }
+}
+
 type IssueRow = Tables<"issues">
 type IssueAutomaticPrRequestRow = Tables<"issue_automatic_pr_requests">
 type IssueRelationRow = Tables<"issue_relations">

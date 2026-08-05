@@ -41,6 +41,7 @@ import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -51,16 +52,19 @@ import {
 } from "@gentic/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
+import { IssueLabelChips } from "./issue-label-chips"
 import {
   issuePriorityLabels,
   issuePriorityOptions,
   issuePriorityOrder,
+  type AgentProvider,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
 } from "@gentic/validators/issues"
 
 import { updateIssuePriority, updateIssueStatus } from "./actions"
+import { agentProviderLabels } from "./agent-provider-options"
 import { updateIssuesInCaches } from "./issues-cache"
 
 export const statusLabels: Record<IssueStatus, string> = {
@@ -237,6 +241,17 @@ export function IssueTypeBadge({ type }: { type: IssueType }) {
   )
 }
 
+export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
+  return (
+    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+      <AgentProviderIcon provider={provider} tone="mono" className="size-3.5" />
+      <span className="whitespace-nowrap">
+        {agentProviderLabels[provider]}
+      </span>
+    </span>
+  )
+}
+
 export const blockingBadgeStyles = {
   blocked: "bg-muted text-muted-foreground",
   blocking: "bg-muted text-muted-foreground",
@@ -292,7 +307,9 @@ export function PullRequestPills({
                   stateMeta.className
                 )}
               >
-                <StateIcon className={cn("size-3.5", stateMeta.iconClassName)} />
+                <StateIcon
+                  className={cn("size-3.5", stateMeta.iconClassName)}
+                />
                 <span className="whitespace-nowrap">{label.short}</span>
               </Link>
             </TooltipTrigger>
@@ -480,10 +497,7 @@ export function IssueStatusMenu({
           onClick={(event) => event.stopPropagation()}
         >
           <StatusIcon
-            className={cn(
-              "size-3.5 shrink-0",
-              statusIconStyles[issue.status]
-            )}
+            className={cn("size-3.5 shrink-0", statusIconStyles[issue.status])}
           />
           {showLabel ? (
             <span className="whitespace-nowrap">
@@ -647,7 +661,9 @@ export function IssuePriorityMenu({
 
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,
-  blockingIssueIds: Set<string>
+  blockingIssueIds: Set<string>,
+  selectedLabelIds: Set<string> = new Set(),
+  onLabelSelect: (labelId: string) => void = () => undefined
 ): ColumnDef<HomeIssue>[] {
   return [
     {
@@ -716,6 +732,14 @@ export function getIssuesColumns(
       cell: ({ row }) => <IssueTypeBadge type={row.original.type} />,
     },
     {
+      id: "agent_provider",
+      accessorFn: (issue) => agentProviderLabels[issue.agent_provider],
+      header: ({ column }) => <SortableHeader label="Agent" column={column} />,
+      cell: ({ row }) => (
+        <AgentProviderBadge provider={row.original.agent_provider} />
+      ),
+    },
+    {
       id: "project",
       accessorFn: (issue) => issue.projects?.name ?? "Unknown project",
       header: ({ column }) => (
@@ -736,6 +760,18 @@ export function getIssuesColumns(
           {row.original.projects?.repo ?? ""}
         </span>
       ),
+    },
+    {
+      id: "labels",
+      header: "Labels",
+      cell: ({ row }) => (
+        <IssueLabelChips
+          labels={row.original.labels}
+          selectedLabelIds={selectedLabelIds}
+          onLabelSelect={onLabelSelect}
+        />
+      ),
+      enableSorting: false,
     },
     {
       accessorKey: "status",
