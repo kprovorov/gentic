@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { z } from "zod"
+
 const { registerGenticMcpTools } = await import("../lib/mcp/handler")
 
 const projectId = "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2"
@@ -77,6 +79,25 @@ test("label MCP tools expose the active catalog contract", () => {
       (field.safeParse as (value: unknown) => { success: boolean })(candidate)
         .success,
       true
+    )
+  }
+})
+
+test("every tool's input/output schema converts to JSON Schema", () => {
+  // The MCP SDK converts each tool's inputSchema/outputSchema to JSON Schema
+  // for tools/list; a ZodEffects (e.g. from .transform()) throws there
+  // ("Transforms cannot be represented in JSON Schema"), which fails the
+  // whole tools/list call for a connected client, not just one tool.
+  const tools = registerTools()
+
+  for (const [name, { config }] of tools) {
+    assert.doesNotThrow(
+      () => z.toJSONSchema(z.object(config.inputSchema)),
+      `${name} inputSchema`
+    )
+    assert.doesNotThrow(
+      () => z.toJSONSchema(z.object(config.outputSchema)),
+      `${name} outputSchema`
     )
   }
 })

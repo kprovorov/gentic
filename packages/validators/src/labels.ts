@@ -53,11 +53,17 @@ export const labelPresetColors = [
   "#3F3F46",
 ] as const
 
-export const labelColorSchema = z
+// Transforms can't be represented in JSON Schema (Zod's toJSONSchema throws),
+// so callers building a JSON-Schema-facing shape (e.g. MCP tool input/output
+// schemas) must use this untransformed base rather than labelColorSchema.
+export const labelColorFormatSchema = z
   .string()
   .trim()
   .regex(/^#[0-9A-Fa-f]{6}$/, "Use a #RRGGBB color.")
-  .transform((value) => value.toUpperCase())
+
+export const labelColorSchema = labelColorFormatSchema.transform((value) =>
+  value.toUpperCase()
+)
 
 export const labelNameSchema = z
   .string()
