@@ -51,6 +51,7 @@ import {
 } from "@gentic/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
+import { IssueLabelChips } from "./issue-label-chips"
 import {
   issuePriorityLabels,
   issuePriorityOptions,
@@ -292,7 +293,9 @@ export function PullRequestPills({
                   stateMeta.className
                 )}
               >
-                <StateIcon className={cn("size-3.5", stateMeta.iconClassName)} />
+                <StateIcon
+                  className={cn("size-3.5", stateMeta.iconClassName)}
+                />
                 <span className="whitespace-nowrap">{label.short}</span>
               </Link>
             </TooltipTrigger>
@@ -480,10 +483,7 @@ export function IssueStatusMenu({
           onClick={(event) => event.stopPropagation()}
         >
           <StatusIcon
-            className={cn(
-              "size-3.5 shrink-0",
-              statusIconStyles[issue.status]
-            )}
+            className={cn("size-3.5 shrink-0", statusIconStyles[issue.status])}
           />
           {showLabel ? (
             <span className="whitespace-nowrap">
@@ -647,7 +647,9 @@ export function IssuePriorityMenu({
 
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,
-  blockingIssueIds: Set<string>
+  blockingIssueIds: Set<string>,
+  selectedLabelIds: Set<string> = new Set(),
+  onLabelSelect: (labelId: string) => void = () => undefined
 ): ColumnDef<HomeIssue>[] {
   return [
     {
@@ -736,6 +738,18 @@ export function getIssuesColumns(
           {row.original.projects?.repo ?? ""}
         </span>
       ),
+    },
+    {
+      id: "labels",
+      header: "Labels",
+      cell: ({ row }) => (
+        <IssueLabelChips
+          labels={row.original.labels}
+          selectedLabelIds={selectedLabelIds}
+          onLabelSelect={onLabelSelect}
+        />
+      ),
+      enableSorting: false,
     },
     {
       accessorKey: "status",

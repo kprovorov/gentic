@@ -1,5 +1,6 @@
 export {
   getIssueCode,
+  type AssignedIssueLabel,
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,
@@ -16,6 +17,7 @@ export {
   listIssueRelationCandidates,
   listIssueRelations,
   listIssues,
+  type ListIssuesFilters,
 } from "./issues/queries"
 export {
   bulkDeleteIssues,

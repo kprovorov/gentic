@@ -1,25 +1,65 @@
 import { ServiceError, unwrap } from "../errors"
+import { ensureLabelsAssignable } from "../labels"
 import type { Supabase } from "../types"
 import { ensureIssueOwned, ensureProjectOwned } from "./ownership"
 import {
-  ISSUE_WITH_PROJECT_SELECT,
+  ISSUE_WITH_PROJECT_AND_LABELS_SELECT,
   type IssuePullRequest,
   type IssueRelation,
   type IssueRelationIssue,
+  withActiveAssignedLabels,
 } from "./shared"
+
+export type ListIssuesFilters = {
+  projectId?: string
+  labelIds?: string[]
+  unlabeled?: boolean
+}
+
+async function validateLabelFilters(
+  supabase: Supabase,
+  userId: string,
+  filters?: ListIssuesFilters
+) {
+  const labelIds = Array.from(new Set(filters?.labelIds ?? []))
+
+  if (filters?.unlabeled && labelIds.length > 0) {
+    throw new ServiceError(
+      "validation",
+      "No labels cannot be combined with specific Label filters."
+    )
+  }
+
+  if (labelIds.length > 0) {
+    try {
+      await ensureLabelsAssignable(supabase, userId, labelIds)
+    } catch (error) {
+      if (error instanceof ServiceError && error.code === "not_found") {
+        throw new ServiceError(
+          "not_found",
+          "One or more Label filter IDs are missing, archived, or not owned by this account."
+        )
+      }
+      throw error
+    }
+  }
+
+  return labelIds
+}
 
 export async function listIssues(
   supabase: Supabase,
   userId: string,
-  filters?: { projectId?: string }
+  filters?: ListIssuesFilters
 ) {
   if (filters?.projectId) {
     await ensureProjectOwned(supabase, userId, filters.projectId)
   }
 
+  const labelIds = await validateLabelFilters(supabase, userId, filters)
   let query = supabase
     .from("issues")
-    .select(ISSUE_WITH_PROJECT_SELECT)
+    .select(ISSUE_WITH_PROJECT_AND_LABELS_SELECT)
     .eq("projects.user_id", userId)
     .order("created_at", { ascending: false })
 
@@ -27,13 +67,21 @@ export async function listIssues(
     query = query.eq("project_id", filters.projectId)
   }
 
-  return unwrap(await query)
+  const issues = unwrap(await query).map((issue) =>
+    withActiveAssignedLabels(issue)
+  )
+
+  return issues.filter((issue) => {
+    const assignedIds = new Set(issue.labels.map((label) => label.id))
+    if (filters?.unlabeled) return assignedIds.size === 0
+    return labelIds.every((labelId) => assignedIds.has(labelId))
+  })
 }
 
 export async function getIssue(supabase: Supabase, userId: string, id: string) {
   const { data, error } = await supabase
     .from("issues")
-    .select(ISSUE_WITH_PROJECT_SELECT)
+    .select(ISSUE_WITH_PROJECT_AND_LABELS_SELECT)
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -45,7 +93,7 @@ export async function getIssue(supabase: Supabase, userId: string, id: string) {
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  return data
+  return withActiveAssignedLabels(data)
 }
 
 export async function getIssueByCode(
@@ -56,7 +104,7 @@ export async function getIssueByCode(
 ) {
   const { data, error } = await supabase
     .from("issues")
-    .select(ISSUE_WITH_PROJECT_SELECT)
+    .select(ISSUE_WITH_PROJECT_AND_LABELS_SELECT)
     .eq("number", issueNumber)
     .eq("projects.key", projectKey)
     .eq("projects.user_id", userId)
@@ -69,7 +117,7 @@ export async function getIssueByCode(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  return data
+  return withActiveAssignedLabels(data)
 }
 
 export async function listIssueRelationCandidates(

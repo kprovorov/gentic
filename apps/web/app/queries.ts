@@ -11,7 +11,6 @@ import type { Supabase } from "@gentic/services/types"
 import {
   chatMessageSchema,
   issueEventSchema,
-  type LabelSnapshot,
 } from "@gentic/validators/realtime"
 import { z } from "zod"
 
@@ -24,6 +23,7 @@ import {
   toIssueDetail,
   toIssueEdit,
   type HomeIssue,
+  type AssignedIssueLabel,
   type IssueDetail,
   type IssueEdit,
   type ProjectOption,
@@ -69,10 +69,7 @@ export type GithubRepositoryOption = {
   private: boolean
 }
 
-export type IssuePullRequest = Omit<
-  issuesService.IssuePullRequest,
-  "state"
-> & {
+export type IssuePullRequest = Omit<issuesService.IssuePullRequest, "state"> & {
   state?: GithubPullRequestState
 }
 
@@ -80,6 +77,7 @@ export type IssueEvent = z.infer<typeof issueEventSchema>
 
 export type HomeData = {
   issues: HomeIssue[]
+  labels: AssignedIssueLabel[]
   blockedIssueIds: string[]
   blockingIssueIds: string[]
 }
@@ -116,7 +114,7 @@ export type IssueDetailData = {
   relations: issuesService.IssueRelation[]
   relationCandidates: issuesService.IssueRelationIssue[]
   events: IssueEvent[]
-  labels: LabelSnapshot[]
+  labels: AssignedIssueLabel[]
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
@@ -168,7 +166,7 @@ function normalizePersistedState(
 // back to the last state we successfully resolved, and write back any newly
 // resolved state so future failures have a fresher fallback to use.
 async function attachPullRequestStates<
-  T extends { id: string; url: string; state?: string | null }
+  T extends { id: string; url: string; state?: string | null },
 >(
   supabase: Supabase,
   pullRequests: T[],
@@ -222,12 +220,15 @@ export async function getHomeData(
   context?: AuthenticatedContext
 ): Promise<HomeData> {
   const { supabase, userId } = await resolveContext(context)
-  const { data: issues, error } = await supabase
-    .from("issues")
-    .select(
-      "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at,state),projects(id,name,repo,key)"
-    )
-    .order("created_at", { ascending: false })
+  const [{ data: issues, error }, labels] = await Promise.all([
+    supabase
+      .from("issues")
+      .select(
+        "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),projects(id,name,repo,key)"
+      )
+      .order("created_at", { ascending: false }),
+    labelsService.listLabels(supabase, userId),
+  ])
 
   if (error) {
     throw new Error(error.message)
@@ -255,6 +256,7 @@ export async function getHomeData(
 
   return {
     issues: issuesWithPullRequestStates,
+    labels: labels.map(({ id, name, color }) => ({ id, name, color })),
     blockedIssueIds: Array.from(blockedIssueIds),
     blockingIssueIds: Array.from(blockingIssueIds),
   }
@@ -484,7 +486,6 @@ async function getIssueDetailDataForIssue(
     { data: messages, error: messagesError },
     { data: attachmentRows, error: attachmentsError },
     { data: eventRows, error: eventsError },
-    { data: issueLabelRows, error: issueLabelsError },
     pullRequests,
     { data: automaticPrRequestRows, error: automaticPrRequestsError },
     relations,
@@ -510,12 +511,6 @@ async function getIssueDetailDataForIssue(
       .select("id,issue_id,type,payload,created_at")
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
-    supabase
-      .from("issue_labels")
-      .select("labels!inner(id,name,color,state)")
-      .eq("issue_id", id)
-      .eq("labels.state", "active")
-      .returns<Array<{ labels: LabelSnapshot & { state: string } }>>(),
     issuesService.listIssuePullRequests(supabase, userId, id),
     supabase
       .from("issue_automatic_pr_requests")
@@ -536,17 +531,9 @@ async function getIssueDetailDataForIssue(
   if (eventsError) {
     throw new Error(eventsError.message)
   }
-  if (issueLabelsError) {
-    throw new Error(issueLabelsError.message)
-  }
   if (automaticPrRequestsError) {
     throw new Error(automaticPrRequestsError.message)
   }
-
-  const labels = (issueLabelRows ?? [])
-    .map((row) => row.labels)
-    .map(({ id: labelId, name, color }) => ({ id: labelId, name, color }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
 
   const events = z.array(issueEventSchema).parse(eventRows ?? [])
 
@@ -589,7 +576,7 @@ async function getIssueDetailDataForIssue(
     relations,
     relationCandidates,
     events,
-    labels,
+    labels: parsedIssue.labels,
   }
 }
 
