@@ -9,7 +9,12 @@ import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssuesView } from "./issues-view"
-import { bulkUpdateIssuePriority, updateIssuePriority } from "./actions"
+import {
+  bulkAddIssueLabels,
+  bulkRemoveIssueLabels,
+  bulkUpdateIssuePriority,
+  updateIssuePriority,
+} from "./actions"
 
 const replace = vi.fn()
 let searchParams = new URLSearchParams()
@@ -28,7 +33,9 @@ vi.mock("@/components/realtime-refresh", () => ({
 }))
 
 vi.mock("./actions", () => ({
+  bulkAddIssueLabels: vi.fn().mockResolvedValue(undefined),
   bulkDeleteIssues: vi.fn().mockResolvedValue(undefined),
+  bulkRemoveIssueLabels: vi.fn().mockResolvedValue(undefined),
   bulkUpdateIssueAgentProvider: vi.fn().mockResolvedValue(undefined),
   bulkUpdateIssuePriority: vi.fn().mockResolvedValue(undefined),
   bulkUpdateIssueStatus: vi.fn().mockResolvedValue(undefined),
@@ -38,10 +45,13 @@ vi.mock("./actions", () => ({
   saveIssueDraft: vi.fn().mockResolvedValue(undefined),
 }))
 
+const toastErrorMock = vi.fn()
+const toastSuccessMock = vi.fn()
+
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: (message: string) => toastErrorMock(message),
+    success: (message: string) => toastSuccessMock(message),
   },
 }))
 
@@ -533,6 +543,190 @@ describe("IssuesView Label discovery", () => {
     expect(
       screen.getByRole("menuitemcheckbox", { name: "No labels" })
     ).toHaveAttribute("data-state", "checked")
+  })
+})
+
+describe("IssuesView bulk label actions", () => {
+  const projectB = {
+    id: "project-2",
+    name: "Other Project",
+    repo: "acme/other",
+    key: "OTH",
+  }
+  // Named to avoid colliding with the issue type badge text ("Issue",
+  // "Feature", "Bug", "Feedback", "Idea") that also renders in each row.
+  const docs = { id: "label-docs", name: "Docs", color: "#DC2626" }
+  const infra = { id: "label-infra", name: "Infra", color: "#65A30D" }
+  const perf = { id: "label-perf", name: "Perf", color: "#2563EB" }
+
+  function dataWithCatalog(
+    issues: HomeIssue[],
+    catalogLabels: { id: string; name: string; color: string }[]
+  ): IssuesData {
+    return { ...baseData(issues), labels: catalogLabels }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    searchParams = new URLSearchParams()
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    )
+  })
+
+  it("adds labels to a selection spanning multiple projects, searched and chosen alphabetically", async () => {
+    const { user } = renderIssuesView({
+      data: dataWithCatalog(
+        [
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Project A issue",
+          }),
+          issue({
+            id: "22222222-2222-4222-8222-222222222222",
+            title: "Project B issue",
+            projects: projectB,
+          }),
+        ],
+        [docs, infra, perf]
+      ),
+    })
+
+    await user.click(screen.getByRole("checkbox", { name: "Select GEN-1" }))
+    await user.click(screen.getByRole("checkbox", { name: "Select GEN-2" }))
+    await user.click(screen.getByRole("button", { name: "Add labels" }))
+
+    const searchInput = await screen.findByPlaceholderText("Search labels")
+
+    // Options render alphabetically as given by the catalog.
+    const optionLabels = screen
+      .getAllByText(/^(Docs|Infra|Perf)$/)
+      .map((node) => node.textContent)
+    expect(optionLabels).toEqual(["Docs", "Infra", "Perf"])
+
+    await user.type(searchInput, "per")
+    expect(screen.queryByText("Docs")).not.toBeInTheDocument()
+    expect(screen.getByText("Perf")).toBeVisible()
+
+    await user.click(screen.getByRole("checkbox", { name: "Perf" }))
+    await user.click(screen.getByRole("button", { name: "Add 1 label" }))
+
+    expect(bulkAddIssueLabels).toHaveBeenCalledTimes(1)
+    const formData = vi.mocked(bulkAddIssueLabels).mock.calls[0][0]
+    expect(formData.getAll("issue_id").sort()).toEqual(
+      [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+      ].sort()
+    )
+    expect(formData.getAll("label_id")).toEqual(["label-perf"])
+
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith("Added labels to 2 issues")
+    })
+    // Selection state clears on success.
+    expect(
+      screen.queryByRole("button", { name: "Add labels" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("removes labels from only the selected issues and preserves unrelated assignments", async () => {
+    const { user } = renderIssuesView({
+      data: dataWithCatalog(
+        [
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Selected issue",
+            labels: [docs, infra],
+          }),
+          issue({
+            id: "22222222-2222-4222-8222-222222222222",
+            title: "Untouched issue",
+            labels: [docs],
+          }),
+        ],
+        [docs, infra, perf]
+      ),
+    })
+
+    await user.click(screen.getByRole("checkbox", { name: "Select GEN-1" }))
+    await user.click(screen.getByRole("button", { name: "Remove labels" }))
+    await user.click(await screen.findByRole("checkbox", { name: "Docs" }))
+    await user.click(screen.getByRole("button", { name: "Remove 1 label" }))
+
+    expect(bulkRemoveIssueLabels).toHaveBeenCalledTimes(1)
+    const formData = vi.mocked(bulkRemoveIssueLabels).mock.calls[0][0]
+    expect(formData.getAll("issue_id")).toEqual([
+      "11111111-1111-4111-8111-111111111111",
+    ])
+    expect(formData.getAll("label_id")).toEqual(["label-docs"])
+
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith(
+        "Removed labels from 1 issue"
+      )
+    })
+  })
+
+  it("keeps the selection and shows an error toast when the bulk add fails", async () => {
+    vi.mocked(bulkAddIssueLabels).mockRejectedValueOnce(new Error("nope"))
+    const { user } = renderIssuesView({
+      data: dataWithCatalog(
+        [
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Issue one",
+          }),
+        ],
+        [docs]
+      ),
+    })
+
+    await user.click(screen.getByRole("checkbox", { name: "Select GEN-1" }))
+    await user.click(screen.getByRole("button", { name: "Add labels" }))
+    await user.click(await screen.findByRole("checkbox", { name: "Docs" }))
+    await user.click(screen.getByRole("button", { name: "Add 1 label" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Failed to add labels to 1 issue"
+      )
+    })
+    // Selection state is preserved after a failure, unlike after success.
+    expect(screen.getByRole("checkbox", { name: "Select GEN-1" })).toBeChecked()
+    expect(screen.getByRole("button", { name: "Add labels" })).toBeVisible()
+  })
+
+  it("disables Apply until at least one label is selected", async () => {
+    const { user } = renderIssuesView({
+      data: dataWithCatalog(
+        [
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Issue one",
+          }),
+        ],
+        [docs, infra]
+      ),
+    })
+
+    await user.click(screen.getByRole("checkbox", { name: "Select GEN-1" }))
+    await user.click(screen.getByRole("button", { name: "Add labels" }))
+
+    await screen.findByPlaceholderText("Search labels")
+    expect(screen.getByRole("button", { name: "Add labels" })).toBeVisible()
+    const applyButtons = screen.getAllByRole("button", { name: /^Add \d/ })
+    expect(applyButtons[0]).toBeDisabled()
+
+    await user.click(screen.getByRole("checkbox", { name: "Docs" }))
+    await user.click(screen.getByRole("checkbox", { name: "Infra" }))
+
+    expect(screen.getByRole("button", { name: "Add 2 labels" })).toBeEnabled()
   })
 })
 
