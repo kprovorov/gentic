@@ -48,6 +48,7 @@ import type {
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
+import { Attachments, type Attachment } from "./attachments"
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 import {
   IssueDetailPriority,
@@ -726,6 +727,7 @@ export function IssueDetailRail({
   relations,
   relationCandidates,
   labels,
+  attachments,
 }: {
   issueId: string
   issueCode: string | null
@@ -737,6 +739,7 @@ export function IssueDetailRail({
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
   labels: LabelSnapshot[]
+  attachments: Attachment[]
 }) {
   const queryClient = useQueryClient()
   const addRelationMutation = useMutation({
@@ -771,6 +774,12 @@ export function IssueDetailRail({
           hasUnpublishedAgentChanges={hasUnpublishedAgentChanges}
           automaticPrPublishingInProgress={automaticPrPublishingInProgress}
         />
+      </RailSection>
+
+      {/* Files attached to the issue itself: they are not part of any chat
+          turn, so they stay here across agent and conversation resets. */}
+      <RailSection title="Files">
+        <Attachments issueId={issueId} attachments={attachments} />
       </RailSection>
 
       <RailSection

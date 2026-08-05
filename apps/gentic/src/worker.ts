@@ -320,6 +320,7 @@ export async function processIssue(
 
   let channel: IssueRealtimeChannel | null = null
   let currentSessionId = issue.sessionId
+  let issueAttachmentsDelivered = false
 
   try {
     throwIfAborted(options.signal)
@@ -329,12 +330,19 @@ export async function processIssue(
       runId: issue.activeRunId,
       pollIntervalMs: config.POLL_INTERVAL_MS,
       buildPrompt: async (message) => {
+        // The issue's own attachments are handed to the agent once per run, on
+        // its first prompt: they outlive resets, so a new session has to see
+        // them again, but re-sending them every follow-up turn would just
+        // re-upload the same bytes.
+        const includeIssueAttachments = !issueAttachmentsDelivered
+        issueAttachmentsDelivered = true
         const attachmentBlocks = await deps.buildAttachmentBlocks(
           api,
           issue.id,
           issue.activeRunId,
           message.id,
-          attachmentsDir
+          attachmentsDir,
+          { includeIssueAttachments }
         )
         if (attachmentBlocks.length > 0) {
           return [{ type: "text", text: message.content }, ...attachmentBlocks]

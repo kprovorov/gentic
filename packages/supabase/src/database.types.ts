@@ -18,6 +18,7 @@ export type Database = {
           file_name: string
           id: string
           issue_id: string
+          kind: string
           message_id: string | null
           size_bytes: number | null
           storage_deleted_at: string | null
@@ -31,6 +32,7 @@ export type Database = {
           file_name: string
           id?: string
           issue_id: string
+          kind?: string
           message_id?: string | null
           size_bytes?: number | null
           storage_deleted_at?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           file_name?: string
           id?: string
           issue_id?: string
+          kind?: string
           message_id?: string | null
           size_bytes?: number | null
           storage_deleted_at?: string | null

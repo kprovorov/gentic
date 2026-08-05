@@ -11,6 +11,8 @@ const createManualIssuePullRequestMock = vi.fn()
 const deleteIssueRelationMock = vi.fn()
 const addIssueLabelsMock = vi.fn()
 const removeIssueLabelsMock = vi.fn()
+const uploadAttachmentsMock = vi.fn()
+const deleteAttachmentMock = vi.fn()
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
 
@@ -25,6 +27,8 @@ vi.mock("@/app/issues/actions", () => ({
   updateIssueStatus: (formData: FormData) => updateIssueStatusMock(formData),
   addIssueLabels: (formData: FormData) => addIssueLabelsMock(formData),
   removeIssueLabels: (formData: FormData) => removeIssueLabelsMock(formData),
+  uploadAttachments: (formData: FormData) => uploadAttachmentsMock(formData),
+  deleteAttachment: (formData: FormData) => deleteAttachmentMock(formData),
 }))
 
 // The real field fetches the label catalog over the network for its search
@@ -140,6 +144,7 @@ function renderRail(
         relations={[]}
         relationCandidates={[]}
         labels={[]}
+        attachments={[]}
         {...props}
       />
     </QueryClientProvider>
@@ -446,5 +451,55 @@ describe("IssueDetailRail relations", () => {
     expect(screen.getByLabelText("Tests failed status")).toHaveClass(
       "text-red-600"
     )
+  })
+})
+
+describe("IssueDetailRail issue attachments", () => {
+  it("lists the issue's durable files", () => {
+    renderRail(createQueryClient(), {
+      attachments: [
+        {
+          id: "attachment-1",
+          fileName: "spec.md",
+          sizeBytes: 2048,
+          url: "https://signed.test/spec.md",
+          thumbnailUrl: null,
+        },
+      ],
+    })
+
+    expect(screen.getByText("Files")).toBeVisible()
+    expect(screen.getByText("spec.md")).toBeVisible()
+  })
+
+  it("uploads to the issue without sending a chat message", async () => {
+    const user = userEvent.setup()
+    uploadAttachmentsMock.mockResolvedValue(undefined)
+    renderRail(createQueryClient())
+
+    expect(
+      screen.getByText(/not sent to the agent as a message/i)
+    ).toBeVisible()
+
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" })
+    const input = screen.getByLabelText(
+      "Attach files to this issue"
+    ) as HTMLInputElement
+    await user.upload(input, file)
+    // jsdom drops file inputs when constructing FormData from a form, so the
+    // selection itself is asserted on the input.
+    expect(input.files?.[0]?.name).toBe("notes.txt")
+
+    await user.click(screen.getByRole("button", { name: "Upload" }))
+
+    await waitFor(() => {
+      expect(uploadAttachmentsMock).toHaveBeenCalledTimes(1)
+    })
+
+    const formData = uploadAttachmentsMock.mock.calls[0]?.[0] as FormData
+    expect(formData.get("issue_id")).toBe(issueId)
+    // Nothing in this upload creates a message or wakes the agent.
+    expect(formData.get("content")).toBeNull()
+    expect(formData.get("client_message_id")).toBeNull()
   })
 })

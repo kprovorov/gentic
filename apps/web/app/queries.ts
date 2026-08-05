@@ -1,5 +1,9 @@
 import "server-only"
 
+import {
+  groupMessageAttachments,
+  selectIssueAttachments,
+} from "@gentic/services/attachments"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import * as labelsService from "@gentic/services/labels"
@@ -46,6 +50,7 @@ const ATTACHMENT_THUMBNAIL_SIZE = 96
 type AttachmentRow = {
   id: string
   issue_id: string
+  kind: string
   message_id: string | null
   file_name: string
   content_type: string | null
@@ -427,7 +432,7 @@ async function getIssueDetailDataForIssue(
     supabase
       .from("attachments")
       .select(
-        "id,issue_id,message_id,file_name,content_type,size_bytes,storage_path,upload_completed_at,deleted_at"
+        "id,issue_id,kind,message_id,file_name,content_type,size_bytes,storage_path,upload_completed_at,deleted_at"
       )
       .eq("issue_id", id)
       .order("created_at", { ascending: true }),
@@ -461,17 +466,16 @@ async function getIssueDetailDataForIssue(
 
   const events = z.array(issueEventSchema).parse(eventRows ?? [])
 
-  const attachmentRowsByMessageId = groupCompletedAttachmentRowsByMessageId(
+  // The two ownerships are surfaced separately: durable Issue Attachments
+  // stand on their own, Message Attachments hang off the turn they were sent
+  // with.
+  const attachmentRowsByMessageId = groupMessageAttachments(
     (attachmentRows ?? []) satisfies AttachmentRow[]
   )
   const attachments: Attachment[] = await Promise.all(
-    ((attachmentRows ?? []) satisfies AttachmentRow[])
-      .filter(
-        (attachment) =>
-          attachment.deleted_at === null &&
-          attachment.upload_completed_at !== null
-      )
-      .map((attachment) => signAttachment(supabase, attachment))
+    selectIssueAttachments(
+      (attachmentRows ?? []) satisfies AttachmentRow[]
+    ).map((attachment) => signAttachment(supabase, attachment))
   )
   const messagesWithAttachments = await Promise.all(
     z
@@ -498,26 +502,6 @@ async function getIssueDetailDataForIssue(
     events,
     labels: parsedIssue.labels,
   }
-}
-
-function groupCompletedAttachmentRowsByMessageId(attachments: AttachmentRow[]) {
-  const grouped = new Map<string, AttachmentRow[]>()
-  for (const attachment of attachments) {
-    if (!attachment.message_id) {
-      continue
-    }
-    if (
-      attachment.upload_completed_at === null &&
-      attachment.deleted_at === null
-    ) {
-      continue
-    }
-    grouped.set(attachment.message_id, [
-      ...(grouped.get(attachment.message_id) ?? []),
-      attachment,
-    ])
-  }
-  return grouped
 }
 
 async function signAttachment(

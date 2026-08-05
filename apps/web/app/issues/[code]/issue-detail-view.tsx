@@ -76,6 +76,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             relations={relations}
             relationCandidates={relationCandidates}
             labels={labels}
+            attachments={attachments}
           />
         </aside>
       </div>

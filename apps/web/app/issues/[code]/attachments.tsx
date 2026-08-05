@@ -112,6 +112,9 @@ export function AttachmentPreviews({
   )
 }
 
+// Durable Issue Attachments: files owned by the issue rather than by one chat
+// turn. Uploading here writes no message and does not requeue or wake the
+// agent, and the files survive an agent or conversation reset.
 export function Attachments({
   issueId,
   attachments,
@@ -136,7 +139,10 @@ export function Attachments({
   return (
     <div className="grid gap-4">
       {attachments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No files attached.</p>
+        <p className="text-[12.5px] text-muted-foreground">
+          No files attached. Files added here stay with the issue and are not
+          sent to the agent as a message.
+        </p>
       ) : (
         <ul className="grid gap-2">
           {attachments.map((attachment) => (
@@ -159,6 +165,7 @@ export function Attachments({
           type="file"
           name="files"
           multiple
+          aria-label="Attach files to this issue"
           className="min-w-0 text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
         <Button

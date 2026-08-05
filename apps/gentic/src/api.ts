@@ -72,10 +72,11 @@ export interface AgentApi {
     issueId: string,
     activeRunId: string
   ): Promise<AutomaticPrPublishResponse>
+  /** `messageId: null` asks for the issue's own durable attachments. */
   fetchAttachments(
     issueId: string,
     activeRunId: string,
-    messageId: string
+    messageId: string | null
   ): Promise<Attachment[]>
   fetchRealtimeToken(
     issueId: string,
@@ -214,10 +215,10 @@ export function createAgentApi(input: {
       )
     },
     async fetchAttachments(issueId, activeRunId, messageId) {
-      const params = new URLSearchParams({
-        message_id: messageId,
-        run_id: activeRunId,
-      })
+      const params = new URLSearchParams({ run_id: activeRunId })
+      if (messageId !== null) {
+        params.set("message_id", messageId)
+      }
       const data = await request(
         `/agent/issues/${encodeURIComponent(issueId)}/attachments?${params}`,
         attachmentsResponseSchema
