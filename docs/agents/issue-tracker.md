@@ -6,7 +6,7 @@ Issues and PRDs for this repo live in the Gentic app itself — this repo is the
 
 ## Conventions
 
-- **Create an issue**: `mcp__gentic__create_issue` with `project_id` above, a `title`, and a `body` (the detailed instructions/spec). Defaults to `type: feature`, `status: draft`, `priority: medium`. Create as `draft` unless you intentionally want it to enter another workflow state.
+- **Create an issue**: `mcp__gentic__create_issue` with `project_id` above, a `title`, and a `body` (the detailed instructions/spec). Defaults to `type: feature`, `status: draft`, `priority: medium`, `create_pr_automatically: true`. Create as `draft` unless you intentionally want it to enter another workflow state. Pass `create_pr_automatically: false` to have the agent stop before opening a pull request.
 - **Read an issue**: `mcp__gentic__get_issue` by its Issue Code (e.g. `GEN-123`).
 - **List issues**: `mcp__gentic__list_issues` with `project_id` set to the id above.
 - **Update title/spec/type/priority**: `mcp__gentic__update_issue`. There is no separate comment thread — the `body` field *is* the living spec, so append updates to it (e.g. a `--- update <date> ---` marker line) rather than expecting a comments API.
