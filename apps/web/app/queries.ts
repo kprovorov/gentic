@@ -137,9 +137,8 @@ async function resolveContext(context?: AuthenticatedContext) {
 
 // Persisted state (`issue_pull_requests.state`) is a plain `text` column, so
 // narrow it back to `GithubPullRequestState` rather than trusting it blindly.
-// The state is resolved off the render path (once when the PR is attached, then
-// kept live by the GitHub webhook), so rendering just reads it — no per-render
-// GitHub API call.
+// The GitHub webhook route keeps this column live on every `pull_request`
+// event, so rendering just reads it — no per-render GitHub API call.
 function attachPullRequestStates<
   T extends { url: string; state?: string | null }
 >(

@@ -562,6 +562,24 @@ export type Database = {
         }
         Relationships: []
       }
+      pull_request_states: {
+        Row: {
+          state: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          state: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          state?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string

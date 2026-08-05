@@ -219,9 +219,17 @@ async function handlePullRequestEvent(
 ) {
   // The payload always carries the PR's full current state regardless of
   // action, so every delivery is a chance to refresh the cached pill state
-  // (`issue_pull_requests.state`) without ever polling the GitHub API.
+  // without ever polling the GitHub API. Buffer it by URL (survives deliveries
+  // that arrive before the PR is attached to an issue — the worker only
+  // attaches at run finish) and update the attached row directly so later
+  // transitions land immediately.
   const prState = resolvePullRequestState(payload.pull_request)
   if (prState !== "unknown") {
+    await issuesService.recordPullRequestState(
+      supabase,
+      payload.pull_request.html_url,
+      prState
+    )
     await issuesService.updatePullRequestStateByPrUrl(
       supabase,
       payload.pull_request.html_url,

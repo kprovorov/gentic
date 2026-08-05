@@ -5,6 +5,7 @@ import {
   attachIssuePullRequest,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
+  recordPullRequestState,
   recordUnpublishedAgentChanges,
   requestAutomaticPrPublish,
   updateIssuePriority,
@@ -129,6 +130,7 @@ type TableName =
   | "issue_pull_requests"
   | "issue_events"
   | "projects"
+  | "pull_request_states"
   | "issue_automatic_pr_requests"
   | "messages"
 type Filter =
@@ -140,6 +142,7 @@ class EventLogDb {
   issue_pull_requests: Row[] = []
   issue_events: Row[] = []
   projects: Row[] = []
+  pull_request_states: Row[] = []
   issue_automatic_pr_requests: Row[] = []
   messages: Row[] = []
   nextIssueNumber = 1
@@ -967,6 +970,59 @@ test("attachIssuePullRequest logs pr_opened once, not again on a duplicate call"
       },
     ]
   )
+})
+
+test("attachIssuePullRequest adopts a state the webhook buffered before attach", async () => {
+  const db = new EventLogDb()
+  // Simulates the `pull_request` webhook landing before the PR is attached:
+  // the state is buffered by URL with no `issue_pull_requests` row yet.
+  db.pull_request_states.push({
+    url: "https://github.com/acme/widget/pull/7",
+    state: "open",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  await attachIssuePullRequest(
+    supabase as never,
+    "issue-7",
+    "https://github.com/acme/widget/pull/7"
+  )
+
+  assert.equal(db.issue_pull_requests.length, 1)
+  assert.equal(db.issue_pull_requests[0].state, "open")
+})
+
+test("attachIssuePullRequest leaves state null when nothing was buffered", async () => {
+  const db = new EventLogDb()
+  const supabase = new EventLogSupabase(db)
+
+  await attachIssuePullRequest(
+    supabase as never,
+    "issue-7",
+    "https://github.com/acme/widget/pull/7"
+  )
+
+  assert.equal(db.issue_pull_requests.length, 1)
+  assert.equal(db.issue_pull_requests[0].state, undefined)
+})
+
+test("recordPullRequestState upserts the buffered state by URL", async () => {
+  const db = new EventLogDb()
+  const supabase = new EventLogSupabase(db)
+
+  await recordPullRequestState(
+    supabase as never,
+    "https://github.com/acme/widget/pull/7",
+    "open"
+  )
+  await recordPullRequestState(
+    supabase as never,
+    "https://github.com/acme/widget/pull/7",
+    "merged"
+  )
+
+  assert.equal(db.pull_request_states.length, 1)
+  assert.equal(db.pull_request_states[0].state, "merged")
 })
 
 test("a raw run-state style status update does not log an event", async () => {

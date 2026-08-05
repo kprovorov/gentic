@@ -481,9 +481,36 @@ export async function attachIssuePullRequest(
 
   if (result.length > 0) {
     await logIssueEvent(supabase, issueId, "pr_opened", { pr_url: prUrl })
+    // The `pull_request` webhook may have already reported this PR's state
+    // before it was attached (the agent opens the PR mid-run, but the row is
+    // only created here at run finish). Adopt whatever the webhook buffered so
+    // the pill doesn't sit at "status unavailable" waiting for an event that
+    // won't repeat.
+    await adoptBufferedPullRequestState(supabase, prUrl)
   }
 
   return result
+}
+
+async function adoptBufferedPullRequestState(supabase: Supabase, prUrl: string) {
+  const { data, error } = await supabase
+    .from("pull_request_states")
+    .select("state")
+    .eq("url", prUrl)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  if (data?.state) {
+    unwrap(
+      await supabase
+        .from("issue_pull_requests")
+        .update({ state: data.state })
+        .eq("url", prUrl)
+    )
+  }
 }
 
 export type PersistedPullRequestState =
@@ -506,6 +533,27 @@ export async function updatePullRequestStateByPrUrl(
       .from("issue_pull_requests")
       .update({ state })
       .eq("url", prUrl)
+  )
+}
+
+// Persists the last state the `pull_request` webhook saw for a PR, keyed by URL
+// and independent of whether the PR has been attached to an issue yet. This is
+// what makes `pull_request` deliveries that arrive before the PR is attached
+// survive: `attachIssuePullRequest` adopts the buffered state once the row
+// exists. `updatePullRequestStateByPrUrl` still updates the (already-attached)
+// row directly so later transitions land immediately.
+export async function recordPullRequestState(
+  supabase: Supabase,
+  prUrl: string,
+  state: PersistedPullRequestState
+) {
+  unwrap(
+    await supabase
+      .from("pull_request_states")
+      .upsert(
+        { url: prUrl, state, updated_at: new Date().toISOString() },
+        { onConflict: "url" }
+      )
   )
 }
 

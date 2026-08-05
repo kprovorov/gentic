@@ -47,6 +47,7 @@ export {
   bulkUpdateIssueStatus,
   getIssueRepo,
   type PersistedPullRequestState,
+  recordPullRequestState,
   recordUnpublishedAgentChanges,
   requestAutomaticPrPublish,
   resetIssueAgent,
