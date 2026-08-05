@@ -7,7 +7,7 @@ Issues and PRDs for this repo live in the Gentic app itself — this repo is the
 ## Conventions
 
 - **Create an issue**: `mcp__gentic__create_issue` with `project_id` above, a `title`, and a `body` (the detailed instructions/spec). Defaults to `type: feature`, `status: draft`, `priority: medium`. Create as `draft` unless you intentionally want it to enter another workflow state.
-- **Read an issue**: `mcp__gentic__get_issue` by id.
+- **Read an issue**: `mcp__gentic__get_issue` by its Issue Code (e.g. `GEN-123`).
 - **List issues**: `mcp__gentic__list_issues` with `project_id` set to the id above.
 - **Update title/spec/type/priority**: `mcp__gentic__update_issue`. There is no separate comment thread — the `body` field *is* the living spec, so append updates to it (e.g. a `--- update <date> ---` marker line) rather than expecting a comments API.
 - **Change priority only**: `mcp__gentic__update_issue_priority`.
@@ -29,7 +29,7 @@ Create a Gentic issue with `mcp__gentic__create_issue`, status `draft`.
 
 ## When a skill says "fetch the relevant ticket"
 
-`mcp__gentic__get_issue` with the issue id (or `list_issues` + filter by title if only given a human-readable reference).
+`mcp__gentic__get_issue` with the Issue Code, e.g. `GEN-123` (or `list_issues` + filter by title if only given a human-readable reference).
 
 ## Wayfinding operations
 

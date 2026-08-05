@@ -3,10 +3,37 @@ import test from "node:test"
 
 import { z } from "zod"
 
+import { resolveMcpUserId } from "../lib/mcp/lib"
+
 const { registerGenticMcpTools } = await import("../lib/mcp/handler")
 
 const projectId = "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2"
 const issueId = "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1"
+
+// The two authentication families the MCP server accepts, each resolving to the
+// same account-scoped user id in authInfo.extra.userId (see token-verifier).
+const clerkAuthInfo = {
+  token: "clerk_oauth_token",
+  clientId: "clerk-client",
+  scopes: [],
+  extra: { userId: "user_clerk" },
+}
+const workerAuthInfo = {
+  token: "gtwc_worker_credential",
+  clientId: "worker:worker-1",
+  scopes: [],
+  extra: { userId: "user_owner", workerId: "worker-1" },
+}
+
+/** Drive a tool handler as the real `tool` wrapper would for a given authInfo. */
+const toolFromAuthInfo =
+  (authInfo: unknown): ToolWrapper =>
+  (run) =>
+  (input) =>
+    run(
+      { supabase: "supabase", userId: resolveMcpUserId(authInfo as never) },
+      input
+    )
 
 type RegisteredTool = {
   config: {
@@ -28,9 +55,17 @@ class FakeServer {
   }
 }
 
+type ToolWrapper = (
+  run: (ctx: unknown, input: unknown) => Promise<Record<string, unknown>>
+) => (input: Record<string, unknown>) => Promise<Record<string, unknown>>
+
+const defaultToolWrapper: ToolWrapper = (run) => (input) =>
+  run({ supabase: "supabase", userId: "user_1" }, input)
+
 function registerTools(
   issuesService: Record<string, unknown> = {},
-  labelsService: Record<string, unknown> = {}
+  labelsService: Record<string, unknown> = {},
+  toolWrapper: ToolWrapper = defaultToolWrapper
 ): Map<string, RegisteredTool> {
   const server = new FakeServer()
 
@@ -38,11 +73,7 @@ function registerTools(
     issuesService: issuesService as never,
     labelsService: labelsService as never,
     projectsService: {} as never,
-    tool: ((
-        run: (ctx: unknown, input: unknown) => Promise<Record<string, unknown>>
-      ) =>
-      (input: Record<string, unknown>) =>
-        run({ supabase: "supabase", userId: "user_1" }, input)) as never,
+    tool: toolWrapper as never,
   })
 
   return server.tools
@@ -210,7 +241,11 @@ test("archive_label reports the affected issue count for zero, one, and many ass
 test("archive_label has no permanent-delete or restore counterpart", () => {
   const tools = registerTools()
 
-  for (const name of ["delete_label", "restore_label", "list_archived_labels"]) {
+  for (const name of [
+    "delete_label",
+    "restore_label",
+    "list_archived_labels",
+  ]) {
     assert.equal(tools.has(name), false, `${name} is not registered`)
   }
   assert.equal(tools.has("archive_label"), true)
@@ -281,6 +316,124 @@ test("issue MCP tools document and return priority in their output contracts", (
       false
     )
   }
+})
+
+test("get_issue accepts an Issue Code and no longer accepts an issue id", () => {
+  const inputSchema = registerTools().get("get_issue")?.config.inputSchema
+  assert.ok(inputSchema, "get_issue is registered")
+
+  assert.ok(inputSchema.code, "get_issue takes an Issue Code")
+  assert.equal(
+    inputSchema.id,
+    undefined,
+    "get_issue no longer takes an issue id"
+  )
+  assert.match(inputSchema.code.description ?? "", /GEN-123/)
+})
+
+test("get_issue resolves an Issue Code scoped to the authenticated account across both auth paths", async () => {
+  for (const { label, authInfo, expectedUserId } of [
+    {
+      label: "Clerk OAuth",
+      authInfo: clerkAuthInfo,
+      expectedUserId: "user_clerk",
+    },
+    {
+      label: "Worker Credential",
+      authInfo: workerAuthInfo,
+      expectedUserId: "user_owner",
+    },
+  ]) {
+    const calls: Record<string, unknown>[] = []
+    const tools = registerTools(
+      {
+        getIssueByCode: async (
+          supabase: unknown,
+          userId: string,
+          projectKey: string,
+          issueNumber: number
+        ) => {
+          calls.push({ supabase, userId, projectKey, issueNumber })
+          return {
+            id: issueId,
+            number: issueNumber,
+            priority: "high",
+            body: "Do the thing",
+            projects: { key: projectKey },
+            labels: [],
+          }
+        },
+      },
+      {},
+      toolFromAuthInfo(authInfo)
+    )
+
+    // Lower-case and surrounding whitespace still resolve to the canonical code.
+    const result = await tools.get("get_issue")?.handler({ code: " gen-123 " })
+
+    assert.deepEqual(
+      calls,
+      [
+        {
+          supabase: "supabase",
+          userId: expectedUserId,
+          projectKey: "GEN",
+          issueNumber: 123,
+        },
+      ],
+      label
+    )
+    assert.equal(
+      (result?.issue as { id?: string } | undefined)?.id,
+      issueId,
+      label
+    )
+  }
+})
+
+test("get_issue rejects malformed Issue Codes without querying the issue store", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  let queried = false
+  const tools = registerTools({
+    getIssueByCode: async () => {
+      queried = true
+      return {}
+    },
+  })
+  const handler = tools.get("get_issue")?.handler
+  assert.ok(handler)
+
+  for (const code of ["not-a-code", "GEN", "GEN-0", "-5", "123-4", ""]) {
+    await assert.rejects(
+      () => handler({ code }),
+      (error: unknown) =>
+        error instanceof ServiceError &&
+        error.code === "not_found" &&
+        error.message === "Issue not found",
+      code
+    )
+  }
+
+  assert.equal(queried, false)
+})
+
+test("get_issue surfaces foreign or missing Issue Codes as an ordinary not-found error", async () => {
+  const { ServiceError } = await import("@gentic/services/errors")
+  const tools = registerTools({
+    getIssueByCode: async () => {
+      throw new ServiceError("not_found", "Issue not found")
+    },
+  })
+  const handler = tools.get("get_issue")?.handler
+  assert.ok(handler)
+
+  await assert.rejects(
+    () => handler({ code: "GEN-999" }),
+    (error: unknown) =>
+      error instanceof ServiceError &&
+      error.code === "not_found" &&
+      error.message === "Issue not found"
+  )
 })
 
 test("list_issues passes deduped match-all Label filters and unlabeled mode", async () => {

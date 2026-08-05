@@ -1,5 +1,6 @@
 export {
   getIssueCode,
+  parseIssueCode,
   type AssignedIssueLabel,
   type IssuePullRequest,
   type IssueRelation,

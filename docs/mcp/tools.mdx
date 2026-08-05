@@ -149,8 +149,9 @@ Lists issues owned by the authenticated account. Filter by project to narrow res
 
 Returns full details for a single issue, including its current status, priority, body, and agent configuration.
 
-<ParamField body="id" type="string (uuid)" required>
-  The issue ID, from `list_issues` or `create_issue`.
+<ParamField body="code" type="string" required>
+  The issue's human-readable Issue Code such as `GEN-123`, built from the
+  project key and issue number returned by `list_issues` or `create_issue`.
 </ParamField>
 
 <Expandable title="Output fields">

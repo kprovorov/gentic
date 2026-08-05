@@ -80,3 +80,22 @@ export type UserChatMessage = ChatMessageContract & {
 export function getIssueCode(projectKey: string, issueNumber: number) {
   return `${projectKey}-${issueNumber}`
 }
+
+/**
+ * Parse a human-readable Issue Code such as `GEN-123` into its project key and
+ * issue number, the inverse of {@link getIssueCode}. Returns `null` for any
+ * malformed input so callers can surface an ordinary not-found error without
+ * leaking whether a project or issue exists.
+ */
+export function parseIssueCode(code: string) {
+  const match = /^([A-Z][A-Z0-9]*)-(\d+)$/.exec(code.trim().toUpperCase())
+  if (!match) return null
+
+  const issueNumber = Number.parseInt(match[2], 10)
+  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1) return null
+
+  return {
+    projectKey: match[1],
+    issueNumber,
+  }
+}
