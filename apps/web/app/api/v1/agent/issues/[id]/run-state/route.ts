@@ -2,6 +2,7 @@ import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
 import { resolvePrFinishStatus } from "@/lib/ci-status"
+import { backfillAttachedPullRequestState } from "@/lib/pull-request-state"
 
 import {
   ensureIssueOwned,
@@ -14,6 +15,30 @@ import {
 } from "../../../_lib"
 
 export const runtime = "nodejs"
+
+// Attaches the PR and, only when the row was freshly inserted, resolves its
+// pill state so it doesn't sit at "status unavailable" until the first
+// `pull_request` webhook lands. Gating on the insert keeps this to one GitHub
+// call per PR — the worker re-sends `pr_url` on every run-state update, but
+// `attachIssuePullRequest` returns no row on a duplicate.
+async function attachPullRequestAndBackfillState(
+  supabase: Awaited<ReturnType<typeof getAgentContext>>["supabase"],
+  userId: string,
+  issueId: string,
+  prUrl: string
+) {
+  const inserted = await issuesService.attachIssuePullRequest(
+    supabase,
+    issueId,
+    prUrl
+  )
+  if (inserted.length === 0) {
+    return
+  }
+
+  const repo = await issuesService.getIssueRepo(supabase, issueId)
+  await backfillAttachedPullRequestState(supabase, userId, repo, prUrl)
+}
 
 export async function PATCH(
   request: Request,
@@ -72,7 +97,12 @@ export async function PATCH(
       }
 
       if (data && fields.pr_url) {
-        await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
+        await attachPullRequestAndBackfillState(
+          supabase,
+          userId,
+          id,
+          fields.pr_url
+        )
       }
 
       if (data && status !== fields.status) {
@@ -124,7 +154,7 @@ export async function PATCH(
     }
 
     if (fields.pr_url) {
-      await issuesService.attachIssuePullRequest(supabase, id, fields.pr_url)
+      await attachPullRequestAndBackfillState(supabase, userId, id, fields.pr_url)
     }
 
     return json({ ok: true })
