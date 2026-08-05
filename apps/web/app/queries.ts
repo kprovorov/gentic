@@ -224,7 +224,7 @@ export async function getHomeData(
     supabase
       .from("issues")
       .select(
-        "id,title,status,type,priority,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),projects(id,name,repo,key)"
+        "id,title,status,type,priority,agent_provider,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),projects(id,name,repo,key)"
       )
       .order("created_at", { ascending: false }),
     labelsService.listLabels(supabase, userId),

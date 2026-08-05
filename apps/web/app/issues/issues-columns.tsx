@@ -41,6 +41,7 @@ import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -56,12 +57,14 @@ import {
   issuePriorityLabels,
   issuePriorityOptions,
   issuePriorityOrder,
+  type AgentProvider,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
 } from "@gentic/validators/issues"
 
 import { updateIssuePriority, updateIssueStatus } from "./actions"
+import { agentProviderLabels } from "./agent-provider-options"
 import { updateIssuesInCaches } from "./issues-cache"
 
 export const statusLabels: Record<IssueStatus, string> = {
@@ -234,6 +237,17 @@ export function IssueTypeBadge({ type }: { type: IssueType }) {
     >
       <TypeIcon className={cn("size-3.5", issueTypeIconStyles[type])} />
       <span className="whitespace-nowrap">{issueTypeLabels[type]}</span>
+    </span>
+  )
+}
+
+export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
+  return (
+    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+      <AgentProviderIcon provider={provider} tone="mono" className="size-3.5" />
+      <span className="whitespace-nowrap">
+        {agentProviderLabels[provider]}
+      </span>
     </span>
   )
 }
@@ -716,6 +730,14 @@ export function getIssuesColumns(
       accessorFn: (issue) => issueTypeLabels[issue.type],
       header: ({ column }) => <SortableHeader label="Type" column={column} />,
       cell: ({ row }) => <IssueTypeBadge type={row.original.type} />,
+    },
+    {
+      id: "agent_provider",
+      accessorFn: (issue) => agentProviderLabels[issue.agent_provider],
+      header: ({ column }) => <SortableHeader label="Agent" column={column} />,
+      cell: ({ row }) => (
+        <AgentProviderBadge provider={row.original.agent_provider} />
+      ),
     },
     {
       id: "project",

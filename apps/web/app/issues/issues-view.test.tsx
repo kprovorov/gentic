@@ -61,6 +61,7 @@ function issue(
     status: "todo",
     type: "feature",
     priority: "medium",
+    agent_provider: "claude_code",
     created_at: "2026-07-01T00:00:00.000Z",
     pullRequests: [],
     projects: project,
