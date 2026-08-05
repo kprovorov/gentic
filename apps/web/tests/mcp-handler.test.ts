@@ -792,7 +792,7 @@ test("create_issue defaults priority to medium without changing other defaults",
     title: "Expose priority",
     status: "draft",
     priority: "medium",
-    create_pr_automatically: false,
+    create_pr_automatically: true,
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
@@ -828,11 +828,45 @@ test("create_issue passes deduped label_ids through to the issue service", async
     title: "Labeled issue",
     status: "draft",
     priority: "medium",
-    create_pr_automatically: false,
+    create_pr_automatically: true,
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
     label_ids: [labelId],
+  })
+})
+
+test("create_issue lets callers opt out of automatic PR creation", async () => {
+  let createInput: Record<string, unknown> | null = null
+  const tools = registerTools({
+    createIssue: async (
+      supabase: unknown,
+      userId: string,
+      input: Record<string, unknown>
+    ) => {
+      createInput = { supabase, userId, ...input }
+      return { id: issueId, priority: input.priority }
+    },
+  })
+
+  await tools.get("create_issue")?.handler({
+    project_id: projectId,
+    title: "Manual PR",
+    create_pr_automatically: false,
+  })
+
+  assert.deepEqual(createInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    project_id: projectId,
+    title: "Manual PR",
+    status: "draft",
+    priority: "medium",
+    create_pr_automatically: false,
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+    label_ids: [],
   })
 })
 
@@ -891,6 +925,42 @@ test("update_issue passes priority through the ownership-checked update service"
     type: "bug",
   })
   assert.deepEqual(result, { issue: { id: issueId, priority: "high" } })
+})
+
+test("update_issue forwards create_pr_automatically when provided", async () => {
+  let updateInput: Record<string, unknown> | null = null
+  const tools = registerTools({
+    updateIssue: async (
+      supabase: unknown,
+      userId: string,
+      id: string,
+      input: Record<string, unknown>
+    ) => {
+      updateInput = { supabase, userId, id, ...input }
+      return { id, priority: input.priority }
+    },
+  })
+
+  await tools.get("update_issue")?.handler({
+    id: issueId,
+    title: "Toggle auto PR",
+    agent_provider: "claude_code",
+    priority: "medium",
+    type: "feature",
+    create_pr_automatically: false,
+  })
+
+  assert.deepEqual(updateInput, {
+    supabase: "supabase",
+    userId: "user_1",
+    id: issueId,
+    title: "Toggle auto PR",
+    agent_provider: "claude_code",
+    issue_model: null,
+    priority: "medium",
+    type: "feature",
+    create_pr_automatically: false,
+  })
 })
 
 test("add_issue_labels dedupes ids and routes through the issue service", async () => {
