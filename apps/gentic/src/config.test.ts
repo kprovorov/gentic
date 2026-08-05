@@ -15,11 +15,12 @@ const CONFIG_KEYS = [
   "MAX_CONCURRENT_ISSUES",
 ] as const
 
-// `env-paths` resolves the config directory once, at module-evaluation time,
-// so XDG_CONFIG_HOME must be set before config-store.ts (and config.ts,
-// which imports it) are first evaluated.
+// GENTIC_CONFIG_DIR redirects config-store reads/writes to a temp dir so this
+// test never touches the real host config file. It must be honored at call
+// time (config-store reads it inside configFilePath), not via XDG_CONFIG_HOME,
+// which `env-paths` ignores on macOS and resolves once at import time anyway.
 const configDir = mkdtempSync(join(tmpdir(), "gentic-config-test-"))
-process.env.XDG_CONFIG_HOME = configDir
+process.env.GENTIC_CONFIG_DIR = configDir
 
 const { writeConfigFile, clearConfigFile } = await import("./config-store.js")
 const { loadConfig } = await import("./config.js")
@@ -42,7 +43,7 @@ afterEach(() => {
 })
 
 after(() => {
-  delete process.env.XDG_CONFIG_HOME
+  delete process.env.GENTIC_CONFIG_DIR
   rmSync(configDir, { recursive: true, force: true })
 })
 

@@ -21,8 +21,14 @@ export interface ConfigFile {
 }
 
 export function configFilePath(): string {
-  const paths = envPaths("gentic", { suffix: "" })
-  return join(paths.config, "config.json")
+  // GENTIC_CONFIG_DIR is an explicit, call-time override for the config
+  // directory. It exists primarily so tests can redirect reads/writes to a
+  // temp dir: `env-paths` ignores XDG_CONFIG_HOME on macOS (and resolves its
+  // paths once at import time), so an env var it honors at call time is the
+  // only cross-platform way to keep tests off the real host config file.
+  const override = process.env.GENTIC_CONFIG_DIR
+  const configDir = override ?? envPaths("gentic", { suffix: "" }).config
+  return join(configDir, "config.json")
 }
 
 export function readConfigFile(): ConfigFile {
