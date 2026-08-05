@@ -14,7 +14,7 @@ Point your MCP client at the following URL:
 https://app.gentic.chat/mcp
 ```
 
-This single endpoint supports all 12 Gentic tools, covering account inspection, project management, and the full issue lifecycle.
+This single endpoint supports every Gentic tool, covering account inspection, project management, the full issue lifecycle, and account-scoped Label organization.
 
 <Note>
   The MCP server uses **OAuth 2.0** for authentication. The first time your client connects, it will redirect you to app.gentic.chat so you can authorize access with your Gentic account. No API keys or manual token setup is required.
@@ -65,6 +65,9 @@ Once connected, your AI assistant can:
   <Card title="Trigger agent runs" icon="robot">
     Transition an issue from `draft` to `todo` to queue a background AI coding agent run immediately.
   </Card>
+  <Card title="Organize with Labels" icon="tag">
+    Create account-scoped Labels, assign them across projects, and filter issues by Label or find unlabeled work.
+  </Card>
 </CardGroup>
 
 ## Example: create a bug report and queue an agent run
@@ -81,4 +84,4 @@ Your assistant will call `create_issue` to create the issue in draft state, then
 
 ## Available tools
 
-See the [Tools reference](/mcp/tools) for a complete list of all 12 MCP tools, their parameters, and example usage.
+See the [Tools reference](/mcp/tools) for a complete list of the MCP tools, their parameters, and example usage.

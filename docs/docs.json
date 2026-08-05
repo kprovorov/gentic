@@ -43,6 +43,7 @@
             "pages": [
               "web/projects",
               "web/issues",
+              "web/labels",
               "web/github-integration",
               "web/issue-statuses",
               "web/connected-workers"

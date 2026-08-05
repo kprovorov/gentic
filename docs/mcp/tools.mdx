@@ -1,10 +1,10 @@
 ---
-title: "Gentic MCP Tools Reference: All 12 Tools Explained"
+title: "Gentic MCP Tools Reference: Projects, Issues, and Labels"
 sidebarTitle: "Tools"
-description: "Reference for all 12 Gentic MCP tools: create and manage projects, issues, and trigger AI coding agent runs from any MCP-compatible client."
+description: "Reference for the Gentic MCP tools: create and manage projects and issues, organize work with account-scoped Labels, and trigger AI coding agent runs from any MCP-compatible client."
 ---
 
-Gentic's MCP server exposes 12 tools that your AI assistant can call once you have connected and authorized via OAuth 2.0. The tools are grouped into three categories — Account, Projects, and Issues — and cover core project and issue management. Attachments, messages, relations, retries, and GitHub integration settings remain web-app workflows. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
+Gentic's MCP server exposes tools your AI assistant can call once you have connected and authorized via OAuth 2.0. This reference groups them into four categories — Account, Projects, Issues, and Labels — covering project management, the full issue lifecycle, and account-scoped Label organization. Issue relations have their own tools, documented in the [Issue Relations guide](/guides/issue-relations). Attachments, messages, retries, and GitHub integration settings remain web-app workflows. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
 
 ---
 
@@ -131,15 +131,23 @@ Permanently deletes a project and all of its issues. All issues belonging to the
 
 ### `list_issues`
 
-Lists issues owned by the authenticated account. Filter by project to narrow results. Returned issue objects include `priority`.
+Lists issues owned by the authenticated account. Filter by project and/or by Label to narrow results. Returned issue objects include `priority` and their assigned active `labels`.
 
 <ParamField body="project_id" type="string (uuid)">
   Optional. When provided, returns only issues belonging to this project. Omit to list issues across all projects.
 </ParamField>
 
+<ParamField body="label_ids" type="array of string (uuid)">
+  Optional stable Label IDs. Returns only issues that carry **every** supplied Label (match-all). Up to 20 IDs; duplicates are ignored. Cannot be combined with `unlabeled`. Archived, missing, or foreign Label IDs are rejected rather than treated as an empty match.
+</ParamField>
+
+<ParamField body="unlabeled" type="boolean" default="false">
+  Optional. When `true`, returns only issues that have **no** active Labels — useful for finding work that still needs classification. Cannot be combined with `label_ids`.
+</ParamField>
+
 <Expandable title="Output fields">
   <ResponseField name="issues" type="array">
-    An array of issue objects matching the filter.
+    An array of issue objects matching the filter. Each issue includes a `labels` array of its assigned active Labels (`id`, `name`, `color`), ordered case-insensitively by name.
   </ResponseField>
 </Expandable>
 
@@ -147,7 +155,7 @@ Lists issues owned by the authenticated account. Filter by project to narrow res
 
 ### `get_issue`
 
-Returns full details for a single issue, including its current status, priority, body, agent configuration, and the metadata of its active durable Issue Attachments.
+Returns full details for a single issue, including its current status, priority, body, agent configuration, assigned active Labels, and the metadata of its active durable Issue Attachments.
 
 <ParamField body="code" type="string" required>
   The issue's human-readable Issue Code such as `GEN-123`, built from the
@@ -157,6 +165,10 @@ Returns full details for a single issue, including its current status, priority,
 <Expandable title="Output fields">
   <ResponseField name="issue" type="object">
     The matching issue object.
+  </ResponseField>
+  <ResponseField name="issue.labels" type="array">
+    The issue's assigned active Labels, each with `id`, `name`, and `color`,
+    ordered case-insensitively by name. Archived Labels are excluded.
   </ResponseField>
   <ResponseField name="issue.attachments" type="array">
     Active durable Issue Attachments, oldest first, as metadata only — `id`,
@@ -238,6 +250,10 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
   Categorizes the nature of the issue. Defaults to `feature`.
 
   Accepted values: `feature`, `bug`, `feedback`, `idea`
+</ParamField>
+
+<ParamField body="label_ids" type="array of string (uuid)">
+  Optional stable Label IDs to assign at creation, from [`list_labels`](#list_labels) or [`create_label`](#create_label). Up to 20 per issue. Every ID must be an **active** Label owned by the authenticated account, or the whole call is rejected and no issue is created — initial assignment is atomic with issue creation.
 </ParamField>
 
 <Expandable title="Output fields">
@@ -360,6 +376,177 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
     The updated issue object, reflecting the new status.
   </ResponseField>
 </Expandable>
+
+---
+
+## Labels
+
+Labels are reusable, **account-scoped** classifications you can assign to issues
+in any project you own. They are passive metadata — assigning a Label never
+changes status, priority, worker selection, agent scheduling, prompts, or
+sessions — and they are never synchronized to GitHub. See the
+[Labels guide](/web/labels) for the full model.
+
+Every Label mutation identifies the Label by its **stable `id`**, never its
+display name, so renames never make a reference ambiguous. Colors are opaque
+`#RRGGBB` values. The catalog is capped at **100 active Labels** per account, an
+issue holds at most **20** Labels, and a single add/remove call spans at most
+**100 issues**.
+
+### `list_labels`
+
+Lists your **active** account Labels, ordered alphabetically (case-insensitive). Archived Labels are never returned.
+
+<ParamField body="search" type="string">
+  Optional case-insensitive substring match on Label name. Maximum 50 characters.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="labels" type="array">
+    Active account Labels, each with `id` (uuid), `name`, `color` (`#RRGGBB`), and
+    `assignment_count` — the number of issues carrying the Label across **every**
+    status.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `create_label`
+
+Creates an active account Label, or restores an archived one. If an archived Label already has the same name (trimmed, case-insensitive), it is **restored** — reviving its original `id`, display casing, and color — and `restored` is `true`.
+
+<ParamField body="name" type="string" required>
+  1–50 characters after trimming. Unicode and spaces allowed; control characters
+  rejected. Must be unique per account (case-insensitively) across active and
+  archived Labels. A collision with an **active** name is rejected.
+</ParamField>
+
+<ParamField body="color" type="#RRGGBB">
+  Optional. Omit to have Gentic pick one of the least-used preset colors. When
+  restoring an archived Label, any supplied color (and casing) is **ignored** in
+  favor of the Label's original values.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="label" type="object">
+    The created or restored Label (`id`, `name`, `color`, `assignment_count`).
+  </ResponseField>
+  <ResponseField name="restored" type="boolean">
+    `true` when an archived Label of the same name was restored instead of a new
+    Label being created; otherwise `false`.
+  </ResponseField>
+</Expandable>
+
+<Note>
+  Restoration respects the 100-active-Label limit and does **not** re-attach the
+  Label's former issue assignments — a restored Label comes back empty.
+</Note>
+
+---
+
+### `update_label`
+
+Renames and/or recolors an active Label by its stable ID. Name collisions with any active or archived Label are rejected without merging identities. Provide at least one of `name` or `color`.
+
+<ParamField body="id" type="string (uuid)" required>
+  The stable Label ID, from `list_labels` or `create_label`.
+</ParamField>
+
+<ParamField body="name" type="string">
+  Optional new name. Same rules as `create_label`.
+</ParamField>
+
+<ParamField body="color" type="#RRGGBB">
+  Optional new color.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="label" type="object">
+    The updated Label (`id`, `name`, `color`, `assignment_count`).
+  </ResponseField>
+</Expandable>
+
+---
+
+### `archive_label`
+
+Archives an active Label by its stable ID. Archiving atomically removes the Label from **every** issue that carries it — any number, including none — records one grouped removal entry on each affected issue's timeline, and drops the Label from listing, assignment, and filtering. This replaces permanent deletion; former assignments are not recoverable, but re-creating the same name later restores the Label's original identity.
+
+<ParamField body="id" type="string (uuid)" required>
+  The stable Label ID to archive.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="id" type="string (uuid)">
+    The ID of the archived Label.
+  </ResponseField>
+  <ResponseField name="archived" type="boolean">
+    Always `true` when archival completed successfully.
+  </ResponseField>
+  <ResponseField name="affected_issue_count" type="number">
+    The number of issues the Label was removed from, across every issue status.
+    Zero when it had no assignments.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `add_issue_labels`
+
+Assigns one or more active Labels to one or more issues. Idempotent — already-assigned pairs are no-ops, so retries are safe. Validated atomically: if any issue ID or Label ID is missing, not owned by the caller, archived, or would push an issue past 20 Labels, the whole call is rejected and nothing changes.
+
+<ParamField body="issue_ids" type="array of string (uuid)" required>
+  1–100 issue IDs. Duplicates are ignored. Issues may span different projects.
+</ParamField>
+
+<ParamField body="label_ids" type="array of string (uuid)" required>
+  1–20 active Label IDs. Duplicates are ignored.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue_ids" type="array">
+    The issue IDs the operation applied to.
+  </ResponseField>
+  <ResponseField name="label_ids" type="array">
+    The Label IDs that were added.
+  </ResponseField>
+  <ResponseField name="added" type="boolean">
+    Always `true` when the operation completed successfully.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `remove_issue_labels`
+
+Removes one or more Labels from one or more issues. Idempotent — pairs that aren't assigned are no-ops. Works at every issue status, including when an issue already holds 20 Labels. Validated atomically the same way as `add_issue_labels`.
+
+<ParamField body="issue_ids" type="array of string (uuid)" required>
+  1–100 issue IDs. Duplicates are ignored. Issues may span different projects.
+</ParamField>
+
+<ParamField body="label_ids" type="array of string (uuid)" required>
+  1–20 Label IDs. Duplicates are ignored.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue_ids" type="array">
+    The issue IDs the operation applied to.
+  </ResponseField>
+  <ResponseField name="label_ids" type="array">
+    The Label IDs that were removed.
+  </ResponseField>
+  <ResponseField name="removed" type="boolean">
+    Always `true` when the operation completed successfully.
+  </ResponseField>
+</Expandable>
+
+<Note>
+  There is no archive-list or restore tool. `list_labels` never returns archived
+  Labels, and restoration happens through `create_label` by name. Assigning or
+  filtering by an archived Label ID is rejected as not-found so stale state is
+  visible rather than silently ignored.
+</Note>
 
 ---
 
