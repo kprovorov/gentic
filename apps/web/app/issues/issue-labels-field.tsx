@@ -51,7 +51,7 @@ export function IssueLabelsField({
 
   const createMutation = useMutation({
     mutationFn: createLabel,
-    onSuccess: async (label) => {
+    onSuccess: async ({ label }) => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "labels"] })
       onSelectedIdsChange([...selectedIds, label.id])
       setSearch("")

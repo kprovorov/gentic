@@ -111,6 +111,12 @@ export async function createLabel(formData: FormData) {
   const created = await labelsService.createLabel(supabase, userId, label)
 
   revalidatePath("/settings/labels")
+  // Restoring an archived label revives its historical timeline appearances
+  // (dropping the archived gray/strikethrough styling), so the issue views are
+  // stale too — a plain new label never touches them.
+  if (created.restored) {
+    revalidatePath("/issues")
+  }
 
   return created
 }

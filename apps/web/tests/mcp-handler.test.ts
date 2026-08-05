@@ -145,10 +145,13 @@ test("create_label and update_label route through the label service", async () =
       ) => {
         calls.push({ op: "create", supabase, userId, ...input })
         return {
-          id: projectId,
-          name: input.name,
-          color: input.color,
-          assignment_count: 0,
+          label: {
+            id: projectId,
+            name: input.name,
+            color: input.color,
+            assignment_count: 0,
+          },
+          restored: false,
         }
       },
       updateLabel: async (
@@ -194,6 +197,48 @@ test("create_label and update_label route through the label service", async () =
       color: "#1D4ED8",
     },
   ])
+})
+
+test("create_label surfaces restored true when an archived label is revived", async () => {
+  for (const restored of [true, false]) {
+    const tools = registerTools(
+      {},
+      {
+        createLabel: async () => ({
+          label: {
+            id: projectId,
+            name: "Ready",
+            color: "#2563EB",
+            assignment_count: 0,
+          },
+          restored,
+        }),
+      }
+    )
+
+    const result = await tools.get("create_label")?.handler({ name: "Ready" })
+
+    assert.deepEqual(result, {
+      label: {
+        id: projectId,
+        name: "Ready",
+        color: "#2563EB",
+        assignment_count: 0,
+      },
+      restored,
+    })
+
+    const outputSchema = tools.get("create_label")?.config.outputSchema
+    assert.ok(outputSchema)
+    assert.equal(
+      (
+        outputSchema.restored.safeParse as (value: unknown) => {
+          success: boolean
+        }
+      )(restored).success,
+      true
+    )
+  }
 })
 
 test("archive_label reports the affected issue count for zero, one, and many assignments", async () => {
