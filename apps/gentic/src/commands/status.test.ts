@@ -66,6 +66,7 @@ test("status JSON includes config file location when worker is connected", async
     uninstall: async () => {},
     start: async () => {},
     stop: async () => {},
+    reload: async () => {},
     restart: async () => {},
     status: async () => ({ state: "not-installed" }),
     isEnabledOnBoot: async () => false,

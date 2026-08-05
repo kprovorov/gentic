@@ -238,6 +238,7 @@ that it won't survive a reboot or restart itself on crash.
 ```bash
 gentic start            # install (if needed) and start the service
 gentic stop              # stop the service
+gentic reload            # reload runtime config without stopping active issues
 gentic restart           # restart the service
 gentic start --no-boot   # start without enabling boot/login autostart
 gentic start --system    # install a system-wide unit (Linux/systemd only)

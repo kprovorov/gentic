@@ -1,10 +1,10 @@
 ---
 title: "Run the Gentic Worker as a Background Service"
 sidebarTitle: "Service Management"
-description: "Use gentic start, stop, restart, status, and logs to manage the agent worker as a system service on Linux (systemd) or macOS (launchd) with automatic restarts."
+description: "Use gentic start, stop, reload, restart, status, and logs to manage the agent worker as a system service on Linux (systemd) or macOS (launchd) with automatic restarts."
 ---
 
-The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. When you need to update the worker or change its configuration, `gentic restart` applies the change without touching your service unit file.
+The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. Use `gentic reload` after changing runtime configuration, or `gentic restart` after upgrading the worker or changing its connection settings.
 
 <Tip>
   Always use `gentic start` in production instead of running `gentic run`
@@ -78,6 +78,22 @@ Restart the **system-wide** service instead of the per-user one (Linux/systemd o
 ```bash
 gentic restart --system
 ```
+
+### Reload worker configuration
+
+Re-read runtime configuration without interrupting active issue runs:
+
+```bash
+gentic reload
+```
+
+For a system-wide worker on Linux:
+
+```bash
+gentic reload --system
+```
+
+Worker identity, credential, and API URL changes still require `gentic restart`.
 
 ### Check service status
 

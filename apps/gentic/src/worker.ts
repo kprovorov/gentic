@@ -57,6 +57,7 @@ export interface WorkerLoopDeps extends ProcessIssueDeps {
   sleep: (ms: number) => Promise<void>
   now: () => Date
   getToolStatuses: () => Promise<ToolStatuses>
+  loadConfig: () => Config
 }
 
 const defaultProcessIssueDeps: ProcessIssueDeps = {
@@ -78,6 +79,28 @@ const defaultWorkerLoopDeps: WorkerLoopDeps = {
   sleep,
   now: () => new Date(),
   getToolStatuses,
+  loadConfig,
+}
+
+const RESTART_ONLY_CONFIG_KEYS = [
+  "GENTIC_WORKER_ID",
+  "GENTIC_WORKER_CREDENTIAL",
+  "GENTIC_API_URL",
+] as const satisfies readonly (keyof Config)[]
+
+export function applyReloadedConfig(
+  current: Config,
+  next: Config
+): (keyof Config)[] {
+  const restartRequired = RESTART_ONLY_CONFIG_KEYS.filter(
+    (key) => current[key] !== next[key]
+  )
+  const connection = Object.fromEntries(
+    RESTART_ONLY_CONFIG_KEYS.map((key) => [key, current[key]])
+  ) as Pick<Config, (typeof RESTART_ONLY_CONFIG_KEYS)[number]>
+
+  Object.assign(current, next, connection)
+  return restartRequired
 }
 
 export async function runWorker(): Promise<void> {
@@ -113,8 +136,24 @@ export async function runWorkerLoop(
       })
     }
   }
+  const reload = (): void => {
+    try {
+      const restartRequired = applyReloadedConfig(config, deps.loadConfig())
+      logInfo(
+        `worker config reloaded; polling every ${config.POLL_INTERVAL_MS}ms with up to ${config.MAX_CONCURRENT_ISSUES} concurrent issues`
+      )
+      if (restartRequired.length > 0) {
+        logInfo(
+          `worker connection settings require a restart and were not reloaded: ${restartRequired.join(", ")}`
+        )
+      }
+    } catch (error) {
+      logError("failed to reload worker config; keeping current config:", describe(error))
+    }
+  }
   process.on("SIGINT", stop)
   process.on("SIGTERM", stop)
+  process.on("SIGHUP", reload)
 
   logInfo(
     `worker started; polling every ${config.POLL_INTERVAL_MS}ms with up to ${config.MAX_CONCURRENT_ISSUES} concurrent issues`
@@ -258,6 +297,7 @@ export async function runWorkerLoop(
 
   process.off("SIGINT", stop)
   process.off("SIGTERM", stop)
+  process.off("SIGHUP", reload)
   logInfo("worker stopped")
 }
 

@@ -21,11 +21,35 @@ import type {
 } from "@gentic/validators/workers"
 import {
   CONTROL_INTERVAL_MS,
+  applyReloadedConfig,
   processIssue,
   runWorkerLoop,
   type ProcessIssueDeps,
   type WorkerLoopDeps,
 } from "../worker.js"
+
+test("reloaded config applies runtime settings and keeps worker connection settings", () => {
+  const current = testConfig()
+  const next: Config = {
+    ...current,
+    GENTIC_WORKER_ID: "worker-2",
+    GENTIC_WORKER_CREDENTIAL: "new-key",
+    GENTIC_API_URL: "https://other.gentic.example",
+    POLL_INTERVAL_MS: 5000,
+    MAX_CONCURRENT_ISSUES: 4,
+  }
+
+  assert.deepEqual(applyReloadedConfig(current, next), [
+    "GENTIC_WORKER_ID",
+    "GENTIC_WORKER_CREDENTIAL",
+    "GENTIC_API_URL",
+  ])
+  assert.equal(current.GENTIC_WORKER_ID, "worker-1")
+  assert.equal(current.GENTIC_WORKER_CREDENTIAL, "test-key")
+  assert.equal(current.GENTIC_API_URL, "https://gentic.example")
+  assert.equal(current.POLL_INTERVAL_MS, 5000)
+  assert.equal(current.MAX_CONCURRENT_ISSUES, 4)
+})
 
 test("consumes persisted prompts in order, dedupes in-flight fetches, and acks processed messages", async () => {
   await withHarness(async ({ config, issue, api, deps, realtimeWakes }) => {
@@ -273,6 +297,30 @@ test("worker loop sends heartbeat every 30s and checks control every 10s", async
       "2026-07-29T08:31:10.000Z",
     ])
     assert.equal(api.providerCheckCalls, 1)
+    assert.equal(api.offlineCalls, 0)
+  }, { now: () => clock.now() })
+})
+
+test("worker loop reloads config on SIGHUP without stopping", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, api, deps }) => {
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 21_000 },
+      runs: [],
+    })
+    const workerDeps = loopDeps(deps, clock, api)
+    workerDeps.loadConfig = () => ({
+      ...config,
+      POLL_INTERVAL_MS: 2000,
+      MAX_CONCURRENT_ISSUES: 5,
+    })
+    clock.onSleep = () => process.emit("SIGHUP")
+
+    await runWorkerLoop(api, config, workerDeps)
+
+    assert.equal(config.POLL_INTERVAL_MS, 2000)
+    assert.equal(config.MAX_CONCURRENT_ISSUES, 5)
     assert.equal(api.offlineCalls, 0)
   }, { now: () => clock.now() })
 })
@@ -732,16 +780,7 @@ async function withHarness(
 ): Promise<void> {
   const workdir = await mkdtemp(join(tmpdir(), "gentic-worker-test-"))
   try {
-    const config: Config = {
-      GENTIC_WORKER_ID: "worker-1",
-      GENTIC_WORKER_CREDENTIAL: "test-key",
-      GENTIC_API_URL: "https://gentic.example",
-      GENTIC_WORKER_SETUP_STATE: "ready",
-      GIT_REMOTE_BASE: "git@github.com:",
-      WORKDIR: workdir,
-      POLL_INTERVAL_MS: 1,
-      MAX_CONCURRENT_ISSUES: 2,
-    }
+    const config = testConfig({ WORKDIR: workdir })
     const api = new FakeApi(options.now)
     const realtimeWakes = new Map<string, () => void>()
     const deps = fakeDeps(api, realtimeWakes)
@@ -1062,6 +1101,9 @@ function loopDeps(
     ...deps,
     sleep: (ms) => clock.sleep(ms),
     now: () => clock.now(),
+    loadConfig: () => {
+      throw new Error("unexpected config reload")
+    },
     async getToolStatuses(): Promise<ToolStatuses> {
       api.providerCheckCalls += 1
       if (api.failNextProviderCheck) {
@@ -1074,6 +1116,20 @@ function loopDeps(
         codex: { installed: true, authenticated: true, version: "0.1.0" },
       }
     },
+  }
+}
+
+function testConfig(overrides: Partial<Config> = {}): Config {
+  return {
+    GENTIC_WORKER_ID: "worker-1",
+    GENTIC_WORKER_CREDENTIAL: "test-key",
+    GENTIC_API_URL: "https://gentic.example",
+    GENTIC_WORKER_SETUP_STATE: "ready",
+    GIT_REMOTE_BASE: "git@github.com:",
+    WORKDIR: "/tmp/gentic-worker-test",
+    POLL_INTERVAL_MS: 1,
+    MAX_CONCURRENT_ISSUES: 2,
+    ...overrides,
   }
 }
 
