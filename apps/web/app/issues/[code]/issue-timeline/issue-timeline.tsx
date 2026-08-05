@@ -86,24 +86,42 @@ export function IssueTimeline({
   items,
   issuePrompt,
   attachments,
+  archivedLabelIds,
   currentUserName,
   currentUserImageUrl,
 }: {
   items: TimelineItem[]
   issuePrompt: string | null
   attachments: Attachment[]
+  // Label ids that are archived today. Historical event snapshots keep the
+  // label's name and color so the entry stays readable; these ids tell the
+  // timeline to render those references as gone from the active catalog.
+  archivedLabelIds?: string[]
   currentUserName?: string | null
   currentUserImageUrl?: string | null
 }) {
+  const archivedLabelIdKey = archivedLabelIds?.join(",") ?? ""
+  const archivedLabelIdSet = useMemo(
+    () => new Set(archivedLabelIdKey ? archivedLabelIdKey.split(",") : []),
+    [archivedLabelIdKey]
+  )
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
     return buildTimelineRows(displayItems, {
       issuePrompt,
       attachments,
+      archivedLabelIds: archivedLabelIdSet,
       currentUserName,
       currentUserImageUrl,
     })
-  }, [items, issuePrompt, attachments, currentUserName, currentUserImageUrl])
+  }, [
+    items,
+    issuePrompt,
+    attachments,
+    archivedLabelIdSet,
+    currentUserName,
+    currentUserImageUrl,
+  ])
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -131,11 +149,13 @@ function buildTimelineRows(
   {
     issuePrompt,
     attachments,
+    archivedLabelIds,
     currentUserName,
     currentUserImageUrl,
   }: {
     issuePrompt: string | null
     attachments: Attachment[]
+    archivedLabelIds: Set<string>
     currentUserName?: string | null
     currentUserImageUrl?: string | null
   }
@@ -258,7 +278,11 @@ function buildTimelineRows(
           timestamp: item.timestamp,
           icon: <IconTag />,
           content: (
-            <LabelsMilestoneContent added={item.added} removed={item.removed} />
+            <LabelsMilestoneContent
+              added={item.added}
+              removed={item.removed}
+              archivedLabelIds={archivedLabelIds}
+            />
           ),
         })
         break
@@ -832,22 +856,28 @@ const LABEL_CHIP_DISPLAY_LIMIT = 4
 function LabelsMilestoneContent({
   added,
   removed,
+  archivedLabelIds,
 }: {
   added: LabelSnapshot[]
   removed: LabelSnapshot[]
+  archivedLabelIds: Set<string>
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       {added.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Added</span>
-          <LabelChipGroup labels={added} />
+          <LabelChipGroup labels={added} archivedLabelIds={archivedLabelIds} />
         </div>
       ) : null}
       {removed.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Removed</span>
-          <LabelChipGroup labels={removed} muted />
+          <LabelChipGroup
+            labels={removed}
+            archivedLabelIds={archivedLabelIds}
+            muted
+          />
         </div>
       ) : null}
     </div>
@@ -856,9 +886,11 @@ function LabelsMilestoneContent({
 
 function LabelChipGroup({
   labels,
+  archivedLabelIds,
   muted,
 }: {
   labels: LabelSnapshot[]
+  archivedLabelIds: Set<string>
   muted?: boolean
 }) {
   const visible = labels.slice(0, LABEL_CHIP_DISPLAY_LIMIT)
@@ -867,7 +899,11 @@ function LabelChipGroup({
   return (
     <>
       {visible.map((label) => (
-        <LabelChip key={label.id} label={label} muted={muted} />
+        <LabelChip
+          key={label.id}
+          label={label}
+          muted={muted || archivedLabelIds.has(label.id)}
+        />
       ))}
       {remaining > 0 ? (
         <span className="text-xs text-muted-foreground">

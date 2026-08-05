@@ -235,3 +235,65 @@ export async function updateLabel(
 
   return (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
 }
+
+export type ArchiveLabelResult = {
+  archived: true
+  affected_issue_count: number
+}
+
+// Atomically marks the label archived, removes every assignment (any
+// count, including zero), and records one grouped removal event per
+// affected issue — all inside the `archive_label` SECURITY DEFINER RPC
+// (20260805090000_add_archive_label_rpc.sql), so a failure partway through
+// leaves no state changed. That RPC enforces ownership itself via
+// `p_user_id` and is granted to `service_role` only (like the worker
+// lifecycle RPCs), so callers must pass a service-role `Supabase` client.
+// There is no restore path — archival is one-directional by design.
+export async function archiveLabel(
+  supabase: Supabase,
+  userId: string,
+  id: string
+): Promise<ArchiveLabelResult> {
+  const { data, error } = await supabase
+    .rpc("archive_label", {
+      p_user_id: userId,
+      p_label_id: id,
+    })
+    .maybeSingle()
+    .returns<{ id: string; affected_issue_count: number } | null>()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Label not found.")
+  }
+
+  return { archived: true, affected_issue_count: data.affected_issue_count }
+}
+
+// Narrows a set of label ids (typically referenced by historical
+// `labels_changed` event snapshots) down to the ones that are currently
+// archived, so historical timeline entries can still render the label's
+// name/color while indicating it's no longer part of the active catalog.
+export async function listArchivedLabelIds(
+  supabase: Supabase,
+  userId: string,
+  labelIds: string[]
+): Promise<Set<string>> {
+  if (labelIds.length === 0) {
+    return new Set()
+  }
+
+  const rows = unwrap(
+    await supabase
+      .from("labels")
+      .select("id")
+      .eq("user_id", userId)
+      .in("id", labelIds)
+      .eq("state", "archived")
+      .returns<Array<{ id: string }>>()
+  )
+
+  return new Set(rows.map((row) => row.id))
+}

@@ -89,6 +89,18 @@ const labelsOutputSchema = {
     .describe("Active account-owned Gentic labels."),
 }
 
+const archivedLabelOutputSchema = {
+  id: z.string().uuid().describe("The archived Gentic label id."),
+  archived: z.literal(true).describe("True when the label was archived."),
+  affected_issue_count: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe(
+      "Number of issues the label was removed from, across every issue status. Zero when the label had no assignments."
+    ),
+}
+
 const issueOutputSchema = {
   issue: issueObjectOutputSchema.describe(
     "A Gentic issue owned by the authenticated account, including priority."
@@ -315,6 +327,30 @@ export function registerGenticMcpTools(
         return { label }
       }
     )
+  )
+
+  server.registerTool(
+    "archive_label",
+    {
+      title: "Archive Label",
+      description:
+        "Archive an active Gentic label using its stable label id. Archiving atomically removes the label from every issue that carries it — any number, including none — and records one grouped removal entry on each affected issue's timeline. Archived labels disappear from list_labels, assignment, and filtering, and stop counting toward the 100-active-label limit; historical timeline entries keep showing them. This replaces permanent deletion and cannot be undone.",
+      inputSchema: {
+        id: z
+          .string()
+          .uuid()
+          .describe("The stable label id from list_labels or create_label."),
+      },
+      outputSchema: archivedLabelOutputSchema,
+    },
+    deps.tool(async ({ supabase, userId }, { id }: { id: string }) => {
+      const { affected_issue_count } = await deps.labelsService.archiveLabel(
+        supabase,
+        userId,
+        id
+      )
+      return { id, archived: true as const, affected_issue_count }
+    })
   )
 
   server.registerTool(

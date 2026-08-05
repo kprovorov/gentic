@@ -13,7 +13,10 @@ import * as projectsService from "@gentic/services/projects"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as userSettingsService from "@gentic/services/user-settings"
 
-import { getAuthenticatedContext } from "../_lib/auth-context"
+import {
+  getAuthenticatedContext,
+  getAuthenticatedServiceContext,
+} from "../_lib/auth-context"
 import { getCheckbox, getString } from "../_lib/form-data"
 import { fetchInstallationRepositories } from "@/lib/github-app"
 
@@ -125,4 +128,23 @@ export async function updateLabel(formData: FormData) {
   await labelsService.updateLabel(supabase, userId, label)
 
   revalidatePath("/settings/labels")
+}
+
+// Uses the service-role client because archiving calls the `archive_label`
+// SECURITY DEFINER RPC (granted to service_role only, like the worker
+// lifecycle RPCs), which atomically marks the label archived, removes
+// every assignment, and records one grouped removal event per affected
+// issue — see 20260805090000_add_archive_label_rpc.sql.
+export async function archiveLabel(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedServiceContext()
+  const id = idSchema.parse(getString(formData, "id"))
+
+  const result = await labelsService.archiveLabel(supabase, userId, id)
+
+  revalidatePath("/settings/labels")
+  // Unlike rename/recolor, archiving also strips the label off every issue
+  // that carried it, so the issue list's chips and filters are stale too.
+  revalidatePath("/issues")
+
+  return result
 }

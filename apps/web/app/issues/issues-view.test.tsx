@@ -503,6 +503,41 @@ describe("IssuesView Label discovery", () => {
     expect(screen.queryByText("No classification")).not.toBeInTheDocument()
   })
 
+  it("drops an archived Label from chips, the filter list, and free-text matching", async () => {
+    // Archiving removes every assignment and takes the Label out of the
+    // active catalog, so the issue list receives neither the chip nor the
+    // filter entry — the name must not survive anywhere in the list UI.
+    const archived = { id: "label-retired", name: "Retired", color: "#EA580C" }
+    const { user } = renderIssuesView({
+      data: {
+        ...baseData([
+          issue({
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "Formerly tagged",
+            labels: [alpha],
+          }),
+        ]),
+      },
+    })
+
+    expect(
+      screen.queryByRole("button", { name: `Filter by Label ${archived.name}` })
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.click(screen.getByRole("menuitem", { name: "Labels" }))
+    expect(
+      screen.queryByRole("menuitemcheckbox", { name: archived.name })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Alpha" })
+    ).toBeInTheDocument()
+    await user.keyboard("{Escape}")
+
+    await user.type(screen.getByPlaceholderText("Search issues…"), "Retired")
+    expect(screen.queryByText("Formerly tagged")).not.toBeInTheDocument()
+  })
+
   it("makes No labels mutually exclusive with specific Labels", async () => {
     const { user } = renderIssuesView({
       data: baseData([

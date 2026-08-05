@@ -17,6 +17,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     relationCandidates,
     events,
     labels,
+    archivedLabelIds,
   } = data
   const displayedPullRequests =
     pullRequests.length > 0
@@ -62,6 +63,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           initialPullRequests={pullRequests}
           attachments={attachments}
           events={events}
+          archivedLabelIds={archivedLabelIds}
         />
 
         <aside className="min-w-0 border-t bg-muted/25 xl:w-[19rem] xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">

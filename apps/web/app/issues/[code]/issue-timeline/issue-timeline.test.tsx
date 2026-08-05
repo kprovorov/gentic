@@ -470,6 +470,37 @@ describe("IssueTimeline", () => {
     expect(screen.getByText("Feature")).toBeInTheDocument()
   })
 
+  it("keeps archived label references readable but grays and strikes them through", () => {
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "labels-milestone",
+            key: "evt-labels-archived",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            added: [
+              { id: "label-archived", name: "Retired", color: "#FF0000" },
+              { id: "label-active", name: "Bug", color: "#00FF00" },
+            ],
+            removed: [],
+          },
+        ]}
+        issuePrompt={null}
+        attachments={[]}
+        archivedLabelIds={["label-archived"]}
+      />
+    )
+
+    const archivedChip = screen.getByText("Retired")
+    expect(archivedChip).toBeVisible()
+    expect(archivedChip).toHaveClass("line-through")
+    expect(archivedChip).toHaveClass("text-muted-foreground")
+
+    const activeChip = screen.getByText("Bug")
+    expect(activeChip).not.toHaveClass("line-through")
+    expect(activeChip).toHaveClass("text-foreground")
+  })
+
   it("renders only the added group when nothing was removed", () => {
     render(
       <IssueTimeline

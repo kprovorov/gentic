@@ -42,6 +42,7 @@ export function IssueDetailTimelinePanel({
   initialPullRequests,
   attachments,
   events,
+  archivedLabelIds,
 }: {
   issueId: string
   issueCreatedAt: string
@@ -55,6 +56,7 @@ export function IssueDetailTimelinePanel({
   initialPullRequests: IssuePullRequest[]
   attachments: Attachment[]
   events: IssueEventContract[]
+  archivedLabelIds: string[]
 }) {
   const chat = useIssueChatState({
     issueId,
@@ -117,6 +119,7 @@ export function IssueDetailTimelinePanel({
                   items={timelineItems}
                   issuePrompt={issuePrompt}
                   attachments={attachments}
+                  archivedLabelIds={archivedLabelIds}
                   currentUserName={currentUserName}
                   currentUserImageUrl={currentUserImageUrl}
                 />
