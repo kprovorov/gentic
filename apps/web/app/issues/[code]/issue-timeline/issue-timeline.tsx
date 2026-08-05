@@ -84,14 +84,14 @@ const priorityIcons = {
 
 export function IssueTimeline({
   items,
-  issuePrompt,
+  issueBody,
   attachments,
   archivedLabelIds,
   currentUserName,
   currentUserImageUrl,
 }: {
   items: TimelineItem[]
-  issuePrompt: string | null
+  issueBody: string | null
   attachments: Attachment[]
   // Label ids that are archived today. Historical event snapshots keep the
   // label's name and color so the entry stays readable; these ids tell the
@@ -108,7 +108,7 @@ export function IssueTimeline({
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
     return buildTimelineRows(displayItems, {
-      issuePrompt,
+      issueBody,
       attachments,
       archivedLabelIds: archivedLabelIdSet,
       currentUserName,
@@ -116,7 +116,7 @@ export function IssueTimeline({
     })
   }, [
     items,
-    issuePrompt,
+    issueBody,
     attachments,
     archivedLabelIdSet,
     currentUserName,
@@ -147,13 +147,13 @@ export function IssueTimeline({
 function buildTimelineRows(
   displayItems: TimelineDisplayItem[],
   {
-    issuePrompt,
+    issueBody,
     attachments,
     archivedLabelIds,
     currentUserName,
     currentUserImageUrl,
   }: {
-    issuePrompt: string | null
+    issueBody: string | null
     attachments: Attachment[]
     archivedLabelIds: Set<string>
     currentUserName?: string | null
@@ -163,9 +163,9 @@ function buildTimelineRows(
   const rows: TimelineRowData[] = []
   const originalRequestMessageKey = findOriginalRequestMessageKey(
     displayItems,
-    issuePrompt
+    issueBody
   )
-  const shouldShowRequestPrompt = originalRequestMessageKey === null
+  const shouldShowRequestBody = originalRequestMessageKey === null
 
   for (const displayItem of displayItems) {
     if (displayItem.kind === "tool-group") {
@@ -223,14 +223,14 @@ function buildTimelineRows(
           icon: <IconFilePlus />,
           content: "Issue created by you",
         })
-        if (shouldShowRequestPrompt) {
+        if (shouldShowRequestBody) {
           rows.push({
             key: "request",
             timestamp: item.timestamp,
             icon: <IconFileText />,
             content: (
               <RequestContent
-                prompt={shouldShowRequestPrompt ? issuePrompt : null}
+                body={shouldShowRequestBody ? issueBody : null}
                 attachments={attachments}
               />
             ),
@@ -321,9 +321,9 @@ function buildTimelineRows(
 
 function findOriginalRequestMessageKey(
   displayItems: TimelineDisplayItem[],
-  issuePrompt: string | null
+  issueBody: string | null
 ): string | null {
-  const normalizedPrompt = normalizeRequestText(issuePrompt)
+  const normalizedBody = normalizeRequestText(issueBody)
 
   const firstUserMessage = displayItems.find(
     (displayItem) =>
@@ -334,13 +334,13 @@ function findOriginalRequestMessageKey(
     return null
   }
 
-  if (!normalizedPrompt) {
+  if (!normalizedBody) {
     return firstUserMessage.item.key
   }
 
   if (
     normalizeRequestText(firstUserMessage.item.message.content) ===
-    normalizedPrompt
+    normalizedBody
   ) {
     return firstUserMessage.item.key
   }
@@ -701,10 +701,10 @@ function ToolCallMessageContent({ message }: { message: ChatMessage }) {
 }
 
 function RequestContent({
-  prompt,
+  body,
   attachments,
 }: {
-  prompt: string | null
+  body: string | null
   attachments: Attachment[]
 }) {
   const [open, setOpen] = useState(true)
@@ -712,7 +712,7 @@ function RequestContent({
     ? attachments.length > 0
       ? `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`
       : null
-    : firstLine(prompt ?? "")
+    : firstLine(body ?? "")
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
@@ -742,7 +742,7 @@ function RequestContent({
       <CollapsibleContent>
         <div className="mt-2 min-w-0 rounded-[20px] bg-muted/40 p-4">
           <p className="text-sm leading-6 whitespace-pre-wrap">
-            {prompt || "No prompt provided."}
+            {body || "No body provided."}
           </p>
           {attachments.length > 0 ? (
             <div className="mt-3.5 border-t pt-3">

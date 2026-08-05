@@ -41,7 +41,7 @@ export async function createIssue(
       project_id: input.project_id,
       number,
       title: input.title ?? null,
-      prompt: input.prompt ?? null,
+      body: input.body ?? null,
       status: input.status === "todo" ? "draft" : input.status,
       priority: input.priority,
       create_pr_automatically: input.create_pr_automatically,
@@ -167,7 +167,7 @@ export async function updateIssue(
     .from("issues")
     .update({
       title: input.title,
-      prompt: input.prompt ?? null,
+      body: input.body ?? null,
       agent_provider: input.agent_provider,
       issue_model: input.issue_model,
       type: input.type,

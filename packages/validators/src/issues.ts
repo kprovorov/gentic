@@ -129,7 +129,7 @@ export const createIssueSchema = z.object({
   // the background after the issue is saved. Trusted callers that already
   // know the title (e.g. the MCP `create_issue` tool) may still supply one.
   title: z.string().trim().min(1).max(160).optional(),
-  prompt: z.string().trim().optional(),
+  body: z.string().trim().optional(),
   status: issueStatusSchema,
   priority: issuePrioritySchema.default(defaultIssuePriority),
   create_pr_automatically: z.boolean().default(false),
@@ -160,7 +160,7 @@ export function hasAttachedIssuePullRequest(issue: {
 export const updateIssueSchema = z.object({
   id: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
-  prompt: z.string().trim().optional(),
+  body: z.string().trim().optional(),
   agent_provider: agentProviderSchema,
   issue_model: issueModelSchema,
   type: issueTypeSchema,

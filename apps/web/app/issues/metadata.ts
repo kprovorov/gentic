@@ -12,7 +12,7 @@ const ISSUE_METADATA_MODEL =
   process.env.ISSUE_METADATA_MODEL ?? "openai/gpt-4.1-mini"
 
 export async function generateIssueMetadata(
-  prompt: string
+  body: string
 ): Promise<GeneratedIssueMetadata> {
   const { output } = await generateText({
     model: gateway(ISSUE_METADATA_MODEL),
@@ -24,8 +24,8 @@ export async function generateIssueMetadata(
     }),
     system:
       `Generate a short issue tracker title (${MAX_TITLE_LENGTH} characters or fewer; no quotes, markdown, trailing punctuation, or labels like Feature/Bug), classify the issue as feature work or a bug fix, and rate its priority.`,
-    prompt: `Generate metadata for this issue prompt:\n\n${prompt}`,
-    maxOutputTokens: 80,
+    prompt: `Generate metadata for this issue body:\n\n${body}`,
+    maxOutputTokens: 200,
     temperature: 0.2,
   })
 

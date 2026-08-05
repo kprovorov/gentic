@@ -22,7 +22,7 @@ test("create issue form parser requires an explicit automatic PR boolean", () =>
     parseCreateIssueFormData(
       createFormData({
         project_id: projectId,
-        prompt: "Run the issue.",
+        body: "Run the issue.",
       })
     )
   )
@@ -32,7 +32,7 @@ test("create issue form parser preserves checked automatic PR submission", () =>
   const fields = parseCreateIssueFormData(
     createFormData({
       project_id: projectId,
-      prompt: "Run the issue.",
+      body: "Run the issue.",
       create_pr_automatically: "true",
       agent_provider: "codex",
     })
@@ -47,7 +47,7 @@ test("create issue form parser preserves unchecked automatic PR submission", () 
   const fields = parseCreateIssueFormData(
     createFormData({
       project_id: projectId,
-      prompt: "Save a draft.",
+      body: "Save a draft.",
       create_pr_automatically: "false",
     })
   )

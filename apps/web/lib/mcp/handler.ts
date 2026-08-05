@@ -588,7 +588,7 @@ export function registerGenticMcpTools(
           .min(1)
           .max(160)
           .describe("Short issue title shown in Gentic."),
-        prompt: z
+        body: z
           .string()
           .trim()
           .optional()
@@ -633,7 +633,7 @@ export function registerGenticMcpTools(
         input: {
           project_id: string
           title: string
-          prompt?: string
+          body?: string
           status?: z.infer<typeof issueStatusSchema>
           priority?: z.infer<typeof issuePrioritySchema>
           agent_provider?: z.infer<typeof agentProviderSchema>
@@ -663,7 +663,7 @@ export function registerGenticMcpTools(
     {
       title: "Update Issue",
       description:
-        "Update the title, prompt, agent provider, type, and priority for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue.",
+        "Update the title, body, agent provider, type, and priority for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue.",
       inputSchema: {
         id: issueIdInputSchema.id,
         title: z
@@ -672,7 +672,7 @@ export function registerGenticMcpTools(
           .min(1)
           .max(160)
           .describe("Updated short issue title shown in Gentic."),
-        prompt: z
+        body: z
           .string()
           .trim()
           .optional()
@@ -703,7 +703,7 @@ export function registerGenticMcpTools(
         input: {
           id: string
           title: string
-          prompt?: string
+          body?: string
           agent_provider: z.infer<typeof agentProviderSchema>
           issue_model?: z.infer<typeof issueModelSchema>
           priority: z.infer<typeof issuePrioritySchema>
@@ -746,7 +746,7 @@ export function registerGenticMcpTools(
     {
       title: "Update Issue Status",
       description:
-        "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message from the issue prompt. Other status changes only update the workflow status.",
+        "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message from the issue body. Other status changes only update the workflow status.",
       inputSchema: {
         id: issueIdInputSchema.id,
         status: issueStatusSchema.describe(

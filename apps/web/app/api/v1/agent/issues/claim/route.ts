@@ -16,7 +16,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, number, title, status, agent_provider, issue_model, session_id, pr_url, prompt, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, number, title, status, agent_provider, issue_model, session_id, pr_url, body, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 function eligibleIssueFilter(now: string): string {
   return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
@@ -142,7 +142,7 @@ export async function claimNextQueuedIssue(
   }
 
   if (candidate.status === "todo") {
-    await ensureTodoIssueHasPendingPrompt(supabase, id, candidate.prompt)
+    await ensureTodoIssueHasPendingPrompt(supabase, id, candidate.body)
   }
 
   return {
@@ -185,7 +185,7 @@ function isProviderReady(
 export async function ensureTodoIssueHasPendingPrompt(
   supabase: Supabase,
   issueId: string,
-  prompt: string | null
+  body: string | null
 ) {
   const { data: pendingMessages, error: pendingMessagesError } = await supabase
     .from("messages")
@@ -205,7 +205,7 @@ export async function ensureTodoIssueHasPendingPrompt(
   const { error: insertError } = await supabase.from("messages").insert({
     issue_id: issueId,
     role: "user",
-    content: prompt ?? "",
+    content: body ?? "",
   })
 
   if (insertError) {

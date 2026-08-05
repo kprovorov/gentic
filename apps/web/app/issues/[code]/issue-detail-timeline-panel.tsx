@@ -32,7 +32,7 @@ import { IssueTimeline } from "./issue-timeline/issue-timeline"
 export function IssueDetailTimelinePanel({
   issueId,
   issueCreatedAt,
-  issuePrompt,
+  issueBody,
   agentProvider,
   issueModel,
   initialMessages,
@@ -46,7 +46,7 @@ export function IssueDetailTimelinePanel({
 }: {
   issueId: string
   issueCreatedAt: string
-  issuePrompt: string | null
+  issueBody: string | null
   agentProvider: AgentProvider
   issueModel: string | null
   initialMessages: ChatMessage[]
@@ -117,7 +117,7 @@ export function IssueDetailTimelinePanel({
               <MessageScrollerItem scrollAnchor>
                 <IssueTimeline
                   items={timelineItems}
-                  issuePrompt={issuePrompt}
+                  issueBody={issueBody}
                   attachments={attachments}
                   archivedLabelIds={archivedLabelIds}
                   currentUserName={currentUserName}

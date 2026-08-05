@@ -233,6 +233,10 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: "1.23"
+          # No go.mod in this repo (nfpm is installed as an external tool,
+          # not built from local Go source), so the default module cache
+          # has nothing to key on and just warns every run. Disable it.
+          cache: false
 
       - name: Install nfpm
         if: matrix.pkg_arch != ''

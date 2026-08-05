@@ -28,6 +28,7 @@ import {
 
 import { fetchIssuesData } from "@/app/client-queries"
 import type { HomeIssue, IssuesData } from "@/app/queries"
+import type { AssignedIssueLabel } from "@/app/query-contracts"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { BrandIcon } from "@/components/agent-provider-icon"
@@ -361,6 +362,7 @@ function IssuesTableView({
   onRowSelectionChange,
   selectedLabelIds,
   onLabelSelect,
+  labels,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
@@ -370,6 +372,7 @@ function IssuesTableView({
   onRowSelectionChange: (selection: RowSelectionState) => void
   selectedLabelIds: Set<string>
   onLabelSelect: (labelId: string) => void
+  labels: AssignedIssueLabel[]
 }) {
   const columns = useMemo(
     () =>
@@ -427,6 +430,7 @@ function IssuesTableView({
       {selectedIds.length > 0 ? (
         <BulkActionsToolbar
           selectedIds={selectedIds}
+          labels={labels}
           onDone={() => onRowSelectionChange({})}
         />
       ) : null}
@@ -1156,6 +1160,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 onRowSelectionChange={setRowSelection}
                 selectedLabelIds={labelFilter}
                 onLabelSelect={addLabelFilter}
+                labels={data.labels}
               />
             ) : pagedIssues.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -1166,6 +1171,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 {selectedIds.length > 0 ? (
                   <BulkActionsToolbar
                     selectedIds={selectedIds}
+                    labels={data.labels}
                     onDone={() => setRowSelection({})}
                   />
                 ) : null}

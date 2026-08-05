@@ -197,7 +197,7 @@ INSERT INTO public.issues (
   id,
   project_id,
   title,
-  prompt,
+  body,
   status,
   number,
   active_worker_id
@@ -205,7 +205,7 @@ INSERT INTO public.issues (
   '20000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000001',
   'Use a worker',
-  'Prompt',
+  'Body',
   'todo',
   1,
   '00000000-0000-4000-8000-000000000001'

@@ -1,7 +1,7 @@
 ---
 title: "Create Your First Gentic Issue and Trigger an Agent Run"
 sidebarTitle: "First Issue"
-description: "Walk through creating a project, writing your first issue prompt, deploying the agent worker, and receiving a pull request from an AI coding agent."
+description: "Walk through creating a project, writing your first issue body, deploying the agent worker, and receiving a pull request from an AI coding agent."
 ---
 
 Creating your first Gentic issue takes about five minutes. By the end of this walkthrough you will have an AI coding agent clone your repository, implement a change described entirely in plain text, and open a pull request for you to review — all without writing a single line of code yourself.
@@ -43,14 +43,14 @@ Enter a project name and the repository in `owner/repo` format — for example `
 Open **Issues**, click **New issue**, and complete the form:
 
 - **Project** — select the repository you just added.
-- **Prompt** — the detailed instructions the agent will receive. See the next step for advice on writing an effective prompt.
+- **Body** — the detailed instructions the agent will receive. See the next step for advice on writing an effective body.
 - **Attachments** — optionally add screenshots, logs, or specifications with the paperclip button or drag and drop.
 
 Click **Save draft**. Gentic generates a title and type in the background. If you do not need to review a draft, use **Run with Claude Code** or its dropdown option, **Run with Codex**, instead.
 
-### Write a great prompt
+### Write a great body
 
-The prompt is the single most important input you give the agent. A vague prompt produces vague results; a precise prompt produces precise, reviewable code.
+The body is the single most important input you give the agent. A vague body produces vague results; a precise body produces precise, reviewable code.
 
 <Tip>
   Follow these patterns for the best results:
@@ -62,17 +62,17 @@ The prompt is the single most important input you give the agent. A vague prompt
   - **List constraints.** "Do not change the public API surface of `UserService`. All new logic should be in a private helper method."
 </Tip>
 
-You can always edit the prompt on the issue detail page before you move the issue out of Draft.
+You can always edit the body on the issue detail page before you move the issue out of Draft.
 
 ### Save as Draft and review
 
-Staying in `Draft` status gives you time to re-read the prompt, upload any supporting attachments (screenshots, log files, spec documents), and add issue relations that should complete first. The agent will not run until you explicitly move the issue forward.
+Staying in `Draft` status gives you time to re-read the body, upload any supporting attachments (screenshots, log files, spec documents), and add issue relations that should complete first. The agent will not run until you explicitly move the issue forward.
 
-Open the issue you just created and review the prompt in the detail panel. Edit it if anything is unclear or missing.
+Open the issue you just created and review the body in the detail panel. Edit it if anything is unclear or missing.
 
 ### Move status to Todo to queue the agent
 
-When you are satisfied with the prompt, change the issue status to **Todo**. This is the trigger: Gentic moves the issue into the unclaimed pool (status `todo`) and inserts the opening user message. On its next poll cycle (every three seconds by default), an agent worker claims the issue — flipping it to `queued` while it clones the repository, then to `in-progress` once the agent session starts.
+When you are satisfied with the body, change the issue status to **Todo**. This is the trigger: Gentic moves the issue into the unclaimed pool (status `todo`) and inserts the opening user message. On its next poll cycle (every three seconds by default), an agent worker claims the issue — flipping it to `queued` while it clones the repository, then to `in-progress` once the agent session starts.
 
 You can change the status from the issue detail page using the **Status** dropdown, or from the **Issues** list using the status menu.
 

@@ -313,6 +313,7 @@ export type Database = {
           active_run_id: string | null
           active_worker_id: string | null
           agent_provider: string
+          body: string | null
           create_pr_automatically: boolean
           created_at: string
           has_unpublished_agent_changes: boolean
@@ -322,7 +323,6 @@ export type Database = {
           pr_url: string | null
           priority: Database["public"]["Enums"]["issue_priority"]
           project_id: string
-          prompt: string | null
           run_error: string | null
           run_finished_at: string | null
           run_started_at: string | null
@@ -337,6 +337,7 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          body?: string | null
           create_pr_automatically?: boolean
           created_at?: string
           has_unpublished_agent_changes?: boolean
@@ -346,7 +347,6 @@ export type Database = {
           pr_url?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id: string
-          prompt?: string | null
           run_error?: string | null
           run_finished_at?: string | null
           run_started_at?: string | null
@@ -361,6 +361,7 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          body?: string | null
           create_pr_automatically?: boolean
           created_at?: string
           has_unpublished_agent_changes?: boolean
@@ -370,7 +371,6 @@ export type Database = {
           pr_url?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id?: string
-          prompt?: string | null
           run_error?: string | null
           run_finished_at?: string | null
           run_started_at?: string | null

@@ -91,7 +91,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     message = await issuesService.createIssueUserMessage(
       supabase,
       created.id,
-      fields.prompt
+      fields.body
     )
 
     await uploadIssueAttachments(
@@ -128,15 +128,15 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     const serviceClient = createServiceClient()
 
     const { title, type, priority } = await generateIssueMetadata(
-      fields.prompt
+      fields.body
     ).catch((error) => {
       console.error(
         `Failed to generate metadata for issue ${created.id}:`,
         error
       )
       return {
-        title: formatGeneratedIssueTitle(fields.prompt),
-        type: fallbackIssueType(fields.prompt),
+        title: formatGeneratedIssueTitle(fields.body),
+        type: fallbackIssueType(fields.body),
         priority: defaultIssuePriority,
       }
     })
@@ -178,7 +178,7 @@ export async function updateIssue(formData: FormData) {
   const {
     id,
     title,
-    prompt,
+    body,
     agent_provider,
     issue_model,
     type,
@@ -190,7 +190,7 @@ export async function updateIssue(formData: FormData) {
   const issue = await issuesService.updateIssue(supabase, userId, id, {
     id,
     title,
-    prompt,
+    body,
     agent_provider,
     issue_model,
     type,
@@ -400,6 +400,32 @@ export async function removeIssueLabels(formData: FormData) {
   await issuesService.removeIssueLabels(supabase, userId, issue_ids, label_ids)
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, issue_ids[0])
+}
+
+// Bulk counterparts of the pair above: same account-wide assignment
+// contract (validate-then-mutate, idempotent, additive-only), but driven
+// from the issue-list bulk toolbar across a multi-issue, multi-project
+// selection rather than a single issue's label field.
+export async function bulkAddIssueLabels(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_ids, label_ids } = mutateIssueLabelsSchema.parse({
+    issue_ids: formData.getAll("issue_id"),
+    label_ids: formData.getAll("label_id"),
+  })
+
+  await issuesService.addIssueLabels(supabase, userId, issue_ids, label_ids)
+  revalidatePath("/issues")
+}
+
+export async function bulkRemoveIssueLabels(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { issue_ids, label_ids } = mutateIssueLabelsSchema.parse({
+    issue_ids: formData.getAll("issue_id"),
+    label_ids: formData.getAll("label_id"),
+  })
+
+  await issuesService.removeIssueLabels(supabase, userId, issue_ids, label_ids)
+  revalidatePath("/issues")
 }
 
 export async function sendIssueMessage(formData: FormData) {

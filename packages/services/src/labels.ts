@@ -244,7 +244,7 @@ export type ArchiveLabelResult = {
 // Atomically marks the label archived, removes every assignment (any
 // count, including zero), and records one grouped removal event per
 // affected issue — all inside the `archive_label` SECURITY DEFINER RPC
-// (20260805090000_add_archive_label_rpc.sql), so a failure partway through
+// (20260805130000_add_archive_label_rpc.sql), so a failure partway through
 // leaves no state changed. That RPC enforces ownership itself via
 // `p_user_id` and is granted to `service_role` only (like the worker
 // lifecycle RPCs), so callers must pass a service-role `Supabase` client.

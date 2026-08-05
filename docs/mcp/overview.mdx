@@ -36,6 +36,14 @@ Claude Desktop reads MCP server configuration from a JSON file. Add the `gentic`
 
 After saving the file and restarting Claude Desktop, Claude will prompt you to authorize the connection through your Gentic account. Once authorized, all Gentic tools are available in your conversation.
 
+## Managed coding agents connect automatically
+
+Coding agents that Gentic runs for you — Claude Code and Codex sessions started by a connected worker — get this same MCP server without any setup. Every session, whether it is a fresh run or a follow-up that resumes an earlier one, is started with the Gentic MCP server already configured and authenticated with that worker's credential.
+
+That connection resolves to **your** Gentic account, so the agent working on an issue sees exactly the projects, issues, and labels you do. Banning or deleting a worker revokes its MCP access along with its API access, immediately and through the same control.
+
+Any MCP servers you configure yourself — in `.mcp.json`, `~/.codex/config.toml`, or your provider's own settings — are left in place; the Gentic server is added alongside them.
+
 ## Connect other MCP clients
 
 Any MCP-compatible client that accepts a server URL — including Cursor, Continue, and custom MCP hosts — can connect using the same endpoint. Consult your client's documentation for where to add a new MCP server entry, then supply `https://app.gentic.chat/mcp` as the URL.
@@ -63,12 +71,12 @@ Once connected, your AI assistant can:
 
 You do not need to open the Gentic dashboard at all. Ask your assistant something like:
 
-> "Create a bug issue for the login project titled 'Fix null pointer in auth' with the prompt 'The login endpoint throws NPE when email is missing — add input validation.' Then move it to todo."
+> "Create a bug issue for the login project titled 'Fix null pointer in auth' with the body 'The login endpoint throws NPE when email is missing — add input validation.' Then move it to todo."
 
 Your assistant will call `create_issue` to create the issue in draft state, then call `update_issue_status` to move it to `todo`, which queues a background agent run automatically.
 
 <Tip>
-  Start issues in `draft` status while you refine the title and prompt. Move to `todo` only when you are ready for the agent to begin work — that transition is what triggers the run.
+  Start issues in `draft` status while you refine the title and body. Move to `todo` only when you are ready for the agent to begin work — that transition is what triggers the run.
 </Tip>
 
 ## Available tools

@@ -288,7 +288,7 @@ export async function getIssueEditData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,prompt,agent_provider,issue_model,type,priority,create_pr_automatically,pr_url,issue_pull_requests(id),projects(id,name,repo,key)"
+      "id,number,title,body,agent_provider,issue_model,type,priority,create_pr_automatically,pr_url,issue_pull_requests(id),projects(id,name,repo,key)"
     )
     .eq("id", id)
     .maybeSingle()

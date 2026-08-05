@@ -6,7 +6,7 @@ VALUES
   ('10000000-0000-4000-8000-000000000601', 'user_alpha', 'Alpha', 'gentic/alpha-archive', 'AAR'),
   ('10000000-0000-4000-8000-000000000602', 'user_beta', 'Beta', 'gentic/beta-archive', 'BAR');
 
-INSERT INTO public.issues (id, project_id, title, prompt, status, number)
+INSERT INTO public.issues (id, project_id, title, body, status, number)
 VALUES
   ('20000000-0000-4000-8000-000000000601', '10000000-0000-4000-8000-000000000601', 'Draft issue', 'Prompt', 'draft', 1),
   ('20000000-0000-4000-8000-000000000602', '10000000-0000-4000-8000-000000000601', 'Done issue', 'Prompt', 'completed', 2),
@@ -84,7 +84,7 @@ SELECT is(
 -- issue status and writes one grouped event per affected issue. The three
 -- seeded issues cover the status spread; the generated ones push the count
 -- well past anything a per-row loop would handle comfortably.
-INSERT INTO public.issues (id, project_id, title, prompt, status, number)
+INSERT INTO public.issues (id, project_id, title, body, status, number)
 SELECT
   ('20000000-0000-4000-8000-' || lpad((700 + value)::text, 12, '0'))::uuid,
   '10000000-0000-4000-8000-000000000601',

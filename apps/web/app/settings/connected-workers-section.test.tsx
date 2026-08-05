@@ -94,6 +94,32 @@ describe("ConnectedWorkersSection", () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it("copies the connect command to the clipboard", async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } })
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        code: "gtce_first",
+        expires_at: "2026-07-30T12:10:00.000Z",
+      }),
+    )
+
+    renderSection()
+
+    await user.click(screen.getByRole("button", { name: "Connect worker" }))
+    expect(
+      await screen.findByText("gentic worker connect gtce_first"),
+    ).toBeVisible()
+
+    await user.click(screen.getByRole("button", { name: "Copy command" }))
+
+    expect(writeText).toHaveBeenCalledWith(
+      "gentic worker connect gtce_first",
+    )
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeVisible()
+  })
+
   it("updates display when polling supplies fresh worker data", () => {
     const { rerender } = renderSection()
 

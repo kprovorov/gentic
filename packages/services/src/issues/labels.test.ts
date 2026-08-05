@@ -222,6 +222,58 @@ test("addIssueLabels rejects the whole batch when only one of several issues wou
   assert.equal(db.issue_events.length, 0)
 })
 
+test("addIssueLabels applies atomically across issues from different projects owned by the same account", async () => {
+  const db = seededDb()
+  db.projects.push({ id: "project-2", user_id: "user-1" })
+  db.issues.push({ id: "issue-3", projects: { user_id: "user-1" } })
+  const supabase = new FakeSupabase(db)
+
+  await addIssueLabels(
+    supabase as never,
+    "user-1",
+    ["issue-1", "issue-3"],
+    ["label-1"]
+  )
+
+  assert.deepEqual(
+    db.issue_labels
+      .filter((row) => row.label_id === "label-1")
+      .map((row) => row.issue_id)
+      .sort(),
+    ["issue-1", "issue-3"]
+  )
+  assert.equal(db.issue_events.length, 2)
+  assert.deepEqual(
+    db.issue_events.map((event) => event.issue_id).sort(),
+    ["issue-1", "issue-3"]
+  )
+})
+
+test("removeIssueLabels applies atomically across issues from different projects owned by the same account", async () => {
+  const db = seededDb()
+  db.projects.push({ id: "project-2", user_id: "user-1" })
+  db.issues.push({ id: "issue-3", projects: { user_id: "user-1" } })
+  db.issue_labels.push(
+    { issue_id: "issue-1", label_id: "label-1" },
+    { issue_id: "issue-3", label_id: "label-1" }
+  )
+  const supabase = new FakeSupabase(db)
+
+  await removeIssueLabels(
+    supabase as never,
+    "user-1",
+    ["issue-1", "issue-3"],
+    ["label-1"]
+  )
+
+  assert.equal(db.issue_labels.length, 0)
+  assert.equal(db.issue_events.length, 2)
+  assert.deepEqual(
+    db.issue_events.map((event) => event.issue_id).sort(),
+    ["issue-1", "issue-3"]
+  )
+})
+
 test("addIssueLabels rejects a cross-account issue id", async () => {
   const db = seededDb()
   db.issues.push({ id: "issue-other", projects: { user_id: "someone-else" } })

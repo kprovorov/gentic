@@ -49,10 +49,10 @@ function loadStoredIssueDraft() {
   }
 }
 
-function storeIssueDraft(prompt: string) {
+function storeIssueDraft(body: string) {
   try {
-    if (prompt) {
-      window.localStorage.setItem(ISSUE_CREATE_DRAFT_STORAGE_KEY, prompt)
+    if (body) {
+      window.localStorage.setItem(ISSUE_CREATE_DRAFT_STORAGE_KEY, body)
     } else {
       window.localStorage.removeItem(ISSUE_CREATE_DRAFT_STORAGE_KEY)
     }
@@ -139,7 +139,7 @@ export function IssueCreateForm({
   defaultAgentProvider?: AgentProvider
   className?: string
 }) {
-  const [prompt, setPrompt] = useState("")
+  const [body, setBody] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [agentProvider, setAgentProvider] =
     useState<AgentProvider>(defaultAgentProvider)
@@ -157,14 +157,14 @@ export function IssueCreateForm({
   const projectErrorId = "issue-project-error"
   const priorityLabelId = "issue-priority-label"
   useEffect(() => {
-    const storedPrompt = loadStoredIssueDraft()
+    const storedBody = loadStoredIssueDraft()
 
-    if (!storedPrompt) {
+    if (!storedBody) {
       return
     }
 
     const timeoutId = window.setTimeout(() => {
-      setPrompt(storedPrompt)
+      setBody(storedBody)
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
@@ -213,12 +213,12 @@ export function IssueCreateForm({
     })
   }
 
-  const updatePrompt = (value: string) => {
-    setPrompt(value)
+  const updateBody = (value: string) => {
+    setBody(value)
     storeIssueDraft(value)
   }
 
-  const clearStoredPrompt = () => {
+  const clearStoredBody = () => {
     storeIssueDraft("")
   }
 
@@ -250,17 +250,17 @@ export function IssueCreateForm({
       formId="new-issue-form"
       action={saveIssueDraft}
       className={className}
-      id="issue-prompt"
-      name="prompt"
-      draft={prompt}
+      id="issue-body"
+      name="body"
+      draft={body}
       draftFiles={files}
-      onDraftChange={updatePrompt}
+      onDraftChange={updateBody}
       onFilesChange={setFiles}
       rows={3}
       placeholder="Describe what you want built, fixed, or investigated."
       required
       submitAriaLabel="Run issue"
-      submitDisabled={!prompt.trim()}
+      submitDisabled={!body.trim()}
       agentProvider={agentProvider}
       issueModel={issueModel}
       hasMessages={false}
@@ -389,19 +389,19 @@ export function IssueCreateForm({
               event.preventDefault()
               return
             }
-            clearStoredPrompt()
+            clearStoredBody()
           }}
         />
       }
       submitButton={
         <RunIssueButton
-          disabled={!prompt.trim()}
+          disabled={!body.trim()}
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
               return
             }
-            clearStoredPrompt()
+            clearStoredBody()
           }}
         />
       }
@@ -413,8 +413,8 @@ export function IssueCreateForm({
       {labelIds.map((id) => (
         <input key={id} type="hidden" name="label_id" value={id} />
       ))}
-      <label className="sr-only" htmlFor="issue-prompt">
-        Prompt
+      <label className="sr-only" htmlFor="issue-body">
+        Body
       </label>
     </MessageComposer>
   )

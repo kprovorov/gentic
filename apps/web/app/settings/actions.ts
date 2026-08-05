@@ -134,7 +134,7 @@ export async function updateLabel(formData: FormData) {
 // SECURITY DEFINER RPC (granted to service_role only, like the worker
 // lifecycle RPCs), which atomically marks the label archived, removes
 // every assignment, and records one grouped removal event per affected
-// issue — see 20260805090000_add_archive_label_rpc.sql.
+// issue — see 20260805130000_add_archive_label_rpc.sql.
 export async function archiveLabel(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedServiceContext()
   const id = idSchema.parse(getString(formData, "id"))
