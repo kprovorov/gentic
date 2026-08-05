@@ -4,6 +4,7 @@ import Link from "next/link"
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  IconArchive,
   IconArrowLeft,
   IconCheck,
   IconPalette,
@@ -12,10 +13,20 @@ import {
 } from "@tabler/icons-react"
 import { labelPresetColors } from "@gentic/validators/labels"
 
-import { createLabel, updateLabel } from "@/app/settings/actions"
+import { archiveLabel, createLabel, updateLabel } from "@/app/settings/actions"
 import { fetchSettingsLabelsData } from "@/app/client-queries"
 import type { SettingsLabelsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@gentic/ui/alert-dialog"
 import { Button } from "@gentic/ui/button"
 import {
   Card,
@@ -56,8 +67,27 @@ export function SettingsLabelsView({
     mutationFn: updateLabel,
     onSuccess: invalidateLabels,
   })
+  const [archiveDialogLabelId, setArchiveDialogLabelId] = React.useState<
+    string | null
+  >(null)
+  const archiveMutation = useMutation({
+    mutationFn: archiveLabel,
+    onSuccess: async () => {
+      await invalidateLabels()
+      setArchiveDialogLabelId(null)
+    },
+  })
   const labels = labelsQuery.data?.labels ?? []
   const selectedCreateColor = createColor || customColor
+  const archiveDialogLabel =
+    labels.find((label) => label.id === archiveDialogLabelId) ?? null
+
+  function submitArchiveLabel() {
+    if (!archiveDialogLabelId) return
+    const formData = new FormData()
+    formData.set("id", archiveDialogLabelId)
+    archiveMutation.mutate(formData)
+  }
 
   function submitCreateLabel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -228,7 +258,7 @@ export function SettingsLabelsView({
                     <CardContent className="p-4">
                       <form
                         onSubmit={submitUpdateLabel}
-                        className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto_auto] md:items-end"
+                        className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto_auto_auto] md:items-end"
                       >
                         <input type="hidden" name="id" value={label.id} />
                         <div className="grid gap-2">
@@ -277,6 +307,14 @@ export function SettingsLabelsView({
                           <IconCheck />
                           Save
                         </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setArchiveDialogLabelId(label.id)}
+                        >
+                          <IconArchive />
+                          Archive
+                        </Button>
                       </form>
                     </CardContent>
                   </Card>
@@ -286,8 +324,59 @@ export function SettingsLabelsView({
           </div>
         </section>
       </div>
+
+      <AlertDialog
+        open={archiveDialogLabel !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchiveDialogLabelId(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Archive {archiveDialogLabel?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {archiveAssignmentSummary(archiveDialogLabel?.assignment_count)}{" "}
+              It will disappear from Settings, assignment autocomplete, and
+              filters. Past activity that referenced it stays visible in
+              issue timelines. This can&rsquo;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {archiveMutation.isError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {archiveMutation.error.message}
+            </p>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiveMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={archiveMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                submitArchiveLabel()
+              }}
+            >
+              {archiveMutation.isPending ? "Archiving..." : "Archive label"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
+}
+
+function archiveAssignmentSummary(assignmentCount: number | undefined) {
+  const count = assignmentCount ?? 0
+  if (count === 0) {
+    return "This label isn't assigned to any issues."
+  }
+  return `This removes it from ${count} assigned issue${count === 1 ? "" : "s"}.`
 }
 
 function ColorButton({
