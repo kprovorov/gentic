@@ -67,7 +67,7 @@ export function EditIssueView({
         <Card>
           <CardHeader>
             <CardTitle>Edit issue</CardTitle>
-            <CardDescription>Update the title and prompt.</CardDescription>
+            <CardDescription>Update the title and body.</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={updateIssue} className="grid gap-5">
@@ -86,12 +86,12 @@ export function EditIssueView({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="issue-prompt">Prompt</Label>
+                <Label htmlFor="issue-body">Body</Label>
                 <textarea
-                  id="issue-prompt"
-                  name="prompt"
+                  id="issue-body"
+                  name="body"
                   rows={6}
-                  defaultValue={issue.prompt ?? ""}
+                  defaultValue={issue.body ?? ""}
                   placeholder="Add context, acceptance notes, or links."
                   className="w-full resize-y rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base transition-[color,box-shadow,background-color] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                 />

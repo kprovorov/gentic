@@ -37,7 +37,7 @@ INSERT INTO public.issues (
   id,
   project_id,
   title,
-  prompt,
+  body,
   status,
   number,
   active_worker_id,
@@ -46,7 +46,7 @@ INSERT INTO public.issues (
   '20000000-0000-4000-8000-200000000001',
   '10000000-0000-4000-8000-200000000001',
   'Finished task',
-  'Prompt',
+  'Body',
   'in-progress',
   1,
   '00000000-0000-4000-8000-200000000001',
@@ -55,7 +55,7 @@ INSERT INTO public.issues (
   '20000000-0000-4000-8000-200000000002',
   '10000000-0000-4000-8000-200000000001',
   'Reset task',
-  'Prompt',
+  'Body',
   'in-progress',
   2,
   '00000000-0000-4000-8000-200000000001',
@@ -164,14 +164,14 @@ SELECT throws_ok(
     INSERT INTO public.issues (
       project_id,
       title,
-      prompt,
+      body,
       status,
       number,
       active_worker_id
     ) VALUES (
       '10000000-0000-4000-8000-200000000001',
       'Invalid orphan',
-      'Prompt',
+      'Body',
       'todo',
       3,
       '00000000-0000-4000-8000-200000000001'

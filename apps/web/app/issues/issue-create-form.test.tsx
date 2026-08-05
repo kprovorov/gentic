@@ -92,7 +92,7 @@ describe("IssueCreateForm", () => {
     vi.mocked(createLabel).mockReset()
   })
 
-  it("restores the saved prompt from browser storage", async () => {
+  it("restores the saved body from browser storage", async () => {
     window.localStorage.setItem(
       "gentic:issue-create-draft:v1",
       "Keep this issue draft after refresh."
@@ -101,28 +101,25 @@ describe("IssueCreateForm", () => {
     renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Prompt")).toHaveValue(
+      expect(screen.getByLabelText("Body")).toHaveValue(
         "Keep this issue draft after refresh."
       )
     })
   })
 
-  it("stores prompt changes in browser storage", async () => {
+  it("stores body changes in browser storage", async () => {
     const user = userEvent.setup()
 
     renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.type(
-      screen.getByLabelText("Prompt"),
-      "Persist this issue draft."
-    )
+    await user.type(screen.getByLabelText("Body"), "Persist this issue draft.")
 
     expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
       "Persist this issue draft."
     )
   })
 
-  it("clears the saved prompt when submitting with a selected project", async () => {
+  it("clears the saved body when submitting with a selected project", async () => {
     const user = userEvent.setup()
     window.localStorage.setItem(
       "gentic:issue-create-draft:v1",
@@ -132,9 +129,7 @@ describe("IssueCreateForm", () => {
     renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Prompt")).toHaveValue(
-        "Persist until submit."
-      )
+      expect(screen.getByLabelText("Body")).toHaveValue("Persist until submit.")
     })
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
@@ -196,7 +191,7 @@ describe("IssueCreateForm", () => {
     renderForm(<IssueCreateForm projects={projects} />)
 
     await user.type(
-      screen.getByLabelText("Prompt"),
+      screen.getByLabelText("Body"),
       "Fix the new issue form validation."
     )
     await user.click(screen.getByRole("button", { name: "Run issue" }))
@@ -254,7 +249,7 @@ describe("IssueCreateForm", () => {
       "create_pr_automatically"
     )
 
-    await user.type(screen.getByLabelText("Prompt"), "Open a PR.")
+    await user.type(screen.getByLabelText("Body"), "Open a PR.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Run issue" }))
@@ -277,7 +272,7 @@ describe("IssueCreateForm", () => {
       "create_pr_automatically"
     )
 
-    await user.type(screen.getByLabelText("Prompt"), "Keep this as a draft.")
+    await user.type(screen.getByLabelText("Body"), "Keep this as a draft.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Save draft" }))

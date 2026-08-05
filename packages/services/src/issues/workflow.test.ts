@@ -435,7 +435,7 @@ function issueRow(overrides: Row): Row {
     issue_model: null,
     number: 1,
     priority: "medium",
-    prompt: null,
+    body: null,
     project_id: "project-1",
     projects: { user_id: "user-1" },
     status: "todo",
@@ -452,7 +452,7 @@ test("createIssue persists the requested priority", async () => {
   const issue = (await createIssue(supabase as never, "user-1", {
     project_id: "project-1",
     title: "Prioritized issue",
-    prompt: "Do the thing",
+    body: "Do the thing",
     status: "draft",
     priority: "urgent",
     create_pr_automatically: false,
@@ -474,7 +474,7 @@ test("createIssue persists explicit automatic PR preference", async () => {
   const issue = (await createIssue(supabase as never, "user-1", {
     project_id: "project-1",
     title: "Automatic PR issue",
-    prompt: "Do the thing",
+    body: "Do the thing",
     status: "draft",
     priority: "medium",
     create_pr_automatically: true,
@@ -496,7 +496,7 @@ test("updateIssue persists priority and logs priority_changed payload", async ()
   const issue = (await updateIssue(supabase as never, "user-1", "issue-full", {
     id: "issue-full",
     title: "Updated",
-    prompt: "Updated prompt",
+    body: "Updated body",
     agent_provider: "claude_code",
     issue_model: null,
     type: "bug",
@@ -539,7 +539,7 @@ test("updateIssue persists automatic PR preference before a PR is attached", asy
     {
       id: "issue-automatic-pr",
       title: "Updated",
-      prompt: "Updated prompt",
+      body: "Updated body",
       agent_provider: "claude_code",
       issue_model: null,
       type: "bug",
@@ -575,7 +575,7 @@ test("updateIssue leaves automatic PR preference historical after a PR is attach
     {
       id: "issue-attached-pr",
       title: "Updated",
-      prompt: "Updated prompt",
+      body: "Updated body",
       agent_provider: "claude_code",
       issue_model: null,
       type: "bug",
@@ -596,7 +596,7 @@ test("updateIssue does not log priority_changed when priority is unchanged", asy
   await updateIssue(supabase as never, "user-1", "issue-full-noop", {
     id: "issue-full-noop",
     title: "Updated",
-    prompt: "Updated prompt",
+    body: "Updated body",
     agent_provider: "claude_code",
     issue_model: null,
     type: "bug",

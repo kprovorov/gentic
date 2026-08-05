@@ -6,22 +6,22 @@ Issues and PRDs for this repo live in the Gentic app itself — this repo is the
 
 ## Conventions
 
-- **Create an issue**: `mcp__gentic__create_issue` with `project_id` above, a `title`, and a `prompt` (the detailed instructions/spec body). Defaults to `type: feature`, `status: draft`, `priority: medium`. Create as `draft` unless you intentionally want it to enter another workflow state.
+- **Create an issue**: `mcp__gentic__create_issue` with `project_id` above, a `title`, and a `body` (the detailed instructions/spec). Defaults to `type: feature`, `status: draft`, `priority: medium`. Create as `draft` unless you intentionally want it to enter another workflow state.
 - **Read an issue**: `mcp__gentic__get_issue` by id.
 - **List issues**: `mcp__gentic__list_issues` with `project_id` set to the id above.
-- **Update title/spec/type/priority**: `mcp__gentic__update_issue`. There is no separate comment thread — the `prompt` field *is* the living spec, so append updates to it (e.g. a `--- update <date> ---` marker line) rather than expecting a comments API.
+- **Update title/spec/type/priority**: `mcp__gentic__update_issue`. There is no separate comment thread — the `body` field *is* the living spec, so append updates to it (e.g. a `--- update <date> ---` marker line) rather than expecting a comments API.
 - **Change priority only**: `mcp__gentic__update_issue_priority`.
 - **Change workflow status**: `mcp__gentic__update_issue_status`.
-- **Close as won't-fix**: set status to `cancelled` via `update_issue_status`. There's no reason field — put the reason in the `prompt` before cancelling if it needs to be preserved.
+- **Close as won't-fix**: set status to `cancelled` via `update_issue_status`. There's no reason field — put the reason in the `body` before cancelling if it needs to be preserved.
 
 ### Important gotcha: `todo` is not just a label
 
 Gentic's status enum (`draft → todo → queued → held → in-progress → waiting-for-input → testing → tests-failed → ready-for-review → changes-requested → approved → merged → deploying → deploy-failed → validating → run-failed → completed`, with `cancelled` reachable from most states) drives a real state machine, not a freeform label set:
 
 - `draft` = created, not yet handed to an agent.
-- Moving status from `draft` to `todo` **starts a background coding-agent run immediately** (it claims the issue, seeds the kickoff message from `prompt`, and a worker begins work). Never do this just to mean "ready-for-agent" as a passive label — only do it when you actually want the agent to start now.
+- Moving status from `draft` to `todo` **starts a background coding-agent run immediately** (it claims the issue, seeds the kickoff message from `body`, and a worker begins work). Never do this just to mean "ready-for-agent" as a passive label — only do it when you actually want the agent to start now.
 - `held` is a system-imposed pause (agent hit a usage/rate limit), not a manual "waiting on human" state — don't use it for triage purposes.
-- There is no `labels`/`tags` field and no assignee field on an issue — only `status`, `type`, `priority`, and `prompt`/`title`.
+- There is no `labels`/`tags` field and no assignee field on an issue — only `status`, `type`, `priority`, and `body`/`title`.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -35,8 +35,8 @@ Create a Gentic issue with `mcp__gentic__create_issue`, status `draft`.
 
 Used by `/wayfinder`. Gentic has no parent/child relation — only pairwise `blocking`/`blocked_by` (`mcp__gentic__add_issue_relation`, `list_issue_relations`, `list_issue_relation_candidates`, `delete_issue_relation`) — so map/child grouping is by convention, not a first-class link.
 
-- **Map**: a Gentic issue titled `[Map] <effort>`, `type: idea`, holding the Notes / Decisions-so-far / Fog body in `prompt`. Keep it in `draft` — never promote a map issue to `todo`.
-- **Child ticket**: a Gentic issue titled `[<effort>] <ticket title>`, `prompt` starting with `Part of: <map issue title>`. A leading line in `prompt` records ticket type (`research`/`prototype`/`grilling`/`task`).
+- **Map**: a Gentic issue titled `[Map] <effort>`, `type: idea`, holding the Notes / Decisions-so-far / Fog content in `body`. Keep it in `draft` — never promote a map issue to `todo`.
+- **Child ticket**: a Gentic issue titled `[<effort>] <ticket title>`, `body` starting with `Part of: <map issue title>`. A leading line in `body` records ticket type (`research`/`prototype`/`grilling`/`task`).
 - **Blocking**: `mcp__gentic__add_issue_relation` with `direction: "blocked_by"` from the child to its blocker. A ticket is unblocked when every blocker relation returned by `list_issue_relations` is on an issue with status `completed` or `cancelled`.
-- **Claim**: for a human-driven wayfinder ticket (research/prototype/grilling), do **not** move it to `todo` — that launches the autonomous agent. Instead record the claim as a line in `prompt` (e.g. `Claimed by: <name>`) and leave status in `draft`. Only use `task`-type tickets with real `todo` status if the ticket is meant to be run by the Gentic agent itself.
-- **Resolve**: append the answer to `prompt` under an `## Answer` heading, set status to `completed`, then append a context pointer to the map issue's `prompt` under Decisions-so-far.
+- **Claim**: for a human-driven wayfinder ticket (research/prototype/grilling), do **not** move it to `todo` — that launches the autonomous agent. Instead record the claim as a line in `body` (e.g. `Claimed by: <name>`) and leave status in `draft`. Only use `task`-type tickets with real `todo` status if the ticket is meant to be run by the Gentic agent itself.
+- **Resolve**: append the answer to `body` under an `## Answer` heading, set status to `completed`, then append a context pointer to the map issue's `body` under Decisions-so-far.

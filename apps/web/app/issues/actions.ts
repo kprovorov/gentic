@@ -91,7 +91,7 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     message = await issuesService.createIssueUserMessage(
       supabase,
       created.id,
-      fields.prompt
+      fields.body
     )
 
     await uploadIssueAttachments(
@@ -128,15 +128,15 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     const serviceClient = createServiceClient()
 
     const { title, type, priority } = await generateIssueMetadata(
-      fields.prompt
+      fields.body
     ).catch((error) => {
       console.error(
         `Failed to generate metadata for issue ${created.id}:`,
         error
       )
       return {
-        title: formatGeneratedIssueTitle(fields.prompt),
-        type: fallbackIssueType(fields.prompt),
+        title: formatGeneratedIssueTitle(fields.body),
+        type: fallbackIssueType(fields.body),
         priority: defaultIssuePriority,
       }
     })
@@ -178,7 +178,7 @@ export async function updateIssue(formData: FormData) {
   const {
     id,
     title,
-    prompt,
+    body,
     agent_provider,
     issue_model,
     type,
@@ -190,7 +190,7 @@ export async function updateIssue(formData: FormData) {
   const issue = await issuesService.updateIssue(supabase, userId, id, {
     id,
     title,
-    prompt,
+    body,
     agent_provider,
     issue_model,
     type,

@@ -55,14 +55,14 @@ INSERT INTO public.issues (
   id,
   project_id,
   title,
-  prompt,
+  body,
   status,
   number
 ) VALUES (
   '20000000-0000-4000-8000-000000000101',
   '10000000-0000-4000-8000-000000000101',
   'Default issue',
-  'Prompt',
+  'Body',
   'draft',
   1
 );

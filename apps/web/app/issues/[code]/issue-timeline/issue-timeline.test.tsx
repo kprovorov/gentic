@@ -51,7 +51,7 @@ const attachment: Attachment = {
 }
 
 describe("IssueTimeline", () => {
-  it("renders an expanded request node with the prompt and attachments", () => {
+  it("renders an expanded request node with the body and attachments", () => {
     render(
       <IssueTimeline
         items={[
@@ -61,7 +61,7 @@ describe("IssueTimeline", () => {
             timestamp: "2026-07-01T00:00:00.000Z",
           },
         ]}
-        issuePrompt="Fix the flaky test"
+        issueBody="Fix the flaky test"
         attachments={[attachment]}
       />
     )
@@ -83,7 +83,7 @@ describe("IssueTimeline", () => {
             timestamp: "2026-07-01T00:00:00.000Z",
           },
         ]}
-        issuePrompt={"Fix the flaky test\nIt fails intermittently in CI."}
+        issueBody={"Fix the flaky test\nIt fails intermittently in CI."}
         attachments={[]}
       />
     )
@@ -112,7 +112,7 @@ describe("IssueTimeline", () => {
             content: "Fix the flaky test",
           }),
         ]}
-        issuePrompt="Fix the flaky test"
+        issueBody="Fix the flaky test"
         attachments={[]}
       />
     )
@@ -132,7 +132,7 @@ describe("IssueTimeline", () => {
             content: "Fix the flaky test",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
@@ -157,7 +157,7 @@ describe("IssueTimeline", () => {
             author_type: "gentic",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
@@ -180,7 +180,7 @@ describe("IssueTimeline", () => {
             content: "Manual follow-up",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
@@ -206,7 +206,7 @@ describe("IssueTimeline", () => {
             generated_action: "create_pr",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
@@ -220,7 +220,7 @@ describe("IssueTimeline", () => {
     )
   })
 
-  it("uses the first user message as the original request when the prompt is empty", () => {
+  it("uses the first user message as the original request when the body is empty", () => {
     render(
       <IssueTimeline
         items={[
@@ -236,7 +236,7 @@ describe("IssueTimeline", () => {
             attachments: [attachment],
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[attachment]}
       />
     )
@@ -257,13 +257,13 @@ describe("IssueTimeline", () => {
             timestamp: "2026-07-01T00:00:00.000Z",
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[attachment]}
       />
     )
 
     expect(screen.getByText("Request")).toBeInTheDocument()
-    expect(screen.getByText("No prompt provided.")).toBeInTheDocument()
+    expect(screen.getByText("No body provided.")).toBeInTheDocument()
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
 
@@ -279,7 +279,7 @@ describe("IssueTimeline", () => {
             to: "ready-for-review",
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -304,7 +304,7 @@ describe("IssueTimeline", () => {
             content: "Editing file B",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -338,7 +338,7 @@ describe("IssueTimeline", () => {
             },
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -360,7 +360,7 @@ describe("IssueTimeline", () => {
             content: "Considering approach",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -387,7 +387,7 @@ describe("IssueTimeline", () => {
             content: "On it",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -413,7 +413,7 @@ describe("IssueTimeline", () => {
             created_at: "2026-07-01T00:05:00.000Z",
           }),
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -438,7 +438,7 @@ describe("IssueTimeline", () => {
             to: "urgent",
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -459,7 +459,7 @@ describe("IssueTimeline", () => {
             removed: [{ id: "label-2", name: "Feature", color: "#00FF00" }],
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -482,7 +482,7 @@ describe("IssueTimeline", () => {
             removed: [],
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -508,7 +508,7 @@ describe("IssueTimeline", () => {
             prUrl: "https://github.com/acme/repo/pull/42",
           },
         ]}
-        issuePrompt={null}
+        issueBody={null}
         attachments={[]}
       />
     )
@@ -520,7 +520,7 @@ describe("IssueTimeline", () => {
   })
 
   it("renders a fallback when there is no timeline activity", () => {
-    render(<IssueTimeline items={[]} issuePrompt={null} attachments={[]} />)
+    render(<IssueTimeline items={[]} issueBody={null} attachments={[]} />)
 
     expect(screen.getByText("No activity yet.")).toBeInTheDocument()
   })
