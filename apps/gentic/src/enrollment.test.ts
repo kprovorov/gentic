@@ -16,12 +16,12 @@ const tools: ToolStatuses = {
 
 beforeEach(() => {
   configDir = mkdtempSync(join(tmpdir(), "gentic-enrollment-test-"))
-  process.env.XDG_CONFIG_HOME = configDir
+  process.env.GENTIC_CONFIG_DIR = configDir
 })
 
 afterEach(() => {
   rmSync(configDir, { recursive: true, force: true })
-  delete process.env.XDG_CONFIG_HOME
+  delete process.env.GENTIC_CONFIG_DIR
 })
 
 async function freshModules() {

@@ -8,13 +8,13 @@ import type { ServiceBackend } from "../service/index.js"
 import type { ToolStatuses } from "../tools.js"
 
 const configDir = mkdtempSync(join(tmpdir(), "gentic-status-test-"))
-process.env.XDG_CONFIG_HOME = configDir
+process.env.GENTIC_CONFIG_DIR = configDir
 
 const { configFilePath } = await import("../config-store.js")
 const { status } = await import("./status.js")
 
 after(() => {
-  delete process.env.XDG_CONFIG_HOME
+  delete process.env.GENTIC_CONFIG_DIR
   rmSync(configDir, { recursive: true, force: true })
 })
 

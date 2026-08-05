@@ -13,7 +13,7 @@ const CONFIG_KEYS = [
 ] as const
 
 const configDir = mkdtempSync(join(tmpdir(), "gentic-gate-config-test-"))
-process.env.XDG_CONFIG_HOME = configDir
+process.env.GENTIC_CONFIG_DIR = configDir
 
 const { checkOnboardingGate } = await import("./cli-gate.js")
 const { getConfigInput } = await import("./config.js")
@@ -38,7 +38,7 @@ afterEach(() => {
 })
 
 after(() => {
-  delete process.env.XDG_CONFIG_HOME
+  delete process.env.GENTIC_CONFIG_DIR
   rmSync(configDir, { recursive: true, force: true })
 })
 
