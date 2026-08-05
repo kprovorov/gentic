@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto"
 
-import { getIssueCode } from "@gentic/services/issues"
+import {
+  formatIssueKickoffMessage,
+  GENTIC_AUTHORED_USER_MESSAGE,
+  getIssueCode,
+} from "@gentic/services/issues"
 import { getWorker } from "@gentic/services/workers"
 import type { WorkerCompatibilityPolicy } from "@gentic/services/workers"
 import type { AgentProvider } from "@gentic/validators/issues"
@@ -16,7 +20,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, number, title, status, agent_provider, issue_model, session_id, pr_url, body, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, number, title, status, agent_provider, issue_model, session_id, pr_url, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 function eligibleIssueFilter(now: string): string {
   return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
@@ -142,7 +146,11 @@ export async function claimNextQueuedIssue(
   }
 
   if (candidate.status === "todo") {
-    await ensureTodoIssueHasPendingPrompt(supabase, id, candidate.body)
+    await ensureTodoIssueHasPendingPrompt(
+      supabase,
+      id,
+      getIssueCode(candidate.projects.key, candidate.number)
+    )
   }
 
   return {
@@ -182,10 +190,15 @@ function isProviderReady(
   )
 }
 
+// Safety net for a `todo` issue that reaches a claim with no unconsumed user
+// message left to work from. The two lifecycle boundaries that open a fresh
+// conversation (`start_issue_from_draft`, `reset_issue_run`) already seed the
+// Kickoff Message, so this only fires when one is somehow missing — and it
+// backfills the same Kickoff Message, never the Body.
 export async function ensureTodoIssueHasPendingPrompt(
   supabase: Supabase,
   issueId: string,
-  body: string | null
+  issueCode: string
 ) {
   const { data: pendingMessages, error: pendingMessagesError } = await supabase
     .from("messages")
@@ -204,8 +217,8 @@ export async function ensureTodoIssueHasPendingPrompt(
 
   const { error: insertError } = await supabase.from("messages").insert({
     issue_id: issueId,
-    role: "user",
-    content: body ?? "",
+    ...GENTIC_AUTHORED_USER_MESSAGE,
+    content: formatIssueKickoffMessage(issueCode),
   })
 
   if (insertError) {

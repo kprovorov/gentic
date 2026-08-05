@@ -82,6 +82,17 @@ export function getIssueCode(projectKey: string, issueNumber: number) {
 }
 
 /**
+ * The fixed Kickoff Message that opens a fresh Coding Agent conversation. It
+ * names the Issue Code and nothing else — no title, Body excerpt, or hidden
+ * instruction — because the agent reads the Body itself through the Gentic MCP
+ * `get_issue` tool. Kept identical to the wording seeded by the
+ * `issue_kickoff_message` SQL function so every creation path matches.
+ */
+export function formatIssueKickoffMessage(issueCode: string) {
+  return `Work on Gentic issue ${issueCode}.`
+}
+
+/**
  * Parse a human-readable Issue Code such as `GEN-123` into its project key and
  * issue number, the inverse of {@link getIssueCode}. Returns `null` for any
  * malformed input so callers can surface an ordinary not-found error without

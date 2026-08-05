@@ -19,7 +19,7 @@ Issues and PRDs for this repo live in the Gentic app itself — this repo is the
 Gentic's status enum (`draft → todo → queued → held → in-progress → waiting-for-input → testing → tests-failed → ready-for-review → changes-requested → approved → merged → deploying → deploy-failed → validating → run-failed → completed`, with `cancelled` reachable from most states) drives a real state machine, not a freeform label set:
 
 - `draft` = created, not yet handed to an agent.
-- Moving status from `draft` to `todo` **starts a background coding-agent run immediately** (it claims the issue, seeds the kickoff message from `body`, and a worker begins work). Never do this just to mean "ready-for-agent" as a passive label — only do it when you actually want the agent to start now.
+- Moving status from `draft` to `todo` **starts a background coding-agent run immediately** (it claims the issue, seeds the kickoff message `Work on Gentic issue {Issue Code}.` — the agent reads the `body` itself via the Gentic MCP `get_issue` tool — and a worker begins work). Never do this just to mean "ready-for-agent" as a passive label — only do it when you actually want the agent to start now.
 - `held` is a system-imposed pause (agent hit a usage/rate limit), not a manual "waiting on human" state — don't use it for triage purposes.
 - There is no `labels`/`tags` field and no assignee field on an issue — only `status`, `type`, `priority`, and `body`/`title`.
 

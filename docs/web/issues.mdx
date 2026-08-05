@@ -103,7 +103,7 @@ Open the issue detail page and click **Edit**. You can update the **Title**, **B
 Retrying an agent clears the current agent session and re-queues the issue as if it were starting fresh. Open the issue and click **Retry with Claude Code**, or use the adjacent dropdown to retry with Codex.
 
 <Warning>
-  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message from the current body. It does not delete pull requests from GitHub.
+  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message — `Work on Gentic issue {Issue Code}.` — that the agent uses to read the current body. It does not delete pull requests from GitHub.
 </Warning>
 
 ## Delete an Issue

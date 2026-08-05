@@ -799,6 +799,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      issue_kickoff_message: { Args: { p_issue_id: string }; Returns: string }
       mark_attachment_storage_deleted: {
         Args: { storage_paths: string[] }
         Returns: number
@@ -870,19 +871,14 @@ export type Database = {
         Args: { p_now: string; p_worker_id: string }
         Returns: number
       }
-      reset_issue_run:
-        | {
-            Args: { p_agent_provider: string; p_issue_id: string }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_agent_provider: string
-              p_issue_id: string
-              p_issue_model?: string
-            }
-            Returns: undefined
-          }
+      reset_issue_run: {
+        Args: {
+          p_agent_provider: string
+          p_issue_id: string
+          p_issue_model?: string
+        }
+        Returns: undefined
+      }
       send_issue_user_message: {
         Args: { p_content: string; p_issue_id: string }
         Returns: {

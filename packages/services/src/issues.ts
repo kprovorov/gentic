@@ -1,4 +1,5 @@
 export {
+  formatIssueKickoffMessage,
   getIssueCode,
   parseIssueCode,
   type AssignedIssueLabel,
@@ -69,6 +70,7 @@ export {
   deleteIssueMessage,
   formatPullRequestCommentMessage,
   formatTestsFailedMessage,
+  GENTIC_AUTHORED_USER_MESSAGE,
   requeueIssueForUserMessage,
   sendIssueMessage,
 } from "./issues/chat"
