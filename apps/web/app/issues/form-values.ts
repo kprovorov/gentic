@@ -11,7 +11,7 @@ const explicitBooleanSchema = z
 export const createIssueFormSchema = createIssueSchema
   .omit({ title: true, status: true, type: true })
   .extend({
-    prompt: z.string().trim().min(1).max(10_000),
+    body: z.string().trim().min(1).max(10_000),
     create_pr_automatically: explicitBooleanSchema,
   })
 
@@ -22,7 +22,7 @@ export const updateIssueFormSchema = updateIssueSchema.extend({
 export function parseCreateIssueFormData(formData: FormData) {
   return createIssueFormSchema.parse({
     project_id: getString(formData, "project_id"),
-    prompt: getString(formData, "prompt"),
+    body: getString(formData, "body"),
     create_pr_automatically: getString(formData, "create_pr_automatically"),
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getString(formData, "issue_model") || null,
@@ -35,7 +35,7 @@ export function parseUpdateIssueFormData(formData: FormData) {
   return updateIssueFormSchema.parse({
     id: getString(formData, "id"),
     title: getString(formData, "title"),
-    prompt: getString(formData, "prompt") || undefined,
+    body: getString(formData, "body") || undefined,
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getString(formData, "issue_model") || null,
     type: getString(formData, "type") || "feature",

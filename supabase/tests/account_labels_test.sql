@@ -16,11 +16,11 @@ VALUES
   ('10000000-0000-4000-8000-000000000501', 'user_alpha', 'Alpha', 'gentic/alpha-labels', 'ALA'),
   ('10000000-0000-4000-8000-000000000502', 'user_beta', 'Beta', 'gentic/beta-labels', 'BLA');
 
-INSERT INTO public.issues (id, project_id, title, prompt, status, number)
+INSERT INTO public.issues (id, project_id, title, body, status, number)
 VALUES
-  ('20000000-0000-4000-8000-000000000501', '10000000-0000-4000-8000-000000000501', 'Draft issue', 'Prompt', 'draft', 1),
-  ('20000000-0000-4000-8000-000000000502', '10000000-0000-4000-8000-000000000501', 'Done issue', 'Prompt', 'completed', 2),
-  ('20000000-0000-4000-8000-000000000503', '10000000-0000-4000-8000-000000000502', 'Other issue', 'Prompt', 'draft', 1);
+  ('20000000-0000-4000-8000-000000000501', '10000000-0000-4000-8000-000000000501', 'Draft issue', 'Body', 'draft', 1),
+  ('20000000-0000-4000-8000-000000000502', '10000000-0000-4000-8000-000000000501', 'Done issue', 'Body', 'completed', 2),
+  ('20000000-0000-4000-8000-000000000503', '10000000-0000-4000-8000-000000000502', 'Other issue', 'Body', 'draft', 1);
 
 INSERT INTO public.labels (id, user_id, name, color)
 VALUES (
@@ -155,8 +155,8 @@ SELECT throws_ok(
 INSERT INTO public.projects (id, user_id, name, repo, key)
 VALUES ('10000000-0000-4000-8000-000000000503', 'limit_issue_user', 'Gamma', 'gentic/gamma-labels', 'GLA');
 
-INSERT INTO public.issues (id, project_id, title, prompt, status, number)
-VALUES ('20000000-0000-4000-8000-000000000504', '10000000-0000-4000-8000-000000000503', 'Heavily labeled issue', 'Prompt', 'draft', 1);
+INSERT INTO public.issues (id, project_id, title, body, status, number)
+VALUES ('20000000-0000-4000-8000-000000000504', '10000000-0000-4000-8000-000000000503', 'Heavily labeled issue', 'Body', 'draft', 1);
 
 INSERT INTO public.labels (id, user_id, name, color)
 SELECT ('40000000-0000-4000-8000-' || lpad(value::text, 12, '0'))::uuid, 'limit_issue_user', 'Issue label ' || value, '#2563EB'

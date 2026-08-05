@@ -52,7 +52,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         <IssueDetailTimelinePanel
           issueId={issue.id}
           issueCreatedAt={issue.created_at}
-          issuePrompt={issue.prompt}
+          issueBody={issue.body}
           agentProvider={issue.agent_provider}
           issueModel={issue.issue_model}
           initialMessages={messages}

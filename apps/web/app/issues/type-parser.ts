@@ -16,9 +16,9 @@ export const issueMetadataSchema = z.object({
 
 export type GeneratedIssueMetadata = z.infer<typeof issueMetadataSchema>
 
-export function fallbackIssueType(prompt: string): GeneratedIssueType {
+export function fallbackIssueType(body: string): GeneratedIssueType {
   const bugPattern =
     /\b(bug|fix|broken|crash|crashes|error|exception|fail|fails|failure|regression|incorrect|wrong|invalid|timeout|stuck|cannot|can't|doesn't|doesnt|not working)\b/i
 
-  return bugPattern.test(prompt) ? "bug" : "feature"
+  return bugPattern.test(body) ? "bug" : "feature"
 }

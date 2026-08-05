@@ -12,13 +12,13 @@ Gentic connects two things: a web app where your team writes and manages work, a
 
 ### You create an issue in the web app
 
-Create a new issue in [app.gentic.chat](https://app.gentic.chat), choose a project, and write the prompt the agent will follow. Choose **Save draft**, **Run with Claude Code**, or **Run with Codex**. Gentic generates a title and issue type in the background. You can also attach files in the prompt composer.
+Create a new issue in [app.gentic.chat](https://app.gentic.chat), choose a project, and write the body the agent will follow. Choose **Save draft**, **Run with Claude Code**, or **Run with Codex**. Gentic generates a title and issue type in the background. You can also attach files in the issue composer.
 
-New issues start in **Draft** status. A draft is never picked up by the worker, giving you time to iterate on the prompt, add attachments, and set any blocking dependencies before the agent begins.
+New issues start in **Draft** status. A draft is never picked up by the worker, giving you time to iterate on the body, add attachments, and set any blocking dependencies before the agent begins.
 
 ### Moving to Todo queues the issue
 
-When you change an issue's status from **Draft** to **Todo**, Gentic records your prompt as the first message in the issue's conversation thread and puts the issue in the unclaimed pool. Every issue in Gentic has a single `status` field that covers both the workflow position (draft, waiting for review, merged, cancelled…) and the current agent lifecycle (queued, in-progress, held, run-failed). The full list is documented in [Issue Statuses](/web/issue-statuses).
+When you change an issue's status from **Draft** to **Todo**, Gentic records your issue body as the first message in the issue's conversation thread and puts the issue in the unclaimed pool. Every issue in Gentic has a single `status` field that covers both the workflow position (draft, waiting for review, merged, cancelled…) and the current agent lifecycle (queued, in-progress, held, run-failed). The full list is documented in [Issue Statuses](/web/issue-statuses).
 
 ### The agent worker polls for queued issues
 
@@ -43,7 +43,7 @@ With the repository cloned, the worker spawns the chosen agent through the **Age
 - **Claude Code** issues run through `@agentclientprotocol/claude-agent-acp`, using Claude Code credentials already present in the worker environment.
 - **Codex** issues run through `@agentclientprotocol/codex-acp`, which shells out to the `codex` CLI already installed and authenticated in the worker environment.
 
-The agent receives the issue prompt (plus any attachment content) as its first user message. Gentic does not append hidden commit, push, or pull-request instructions to the agent's system prompt.
+The agent receives the issue body (plus any attachment content) as its first user message. Gentic does not append hidden commit, push, or pull-request instructions to the agent's system prompt.
 
 As the agent works, its output streams back into the issue's transcript in real time so you can follow along in the web app.
 

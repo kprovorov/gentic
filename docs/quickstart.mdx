@@ -68,17 +68,17 @@ gentic status
 
 ### Create your first issue
 
-Back in the Gentic web app, open **Issues** and click **New issue**. Choose a project, then write a detailed prompt. You can attach supporting files in the same composer.
+Back in the Gentic web app, open **Issues** and click **New issue**. Choose a project, then write a detailed body. You can attach supporting files in the same composer.
 
-Leave **Create PR automatically** enabled if you want Gentic to publish successful code changes. New web issues enable it by default. Click **Save draft** to review the issue before it runs; the draft keeps your publishing selection. Gentic generates the title and type in the background. Draft issues are never picked up by the worker, so you can refine the generated fields, prompt, attachments, and publishing preference before running it.
+Leave **Create PR automatically** enabled if you want Gentic to publish successful code changes. New web issues enable it by default. Click **Save draft** to review the issue before it runs; the draft keeps your publishing selection. Gentic generates the title and type in the background. Draft issues are never picked up by the worker, so you can refine the generated fields, body, attachments, and publishing preference before running it.
 
 <Tip>
-  Write prompts the same way you would write a detailed ticket for a junior engineer: describe the goal, the acceptance criteria, any relevant file paths, and the coding style you expect. The more context you give, the better the output.
+  Write issue bodies the same way you would write a detailed ticket for a junior engineer: describe the goal, the acceptance criteria, any relevant file paths, and the coding style you expect. The more context you give, the better the output.
 </Tip>
 
 ### Move the issue to Todo
 
-When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the prompt as the first message and makes the issue eligible for a worker.
+When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the body as the first message and makes the issue eligible for a worker.
 
 On the worker's next poll (within a few seconds), it claims the issue, clones the repository into a fresh working directory, and starts the AI agent.
 

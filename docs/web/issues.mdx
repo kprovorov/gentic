@@ -4,7 +4,7 @@ sidebarTitle: "Issues"
 description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, track its code changes, and optionally publish them as a pull request."
 ---
 
-An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the worker clones your repository and the agent follows the instructions in your prompt. Every issue tracks its own status, agent conversation, publishing preference, and pull requests in one place.
+An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the worker clones your repository and the agent follows the instructions in the issue body. Every issue tracks its own status, agent conversation, publishing preference, and pull requests in one place.
 
 ## Create an Issue
 
@@ -16,7 +16,7 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
     Choose the project (GitHub repository) the agent should work in. If you have no projects yet, [create one in Settings](/web/projects) first.
   </Step>
   <Step title="Fill in the issue fields">
-    Choose a **Project**, write the **Prompt**, and optionally attach files. Gentic generates a title and issue type after submission.
+    Choose a **Project**, write the **Body**, and optionally attach files. Gentic generates a title and issue type after submission.
   </Step>
   <Step title="Submit">
     Click **Save draft** to review the issue first, or choose **Run with Claude Code** or **Run with Codex** to queue it immediately.
@@ -24,7 +24,7 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
 </Steps>
 
 <Tip>
-  Write a detailed prompt with explicit acceptance criteria — for example, "Add a `/health` endpoint that returns `{ status: 'ok' }` with HTTP 200. Include a Jest test." The more context you give the agent, the fewer revision cycles you need.
+  Write a detailed body with explicit acceptance criteria — for example, "Add a `/health` endpoint that returns `{ status: 'ok' }` with HTTP 200. Include a Jest test." The more context you give the agent, the fewer revision cycles you need.
 </Tip>
 
 ## Field Reference
@@ -52,8 +52,8 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   The AI agent that will execute the issue. The primary run button uses Claude Code; use its dropdown to run with Codex. You can change the agent before the first run from the issue detail page.
 </ParamField>
 
-<ParamField body="prompt" type="text">
-  Detailed instructions for the agent. Include background context, step-by-step requirements, acceptance criteria, links to relevant files, and any constraints. The prompt is passed directly to the agent at the start of each run.
+<ParamField body="body" type="text">
+  Detailed instructions for the agent. Include background context, step-by-step requirements, acceptance criteria, links to relevant files, and any constraints. The body is passed directly to the agent at the start of each run.
 </ParamField>
 
 <ParamField body="status" type="enum">
@@ -96,14 +96,14 @@ If a finished, idle run has unpublished changes and no pull request, the issue s
 
 ## Edit an Issue
 
-Open the issue detail page and click **Edit**. You can update the **Title**, **Prompt**, **Agent**, **Type**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
+Open the issue detail page and click **Edit**. You can update the **Title**, **Body**, **Agent**, **Type**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
 
 ## Retry an Agent
 
 Retrying an agent clears the current agent session and re-queues the issue as if it were starting fresh. Open the issue and click **Retry with Claude Code**, or use the adjacent dropdown to retry with Codex.
 
 <Warning>
-  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message from the current prompt. It does not delete pull requests from GitHub.
+  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message from the current body. It does not delete pull requests from GitHub.
 </Warning>
 
 ## Delete an Issue

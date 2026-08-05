@@ -72,7 +72,7 @@ export async function updateIssueStatus(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("status,prompt,projects!inner(user_id)")
+    .select("status,body,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -84,7 +84,7 @@ export async function updateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
-  // Starting a draft is a durable DB transition so prompt consumption and
+  // Starting a draft is a durable DB transition so body consumption and
   // message creation stay atomic with the status change.
   const startsRun = current.status === "draft" && status === "todo"
 

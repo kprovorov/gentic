@@ -63,12 +63,12 @@ Once connected, your AI assistant can:
 
 You do not need to open the Gentic dashboard at all. Ask your assistant something like:
 
-> "Create a bug issue for the login project titled 'Fix null pointer in auth' with the prompt 'The login endpoint throws NPE when email is missing — add input validation.' Then move it to todo."
+> "Create a bug issue for the login project titled 'Fix null pointer in auth' with the body 'The login endpoint throws NPE when email is missing — add input validation.' Then move it to todo."
 
 Your assistant will call `create_issue` to create the issue in draft state, then call `update_issue_status` to move it to `todo`, which queues a background agent run automatically.
 
 <Tip>
-  Start issues in `draft` status while you refine the title and prompt. Move to `todo` only when you are ready for the agent to begin work — that transition is what triggers the run.
+  Start issues in `draft` status while you refine the title and body. Move to `todo` only when you are ready for the agent to begin work — that transition is what triggers the run.
 </Tip>
 
 ## Available tools

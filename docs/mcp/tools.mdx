@@ -147,7 +147,7 @@ Lists issues owned by the authenticated account. Filter by project to narrow res
 
 ### `get_issue`
 
-Returns full details for a single issue, including its current status, priority, prompt, and agent configuration.
+Returns full details for a single issue, including its current status, priority, body, and agent configuration.
 
 <ParamField body="id" type="string (uuid)" required>
   The issue ID, from `list_issues` or `create_issue`.
@@ -163,7 +163,7 @@ Returns full details for a single issue, including its current status, priority,
 
 ### `create_issue`
 
-Creates a new issue inside a project. Issues are created in `draft` status by default, giving you the chance to refine the title and agent prompt before queuing a run.
+Creates a new issue inside a project. Issues are created in `draft` status by default, giving you the chance to refine the title and issue body before queuing a run.
 
 <ParamField body="project_id" type="string (uuid)" required>
   The ID of the project to create this issue in. Obtain it from `list_projects`.
@@ -173,8 +173,8 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
   Short issue title shown in the Gentic dashboard. Maximum 160 characters.
 </ParamField>
 
-<ParamField body="prompt" type="string">
-  Detailed instructions for the background coding agent. Explain the problem, expected behavior, and any relevant context. The agent uses this prompt as its primary directive when the issue is queued.
+<ParamField body="body" type="string">
+  Detailed instructions for the background coding agent. Explain the problem, expected behavior, and any relevant context. The agent uses this body as its primary directive when the issue is queued.
 </ParamField>
 
 <ParamField body="status" type="enum">
@@ -211,7 +211,7 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
 
 ### `update_issue`
 
-Updates the title, prompt, agent provider, issue model, type, and priority for an existing issue. Use this to refine the agent's instructions before queuing a run. `title`, `agent_provider`, `type`, and `priority` are required; `prompt` and `issue_model` are optional.
+Updates the title, body, agent provider, issue model, type, and priority for an existing issue. Use this to refine the agent's instructions before queuing a run. `title`, `agent_provider`, `type`, and `priority` are required; `body` and `issue_model` are optional.
 
 <ParamField body="id" type="string (uuid)" required>
   The issue ID to update.
@@ -221,8 +221,8 @@ Updates the title, prompt, agent provider, issue model, type, and priority for a
   Updated short issue title. Maximum 160 characters.
 </ParamField>
 
-<ParamField body="prompt" type="string">
-  Updated detailed instructions for the background coding agent. Optional — omit to leave the prompt unchanged.
+<ParamField body="body" type="string">
+  Updated detailed instructions for the background coding agent. Optional — omit to leave the body unchanged.
 </ParamField>
 
 <ParamField body="agent_provider" type="enum" required>
@@ -313,7 +313,7 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 </ParamField>
 
 <Note>
-  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue prompt, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message from the issue body, and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
 </Note>
 
 <Expandable title="Output fields">
@@ -328,7 +328,7 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 
 The most common pattern is to create an issue in `draft` state, optionally review or update it, then transition it to `todo` to start the agent run. You can instruct your assistant with a single natural-language request:
 
-> "Create a bug issue for project `abc-123` titled 'Fix null pointer in auth' with prompt 'The login endpoint throws NPE when email is missing. Add input validation.' then move it to todo."
+> "Create a bug issue for project `abc-123` titled 'Fix null pointer in auth' with body 'The login endpoint throws NPE when email is missing. Add input validation.' then move it to todo."
 
 Your assistant will execute two tool calls in sequence:
 
@@ -338,7 +338,7 @@ Your assistant will execute two tool calls in sequence:
 {
   "project_id": "abc-123",
   "title": "Fix null pointer in auth",
-  "prompt": "The login endpoint throws NPE when email is missing. Add input validation.",
+  "body": "The login endpoint throws NPE when email is missing. Add input validation.",
   "type": "bug",
   "status": "draft",
   "agent_provider": "claude_code"
@@ -354,8 +354,8 @@ Your assistant will execute two tool calls in sequence:
 }
 ```
 
-The `draft → todo` transition queues the background agent run. From this point, Gentic takes over: the agent clones the repository, applies the fix described in the prompt, and advances the issue status as it progresses.
+The `draft → todo` transition queues the background agent run. From this point, Gentic takes over: the agent clones the repository, applies the fix described in the body, and advances the issue status as it progresses.
 
 <Tip>
-  If you want to review or edit the prompt before the agent starts, tell your assistant to create the issue in `draft` and stop. Come back later and ask it to move the issue to `todo` when you are ready.
+  If you want to review or edit the body before the agent starts, tell your assistant to create the issue in `draft` and stop. Come back later and ask it to move the issue to `todo` when you are ready.
 </Tip>

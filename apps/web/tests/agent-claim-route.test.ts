@@ -27,7 +27,7 @@ type FakeIssue = {
   run_started_at: string | null
   run_error: string | null
   run_finished_at: string | null
-  prompt: string | null
+  body: string | null
   number: number
   title: string | null
   agent_provider: "codex" | "claude_code"
@@ -375,7 +375,7 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
     run_started_at: null,
     run_error: "previous error",
     run_finished_at: "2026-07-01T00:01:00.000Z",
-    prompt: "Implement the task",
+    body: "Implement the task",
     number: 1,
     title: "Implement the task",
     agent_provider: "codex",
@@ -427,7 +427,7 @@ function toClaimCandidate(issue: FakeIssue) {
     issue_model: issue.issue_model,
     session_id: issue.session_id,
     pr_url: issue.pr_url,
-    prompt: issue.prompt,
+    body: issue.body,
     projects: {
       key: issue.project_key,
       repo: issue.repo,
@@ -437,7 +437,7 @@ function toClaimCandidate(issue: FakeIssue) {
   }
 }
 
-test("claim backfills a prompt for todo issues without pending user messages", async () => {
+test("claim backfills the issue body for todo issues without pending user messages", async () => {
   const supabase = new FakeSupabase()
 
   await ensureTodoIssueHasPendingPrompt(

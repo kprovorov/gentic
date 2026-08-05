@@ -68,14 +68,14 @@ test("message realtime stays inside the timeline island", () => {
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })
 
-test("the issue prompt is only serialized into the timeline island", () => {
+test("the issue body is only serialized into the timeline island", () => {
   const header = readRouteFile("issue-detail-header.tsx")
   const rail = readRouteFile("issue-detail-rail.tsx")
   const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
 
-  assert.match(timelinePanel, /issuePrompt/)
-  assert.doesNotMatch(header, /issuePrompt/)
-  assert.doesNotMatch(rail, /issuePrompt/)
+  assert.match(timelinePanel, /issueBody/)
+  assert.doesNotMatch(header, /issueBody/)
+  assert.doesNotMatch(rail, /issueBody/)
 })
 
 test("the timeline scroller follows new messages in its internal viewport", () => {

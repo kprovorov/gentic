@@ -56,7 +56,7 @@ export const issueEditSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
   title: z.string().nullable(),
-  prompt: z.string().nullable(),
+  body: z.string().nullable(),
   agent_provider: agentProviderSchema,
   issue_model: z.string().nullable(),
   type: issueTypeSchema,
@@ -71,7 +71,7 @@ export const issueDetailSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
   title: z.string().nullable(),
-  prompt: z.string().nullable(),
+  body: z.string().nullable(),
   agent_provider: agentProviderSchema,
   issue_model: z.string().nullable(),
   type: issueTypeSchema,
@@ -122,7 +122,7 @@ export type IssueDetail = {
   code: string | null
   number: number
   title: string | null
-  prompt: string | null
+  body: string | null
   agent_provider: "claude_code" | "codex"
   issue_model: string | null
   type: IssueType
@@ -146,7 +146,7 @@ export type IssueEdit = Pick<
   | "code"
   | "number"
   | "title"
-  | "prompt"
+  | "body"
   | "agent_provider"
   | "issue_model"
   | "type"
@@ -231,7 +231,7 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     code: getDisplayIssueCode(issue),
     number: issue.number,
     title: issue.title,
-    prompt: issue.prompt,
+    body: issue.body,
     agent_provider: issue.agent_provider,
     issue_model: issue.issue_model,
     type: issue.type,
@@ -258,7 +258,7 @@ export function toIssueEdit(issue: IssueEditRow): IssueEdit {
     code: getDisplayIssueCode(issue),
     number: issue.number,
     title: issue.title,
-    prompt: issue.prompt,
+    body: issue.body,
     agent_provider: issue.agent_provider,
     issue_model: issue.issue_model,
     type: issue.type,
