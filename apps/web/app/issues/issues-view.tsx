@@ -56,6 +56,7 @@ import {
 
 import { BulkActionsToolbar } from "./bulk-actions-toolbar"
 import {
+  AgentProviderBadge,
   blockingBadgeStyles,
   blockingIconStyles,
   formatDate,
@@ -298,6 +299,7 @@ function IssueRow({
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <IssueTypeBadge type={issue.type} />
+            <AgentProviderBadge provider={issue.agent_provider} />
             {isBlocked ? (
               <IssueIndicatorBadge
                 label="Blocked"

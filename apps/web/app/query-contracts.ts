@@ -5,6 +5,7 @@ import {
   issueStatusSchema,
   issueTypeSchema,
   hasAttachedIssuePullRequest,
+  type AgentProvider,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
@@ -27,6 +28,7 @@ export const homeIssueSchema = z.object({
   status: issueStatusSchema,
   type: issueTypeSchema,
   priority: issuePrioritySchema,
+  agent_provider: agentProviderSchema,
   created_at: z.string(),
   issue_pull_requests: z.array(
     z.object({
@@ -90,6 +92,7 @@ export type HomeIssue = {
   status: IssueStatus
   type: IssueType
   priority: IssuePriority
+  agent_provider: AgentProvider
   created_at: string
   pullRequests: {
     id: string
@@ -186,6 +189,7 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
     status: issue.status,
     type: issue.type,
     priority: issue.priority,
+    agent_provider: issue.agent_provider,
     created_at: issue.created_at,
     pullRequests: issue.issue_pull_requests
       .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
