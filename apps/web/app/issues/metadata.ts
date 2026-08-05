@@ -25,7 +25,7 @@ export async function generateIssueMetadata(
     system:
       `Generate a short issue tracker title (${MAX_TITLE_LENGTH} characters or fewer; no quotes, markdown, trailing punctuation, or labels like Feature/Bug), classify the issue as feature work or a bug fix, and rate its priority.`,
     prompt: `Generate metadata for this issue prompt:\n\n${prompt}`,
-    maxOutputTokens: 80,
+    maxOutputTokens: 200,
     temperature: 0.2,
   })
 
