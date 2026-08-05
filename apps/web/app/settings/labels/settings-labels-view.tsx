@@ -342,7 +342,8 @@ export function SettingsLabelsView({
               {archiveAssignmentSummary(archiveDialogLabel?.assignment_count)}{" "}
               It will disappear from Settings, assignment autocomplete, and
               filters. Past activity that referenced it stays visible in
-              issue timelines. This can&rsquo;t be undone.
+              issue timelines. Those assignments won&rsquo;t come back, but
+              creating a label with the same name later restores it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {archiveMutation.isError ? (

@@ -37,6 +37,13 @@ function mapLabelError(error: { code?: string; message: string }) {
   if (isUniqueViolation(error)) {
     return new ServiceError("validation", "Label name already exists.")
   }
+  // The `enforce_active_label_limit` trigger raises a check violation when an
+  // insert or restore would push the account past the 100-active cap; the
+  // service pre-checks the count for a friendly error, so this only fires
+  // under a race, but map it so the atomic failure still reads as validation.
+  if (error.code === "23514") {
+    return new ServiceError("validation", "Active label limit reached.")
+  }
   return new ServiceError("internal", error.message)
 }
 
@@ -150,13 +157,92 @@ export async function listLabels(
   return withAssignmentCounts(supabase, sortedLabels)
 }
 
+export type CreateLabelResult = {
+  label: LabelCatalogItem
+  // True when an archived Label of the same name was revived instead of a new
+  // row being inserted (see the create-or-restore contract below).
+  restored: boolean
+}
+
+// Finds the single Label (active or archived) whose case-insensitive name
+// matches, using the `name_key = lower(name)` generated column — the same key
+// the `(user_id, name_key)` unique constraint enforces, so at most one row can
+// match per account.
+async function findLabelByName(
+  supabase: Supabase,
+  userId: string,
+  name: string
+): Promise<{ id: string; state: "active" | "archived" } | null> {
+  const rows = unwrap(
+    await supabase
+      .from("labels")
+      .select("id,state")
+      .eq("user_id", userId)
+      .eq("name_key", name.toLowerCase())
+      .returns<Array<{ id: string; state: "active" | "archived" }>>()
+  )
+
+  return rows[0] ?? null
+}
+
+// Revives an archived Label in place: flips it back to active and clears
+// `archived_at` while leaving its id, display name, and color untouched, so the
+// original identity returns without the caller's supplied casing/color
+// overwriting it. Former issue assignments are intentionally not restored — the
+// `issue_labels` rows were deleted at archive time and stay gone. The single
+// UPDATE is atomic and fires `enforce_active_label_limit`, so a full active
+// catalog rejects the restore without leaving the row half-changed.
+async function restoreArchivedLabel(
+  supabase: Supabase,
+  userId: string,
+  id: string
+): Promise<LabelCatalogItem> {
+  const { data, error } = await supabase
+    .from("labels")
+    .update({
+      state: "active",
+      archived_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .eq("state", "archived")
+    .select("id,name,color,state,created_at,updated_at")
+    .maybeSingle()
+
+  if (error) {
+    throw mapLabelError(error)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Label not found.")
+  }
+
+  return (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
+}
+
+// Creates a Label, or — when an archived Label already reserves the exact
+// trimmed, case-insensitive name — restores that Label instead of inserting a
+// duplicate (the `(user_id, name_key)` unique constraint spans both states, so
+// a plain insert would otherwise collide). A collision with an *active* name is
+// still rejected. Both paths obey the 100-active-Label limit.
 export async function createLabel(
   supabase: Supabase,
   userId: string,
   input: CreateLabelValues
-): Promise<LabelCatalogItem> {
+): Promise<CreateLabelResult> {
+  const existing = await findLabelByName(supabase, userId, input.name)
+
+  if (existing?.state === "active") {
+    throw new ServiceError("validation", "Label name already exists.")
+  }
+
   if ((await countActiveLabels(supabase, userId)) >= ACTIVE_LABEL_LIMIT) {
     throw new ServiceError("validation", "Active label limit reached.")
+  }
+
+  if (existing) {
+    const label = await restoreArchivedLabel(supabase, userId, existing.id)
+    return { label, restored: true }
   }
 
   const color =
@@ -175,7 +261,8 @@ export async function createLabel(
     throw mapLabelError(error)
   }
 
-  return (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
+  const label = (await withAssignmentCounts(supabase, [data as LabelRow]))[0]
+  return { label, restored: false }
 }
 
 export type LabelSnapshot = { id: string; name: string; color: string }
@@ -248,7 +335,9 @@ export type ArchiveLabelResult = {
 // leaves no state changed. That RPC enforces ownership itself via
 // `p_user_id` and is granted to `service_role` only (like the worker
 // lifecycle RPCs), so callers must pass a service-role `Supabase` client.
-// There is no restore path — archival is one-directional by design.
+// Archival has no dedicated restore action; instead, `createLabel` revives an
+// archived label when a new label reuses its exact name — the former issue
+// assignments stripped here stay gone.
 export async function archiveLabel(
   supabase: Supabase,
   userId: string,

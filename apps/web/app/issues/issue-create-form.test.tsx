@@ -415,9 +415,10 @@ describe("IssueCreateForm", () => {
   })
 
   it("creates a label inline, auto-selects it, and shows no color chooser", async () => {
-    vi.mocked(createLabel).mockResolvedValue(
-      label({ id: "label-chore", name: "Chore" })
-    )
+    vi.mocked(createLabel).mockResolvedValue({
+      label: label({ id: "label-chore", name: "Chore" }),
+      restored: false,
+    })
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
     await user.click(screen.getByRole("button", { name: "Labels" }))

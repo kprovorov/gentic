@@ -5,6 +5,7 @@ import { ServiceError } from "./errors"
 import {
   archiveLabel,
   createLabel,
+  ensureLabelsAssignable,
   listArchivedLabelIds,
   listLabels,
   updateLabel,
@@ -130,7 +131,13 @@ class FakeQuery implements PromiseLike<unknown> {
   }
 
   eq(column: string, value: unknown) {
-    this.filters.push((row) => row[column] === value)
+    if (column === "name_key") {
+      // Model the `name_key = lower(name)` generated column so name lookups
+      // match case-insensitively just like the real unique constraint.
+      this.filters.push((row) => String(row.name).toLowerCase() === value)
+    } else {
+      this.filters.push((row) => row[column] === value)
+    }
     return this
   }
 
@@ -294,11 +301,12 @@ test("createLabel chooses from least-used preset colors when color is omitted", 
   const originalRandom = Math.random
   Math.random = () => 0
   try {
-    const label = await createLabel(db as never, "user_alpha", {
+    const { label, restored } = await createLabel(db as never, "user_alpha", {
       name: "Gamma",
     })
 
     assert.equal(label.color, "#B91C1C")
+    assert.equal(restored, false)
   } finally {
     Math.random = originalRandom
   }
@@ -324,6 +332,108 @@ test("createLabel enforces the active catalog limit excluding archived labels", 
       error instanceof ServiceError &&
       error.code === "validation" &&
       /limit/.test(error.message)
+  )
+})
+
+test("createLabel restores an archived label of the same name instead of duplicating", async () => {
+  const db = seededDb()
+  db.issue_events = []
+
+  const { label, restored } = await createLabel(db as never, "user_alpha", {
+    // Different casing and a different color than the archived "Archived"
+    // (#2563EB) — neither should override the revived identity.
+    name: "archived",
+    color: "#7C3AED",
+  })
+
+  assert.equal(restored, true)
+  assert.equal(label.id, "label-archived")
+  assert.equal(label.name, "Archived")
+  assert.equal(label.color, "#2563EB")
+  assert.equal(label.state, "active")
+  assert.equal(label.assignment_count, 0)
+
+  // Restored in place: one row, active again, archived_at cleared.
+  const matches = db.labels.filter((row) => row.name === "Archived")
+  assert.equal(matches.length, 1)
+  assert.equal(matches[0].state, "active")
+  assert.equal(matches[0].archived_at, null)
+  // Restoration is not an assignment change — no timeline events written.
+  assert.equal(db.issue_events.length, 0)
+})
+
+test("createLabel restore does not resurrect the label's former issue assignments", async () => {
+  const db = seededDb()
+  // "beta" carries one assignment (issue-3); archiving strips it, and
+  // recreating the name must not bring the assignment back.
+  await archiveLabel(db as never, "user_alpha", "label-beta")
+  db.issue_events = []
+
+  const { label, restored } = await createLabel(db as never, "user_alpha", {
+    name: "BETA",
+  })
+
+  assert.equal(restored, true)
+  assert.equal(label.id, "label-beta")
+  assert.equal(label.name, "beta")
+  assert.equal(label.assignment_count, 0)
+  assert.equal(
+    db.issue_labels.some((row) => row.label_id === "label-beta"),
+    false
+  )
+  assert.equal(db.issue_events.length, 0)
+})
+
+test("createLabel restore obeys the active limit and fails atomically when full", async () => {
+  const db = new FakeSupabase()
+  for (let index = 0; index < 100; index++) {
+    db.labels.push(activeLabel(`active-${index}`, "user_alpha", `A${index}`))
+  }
+  db.labels.push({
+    ...activeLabel("label-archived", "user_alpha", "Reusable"),
+    state: "archived",
+  })
+
+  await assert.rejects(
+    () => createLabel(db as never, "user_alpha", { name: "reusable" }),
+    (error) =>
+      error instanceof ServiceError &&
+      error.code === "validation" &&
+      /limit/.test(error.message)
+  )
+
+  // A full catalog blocks the restore without half-changing the row.
+  assert.equal(
+    db.labels.find((row) => row.id === "label-archived")?.state,
+    "archived"
+  )
+})
+
+test("listLabels search matching an archived name never restores or mutates it", async () => {
+  const db = seededDb()
+
+  const labels = await listLabels(db as never, "user_alpha", {
+    search: "archived",
+  })
+
+  assert.deepEqual(labels, [])
+  assert.equal(
+    db.labels.find((row) => row.id === "label-archived")?.state,
+    "archived"
+  )
+})
+
+test("ensureLabelsAssignable rejects an archived label id without restoring it", async () => {
+  const db = seededDb()
+
+  await assert.rejects(
+    () =>
+      ensureLabelsAssignable(db as never, "user_alpha", ["label-archived"]),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+  assert.equal(
+    db.labels.find((row) => row.id === "label-archived")?.state,
+    "archived"
   )
 })
 
@@ -427,7 +537,7 @@ test("archiveLabel frees a slot in the 100-active-label limit", async () => {
   }
 
   await archiveLabel(db as never, "user_alpha", "active-0")
-  const label = await createLabel(db as never, "user_alpha", {
+  const { label } = await createLabel(db as never, "user_alpha", {
     name: "Now fits",
     color: "#2563EB",
   })

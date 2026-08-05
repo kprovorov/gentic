@@ -83,6 +83,17 @@ const labelOutputSchema = {
   ),
 }
 
+const createdLabelOutputSchema = {
+  label: labelObjectOutputSchema.describe(
+    "The active account-owned Gentic label that was created or restored."
+  ),
+  restored: z
+    .boolean()
+    .describe(
+      "True when an archived label of the same name was restored (reviving its original id, name casing, and color) instead of a new label being created."
+    ),
+}
+
 const labelsOutputSchema = {
   labels: z
     .array(labelObjectOutputSchema)
@@ -271,7 +282,7 @@ export function registerGenticMcpTools(
     {
       title: "Create Label",
       description:
-        "Create an active account-owned Gentic label. Omitting color chooses one of the least-used preset colors; labels do not change issue workflow state or scheduling.",
+        "Create an active account-owned Gentic label. Omitting color chooses one of the least-used preset colors; labels do not change issue workflow state or scheduling. If an archived label already has the same name (trimmed, case-insensitive), it is restored — reviving its original id, display casing, and color, ignoring any supplied casing or color — and the response reports restored: true.",
       inputSchema: {
         name: labelNameSchema.describe(
           "Display label name, 1-50 characters after trimming."
@@ -280,16 +291,16 @@ export function registerGenticMcpTools(
           .optional()
           .describe("Optional canonical #RRGGBB color."),
       },
-      outputSchema: labelOutputSchema,
+      outputSchema: createdLabelOutputSchema,
     },
     deps.tool(
       async ({ supabase, userId }, input: { name: string; color?: string }) => {
-        const label = await deps.labelsService.createLabel(
+        const { label, restored } = await deps.labelsService.createLabel(
           supabase,
           userId,
           createLabelSchema.parse(input)
         )
-        return { label }
+        return { label, restored }
       }
     )
   )
@@ -334,7 +345,7 @@ export function registerGenticMcpTools(
     {
       title: "Archive Label",
       description:
-        "Archive an active Gentic label using its stable label id. Archiving atomically removes the label from every issue that carries it — any number, including none — and records one grouped removal entry on each affected issue's timeline. Archived labels disappear from list_labels, assignment, and filtering, and stop counting toward the 100-active-label limit; historical timeline entries keep showing them. This replaces permanent deletion and cannot be undone.",
+        "Archive an active Gentic label using its stable label id. Archiving atomically removes the label from every issue that carries it — any number, including none — and records one grouped removal entry on each affected issue's timeline. Archived labels disappear from list_labels, assignment, and filtering, and stop counting toward the 100-active-label limit; historical timeline entries keep showing them. This replaces permanent deletion. Former assignments are not recoverable, but creating a label with the same name later restores this label's original id, casing, and color.",
       inputSchema: {
         id: z
           .string()

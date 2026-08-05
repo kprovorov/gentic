@@ -501,6 +501,39 @@ describe("IssueTimeline", () => {
     expect(activeChip).toHaveClass("text-foreground")
   })
 
+  it("drops archived styling once a label is restored while preserving event text and timestamp", () => {
+    // Same historical event as the archived case, but the label is no longer
+    // archived (restored), so its id is absent from archivedLabelIds. Nothing
+    // about the stored event changes — only the current-state styling reverts.
+    render(
+      <IssueTimeline
+        items={[
+          {
+            kind: "labels-milestone",
+            key: "evt-labels-restored",
+            timestamp: "2026-07-01T00:00:00.000Z",
+            added: [
+              { id: "label-restored", name: "Retired", color: "#FF0000" },
+            ],
+            removed: [],
+          },
+        ]}
+        issueBody={null}
+        attachments={[]}
+        archivedLabelIds={[]}
+      />
+    )
+
+    const restoredChip = screen.getByText("Retired")
+    expect(restoredChip).toBeVisible()
+    expect(restoredChip).not.toHaveClass("line-through")
+    expect(restoredChip).toHaveClass("text-foreground")
+
+    // Event text and timestamp are untouched by the restore.
+    const timestamp = document.querySelector("time")
+    expect(timestamp).toHaveAttribute("datetime", "2026-07-01T00:00:00.000Z")
+  })
+
   it("renders only the added group when nothing was removed", () => {
     render(
       <IssueTimeline
