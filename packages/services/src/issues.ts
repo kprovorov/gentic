@@ -52,7 +52,7 @@ export {
   updateIssueStatus,
   updateIssueStatusByPrUrl,
   updateIssueStatusByPrUrlIfStatus,
-  updatePullRequestState,
+  updatePullRequestStateByPrUrl,
 } from "./issues/workflow"
 export {
   applyPullRequestComment,

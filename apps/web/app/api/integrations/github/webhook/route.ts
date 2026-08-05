@@ -9,6 +9,7 @@ import {
   fetchCheckSuitesForRef,
   fetchPullRequestNumbersForCommit,
   fetchPullRequestReviewComments,
+  resolvePullRequestState,
 } from "@/lib/github-app"
 
 export const runtime = "nodejs"
@@ -17,7 +18,10 @@ type PullRequestPayload = {
   action: string
   pull_request: {
     html_url: string
+    state: string
+    draft: boolean
     merged: boolean
+    merged_at: string | null
   }
 }
 
@@ -213,6 +217,18 @@ async function handlePullRequestEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: PullRequestPayload
 ) {
+  // The payload always carries the PR's full current state regardless of
+  // action, so every delivery is a chance to refresh the cached pill state
+  // (`issue_pull_requests.state`) without ever polling the GitHub API.
+  const prState = resolvePullRequestState(payload.pull_request)
+  if (prState !== "unknown") {
+    await issuesService.updatePullRequestStateByPrUrl(
+      supabase,
+      payload.pull_request.html_url,
+      prState
+    )
+  }
+
   let status: IssueStatus | null = null
 
   if (payload.action === "closed") {
