@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HomeIssue, IssuesData } from "@/app/queries"
+import { queryKeys } from "@/app/query-keys"
 import { NewIssueDialog } from "@/components/new-issue-dialog"
 import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { TooltipProvider } from "@gentic/ui/tooltip"
@@ -47,11 +48,13 @@ vi.mock("./actions", () => ({
 
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
+const toastInfoMock = vi.fn()
 
 vi.mock("sonner", () => ({
   toast: {
     error: (message: string) => toastErrorMock(message),
     success: (message: string) => toastSuccessMock(message),
+    info: (message: string) => toastInfoMock(message),
   },
 }))
 
@@ -578,6 +581,48 @@ describe("IssuesView Label discovery", () => {
     expect(
       screen.getByRole("menuitemcheckbox", { name: "No labels" })
     ).toHaveAttribute("data-state", "checked")
+  })
+
+  it("clears a selected filter Label archived elsewhere and shows a notice", async () => {
+    const taggedId = "11111111-1111-4111-8111-111111111111"
+    const untaggedId = "22222222-2222-4222-8222-222222222222"
+    const initial = baseData([
+      issue({ id: taggedId, title: "Tagged issue", labels: [alpha] }),
+      issue({ id: untaggedId, title: "Untagged issue" }),
+    ])
+    const { user, queryClient } = renderIssuesView({ data: initial })
+
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.click(screen.getByRole("menuitem", { name: "Labels" }))
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Alpha" }))
+    await user.keyboard("{Escape}")
+
+    // Filter is active: only the tagged issue shows.
+    expect(screen.getByText("Tagged issue")).toBeVisible()
+    expect(screen.queryByText("Untagged issue")).not.toBeInTheDocument()
+
+    // Realtime archival elsewhere removes Alpha from the active catalog and its
+    // assignments. Feeding that refetch through the query cache should prune the
+    // now-stale filter and surface a brief, named notice.
+    act(() => {
+      queryClient.setQueryData(queryKeys.issues, {
+        ...initial,
+        labels: [],
+        issues: [
+          issue({ id: taggedId, title: "Tagged issue", labels: [] }),
+          issue({ id: untaggedId, title: "Untagged issue" }),
+        ],
+      })
+    })
+
+    await waitFor(() => {
+      expect(toastInfoMock).toHaveBeenCalledTimes(1)
+    })
+    expect(toastInfoMock.mock.calls[0][0]).toContain("Alpha")
+    // Filter cleared: both issues are visible again, and no notice repeats.
+    expect(screen.getByText("Tagged issue")).toBeVisible()
+    expect(screen.getByText("Untagged issue")).toBeVisible()
+    expect(toastInfoMock).toHaveBeenCalledTimes(1)
   })
 })
 

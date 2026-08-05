@@ -16,6 +16,10 @@ vi.mock("@/app/settings/actions", () => ({
     .mockResolvedValue({ archived: true, affected_issue_count: 0 }),
 }))
 
+vi.mock("@/components/realtime-refresh", () => ({
+  RealtimeRefresh: () => null,
+}))
+
 function renderLabelsView(data: SettingsLabelsData = labelsData()) {
   const queryClient = new QueryClient({
     defaultOptions: {

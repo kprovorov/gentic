@@ -8,7 +8,9 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { NewIssueDialog } from "@/components/new-issue-dialog"
 import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { PublicHeader } from "@/components/public-header"
+import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { SiteHeader } from "@/components/site-header"
+import { queryKeys } from "./query-keys"
 import { SidebarInset, SidebarProvider } from "@gentic/ui/sidebar"
 import { ThemeProvider } from "@gentic/ui/theme-provider"
 import { Toaster } from "@gentic/ui/sonner"
@@ -81,6 +83,16 @@ export default function RootLayout({
                       </SidebarInset>
                     </SidebarProvider>
                     <NewIssueDialog />
+                    {/* Keep every label picker's catalog (the globally
+                        available new-issue dialog, the issue detail rail, and
+                        the standalone create page) live across tabs. Definition
+                        changes land on the `labels` table; RLS scopes the
+                        subscription to this account. */}
+                    <RealtimeRefresh
+                      channelName="label-catalog"
+                      tables={["labels"]}
+                      queryKey={queryKeys.settingsLabelsRoot}
+                    />
                   </NewIssueDialogProvider>
                 </Show>
                 <Show when="signed-out">

@@ -2,6 +2,9 @@ export const queryKeys = {
   home: ["home"] as const,
   issues: ["issues"] as const,
   settings: ["settings"] as const,
+  // Prefix shared by every `settingsLabels(search)` variant. Invalidating this
+  // root refreshes the whole label catalog (all searches, every picker) at once.
+  settingsLabelsRoot: ["settings", "labels"] as const,
   settingsLabels: (search = "") => ["settings", "labels", search] as const,
   settingsWorkers: ["settings", "workers"] as const,
   newIssue: ["issues", "new"] as const,
