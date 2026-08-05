@@ -7,7 +7,6 @@ import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
 import * as workersService from "@gentic/services/workers"
 import { ServiceError } from "@gentic/services/errors"
-import type { Supabase } from "@gentic/services/types"
 import {
   chatMessageSchema,
   issueEventSchema,
@@ -37,7 +36,6 @@ import {
 } from "./settings/workers-read-model"
 import {
   fetchInstallationRepositories,
-  fetchPullRequestState,
   type GithubPullRequestState,
 } from "@/lib/github-app"
 
@@ -130,90 +128,26 @@ async function resolveContext(context?: AuthenticatedContext) {
   return context ?? getAuthenticatedContext()
 }
 
-function parseGithubPullRequestUrl(url: string) {
-  try {
-    const [, owner, repo, resource, number] = new URL(url).pathname.split("/")
-    if (owner && repo && resource === "pull" && number) {
-      const pullNumber = Number.parseInt(number, 10)
-      if (Number.isInteger(pullNumber) && pullNumber > 0) {
-        return { owner, repo, pullNumber }
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
-
 // Persisted state (`issue_pull_requests.state`) is a plain `text` column, so
 // narrow it back to `GithubPullRequestState` rather than trusting it blindly.
-function normalizePersistedState(
-  state: string | null | undefined
-): GithubPullRequestState | undefined {
-  return state === "draft" ||
-    state === "open" ||
-    state === "merged" ||
-    state === "closed" ||
-    state === "queued"
-    ? state
-    : undefined
-}
-
-// The live GitHub API call is the source of truth, but it's best-effort: a
-// rate limit, network blip, or missing GitHub App installation throws or is
-// skipped entirely. Rather than surface "unknown" on every such hiccup, fall
-// back to the last state we successfully resolved, and write back any newly
-// resolved state so future failures have a fresher fallback to use.
-async function attachPullRequestStates<
-  T extends { id: string; url: string; state?: string | null },
+// The GitHub webhook route keeps this column live on every `pull_request`
+// event, so rendering just reads it — no per-render GitHub API call.
+function attachPullRequestStates<
+  T extends { url: string; state?: string | null }
 >(
-  supabase: Supabase,
-  pullRequests: T[],
-  installationId: string | null | undefined
-): Promise<(Omit<T, "state"> & { state?: GithubPullRequestState })[]> {
-  return Promise.all(
-    pullRequests.map(async (pullRequest) => {
-      const persistedState = normalizePersistedState(pullRequest.state)
-
-      if (!installationId) {
-        return { ...pullRequest, state: persistedState }
-      }
-
-      const parsed = parseGithubPullRequestUrl(pullRequest.url)
-      if (!parsed) {
-        return { ...pullRequest, state: persistedState }
-      }
-
-      try {
-        const state = await fetchPullRequestState(
-          installationId,
-          parsed.owner,
-          parsed.repo,
-          parsed.pullNumber
-        )
-
-        if (state !== "unknown" && state !== persistedState) {
-          issuesService
-            .updatePullRequestState(supabase, pullRequest.id, state)
-            .catch((error) => {
-              console.error(
-                "[issue-detail] failed to persist pull request state:",
-                error
-              )
-            })
-        }
-
-        return { ...pullRequest, state }
-      } catch (error) {
-        console.error(
-          "[issue-detail] failed to fetch pull request state:",
-          error
-        )
-        return { ...pullRequest, state: persistedState }
-      }
-    })
-  )
+  pullRequests: T[]
+): (Omit<T, "state"> & { state?: GithubPullRequestState })[] {
+  return pullRequests.map((pullRequest) => ({
+    ...pullRequest,
+    state:
+      pullRequest.state === "draft" ||
+      pullRequest.state === "open" ||
+      pullRequest.state === "merged" ||
+      pullRequest.state === "closed" ||
+      pullRequest.state === "queued"
+        ? pullRequest.state
+        : undefined,
+  }))
 }
 
 export async function getHomeData(
@@ -236,23 +170,15 @@ export async function getHomeData(
 
   const parsedIssues = z.array(homeIssueSchema).parse(issues).map(toHomeIssue)
   const issueIds = parsedIssues.map((issue) => issue.id)
-  const [blockedIssueIds, blockingIssueIds, githubIntegration] =
-    await Promise.all([
-      issuesService.listBlockedIssueIds(supabase, issueIds),
-      issuesService.listBlockingIssueIds(supabase, issueIds),
-      githubIntegrationsService.getGithubIntegration(supabase, userId),
-    ])
+  const [blockedIssueIds, blockingIssueIds] = await Promise.all([
+    issuesService.listBlockedIssueIds(supabase, issueIds),
+    issuesService.listBlockingIssueIds(supabase, issueIds),
+  ])
 
-  const issuesWithPullRequestStates = await Promise.all(
-    parsedIssues.map(async (issue) => ({
-      ...issue,
-      pullRequests: await attachPullRequestStates(
-        supabase,
-        issue.pullRequests,
-        githubIntegration?.installation_id
-      ),
-    }))
-  )
+  const issuesWithPullRequestStates = parsedIssues.map((issue) => ({
+    ...issue,
+    pullRequests: attachPullRequestStates(issue.pullRequests),
+  }))
 
   return {
     issues: issuesWithPullRequestStates,
@@ -490,7 +416,6 @@ async function getIssueDetailDataForIssue(
     { data: automaticPrRequestRows, error: automaticPrRequestsError },
     relations,
     relationCandidates,
-    githubIntegration,
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -519,7 +444,6 @@ async function getIssueDetailDataForIssue(
       .in("status", ["pending", "claimed"]),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
-    githubIntegrationsService.getGithubIntegration(supabase, userId),
   ])
 
   if (messagesError) {
@@ -567,11 +491,7 @@ async function getIssueDetailDataForIssue(
     issue: parsedIssue,
     messages: messagesWithAttachments,
     attachments,
-    pullRequests: await attachPullRequestStates(
-      supabase,
-      pullRequests,
-      githubIntegration?.installation_id
-    ),
+    pullRequests: attachPullRequestStates(pullRequests),
     automaticPrPublishingInProgress: (automaticPrRequestRows ?? []).length > 0,
     relations,
     relationCandidates,
