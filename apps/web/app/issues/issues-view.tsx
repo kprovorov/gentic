@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
@@ -55,6 +55,7 @@ import {
 } from "@gentic/validators/issues"
 
 import { BulkActionsToolbar } from "./bulk-actions-toolbar"
+import { IssueLabelChips } from "./issue-label-chips"
 import {
   AgentProviderBadge,
   blockingBadgeStyles,
@@ -79,7 +80,8 @@ import {
 type IssuesViewMode = "list" | "table"
 type BlockingFilter =
   "all" | "blocked" | "non-blocked" | "blocking" | "non-blocking"
-type FilterSection = "status" | "priority" | "type" | "blocking" | "project"
+type FilterSection =
+  "status" | "priority" | "type" | "labels" | "blocking" | "project"
 
 const pageSize = 20
 
@@ -143,6 +145,7 @@ function matchesIssue(issue: HomeIssue, filterValue: string) {
     issue.title,
     issue.projects?.name,
     issue.projects?.repo,
+    ...issue.labels.map((label) => label.name),
   ]
     .filter(Boolean)
     .join(" ")
@@ -251,12 +254,16 @@ function IssueRow({
   isBlocking,
   isSelected,
   onSelectedChange,
+  selectedLabelIds,
+  onLabelSelect,
 }: {
   issue: HomeIssue
   isBlocked: boolean
   isBlocking: boolean
   isSelected: boolean
   onSelectedChange: (selected: boolean) => void
+  selectedLabelIds: Set<string>
+  onLabelSelect: (labelId: string) => void
 }) {
   const issueHref = getIssueHref(issue) ?? "/issues"
 
@@ -322,6 +329,11 @@ function IssueRow({
             ) : null}
             <PullRequestPills pullRequests={issue.pullRequests} />
             <IssuePriorityMenu issue={issue} showLabel />
+            <IssueLabelChips
+              labels={issue.labels}
+              selectedLabelIds={selectedLabelIds}
+              onLabelSelect={onLabelSelect}
+            />
           </div>
         </div>
         <div className="min-w-0">
@@ -347,6 +359,8 @@ function IssuesTableView({
   filterKey,
   rowSelection,
   onRowSelectionChange,
+  selectedLabelIds,
+  onLabelSelect,
 }: {
   issues: HomeIssue[]
   blockedIssueIds: Set<string>
@@ -354,10 +368,18 @@ function IssuesTableView({
   filterKey: string
   rowSelection: RowSelectionState
   onRowSelectionChange: (selection: RowSelectionState) => void
+  selectedLabelIds: Set<string>
+  onLabelSelect: (labelId: string) => void
 }) {
   const columns = useMemo(
-    () => getIssuesColumns(blockedIssueIds, blockingIssueIds),
-    [blockedIssueIds, blockingIssueIds]
+    () =>
+      getIssuesColumns(
+        blockedIssueIds,
+        blockingIssueIds,
+        selectedLabelIds,
+        onLabelSelect
+      ),
+    [blockedIssueIds, blockingIssueIds, selectedLabelIds, onLabelSelect]
   )
   const [sorting, setSorting] = useState<SortingState>([
     { id: "status", desc: false },
@@ -478,6 +500,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
   const [projectFilter, setProjectFilter] = useState<Set<string>>(
     () => new Set()
   )
+  const [labelFilter, setLabelFilter] = useState<Set<string>>(() => new Set())
+  const [unlabeledFilter, setUnlabeledFilter] = useState(false)
   const [expandedFilterSection, setExpandedFilterSection] =
     useState<FilterSection | null>(null)
   const activeFilterCount =
@@ -485,7 +509,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     priorityFilter.size +
     typeFilter.size +
     (blockingFilter !== "all" ? 1 : 0) +
-    projectFilter.size
+    projectFilter.size +
+    labelFilter.size +
+    (unlabeledFilter ? 1 : 0)
   const hasActiveFilters = globalFilter.length > 0 || activeFilterCount > 0
   const availableProjects = useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>()
@@ -528,6 +554,11 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
             projectFilter.size === 0 ||
             (issue.projects ? projectFilter.has(issue.projects.id) : false)
         )
+        .filter((issue) => {
+          if (unlabeledFilter) return issue.labels.length === 0
+          const assignedIds = new Set(issue.labels.map((label) => label.id))
+          return Array.from(labelFilter).every((id) => assignedIds.has(id))
+        })
         .toSorted(compareIssues),
     [
       data.issues,
@@ -539,6 +570,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
       blockedIssueIds,
       blockingIssueIds,
       projectFilter,
+      labelFilter,
+      unlabeledFilter,
     ]
   )
   const filterKey = [
@@ -548,6 +581,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     Array.from(priorityFilter).sort().join(","),
     blockingFilter,
     Array.from(projectFilter).sort().join(","),
+    Array.from(labelFilter).sort().join(","),
+    unlabeledFilter ? "unlabeled" : "",
   ].join("|")
   const pageCount = Math.max(1, Math.ceil(filteredIssues.length / pageSize))
   const safePageIndex = Math.min(pageIndex, pageCount - 1)
@@ -630,6 +665,28 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setRowSelection({})
   }
 
+  function toggleLabelFilter(labelId: string) {
+    setLabelFilter((current) => toggleInSet(current, labelId))
+    setUnlabeledFilter(false)
+    setPageIndex(0)
+    setRowSelection({})
+  }
+
+  const addLabelFilter = useCallback((labelId: string) => {
+    setLabelFilter((current) => new Set(current).add(labelId))
+    setUnlabeledFilter(false)
+    setPageIndex(0)
+    setRowSelection({})
+  }, [])
+
+  function toggleUnlabeledFilter() {
+    const next = !unlabeledFilter
+    setUnlabeledFilter(next)
+    if (next) setLabelFilter(new Set())
+    setPageIndex(0)
+    setRowSelection({})
+  }
+
   function updateBlockingFilter(value: BlockingFilter) {
     setBlockingFilter(value)
     setPageIndex(0)
@@ -666,6 +723,13 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setRowSelection({})
   }
 
+  function clearLabelFilter() {
+    setLabelFilter(new Set())
+    setUnlabeledFilter(false)
+    setPageIndex(0)
+    setRowSelection({})
+  }
+
   function clearFilters() {
     setGlobalFilter("")
     setStatusFilter(new Set())
@@ -673,6 +737,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     setPriorityFilter(new Set())
     setBlockingFilter("all")
     setProjectFilter(new Set())
+    setLabelFilter(new Set())
+    setUnlabeledFilter(false)
     setPageIndex(0)
     setRowSelection({})
   }
@@ -744,7 +810,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
     <div className="bg-background px-4 py-8 md:px-8">
       <RealtimeRefresh
         channelName="issues-list"
-        tables={["issues", "issue_relations"]}
+        tables={["issues", "issue_relations", "issue_labels", "labels"]}
         queryKey={queryKeys.issues}
       />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -838,6 +904,50 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                           </DropdownMenuCheckboxItem>
                         )
                       })}
+                    </FilterMenuSection>
+                    <DropdownMenuSeparator />
+                    <FilterMenuSection
+                      label="Labels"
+                      badge={
+                        labelFilter.size > 0 || unlabeledFilter ? (
+                          <span className={activeFilterCountBadgeStyles}>
+                            {unlabeledFilter ? 1 : labelFilter.size}
+                          </span>
+                        ) : null
+                      }
+                      expanded={expandedFilterSection === "labels"}
+                      onToggle={() => toggleFilterSection("labels")}
+                    >
+                      {labelFilter.size > 0 || unlabeledFilter ? (
+                        <DropdownMenuItem onSelect={clearLabelFilter}>
+                          Clear filter
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuCheckboxItem
+                        checked={unlabeledFilter}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={toggleUnlabeledFilter}
+                      >
+                        No labels
+                      </DropdownMenuCheckboxItem>
+                      {data.labels.map((label) => (
+                        <DropdownMenuCheckboxItem
+                          key={label.id}
+                          checked={labelFilter.has(label.id)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() => toggleLabelFilter(label.id)}
+                          className="gap-2"
+                        >
+                          <span
+                            className="size-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: label.color }}
+                            aria-hidden="true"
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {label.name}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      ))}
                     </FilterMenuSection>
                     <DropdownMenuSeparator />
                     <FilterMenuSection
@@ -957,9 +1067,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                             key={option}
                             checked={blockingFilter === option}
                             onSelect={(event) => event.preventDefault()}
-                            onCheckedChange={() =>
-                              updateBlockingFilter(option)
-                            }
+                            onCheckedChange={() => updateBlockingFilter(option)}
                             className="gap-3"
                           >
                             <OptionIcon
@@ -1046,6 +1154,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                 filterKey={filterKey}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
+                selectedLabelIds={labelFilter}
+                onLabelSelect={addLabelFilter}
               />
             ) : pagedIssues.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -1137,6 +1247,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                                 onSelectedChange={(selected) =>
                                   toggleIssueSelected(issue.id, selected)
                                 }
+                                selectedLabelIds={labelFilter}
+                                onLabelSelect={addLabelFilter}
                               />
                             ))}
                           </div>

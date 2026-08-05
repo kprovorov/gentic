@@ -40,6 +40,44 @@ const issueRow = {
       state: "open",
     },
   ],
+  issue_labels: [
+    {
+      labels: {
+        id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3",
+        name: "zeta",
+        color: "#2563EB",
+        state: "active",
+      },
+    },
+    {
+      labels: {
+        id: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4",
+        name: "Alpha",
+        color: "#DC2626",
+        state: "active",
+      },
+    },
+    {
+      labels: {
+        id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c5",
+        name: "Archived",
+        color: "#111111",
+        state: "archived",
+      },
+    },
+  ],
+  labels: [
+    {
+      id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3",
+      name: "zeta",
+      color: "#2563EB",
+    },
+    {
+      id: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4",
+      name: "Alpha",
+      color: "#DC2626",
+    },
+  ],
   created_at: "2026-07-29T12:00:00.000Z",
   updated_at: "2026-07-29T12:05:00.000Z",
   projects: {
@@ -50,11 +88,15 @@ const issueRow = {
   },
 }
 
-test("home issue query contract parses and maps priority", () => {
+test("home issue query contract maps active Labels alphabetically", () => {
   const issue = toHomeIssue(homeIssueSchema.parse(issueRow))
 
   assert.equal(issue.priority, "urgent")
   assert.equal(issue.code, "GEN-7")
+  assert.deepEqual(
+    issue.labels.map((label) => label.name),
+    ["Alpha", "zeta"]
+  )
   assert.deepEqual(issue.pullRequests, [
     {
       id: "pull-request-2",
@@ -69,11 +111,15 @@ test("home issue query contract parses and maps priority", () => {
   ])
 })
 
-test("detail issue query contract parses and maps priority", () => {
+test("detail issue query contract maps assigned Labels alphabetically", () => {
   const issue = toIssueDetail(issueDetailSchema.parse(issueRow))
 
   assert.equal(issue.priority, "urgent")
   assert.equal(issue.code, "GEN-7")
+  assert.deepEqual(
+    issue.labels.map((label) => label.name),
+    ["Alpha", "zeta"]
+  )
 })
 
 test("edit issue query contract parses and maps priority", () => {
