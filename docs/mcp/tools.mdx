@@ -147,7 +147,7 @@ Lists issues owned by the authenticated account. Filter by project to narrow res
 
 ### `get_issue`
 
-Returns full details for a single issue, including its current status, priority, body, and agent configuration.
+Returns full details for a single issue, including its current status, priority, body, agent configuration, and the metadata of its active durable Issue Attachments.
 
 <ParamField body="code" type="string" required>
   The issue's human-readable Issue Code such as `GEN-123`, built from the
@@ -157,6 +157,44 @@ Returns full details for a single issue, including its current status, priority,
 <Expandable title="Output fields">
   <ResponseField name="issue" type="object">
     The matching issue object.
+  </ResponseField>
+  <ResponseField name="issue.attachments" type="array">
+    Active durable Issue Attachments, oldest first, as metadata only — `id`,
+    `file_name`, `content_type`, and `size_bytes`. Message Attachments are
+    excluded, and the file bytes are never inlined. Pass an attachment `id` to
+    [`download_attachment`](#download_attachment) to fetch the file.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `download_attachment`
+
+Returns a fresh, short-lived signed download URL for one active durable Issue Attachment. The response carries a URL to fetch the bytes, never the bytes themselves. Message Attachments, deleted or incomplete uploads, and attachments on other accounts' issues are all rejected as not found without leaking storage details.
+
+<ParamField body="id" type="string (uuid)" required>
+  The Issue Attachment ID, taken from `issue.attachments` in the
+  [`get_issue`](#get_issue) response.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="id" type="string (uuid)">
+    The attachment ID that was passed in.
+  </ResponseField>
+  <ResponseField name="file_name" type="string">
+    The attachment's original file name.
+  </ResponseField>
+  <ResponseField name="content_type" type="string | null">
+    The MIME content type, or `null` when it is unknown.
+  </ResponseField>
+  <ResponseField name="size_bytes" type="number | null">
+    The file size in bytes, or `null` when it is unknown.
+  </ResponseField>
+  <ResponseField name="url" type="string">
+    A fresh, short-lived signed URL. Fetch it directly to download the file.
+  </ResponseField>
+  <ResponseField name="expires_in_seconds" type="number">
+    Seconds until the signed URL expires.
   </ResponseField>
 </Expandable>
 

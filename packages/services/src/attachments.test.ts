@@ -3,14 +3,18 @@ import test from "node:test"
 
 import { ServiceError } from "./errors"
 import {
+  ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS,
   attachmentOwnerColumns,
   attachmentOwnerForMessage,
+  createIssueAttachmentDownloadUrl,
   groupMessageAttachments,
+  listIssueAttachments,
   MAX_ATTACHMENT_BYTES,
   rollbackMessageAttachmentUpload,
   selectIssueAttachments,
   validateAttachmentBatch,
 } from "./attachments"
+import type { Supabase } from "./types"
 
 type AttachmentRow = {
   id: string
@@ -140,6 +144,237 @@ test("validateAttachmentBatch enforces per-file and aggregate limits", () => {
       error instanceof ServiceError &&
       error.code === "validation" &&
       error.message.includes("cannot exceed 50MB")
+  )
+})
+
+type DbRow = Record<string, unknown>
+
+function column(row: DbRow, name: string): unknown {
+  if (name === "projects.user_id") {
+    return (row.projects as DbRow | undefined)?.user_id
+  }
+  return row[name]
+}
+
+// A minimal PostgREST stand-in: enough of the query builder for the two
+// attachment queries and the ownership join they lean on.
+class FakeQuery {
+  private readonly predicates: Array<(row: DbRow) => boolean> = []
+
+  constructor(private readonly rows: DbRow[]) {}
+
+  select() {
+    return this
+  }
+
+  order() {
+    return this
+  }
+
+  eq(name: string, value: unknown) {
+    this.predicates.push((row) => column(row, name) === value)
+    return this
+  }
+
+  is(name: string, value: unknown) {
+    this.predicates.push((row) => column(row, name) === value)
+    return this
+  }
+
+  not(name: string, _op: string, value: unknown) {
+    this.predicates.push((row) => column(row, name) !== value)
+    return this
+  }
+
+  private matched() {
+    return this.rows.filter((row) => this.predicates.every((p) => p(row)))
+  }
+
+  async maybeSingle() {
+    return { data: this.matched()[0] ?? null, error: null }
+  }
+
+  then<T>(
+    onfulfilled: (value: { data: DbRow[]; error: null }) => T | PromiseLike<T>
+  ) {
+    return Promise.resolve({ data: this.matched(), error: null }).then(
+      onfulfilled
+    )
+  }
+}
+
+type SignResult = { data: { signedUrl: string } | null; error: { message: string } | null }
+
+function fakeSupabase(
+  tables: { attachments?: DbRow[]; issues?: DbRow[] },
+  sign: (path: string) => SignResult = (path) => ({
+    data: { signedUrl: `https://storage.example/${path}?token=t` },
+    error: null,
+  }),
+  signCalls: string[] = []
+): Supabase {
+  return {
+    from(table: "attachments" | "issues") {
+      return new FakeQuery(tables[table] ?? [])
+    },
+    storage: {
+      from() {
+        return {
+          createSignedUrl: async (path: string) => {
+            signCalls.push(path)
+            return sign(path)
+          },
+        }
+      },
+    },
+  } as unknown as Supabase
+}
+
+const activeIssueAttachment: DbRow = {
+  id: "att-active",
+  issue_id: "issue-1",
+  kind: "issue",
+  message_id: null,
+  file_name: "spec.pdf",
+  content_type: "application/pdf",
+  size_bytes: 2048,
+  storage_path: "issue-1/att-active-spec.pdf",
+  upload_completed_at: "2026-08-05T12:00:00.000Z",
+  deleted_at: null,
+}
+
+test("listIssueAttachments returns only active Issue Attachment metadata for the issue", async () => {
+  const supabase = fakeSupabase({
+    attachments: [
+      activeIssueAttachment,
+      // Message Attachment — excluded by kind.
+      {
+        ...activeIssueAttachment,
+        id: "att-message",
+        kind: "message",
+        message_id: "message-1",
+      },
+      // Deleted Issue Attachment — excluded.
+      {
+        ...activeIssueAttachment,
+        id: "att-deleted",
+        deleted_at: "2026-08-05T12:30:00.000Z",
+      },
+      // Incomplete upload — excluded.
+      {
+        ...activeIssueAttachment,
+        id: "att-incomplete",
+        upload_completed_at: null,
+      },
+      // Belongs to another issue — excluded.
+      { ...activeIssueAttachment, id: "att-other", issue_id: "issue-2" },
+    ],
+  })
+
+  assert.deepEqual(await listIssueAttachments(supabase, "issue-1"), [
+    {
+      id: "att-active",
+      file_name: "spec.pdf",
+      content_type: "application/pdf",
+      size_bytes: 2048,
+    },
+  ])
+})
+
+test("createIssueAttachmentDownloadUrl signs an owned active Issue Attachment", async () => {
+  const signCalls: string[] = []
+  const supabase = fakeSupabase(
+    {
+      attachments: [activeIssueAttachment],
+      issues: [{ id: "issue-1", projects: { user_id: "user-1" } }],
+    },
+    undefined,
+    signCalls
+  )
+
+  assert.deepEqual(
+    await createIssueAttachmentDownloadUrl(supabase, "user-1", "att-active"),
+    {
+      id: "att-active",
+      file_name: "spec.pdf",
+      content_type: "application/pdf",
+      size_bytes: 2048,
+      url: "https://storage.example/issue-1/att-active-spec.pdf?token=t",
+      expires_in_seconds: ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS,
+    }
+  )
+  assert.deepEqual(signCalls, ["issue-1/att-active-spec.pdf"])
+})
+
+test("createIssueAttachmentDownloadUrl hides foreign, deleted, incomplete, and Message Attachment ids behind one not-found error", async () => {
+  const owner = { id: "issue-1", projects: { user_id: "user-1" } }
+
+  const cases: Array<{ label: string; attachments: DbRow[]; issues: DbRow[] }> =
+    [
+      {
+        label: "foreign issue",
+        attachments: [activeIssueAttachment],
+        issues: [{ id: "issue-1", projects: { user_id: "someone-else" } }],
+      },
+      {
+        label: "deleted",
+        attachments: [
+          {
+            ...activeIssueAttachment,
+            deleted_at: "2026-08-05T12:30:00.000Z",
+          },
+        ],
+        issues: [owner],
+      },
+      {
+        label: "incomplete upload",
+        attachments: [{ ...activeIssueAttachment, upload_completed_at: null }],
+        issues: [owner],
+      },
+      {
+        label: "Message Attachment",
+        attachments: [
+          {
+            ...activeIssueAttachment,
+            kind: "message",
+            message_id: "message-1",
+          },
+        ],
+        issues: [owner],
+      },
+      { label: "unknown id", attachments: [], issues: [owner] },
+    ]
+
+  for (const { label, attachments, issues } of cases) {
+    const signCalls: string[] = []
+    const supabase = fakeSupabase({ attachments, issues }, undefined, signCalls)
+
+    await assert.rejects(
+      () => createIssueAttachmentDownloadUrl(supabase, "user-1", "att-active"),
+      (error: unknown) =>
+        error instanceof ServiceError &&
+        error.code === "not_found" &&
+        error.message === "Attachment not found",
+      label
+    )
+    // Nothing is signed for a rejected request, so no storage detail leaks.
+    assert.deepEqual(signCalls, [], label)
+  }
+})
+
+test("createIssueAttachmentDownloadUrl surfaces a signing failure as an internal error", async () => {
+  const supabase = fakeSupabase(
+    {
+      attachments: [activeIssueAttachment],
+      issues: [{ id: "issue-1", projects: { user_id: "user-1" } }],
+    },
+    () => ({ data: null, error: { message: "storage unavailable" } })
+  )
+
+  await assert.rejects(
+    () => createIssueAttachmentDownloadUrl(supabase, "user-1", "att-active"),
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "internal"
   )
 })
 
