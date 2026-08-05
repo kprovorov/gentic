@@ -412,6 +412,13 @@ export async function processIssue(
       agentProvider: issue.agentProvider,
       issueModel: issue.issueModel,
       cwd: dir,
+      // Every managed session — fresh or resumed — talks to the owner's
+      // Gentic MCP endpoint with this worker's own credential. No preflight:
+      // an unreachable endpoint surfaces through the normal run-failed path.
+      genticMcp: {
+        apiUrl: config.GENTIC_API_URL,
+        credential: config.GENTIC_WORKER_CREDENTIAL,
+      },
       resumeSessionId: issue.sessionId,
       existingPrUrl: issue.prUrl,
       existingPrCheckedOut,

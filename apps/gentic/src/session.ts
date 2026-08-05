@@ -11,9 +11,11 @@ import {
   type ActiveSession,
   type ClientContext,
   type ContentBlock,
+  type McpServer,
   type NewSessionResponse,
   type NewSessionRequest,
   type PermissionOption,
+  type ResumeSessionRequest,
   type SessionUpdate,
   type ToolCallContent,
   type ToolCallStatus,
@@ -23,6 +25,7 @@ import {
 
 import type { AgentApi } from "./api.js"
 import { logError } from "./log.js"
+import { withGenticMcpServer, type GenticMcpAccess } from "./mcp.js"
 import {
   StreamingAssistantMessage,
   publishStructuredMessage,
@@ -97,6 +100,12 @@ export interface RunSessionInput {
    * resumes with its prior conversation context instead of starting fresh.
    */
   resumeSessionId?: string | null
+  /**
+   * Credentials for the owner's Gentic MCP endpoint, injected into every
+   * session so the coding agent can read and update its own issue tracker.
+   * Omitted only when the worker has no usable connection details.
+   */
+  genticMcp?: GenticMcpAccess | null
   /** Existing pull request for the issue, if a previous run already opened one. */
   existingPrUrl?: string | null
   /** Whether the existing pull request branch is checked out in `cwd`. */
@@ -155,7 +164,13 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
 
       const session =
         agent.provider === "codex" && input.resumeSessionId
-          ? await resumeSession(ctx, input.resumeSessionId, input.cwd)
+          ? await resumeSession(
+              ctx,
+              buildResumeSessionRequest({
+                ...input,
+                sessionId: input.resumeSessionId,
+              })
+            )
           : await ctx.buildSession(agent.newSession(input)).start()
       await input.onSessionId(session.sessionId)
 
@@ -197,13 +212,44 @@ function normalizePromptDelivery(
   return { prompt: next, messageIds: [] }
 }
 
+/** Fields a new/resumed session request is built from. */
+export type SessionSetupInput = Pick<
+  RunSessionInput,
+  "cwd" | "issueModel" | "resumeSessionId" | "genticMcp"
+>
+
 interface AgentProviderConfig {
   provider: AgentProvider
   entry: AgentEntry
   env: NodeJS.ProcessEnv
-  newSession: (
-    input: Pick<RunSessionInput, "cwd" | "issueModel" | "resumeSessionId">
-  ) => NewSessionRequest
+  newSession: (input: SessionSetupInput) => NewSessionRequest
+}
+
+/**
+ * MCP servers attached to a session: the authenticated Gentic endpoint, added
+ * to whatever the session already carries. Both ACP agents merge these into
+ * the user's own MCP configuration instead of replacing it.
+ */
+function sessionMcpServers(
+  input: Pick<SessionSetupInput, "genticMcp">,
+  servers: McpServer[] = []
+): McpServer[] {
+  return withGenticMcpServer(servers, input.genticMcp)
+}
+
+/**
+ * Resume request for a provider that reconnects to its own prior session
+ * (Codex). It has to re-declare the MCP servers, because the resumed session
+ * is configured from this request rather than from the original `session/new`.
+ */
+export function buildResumeSessionRequest(
+  input: SessionSetupInput & { sessionId: string }
+): ResumeSessionRequest {
+  return {
+    sessionId: input.sessionId,
+    cwd: input.cwd,
+    mcpServers: sessionMcpServers(input),
+  }
 }
 
 export function getAgentProviderConfig(
@@ -237,7 +283,7 @@ export function getAgentProviderConfig(
       },
       newSession: (input) => ({
         cwd: input.cwd,
-        mcpServers: [],
+        mcpServers: sessionMcpServers(input),
       }),
     }
   }
@@ -266,7 +312,9 @@ export function getAgentProviderConfig(
     },
     newSession: (input) => ({
       cwd: input.cwd,
-      mcpServers: [],
+      // Claude Code resumes through `session/new` with a `resume` option, so
+      // this single request covers both the fresh and the resumed path.
+      mcpServers: sessionMcpServers(input),
       _meta: {
         claudeCode: {
           options: {
@@ -296,21 +344,19 @@ function mergeCodexConfigModel(issueModel: string): string {
 
 async function resumeSession(
   ctx: ClientContext,
-  sessionId: string,
-  cwd: string
+  request: ResumeSessionRequest
 ): Promise<ActiveSession> {
-  const response = (await ctx.request("session/resume", {
-    sessionId,
-    cwd,
-    mcpServers: [],
-  })) as ResumeSessionResponse
+  const response = (await ctx.request(
+    "session/resume",
+    request
+  )) as ResumeSessionResponse
 
   const attachable = ctx as unknown as {
     attachSession(response: NewSessionResponse): ActiveSession
   }
 
   return attachable.attachSession({
-    sessionId,
+    sessionId: request.sessionId,
     ...response,
   } satisfies NewSessionResponse)
 }

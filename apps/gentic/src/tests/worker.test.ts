@@ -159,6 +159,57 @@ test("resumed runs reuse local checkout and existing pull request context", asyn
   })
 })
 
+test("fresh and resumed runs both hand the agent authenticated Gentic MCP access", async () => {
+  for (const sessionId of [null, "existing-session"]) {
+    await withHarness(async ({ config, issue, api, deps }) => {
+      issue.sessionId = sessionId
+      api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+      deps.hasLocalCheckout = () => Boolean(sessionId)
+
+      const access: (RunSessionInput["genticMcp"] | undefined)[] = []
+      deps.runAgentSession = async (input) => {
+        access.push(input.genticMcp)
+        await input.onSessionId("session-1")
+        await consumePrompt(input)
+        assert.equal(await input.nextPrompt(), null)
+      }
+
+      await processIssue(api, config, issue, deps)
+
+      assert.deepEqual(access, [
+        {
+          apiUrl: config.GENTIC_API_URL,
+          credential: config.GENTIC_WORKER_CREDENTIAL,
+        },
+      ])
+      // No worker-side preflight: nothing probes the MCP endpoint before the
+      // session starts.
+      assert.deepEqual(api.finishedStatuses, ["waiting-for-input"])
+    })
+  }
+})
+
+test("MCP transport failures fail the run instead of silently dropping tools", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+    deps.runAgentSession = async () => {
+      throw new Error("failed to connect to MCP server gentic: 401")
+    }
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(
+      api.runStates.map((entry) => entry.fields.status),
+      ["in-progress", "run-failed"]
+    )
+    assert.match(
+      String(api.runStates.at(-1)?.fields.run_error),
+      /MCP server gentic/
+    )
+    assert.deepEqual(api.finishedStatuses, [])
+  })
+})
+
 test("fresh follow-up continues when previous pull request branch is gone", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.sessionId = "existing-session"
