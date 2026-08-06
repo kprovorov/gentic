@@ -135,7 +135,7 @@ export type RealtimeRunStateStatus = z.infer<
 
 // Worker -> browser: mirror of the run-state PATCH, for instant UI updates.
 export const runStateEventSchema = z.object({
-  status: realtimeRunStateStatusSchema,
+  status: issueStatusSchema,
   pr_url: z.string().url().nullable(),
   usage_limit_reset_at: z.string().nullable(),
   run_error: z.string().nullable(),
@@ -143,7 +143,7 @@ export const runStateEventSchema = z.object({
 })
 
 export type RunStateEvent = {
-  status: z.infer<typeof realtimeRunStateStatusSchema>
+  status: IssueStatus
   pr_url: string | null
   usage_limit_reset_at: string | null
   run_error: string | null

@@ -16,6 +16,7 @@ type IssueRow = {
   create_pr_automatically: boolean
   has_unpublished_agent_changes: boolean
   pr_url: string | null
+  issue_pull_requests: Array<{ id: string }>
   number: number
   title: string | null
 }
@@ -70,6 +71,7 @@ class FakeIssuesQuery {
         create_pr_automatically: row.create_pr_automatically,
         has_unpublished_agent_changes: row.has_unpublished_agent_changes,
         pr_url: row.pr_url,
+        issue_pull_requests: row.issue_pull_requests,
         projects: { key: row.project_key },
       },
       error: null,
@@ -186,6 +188,7 @@ function issue(overrides: Partial<IssueRow> & Pick<IssueRow, "id">): IssueRow {
     create_pr_automatically: true,
     has_unpublished_agent_changes: true,
     pr_url: null,
+    issue_pull_requests: [],
     number: 7,
     title: "Fix the thing",
     ...overrides,
@@ -258,6 +261,24 @@ test("rejects when the issue already has a pull request", async () => {
     }),
     { name: "ServiceError", code: "validation" }
   )
+})
+
+test("rejects when a webhook-owned Associated Pull Request already exists", async () => {
+  const supabase = new FakeSupabase([
+    issue({ id: "issue-1", issue_pull_requests: [{ id: "associated-pr-1" }] }),
+  ])
+
+  await assert.rejects(
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      { active_run_id: runId1 }
+    ),
+    { name: "ServiceError", code: "validation" }
+  )
+  assert.deepEqual(supabase.rpcCalls, [])
 })
 
 test("rejects when there are no unpublished changes", async () => {

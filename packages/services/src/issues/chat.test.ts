@@ -502,3 +502,24 @@ test("createManualFirstPrPublishMessage rejects while automatic publishing is pe
   )
   assert.equal(supabase.messages.length, 0)
 })
+
+test("createManualFirstPrPublishMessage rejects a webhook-owned Associated Pull Request", async () => {
+  const supabase = new ManualCreatePrDb()
+  supabase.issues.push(manualPrIssue())
+  supabase.issue_pull_requests.push({
+    id: "associated-pr-1",
+    issue_id: "issue-manual-pr",
+    url: "https://github.com/acme/widget/pull/12",
+    state: "open",
+  })
+
+  await assert.rejects(
+    createManualFirstPrPublishMessage(
+      supabase as never,
+      "user-1",
+      "issue-manual-pr"
+    ),
+    { name: "ServiceError", code: "validation" }
+  )
+  assert.equal(supabase.messages.length, 0)
+})

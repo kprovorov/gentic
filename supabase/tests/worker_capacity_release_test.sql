@@ -63,11 +63,14 @@ INSERT INTO public.issues (
 );
 
 SELECT ok(
-  public.finish_issue_run_if_no_pending(
-    '20000000-0000-4000-8000-200000000001',
-    '30000000-0000-4000-8000-200000000001',
-    'waiting-for-input',
-    '2026-07-30T07:01:00Z'
+  (
+    SELECT finished
+      FROM public.finish_issue_run_if_no_pending(
+        '20000000-0000-4000-8000-200000000001',
+        '30000000-0000-4000-8000-200000000001',
+        'waiting-for-input',
+        '2026-07-30T07:01:00Z'
+      )
   ),
   'finishing an issue run succeeds'
 );
