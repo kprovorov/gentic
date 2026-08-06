@@ -836,7 +836,10 @@ export type Database = {
           p_run_id: string
           p_status: string
         }
-        Returns: boolean
+        Returns: {
+          finished: boolean
+          status: string
+        }[]
       }
       issue_kickoff_message: { Args: { p_issue_id: string }; Returns: string }
       mark_attachment_storage_deleted: {

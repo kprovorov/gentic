@@ -7,7 +7,11 @@ import {
   chatMessageKindSchema,
   chatMessageStatusSchema,
 } from "./chat-events.js"
-import { agentProviderSchema, issueModelSchema } from "./issues.js"
+import {
+  agentProviderSchema,
+  issueModelSchema,
+  issueStatusSchema,
+} from "./issues.js"
 import { realtimeRunStateStatusSchema } from "./realtime.js"
 
 export type { RealtimeRunStateStatus } from "./realtime.js"
@@ -75,7 +79,7 @@ export const okResponseSchema = z.object({
 
 export const finishRunResponseSchema = z.object({
   finished: z.boolean(),
-  status: realtimeRunStateStatusSchema.optional(),
+  status: issueStatusSchema.optional(),
 })
 
 export const ackMessagesInputSchema = z.object({

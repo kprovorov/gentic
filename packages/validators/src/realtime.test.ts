@@ -5,6 +5,7 @@ import {
   chatMessageSchema,
   issueEventSchema,
   messageEventSchema,
+  runStateEventSchema,
 } from "./realtime.js"
 
 test("chatMessageSchema accepts legacy messages without authorship metadata", () => {
@@ -95,6 +96,18 @@ test("messageEventSchema requires generated actions to be Gentic-authored", () =
       ts: "2026-07-29T12:00:00.000Z",
     })
   )
+})
+
+test("runStateEventSchema broadcasts a database-derived PR aggregate status", () => {
+  const event = runStateEventSchema.parse({
+    status: "tests-failed",
+    pr_url: null,
+    usage_limit_reset_at: null,
+    run_error: null,
+    ts: "2026-08-06T12:00:00.000Z",
+  })
+
+  assert.equal(event.status, "tests-failed")
 })
 
 test("issueEventSchema parses a well-formed issue_events row", () => {

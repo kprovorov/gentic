@@ -1165,6 +1165,30 @@ test("requestAutomaticPrPublish rejects when a pull request already exists", asy
   )
 })
 
+test("requestAutomaticPrPublish rejects a webhook-owned Associated Pull Request", async () => {
+  const db = new EventLogDb()
+  db.issues.push(automaticPrIssueRow())
+  db.issue_pull_requests.push({
+    id: "associated-pr-1",
+    issue_id: "issue-pr",
+    url: "https://github.com/acme/widget/pull/2",
+    state: "open",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  await assert.rejects(
+    requestAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      "issue-pr",
+      "run-1"
+    ),
+    { name: "ServiceError", code: "validation" }
+  )
+  assert.deepEqual(db.issue_automatic_pr_requests, [])
+  assert.deepEqual(db.messages, [])
+})
+
 test("requestAutomaticPrPublish rejects when there are no unpublished changes", async () => {
   const db = new EventLogDb()
   db.issues.push(automaticPrIssueRow({ has_unpublished_agent_changes: false }))
