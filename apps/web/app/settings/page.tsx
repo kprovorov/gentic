@@ -9,8 +9,18 @@ export const metadata: Metadata = {
   description: "Configure account settings.",
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ github?: string | string[] }>
+}) {
+  const githubResult = (await searchParams).github
   const initialData = await getSettingsData()
 
-  return <SettingsView initialData={initialData} />
+  return (
+    <SettingsView
+      initialData={initialData}
+      githubConnectionConflict={githubResult === "installation-conflict"}
+    />
+  )
 }

@@ -74,23 +74,33 @@ export async function upsertGithubIntegration(
   }
 ) {
   const now = new Date().toISOString()
-  return unwrap(
-    await supabase
-      .from("github_integrations")
-      .upsert(
-        {
-          user_id: userId,
-          installation_id: input.installationId,
-          setup_action: input.setupAction,
-          status: input.status,
-          connected_at: input.status === "connected" ? now : null,
-          updated_at: now,
-        },
-        { onConflict: "user_id" }
-      )
-      .select("*")
-      .single()
-  ) as GithubIntegration
+  const { data, error } = await supabase
+    .from("github_integrations")
+    .upsert(
+      {
+        user_id: userId,
+        installation_id: input.installationId,
+        setup_action: input.setupAction,
+        status: input.status,
+        connected_at: input.status === "connected" ? now : null,
+        updated_at: now,
+      },
+      { onConflict: "user_id" }
+    )
+    .select("*")
+    .single()
+
+  if (error?.code === "23505") {
+    throw new ServiceError(
+      "conflict",
+      "This GitHub installation is already connected to another Gentic account."
+    )
+  }
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data as GithubIntegration
 }
 
 export async function deleteGithubIntegration(

@@ -55,6 +55,7 @@ function handleWorkerMutationError(error: unknown): Response {
     const statusByCode: Record<ServiceError["code"], number> = {
       not_found: 404,
       validation: 400,
+      conflict: 409,
       rate_limited: 429,
       forbidden: 403,
       internal: 500,

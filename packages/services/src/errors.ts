@@ -1,5 +1,10 @@
 export type ServiceErrorCode =
-  "not_found" | "forbidden" | "validation" | "rate_limited" | "internal"
+  | "not_found"
+  | "forbidden"
+  | "validation"
+  | "conflict"
+  | "rate_limited"
+  | "internal"
 
 /**
  * Framework-agnostic error thrown by every function in `@gentic/services`.
