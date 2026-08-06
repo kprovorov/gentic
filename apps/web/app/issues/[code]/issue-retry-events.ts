@@ -9,6 +9,5 @@ export type IssueRetryResetEventDetail = {
   message: ChatMessage
   status: IssueStatus
   usageLimitResetAt: string | null
-  prUrl: string | null
   pullRequests: []
 }

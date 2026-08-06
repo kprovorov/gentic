@@ -64,7 +64,7 @@ export async function createManualFirstPrPublishMessage(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id, number, title, status, has_unpublished_agent_changes, pr_url, projects!inner(key)"
+      "id, number, title, status, has_unpublished_agent_changes, projects!inner(key)"
     )
     .eq("id", issueId)
     .maybeSingle()
@@ -84,10 +84,6 @@ export async function createManualFirstPrPublishMessage(
       "Issue has no unpublished agent changes"
     )
   }
-  if (issue.pr_url) {
-    throw new ServiceError("validation", "Issue already has a pull request")
-  }
-
   const pullRequests = unwrap(
     await supabase
       .from("issue_pull_requests")
@@ -312,15 +308,7 @@ export async function applyChangesRequestedReview(
   prUrl: string,
   review: ChangesRequestedReview
 ) {
-  const { data: issue, error } = await supabase
-    .from("issues")
-    .select("id, projects!inner(auto_respond_to_reviews)")
-    .eq("pr_url", prUrl)
-    .maybeSingle()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  const issue = await getIssueForPullRequestFeedback(supabase, prUrl)
   if (!issue || !issue.projects.auto_respond_to_reviews) {
     return
   }
@@ -361,15 +349,7 @@ export async function applyPullRequestComment(
   prUrl: string,
   comment: PullRequestComment
 ) {
-  const { data: issue, error } = await supabase
-    .from("issues")
-    .select("id, projects!inner(auto_respond_to_reviews)")
-    .eq("pr_url", prUrl)
-    .maybeSingle()
-
-  if (error) {
-    throw new ServiceError("internal", error.message)
-  }
+  const issue = await getIssueForPullRequestFeedback(supabase, prUrl)
   if (!issue || !issue.projects.auto_respond_to_reviews) {
     return
   }
@@ -399,6 +379,36 @@ export async function applyPullRequestComment(
       .eq("id", issue.id)
       .not("status", "in", "(draft,todo,queued,held,in-progress)")
   )
+}
+
+async function getIssueForPullRequestFeedback(
+  supabase: Supabase,
+  prUrl: string
+) {
+  const { data: pullRequest, error: pullRequestError } = await supabase
+    .from("issue_pull_requests")
+    .select("issue_id")
+    .eq("url", prUrl)
+    .maybeSingle()
+
+  if (pullRequestError) {
+    throw new ServiceError("internal", pullRequestError.message)
+  }
+  if (!pullRequest) {
+    return null
+  }
+
+  const { data: issue, error: issueError } = await supabase
+    .from("issues")
+    .select("id, projects!inner(auto_respond_to_reviews)")
+    .eq("id", pullRequest.issue_id)
+    .maybeSingle()
+
+  if (issueError) {
+    throw new ServiceError("internal", issueError.message)
+  }
+
+  return issue
 }
 
 // Called from the GitHub webhook route when CI fails after a PR run. The

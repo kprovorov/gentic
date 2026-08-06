@@ -148,7 +148,7 @@ export async function updateIssue(
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select(
-      "agent_provider, issue_model, priority, pr_url, issue_pull_requests(id), projects!inner(user_id)"
+      "agent_provider, issue_model, priority, issue_pull_requests(id), projects!inner(user_id)"
     )
     .eq("id", id)
     .eq("projects.user_id", userId)

@@ -76,9 +76,16 @@ INSERT INTO public.issues (
   '40000000-0000-4000-8000-000000000205'
 );
 
+-- A stale legacy value must not affect eligibility; only an association does.
 UPDATE public.issues
-   SET pr_url = 'https://github.com/gentic/gamma/pull/1'
- WHERE id = '20000000-0000-4000-8000-000000000202';
+   SET pr_url = 'https://github.com/gentic/gamma/pull/legacy'
+ WHERE id = '20000000-0000-4000-8000-000000000201';
+
+INSERT INTO public.issue_pull_requests (issue_id, url)
+VALUES (
+  '20000000-0000-4000-8000-000000000202',
+  'https://github.com/gentic/gamma/pull/1'
+);
 
 SELECT lives_ok(
   $$

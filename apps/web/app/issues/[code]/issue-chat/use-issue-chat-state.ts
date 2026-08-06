@@ -51,7 +51,6 @@ export function useIssueChatState({
   initialMessages,
   initialStatus,
   initialUsageLimitResetAt,
-  initialPrUrl,
   initialPullRequests,
 }: {
   issueId: string
@@ -59,7 +58,6 @@ export function useIssueChatState({
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
-  initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
 }) {
   const { messages: displayedMessages, dispatch } =
@@ -68,7 +66,6 @@ export function useIssueChatState({
   const [usageLimitResetAt, setUsageLimitResetAt] = useState<string | null>(
     initialUsageLimitResetAt
   )
-  const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
   const [pullRequests, setPullRequests] =
     useState<IssuePullRequest[]>(initialPullRequests)
   const [draft, setDraft] = useState("")
@@ -278,7 +275,6 @@ export function useIssueChatState({
       dispatch({ type: "reset", messages: [detail.message] })
       setStatus(detail.status)
       setUsageLimitResetAt(detail.usageLimitResetAt)
-      setPrUrl(detail.prUrl)
       setPullRequests(detail.pullRequests)
     }
 
@@ -349,7 +345,6 @@ export function useIssueChatState({
           }
           setStatus(next.data.status)
           setUsageLimitResetAt(next.data.usage_limit_reset_at)
-          setPrUrl(next.data.pr_url)
         }
       )
       .on(
@@ -454,7 +449,6 @@ export function useIssueChatState({
             }
             setStatus(event.data.status)
             setUsageLimitResetAt(event.data.usage_limit_reset_at)
-            setPrUrl(event.data.pr_url)
           }
         )
         .subscribe((subscribeStatus) => {
@@ -601,7 +595,6 @@ export function useIssueChatState({
   return {
     status,
     usageLimitResetAt,
-    prUrl,
     displayedMessages,
     displayedPullRequests,
     isAgentWorkingWithoutMessage,

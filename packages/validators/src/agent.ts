@@ -209,7 +209,6 @@ export const automaticPrPublishResponseSchema = z.object({
     activeRunId: z.string().uuid(),
     createPrAutomatically: z.boolean(),
     hasUnpublishedAgentChanges: z.boolean(),
-    prUrl: z.string().nullable(),
   }),
 })
 

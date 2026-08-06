@@ -810,7 +810,7 @@ test("updateIssueStatusByPrUrl logs a status_changed event when found via issue_
   )
 })
 
-test("updateIssueStatusByPrUrl logs via the legacy issues.pr_url fallback", async () => {
+test("updateIssueStatusByPrUrl ignores an unassociated legacy issues.pr_url", async () => {
   const db = new EventLogDb()
   db.issues.push(
     issueRow({
@@ -829,7 +829,7 @@ test("updateIssueStatusByPrUrl logs via the legacy issues.pr_url fallback", asyn
 
   assert.deepEqual(
     db.issue_events.map((event) => event.payload),
-    [{ from: "in-progress", to: "merged" }]
+    []
   )
 })
 
@@ -857,6 +857,11 @@ test("updateIssueStatusByPrUrlIfStatus logs a status_changed event when the guar
       pr_url: "https://github.com/acme/widget/pull/5",
     })
   )
+  db.issue_pull_requests.push({
+    id: "pr-5",
+    issue_id: "issue-5",
+    url: "https://github.com/acme/widget/pull/5",
+  })
   const supabase = new EventLogSupabase(db)
 
   await updateIssueStatusByPrUrlIfStatus(
@@ -881,6 +886,11 @@ test("updateIssueStatusByPrUrlIfStatus accepts multiple guarded source statuses"
       pr_url: "https://github.com/acme/widget/pull/9",
     })
   )
+  db.issue_pull_requests.push({
+    id: "pr-9",
+    issue_id: "issue-9",
+    url: "https://github.com/acme/widget/pull/9",
+  })
   const supabase = new EventLogSupabase(db)
 
   await updateIssueStatusByPrUrlIfStatus(
@@ -1149,9 +1159,12 @@ test("requestAutomaticPrPublish rejects when the issue is not opted into automat
 
 test("requestAutomaticPrPublish rejects when a pull request already exists", async () => {
   const db = new EventLogDb()
-  db.issues.push(
-    automaticPrIssueRow({ pr_url: "https://github.com/acme/widget/pull/1" })
-  )
+  db.issues.push(automaticPrIssueRow())
+  db.issue_pull_requests.push({
+    id: "pr-automatic",
+    issue_id: "issue-pr",
+    url: "https://github.com/acme/widget/pull/1",
+  })
   const supabase = new EventLogSupabase(db)
 
   await assert.rejects(

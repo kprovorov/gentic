@@ -75,7 +75,7 @@ class TestsFailedQuery implements PromiseLike<{ data: unknown; error: null }> {
   private selected = false
 
   constructor(
-    private readonly table: "issues" | "messages",
+    private readonly table: "issues" | "messages" | "issue_pull_requests",
     private readonly db: TestsFailedDb
   ) {}
 
@@ -152,8 +152,9 @@ class TestsFailedQuery implements PromiseLike<{ data: unknown; error: null }> {
 class TestsFailedDb {
   issues: Row[] = []
   messages: Row[] = []
+  issue_pull_requests: Row[] = []
 
-  from(table: "issues" | "messages") {
+  from(table: "issues" | "messages" | "issue_pull_requests") {
     return new TestsFailedQuery(table, this)
   }
 }
@@ -188,8 +189,12 @@ test("applyChangesRequestedReview inserts a Gentic-authored follow-up message", 
   supabase.issues.push({
     id: "issue-1",
     status: "changes-requested",
-    pr_url: "https://github.com/acme/widget/pull/42",
     projects: { auto_respond_to_reviews: true },
+  })
+  supabase.issue_pull_requests.push({
+    id: "pr-1",
+    issue_id: "issue-1",
+    url: "https://github.com/acme/widget/pull/42",
   })
 
   await applyChangesRequestedReview(

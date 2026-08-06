@@ -322,7 +322,7 @@ export async function bulkUpdateIssueAgentProvider(
 // Called from the GitHub webhook route, which is trusted server code
 // authenticated by the webhook signature rather than a Clerk user. There is no
 // `userId` to check ownership against, so the exact PR URL is used to find a
-// tracked issue pull request, with a fallback to the legacy `issues.pr_url`.
+// tracked issue pull request.
 export async function updateIssueStatusByPrUrl(
   supabase: Supabase,
   prUrl: string,
@@ -338,17 +338,15 @@ export async function updateIssueStatusByPrUrl(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  const { data: current, error: fetchError } = await (pullRequest
-    ? supabase
-        .from("issues")
-        .select("id,status")
-        .eq("id", pullRequest.issue_id)
-        .maybeSingle()
-    : supabase
-        .from("issues")
-        .select("id,status")
-        .eq("pr_url", prUrl)
-        .maybeSingle())
+  if (!pullRequest) {
+    return null
+  }
+
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,status")
+    .eq("id", pullRequest.issue_id)
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -419,17 +417,15 @@ export async function updateIssueStatusByPrUrlIfStatus(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  const { data: current, error: fetchError } = await (pullRequest
-    ? supabase
-        .from("issues")
-        .select("id,status")
-        .eq("id", pullRequest.issue_id)
-        .maybeSingle()
-    : supabase
-        .from("issues")
-        .select("id,status")
-        .eq("pr_url", prUrl)
-        .maybeSingle())
+  if (!pullRequest) {
+    return null
+  }
+
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,status")
+    .eq("id", pullRequest.issue_id)
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -557,20 +553,15 @@ export type AutomaticPrPublishResult = {
     activeRunId: string
     createPrAutomatically: boolean
     hasUnpublishedAgentChanges: boolean
-    prUrl: string | null
   }
 }
 
 // Requests (or, on a duplicate/retried call, returns the already-requested)
-// automatic create-PR message for the issue's active run. Only the "at most
-// one request per run" and "run must still be active" guarantees are atomic
-// — those come from the `request_automatic_pr_publish` RPC's
-// unique-constraint-backed insert and its active-run trigger, so they stay
-// correct under concurrent callers. The `create_pr_automatically`/`pr_url`/
-// `has_unpublished_agent_changes` checks below are a best-effort read here
-// in application code, not re-validated by the RPC, so a concurrent change
-// to any of them between this read and the RPC call is not guarded against
-// — an accepted, narrow race given how rarely those fields change mid-run.
+// automatic create-PR message for the issue's active run. The "at most one
+// request per run", active-run, publishing-preference, unpublished-change,
+// and associated-PR checks are repeated by the
+// `request_automatic_pr_publish` RPC so they remain correct under concurrent
+// callers.
 // Nothing here writes `create_pr_automatically`, so it stays `true` after an
 // automatic attempt for later auditing (the RPC's insert trigger also
 // snapshots it onto the request row).
@@ -585,7 +576,7 @@ export async function requestAutomaticPrPublish(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id, number, title, active_run_id, create_pr_automatically, has_unpublished_agent_changes, pr_url, projects!inner(key)"
+      "id, number, title, active_run_id, create_pr_automatically, has_unpublished_agent_changes, issue_pull_requests(id), projects!inner(key)"
     )
     .eq("id", issueId)
     .maybeSingle()
@@ -605,7 +596,7 @@ export async function requestAutomaticPrPublish(
       "Issue is not opted into automatic PR creation"
     )
   }
-  if (issue.pr_url) {
+  if (issue.issue_pull_requests.length > 0) {
     throw new ServiceError("validation", "Issue already has a pull request")
   }
   if (!issue.has_unpublished_agent_changes) {
@@ -651,7 +642,6 @@ export async function requestAutomaticPrPublish(
       activeRunId: runId,
       createPrAutomatically: issue.create_pr_automatically,
       hasUnpublishedAgentChanges: issue.has_unpublished_agent_changes,
-      prUrl: issue.pr_url,
     },
   }
 }
