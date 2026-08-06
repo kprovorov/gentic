@@ -1,0 +1,202 @@
+---
+title: "Organize Issues with Account-Scoped Labels in Gentic"
+sidebarTitle: "Labels"
+description: "Labels are reusable, account-wide classifications you can assign to issues in any project. Create, filter, bulk-apply, and archive Labels from the web app or MCP."
+---
+
+A **Label** is a reusable classification you attach to issues — an area, a
+priority theme, a review need, anything your workflow calls for. Labels are
+**passive metadata**: assigning one never changes an issue's status, priority,
+worker, agent scheduling, prompts, or sessions, and it never starts an agent
+run. They exist purely to organize, filter, and find work.
+
+## How Labels Are Scoped
+
+Your Labels belong to your **account**, not to a single project. One catalog
+serves every project you own, so you define a taxonomy such as `frontend`,
+`needs-info`, or `security` once and apply it across all your repositories.
+
+- A new account starts with **no Labels** — Gentic never imposes a taxonomy.
+- The same catalog is available in the web app and through
+  [Gentic MCP](/mcp/tools#labels); both resolve to your account.
+- Labels are **never synchronized to GitHub**. They are account-global Gentic
+  metadata and do not create or modify GitHub issue labels or pull requests.
+- Labels are **never injected into agent prompts or sessions**. A coding agent
+  working an issue does not see the issue's Labels as instructions, and changing
+  Labels never reschedules or re-routes a run.
+
+## Names and Colors
+
+<ParamField body="name" type="string" required>
+  1–50 characters after trimming. Spaces and normal Unicode are allowed; control
+  characters are rejected. Names are **unique per account, case-insensitively**,
+  across both active and archived Labels — you cannot have `Bug` and `bug` at the
+  same time — but your chosen casing is preserved for display.
+</ParamField>
+
+<ParamField body="color" type="#RRGGBB">
+  Stored as an opaque six-digit hex value. Gentic ships a **48-color preset
+  palette** and, in Settings, also accepts a custom `#RRGGBB` value. If you don't
+  pick a color, Gentic automatically assigns one of the **least-used** preset
+  colors across your active Labels, so new Labels stay visually varied. Gentic
+  computes a readable foreground automatically, so Label text stays legible on
+  any color.
+</ParamField>
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Active Labels per account | **100** (archived Labels don't count) |
+| Labels per issue | **20** |
+| Issues per bulk Label action | **100** |
+
+Archiving does not count against the 100-active cap, and restoring a Label does
+— restoration into a full catalog fails until you archive another Label first.
+
+## Create a Label Inline
+
+You can create a Label without leaving your issue workflow. In any issue's Label
+picker (during creation or on the issue detail page), type a name and choose
+**Create "&lt;name&gt;"**.
+
+- Inline creation takes a **name only** and assigns an automatic color — there is
+  no color chooser in the inline flow. Use [Settings → Labels](#manage-labels-in-settings)
+  when you want to pick the color.
+- The Label is **saved immediately** and becomes reusable even if you abandon the
+  issue form.
+- The new Label is **automatically selected** on the current issue.
+
+## Assign Labels When Creating an Issue
+
+The new issue form includes a searchable, multi-select **Labels** picker.
+
+- Selected Labels are **preserved if you change the issue's project** before
+  submitting — the catalog is account-wide, so your choices carry over.
+- The issue and its initial Labels are saved **all-or-nothing**: if the issue
+  can't be created, no Labels are applied, and vice versa.
+- Initial Labels are treated as part of creation, so they don't generate a
+  separate "labels changed" entry in the issue's timeline.
+
+## Change Labels from Issue Details
+
+Open an issue and use the **Labels** section in the detail rail. It's a direct
+multi-select picker — no separate Edit form needed.
+
+- You can change Labels at **any status**, including completed, cancelled, or a
+  running issue.
+- Adds and removes apply live (optimistically), as independent operations —
+  Gentic never replaces your whole Label set.
+- **At the 20-Label limit** the picker shows `20/20`, disables unselected Labels
+  and inline creation, and keeps already-assigned Labels removable so you can
+  swap one out.
+
+## See Labels in the Issue List
+
+Both the list and table views show Labels on each issue row.
+
+- Up to **three** Label chips are shown, followed by a **+N** indicator when an
+  issue carries more. The +N control is keyboard-focusable and its label lists
+  every Label on the issue for screen readers and on hover.
+- Each visible chip is a **button**: click it (or focus and press it) to add that
+  Label to the current filter. Chips reflect whether they're an active filter.
+- The issue detail page shows **every** assigned Label, not just the first three.
+
+## Filter and Search by Label
+
+- **Match-all filtering:** selecting several Labels in the filter shows only
+  issues that carry **all** of them.
+- **No labels:** a dedicated filter finds unclassified issues. It's **mutually
+  exclusive** with specific-Label filters — turning it on clears selected Labels,
+  and selecting a Label turns it off.
+- **Free-text search** matches assigned Label names, so you can find classified
+  work from the search box without opening the filter menu.
+- Label filters behave like Gentic's other local issue filters — they are not
+  persisted to the URL and don't add new sorting. Labels are excluded from issue
+  sorting.
+- If a Label you're filtering by is archived (in another tab or by a teammate
+  tool), Gentic quietly drops it from your active filter and shows a brief notice
+  naming the archived Label.
+
+## Bulk-Apply Labels Across Projects
+
+Select multiple issues (their row checkboxes) to reveal the bulk toolbar with
+**Add labels** and **Remove labels** actions.
+
+- Both are searchable multi-select pickers applied in a single atomic action.
+- **Add** merges Labels onto each issue; **Remove** strips only the chosen
+  Labels. There is never a destructive "replace all Labels" action.
+- Duplicate adds and missing removals are harmless no-ops, so retries are safe.
+- Bulk changes **span projects** — selection works purely on issues, matching the
+  account-wide catalog — and cover up to **100 issues** per action.
+
+## Manage Labels in Settings
+
+**Settings → Labels** is the home for account-wide Label management.
+
+- The page lists your **active** catalog, sorted alphabetically, with a
+  searchable box for large catalogs and an "N active" counter.
+- Each Label shows its **assignment count across every issue status**, so archive
+  impact is accurate.
+- **Create** a Label with a name plus either an automatic color, a preset swatch
+  from the 48-color palette, or a custom `#RRGGBB` value.
+- **Rename** or **recolor** any Label in place. Renames that would collide with an
+  active or archived name are rejected, so Label identities never merge silently.
+  Renaming updates that Label's chips everywhere; renaming and recoloring do
+  **not** add entries to any issue's timeline.
+
+<Note>
+  There is no archived-Label browser and no explicit "restore" button. Archived
+  Labels are brought back implicitly by creating a Label with the same name — see
+  [Archive and Restore](#archive-and-restore).
+</Note>
+
+## Archive and Restore
+
+Labels are **archived**, never deleted, so historical references stay meaningful.
+
+<Steps>
+  <Step title="Archive from Settings">
+    Click **Archive** on a Label. The confirmation states exactly how many
+    assigned issues it will be removed from (or that it isn't assigned to any).
+    The action is called **Archive**, not Delete.
+  </Step>
+  <Step title="Archiving removes current assignments">
+    Archiving atomically removes the Label from **every** issue that carries it —
+    any number, even more than 100 — and records the removal on each affected
+    issue's timeline. The Label then disappears from autocomplete, filters, and
+    Settings, and stops counting toward the 100-active limit.
+  </Step>
+  <Step title="Restore by re-creating the name">
+    Creating a Label whose name exactly matches an archived one (trimmed,
+    case-insensitive) **restores the original Label** — same identity, prior
+    casing, and prior color. Any color you supply while restoring is ignored.
+    Restoration is triggered only when you **confirm** creation, so typing in a
+    search box never mutates data.
+  </Step>
+</Steps>
+
+<Warning>
+  Restoring a Label does **not** bring back its former issue assignments. A
+  restored Label returns empty; past assignments stay in issue history but are
+  not reapplied.
+</Warning>
+
+## Labels in Issue History
+
+Issue timelines record Label additions and removals as a single **labels changed**
+event per issue operation, so a multi-Label change doesn't flood the timeline.
+
+- Initial Labels applied at creation, and no-op changes, produce **no** event.
+- Archive-driven removals are recorded on every affected issue.
+- Historical events keep an immutable snapshot of each Label's name and color, so
+  later edits never rewrite history.
+- A Label that is **currently archived** appears in old events with gray
+  strikethrough styling; restoring it returns those historical chips to normal
+  styling.
+
+## Real-Time Updates
+
+Label definition changes, assignments, archival, restoration, counts, chips,
+filters, Settings, and timeline styling update **live across open tabs** — no
+reload required.
