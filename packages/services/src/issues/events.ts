@@ -8,6 +8,7 @@ export type IssueEventType =
   | "priority_changed"
   | "labels_changed"
   | "pr_opened"
+  | "pr_associated"
   | "pr_merged"
 
 export async function logIssueEvent(

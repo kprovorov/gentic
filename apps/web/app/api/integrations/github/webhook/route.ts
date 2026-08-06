@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
 import { createServiceClient } from "@gentic/supabase/service"
+import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
 import type { IssueStatus } from "@gentic/validators/issues"
 
@@ -22,6 +23,17 @@ type PullRequestPayload = {
     draft: boolean
     merged: boolean
     merged_at: string | null
+    head: {
+      ref: string
+    }
+    base: {
+      repo: {
+        full_name: string
+      }
+    }
+  }
+  installation?: {
+    id: number
   }
 }
 
@@ -146,8 +158,34 @@ type PullRequestReviewCommentPayload = {
   }
 }
 
+type PullRequestEventServices = {
+  associatePullRequestFromWebhook: typeof githubIntegrationsService.associatePullRequestFromWebhook
+  updatePullRequestStateByPrUrl: typeof issuesService.updatePullRequestStateByPrUrl
+  updateIssueStatusByPrUrl: typeof issuesService.updateIssueStatusByPrUrl
+  logIssueEvent: typeof issuesService.logIssueEvent
+}
+
+const defaultPullRequestEventServices: PullRequestEventServices = {
+  associatePullRequestFromWebhook:
+    githubIntegrationsService.associatePullRequestFromWebhook,
+  updatePullRequestStateByPrUrl: issuesService.updatePullRequestStateByPrUrl,
+  updateIssueStatusByPrUrl: issuesService.updateIssueStatusByPrUrl,
+  logIssueEvent: issuesService.logIssueEvent,
+}
+
 export async function POST(request: Request) {
-  const secret = process.env.GITHUB_WEBHOOK_SECRET
+  return handleGithubWebhookRequest(request)
+}
+
+export async function handleGithubWebhookRequest(
+  request: Request,
+  options: {
+    supabase?: ReturnType<typeof createServiceClient>
+    webhookSecret?: string
+    pullRequestServices?: PullRequestEventServices
+  } = {}
+) {
+  const secret = options.webhookSecret ?? process.env.GITHUB_WEBHOOK_SECRET
 
   if (!secret) {
     console.error("[github-webhook] GITHUB_WEBHOOK_SECRET is not configured")
@@ -164,10 +202,14 @@ export async function POST(request: Request) {
   const event = request.headers.get("x-github-event")
   const payload = JSON.parse(body)
 
-  const supabase = createServiceClient()
+  const supabase = options.supabase ?? createServiceClient()
 
   if (event === "pull_request") {
-    await handlePullRequestEvent(supabase, payload as PullRequestPayload)
+    await handlePullRequestEvent(
+      supabase,
+      payload as PullRequestPayload,
+      options.pullRequestServices ?? defaultPullRequestEventServices
+    )
   } else if (event === "pull_request_review") {
     await handlePullRequestReviewEvent(
       supabase,
@@ -215,14 +257,35 @@ function verifySignature(
 
 async function handlePullRequestEvent(
   supabase: ReturnType<typeof createServiceClient>,
-  payload: PullRequestPayload
+  payload: PullRequestPayload,
+  services: PullRequestEventServices
 ) {
   // The payload always carries the PR's full current state regardless of
   // action, so every delivery is a chance to refresh the cached pill state
   // (`issue_pull_requests.state`) without ever polling the GitHub API.
   const prState = resolvePullRequestState(payload.pull_request)
+  const diagnostic = await services.associatePullRequestFromWebhook(supabase, {
+    installationId: payload.installation?.id
+      ? String(payload.installation.id)
+      : null,
+    baseRepository: payload.pull_request.base?.repo?.full_name ?? null,
+    headBranch: payload.pull_request.head?.ref ?? null,
+    prUrl: payload.pull_request.html_url,
+    prState,
+    readyForReview: prState === "open" && payload.pull_request.draft === false,
+  })
+
+  console.info(
+    "[github-webhook] pull request association",
+    JSON.stringify({ action: payload.action, ...diagnostic })
+  )
+
+  if (diagnostic.outcome === "no_match") {
+    return
+  }
+
   if (prState !== "unknown") {
-    await issuesService.updatePullRequestStateByPrUrl(
+    await services.updatePullRequestStateByPrUrl(
       supabase,
       payload.pull_request.html_url,
       prState
@@ -241,14 +304,18 @@ async function handlePullRequestEvent(
     return
   }
 
-  const result = await issuesService.updateIssueStatusByPrUrl(
+  if (payload.action === "reopened") {
+    return
+  }
+
+  const result = await services.updateIssueStatusByPrUrl(
     supabase,
     payload.pull_request.html_url,
     status
   )
 
   if (result && payload.pull_request.merged) {
-    await issuesService.logIssueEvent(supabase, result.id, "pr_merged", {
+    await services.logIssueEvent(supabase, result.id, "pr_merged", {
       pr_url: payload.pull_request.html_url,
     })
   }
