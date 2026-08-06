@@ -51,7 +51,8 @@ SELECT *
     '20000000-0000-4000-8000-600000000001',
     'https://github.com/acme/base/pull/1',
     'open',
-    true
+    true,
+    'head-1'
   );
 
 SELECT is(
@@ -96,7 +97,8 @@ SELECT *
     '20000000-0000-4000-8000-600000000002',
     'https://github.com/acme/base/pull/1',
     'open',
-    true
+    true,
+    'head-1'
   );
 
 SELECT is(
@@ -127,7 +129,8 @@ SELECT public.associate_pull_request_from_webhook(
   '20000000-0000-4000-8000-600000000003',
   'https://github.com/acme/base/pull/3',
   'draft',
-  false
+  false,
+  'head-3'
 );
 
 SELECT is(
@@ -140,7 +143,8 @@ SELECT public.associate_pull_request_from_webhook(
   '20000000-0000-4000-8000-600000000004',
   'https://github.com/acme/base/pull/4',
   'open',
-  true
+  true,
+  'head-4'
 );
 
 SELECT is(

@@ -242,24 +242,33 @@ export type Database = {
       }
       issue_pull_requests: {
         Row: {
+          ci_state: string
           created_at: string
+          head_sha: string | null
           id: string
           issue_id: string
-          state: string | null
+          review_decision: string
+          state: string
           url: string
         }
         Insert: {
+          ci_state?: string
           created_at?: string
+          head_sha?: string | null
           id?: string
           issue_id: string
-          state?: string | null
+          review_decision?: string
+          state?: string
           url: string
         }
         Update: {
+          ci_state?: string
           created_at?: string
+          head_sha?: string | null
           id?: string
           issue_id?: string
-          state?: string | null
+          review_decision?: string
+          state?: string
           url?: string
         }
         Relationships: [
@@ -699,6 +708,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_pull_request_delivery_state: {
+        Args: {
+          p_ci_state?: string
+          p_expected_head_sha?: string
+          p_head_sha?: string
+          p_pr_url: string
+          p_review_decision?: string
+          p_state?: string
+        }
+        Returns: {
+          associated_issue_id: string
+          issue_status: string
+          issue_status_changed: boolean
+          pull_request_updated: boolean
+        }[]
+      }
       archive_label: {
         Args: { p_label_id: string; p_now?: string; p_user_id: string }
         Returns: {
@@ -708,6 +733,7 @@ export type Database = {
       }
       associate_pull_request_from_webhook: {
         Args: {
+          p_head_sha?: string
           p_issue_id: string
           p_pr_state: string
           p_pr_url: string
@@ -820,6 +846,15 @@ export type Database = {
       next_issue_number_for_project: {
         Args: { p_project_id: string }
         Returns: number
+      }
+      recompute_issue_status_from_pull_requests: {
+        Args: { p_issue_id: string }
+        Returns: {
+          issue_id: string
+          next_status: string
+          previous_status: string
+          status_changed: boolean
+        }[]
       }
       reconcile_offline_worker_runs: {
         Args: { p_now?: string }

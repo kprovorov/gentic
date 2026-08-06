@@ -32,12 +32,12 @@ export type PullRequestAssociationDiagnostic =
     }
 
 type WebhookPullRequestState =
-  | "draft"
-  | "open"
-  | "merged"
-  | "closed"
-  | "queued"
-  | "unknown"
+  "draft" | "open" | "merged" | "closed" | "queued" | "unknown"
+
+export type PullRequestCiState = "unknown" | "pending" | "success" | "failure"
+
+export type PullRequestReviewDecision =
+  "unknown" | "review_required" | "approved" | "changes_requested"
 
 export function parseCanonicalIssueBranch(branch: string): {
   projectKey: string
@@ -73,6 +73,7 @@ export async function associatePullRequestFromWebhook(
     prUrl: string
     prState: WebhookPullRequestState
     readyForReview: boolean
+    headSha: string | null
   }
 ): Promise<PullRequestAssociationDiagnostic> {
   if (!input.installationId || !input.baseRepository || !input.headBranch) {
@@ -170,6 +171,7 @@ async function persistPullRequestAssociation(
     prUrl: string
     prState: WebhookPullRequestState
     readyForReview: boolean
+    headSha: string | null
   }
 ): Promise<PullRequestAssociationDiagnostic> {
   const result = unwrap(
@@ -178,6 +180,7 @@ async function persistPullRequestAssociation(
       p_pr_url: input.prUrl,
       p_pr_state: input.prState,
       p_ready_for_review: input.readyForReview,
+      p_head_sha: input.headSha ?? undefined,
     })
   )[0]
 
@@ -193,6 +196,31 @@ async function persistPullRequestAssociation(
     issueId: result.associated_issue_id,
     statusChanged: result.issue_status_changed,
   }
+}
+
+export async function applyPullRequestDeliveryState(
+  supabase: Supabase,
+  input: {
+    prUrl: string
+    state?: WebhookPullRequestState
+    headSha?: string
+    ciState?: PullRequestCiState
+    reviewDecision?: PullRequestReviewDecision
+    expectedHeadSha?: string
+  }
+) {
+  return (
+    unwrap(
+      await supabase.rpc("apply_pull_request_delivery_state", {
+        p_pr_url: input.prUrl,
+        p_state: input.state,
+        p_head_sha: input.headSha,
+        p_ci_state: input.ciState,
+        p_review_decision: input.reviewDecision,
+        p_expected_head_sha: input.expectedHeadSha,
+      })
+    )[0] ?? null
+  )
 }
 
 export async function getGithubIntegration(supabase: Supabase, userId: string) {

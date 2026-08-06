@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   isRelevantCheckSuite,
+  resolvePullRequestSnapshot,
   resolvePullRequestState,
 } from "../lib/github-app"
 
@@ -14,6 +15,24 @@ test("isRelevantCheckSuite drops suites that never ran any checks", () => {
       latest_check_runs_count: 0,
     }),
     false
+  )
+})
+
+test("resolvePullRequestSnapshot preserves GitHub aggregate review and CI state", () => {
+  assert.deepEqual(
+    resolvePullRequestSnapshot({
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: "head-42",
+      reviewDecision: "CHANGES_REQUESTED",
+      statusCheckRollup: { state: "FAILURE" },
+    }),
+    {
+      state: "open",
+      headSha: "head-42",
+      ciState: "failure",
+      reviewDecision: "changes_requested",
+    }
   )
 })
 

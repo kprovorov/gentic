@@ -11,7 +11,7 @@ import {
 
 const webhookSecret = "signed-request-test-secret"
 
-function signedPullRequest(payload: Record<string, unknown>) {
+function signedWebhook(event: string, payload: Record<string, unknown>) {
   const body = JSON.stringify(payload)
   const signature = `sha256=${createHmac("sha256", webhookSecret)
     .update(body)
@@ -21,11 +21,15 @@ function signedPullRequest(payload: Record<string, unknown>) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-github-event": "pull_request",
+      "x-github-event": event,
       "x-hub-signature-256": signature,
     },
     body,
   })
+}
+
+function signedPullRequest(payload: Record<string, unknown>) {
+  return signedWebhook("pull_request", payload)
 }
 
 function pullRequestPayload(overrides: Record<string, unknown> = {}) {
@@ -39,8 +43,10 @@ function pullRequestPayload(overrides: Record<string, unknown> = {}) {
       draft: false,
       merged: false,
       merged_at: null,
+      number: 42,
       head: {
         ref: "users/alice/GEN-42-fix-webhook",
+        sha: "head-42",
         repo: { full_name: "alice/base-fork" },
       },
       base: { repo: { full_name: "acme/base" } },
@@ -63,13 +69,27 @@ function pullRequestServiceRecorder(
   }
 ) {
   const associations: Array<Record<string, unknown>> = []
-  const states: Array<{ url: string; state: string }> = []
-  const statusUpdates: Array<{ url: string; status: string }> = []
+  const deliveryStates: Array<Record<string, unknown>> = []
+  const hydrationCalls: Array<Record<string, unknown>> = []
 
   return {
     associations,
-    states,
-    statusUpdates,
+    deliveryStates,
+    hydrationCalls,
+    async stateFetcher(
+      installationId: string,
+      owner: string,
+      repo: string,
+      pullNumber: number
+    ) {
+      hydrationCalls.push({ installationId, owner, repo, pullNumber })
+      return {
+        state: "open" as const,
+        headSha: "hydrated-head-42",
+        ciState: "failure" as const,
+        reviewDecision: "changes_requested" as const,
+      }
+    },
     services: {
       async associatePullRequestFromWebhook(
         _supabase: unknown,
@@ -78,19 +98,11 @@ function pullRequestServiceRecorder(
         associations.push(input)
         return associationResult
       },
-      async updatePullRequestStateByPrUrl(
+      async applyPullRequestDeliveryState(
         _supabase: unknown,
-        url: string,
-        state: string
+        input: Record<string, unknown>
       ) {
-        states.push({ url, state })
-      },
-      async updateIssueStatusByPrUrl(
-        _supabase: unknown,
-        url: string,
-        status: string
-      ) {
-        statusUpdates.push({ url, status })
+        deliveryStates.push(input)
         return null
       },
       async logIssueEvent() {},
@@ -108,6 +120,7 @@ test("every signed pull-request action attempts association from the current for
         webhookSecret,
         supabase: {} as never,
         pullRequestServices: recorder.services as never,
+        pullRequestStateFetcher: recorder.stateFetcher,
       }
     )
     assert.equal(response.status, 200)
@@ -122,6 +135,7 @@ test("every signed pull-request action attempts association from the current for
       prUrl: "https://github.com/acme/base/pull/42",
       prState: "open",
       readyForReview: true,
+      headSha: "head-42",
     })
   }
 })
@@ -141,16 +155,16 @@ test("a signed unmatched pull-request branch is a successful no-op", async () =>
       webhookSecret,
       supabase: {} as never,
       pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
     }
   )
 
   assert.equal(response.status, 200)
   assert.equal(recorder.associations.length, 1)
-  assert.deepEqual(recorder.states, [])
-  assert.deepEqual(recorder.statusUpdates, [])
+  assert.deepEqual(recorder.deliveryStates, [])
 })
 
-test("a signed reopened event cannot overwrite the live status retained by the association transaction", async () => {
+test("an existing association refreshes durable state without directly writing Issue status", async () => {
   const recorder = pullRequestServiceRecorder({
     outcome: "already_associated",
     issueId: "issue-42",
@@ -163,12 +177,74 @@ test("a signed reopened event cannot overwrite the live status retained by the a
       webhookSecret,
       supabase: {} as never,
       pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
     }
   )
 
   assert.equal(response.status, 200)
   assert.equal(recorder.associations.length, 1)
-  assert.deepEqual(recorder.statusUpdates, [])
+  assert.deepEqual(recorder.deliveryStates, [
+    {
+      prUrl: "https://github.com/acme/base/pull/42",
+      state: "open",
+      headSha: "hydrated-head-42",
+      ciState: "failure",
+      reviewDecision: "changes_requested",
+    },
+  ])
+})
+
+test("a first association hydrates only that pull request and persists its complete delivery state", async () => {
+  const recorder = pullRequestServiceRecorder()
+
+  const response = await handleGithubWebhookRequest(
+    signedPullRequest(pullRequestPayload()),
+    {
+      webhookSecret,
+      supabase: {} as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.hydrationCalls, [
+    {
+      installationId: "12345",
+      owner: "acme",
+      repo: "base",
+      pullNumber: 42,
+    },
+  ])
+  assert.deepEqual(recorder.deliveryStates, [
+    {
+      prUrl: "https://github.com/acme/base/pull/42",
+      state: "open",
+      headSha: "hydrated-head-42",
+      ciState: "failure",
+      reviewDecision: "changes_requested",
+    },
+  ])
+})
+
+test("hydration failure keeps a newly created association and returns success", async () => {
+  const recorder = pullRequestServiceRecorder()
+
+  const response = await handleGithubWebhookRequest(
+    signedPullRequest(pullRequestPayload()),
+    {
+      webhookSecret,
+      supabase: {} as never,
+      pullRequestServices: recorder.services as never,
+      async pullRequestStateFetcher() {
+        throw new Error("temporary GitHub failure")
+      },
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(recorder.associations.length, 1)
+  assert.deepEqual(recorder.deliveryStates, [])
 })
 
 test("getWorkflowRunPullNumbers reads pull request numbers from workflow_run payloads", () => {
@@ -195,15 +271,61 @@ test("getWorkflowRunPullNumbers tolerates workflow_run payloads without pull req
 })
 
 test("isPendingCheckAction recognizes GitHub rerun webhook actions", () => {
+  assert.equal(isPendingCheckAction("check_suite", "requested"), true)
   assert.equal(isPendingCheckAction("check_suite", "rerequested"), true)
+  assert.equal(isPendingCheckAction("check_run", "created"), true)
   assert.equal(isPendingCheckAction("check_run", "rerequested"), true)
   assert.equal(isPendingCheckAction("workflow_run", "requested"), true)
+  assert.equal(isPendingCheckAction("workflow_run", "in_progress"), true)
 })
 
 test("isPendingCheckAction rejects completed and unrelated webhook actions", () => {
   assert.equal(isPendingCheckAction("check_suite", "completed"), false)
-  assert.equal(isPendingCheckAction("check_run", "created"), false)
+  assert.equal(isPendingCheckAction("check_run", "completed"), false)
   assert.equal(isPendingCheckAction("workflow_run", "completed"), false)
+})
+
+test("a review delivery persists GitHub's aggregate decision for the exact PR", async () => {
+  const recorder = pullRequestServiceRecorder({
+    outcome: "already_associated",
+    issueId: "issue-42",
+    statusChanged: false,
+  })
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9001,
+        state: "approved",
+        body: null,
+        user: { login: "alice" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: {} as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.deliveryStates, [
+    {
+      prUrl: "https://github.com/acme/base/pull/42",
+      state: "open",
+      headSha: "hydrated-head-42",
+      ciState: "failure",
+      reviewDecision: "changes_requested",
+    },
+  ])
 })
 
 test("isPullRequestIssue recognizes PR issue_comment payloads", () => {

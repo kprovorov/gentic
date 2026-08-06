@@ -219,6 +219,24 @@ export async function fetchPullRequestHeadSha(
 export type GithubPullRequestState =
   "draft" | "open" | "merged" | "closed" | "queued" | "unknown"
 
+export type GithubPullRequestSnapshot = {
+  state: GithubPullRequestState
+  headSha: string
+  ciState: "unknown" | "pending" | "success" | "failure"
+  reviewDecision:
+    "unknown" | "review_required" | "approved" | "changes_requested"
+}
+
+type RawPullRequestSnapshot = {
+  state: "OPEN" | "CLOSED" | "MERGED"
+  isDraft: boolean
+  headRefOid: string
+  reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null
+  statusCheckRollup: {
+    state: "EXPECTED" | "ERROR" | "FAILURE" | "PENDING" | "SUCCESS"
+  } | null
+}
+
 type RawPullRequestState = {
   state: string
   draft?: boolean | null
@@ -273,6 +291,108 @@ export async function fetchPullRequestState(
   }
 
   return resolvePullRequestState((await response.json()) as RawPullRequestState)
+}
+
+export async function fetchPullRequestSnapshot(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<GithubPullRequestSnapshot> {
+  const token = await getInstallationToken(installationId)
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify({
+      query: `
+        query PullRequestDeliveryState(
+          $owner: String!
+          $repo: String!
+          $number: Int!
+        ) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $number) {
+              state
+              isDraft
+              headRefOid
+              reviewDecision
+              statusCheckRollup { state }
+            }
+          }
+        }
+      `,
+      variables: { owner, repo, number: pullNumber },
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to hydrate pull request delivery state (${response.status})`
+    )
+  }
+
+  const result = (await response.json()) as {
+    data?: {
+      repository?: {
+        pullRequest?: RawPullRequestSnapshot | null
+      } | null
+    }
+    errors?: { message: string }[]
+  }
+
+  const pullRequest = result.data?.repository?.pullRequest
+  if (!pullRequest) {
+    const detail = result.errors?.map((error) => error.message).join("; ")
+    throw new Error(
+      `Failed to hydrate pull request delivery state${detail ? `: ${detail}` : ""}`
+    )
+  }
+
+  return resolvePullRequestSnapshot(pullRequest)
+}
+
+export function resolvePullRequestSnapshot(
+  pullRequest: RawPullRequestSnapshot
+): GithubPullRequestSnapshot {
+  const state: GithubPullRequestState = pullRequest.isDraft
+    ? "draft"
+    : pullRequest.state === "MERGED"
+      ? "merged"
+      : pullRequest.state === "CLOSED"
+        ? "closed"
+        : "open"
+
+  const ciState =
+    pullRequest.statusCheckRollup?.state === "ERROR" ||
+    pullRequest.statusCheckRollup?.state === "FAILURE"
+      ? "failure"
+      : pullRequest.statusCheckRollup?.state === "EXPECTED" ||
+          pullRequest.statusCheckRollup?.state === "PENDING"
+        ? "pending"
+        : pullRequest.statusCheckRollup?.state === "SUCCESS"
+          ? "success"
+          : "unknown"
+
+  const reviewDecision =
+    pullRequest.reviewDecision === "APPROVED"
+      ? "approved"
+      : pullRequest.reviewDecision === "CHANGES_REQUESTED"
+        ? "changes_requested"
+        : pullRequest.reviewDecision === "REVIEW_REQUIRED"
+          ? "review_required"
+          : "unknown"
+
+  return {
+    state,
+    headSha: pullRequest.headRefOid,
+    ciState,
+    reviewDecision,
+  }
 }
 
 // The check_suite webhook payload's own `pull_requests` array is only
