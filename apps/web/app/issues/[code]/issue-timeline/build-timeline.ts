@@ -71,6 +71,7 @@ function eventToTimelineItem(event: IssueEventContract): TimelineItem {
 
   switch (event.type) {
     case "pr_opened":
+    case "pr_associated":
       return {
         kind: "pr-opened",
         key,

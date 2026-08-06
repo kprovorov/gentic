@@ -706,6 +706,19 @@ export type Database = {
           id: string
         }[]
       }
+      associate_pull_request_from_webhook: {
+        Args: {
+          p_issue_id: string
+          p_pr_state: string
+          p_pr_url: string
+          p_ready_for_review: boolean
+        }
+        Returns: {
+          associated_issue_id: string
+          association_created: boolean
+          issue_status_changed: boolean
+        }[]
+      }
       ban_worker: {
         Args: { p_now?: string; p_user_id: string; p_worker_id: string }
         Returns: {

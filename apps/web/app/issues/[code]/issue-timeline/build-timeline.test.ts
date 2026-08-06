@@ -20,7 +20,9 @@ function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   }
 }
 
-function event(overrides: Partial<IssueEventContract> = {}): IssueEventContract {
+function event(
+  overrides: Partial<IssueEventContract> = {}
+): IssueEventContract {
   return {
     id: "event-1",
     issue_id: "issue-1",
@@ -39,7 +41,11 @@ test("synthesizes an issue-created node from the issue's created_at", () => {
   const timeline = buildIssueTimeline({ issue, messages: [], events: [] })
 
   assert.deepEqual(timeline, [
-    { kind: "issue-created", key: "issue-created", timestamp: issue.created_at },
+    {
+      kind: "issue-created",
+      key: "issue-created",
+      timestamp: issue.created_at,
+    },
   ])
 })
 
@@ -211,6 +217,26 @@ test("maps pr_opened events to pr-opened items carrying the PR url", () => {
     key: "event-1",
     timestamp: "2026-07-01T00:10:00.000Z",
     prUrl: "https://github.com/acme/repo/pull/1",
+  })
+})
+
+test("maps pr_associated events to pr-opened items while retaining pr_opened compatibility", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "pr_associated",
+        payload: { pr_url: "https://github.com/acme/repo/pull/2" },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "pr-opened",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    prUrl: "https://github.com/acme/repo/pull/2",
   })
 })
 
