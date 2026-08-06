@@ -260,6 +260,24 @@ test("rejects when the issue already has a pull request", async () => {
   )
 })
 
+test("rejects when a webhook-owned Associated Pull Request already exists", async () => {
+  const supabase = new FakeSupabase([
+    issue({ id: "issue-1", issue_pull_requests: [{ id: "associated-pr-1" }] }),
+  ])
+
+  await assert.rejects(
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      { active_run_id: runId1 }
+    ),
+    { name: "ServiceError", code: "validation" }
+  )
+  assert.deepEqual(supabase.rpcCalls, [])
+})
+
 test("rejects when there are no unpublished changes", async () => {
   const supabase = new FakeSupabase([
     issue({ id: "issue-1", has_unpublished_agent_changes: false }),

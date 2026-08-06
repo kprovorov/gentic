@@ -15,11 +15,11 @@ import {
   type FinishRunFields,
   type InsertMessageInput,
   type RecordUnpublishedChangesInput,
-  type RealtimeRunStateStatus,
   type RealtimeTokenResponse,
   type RunStateFields,
   type UserMessage,
 } from "@gentic/validators/agent"
+import type { IssueStatus } from "@gentic/validators/issues"
 import {
   workerControlResponseSchema,
   type WorkerControlResponse,
@@ -43,7 +43,7 @@ export type {
 
 export type FinishRunResult = {
   finished: boolean
-  status: RealtimeRunStateStatus
+  status: IssueStatus
 }
 
 export interface AgentApi {

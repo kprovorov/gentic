@@ -8,6 +8,7 @@ import type {
   AgentApi,
   ClaimedIssue,
   FinishRunFields,
+  FinishRunResult,
   RunStateFields,
   UserMessage,
 } from "../api.js"
@@ -728,6 +729,21 @@ test("automatic publishing request failures finish waiting without looping", asy
   })
 })
 
+test("a webhook association suppresses automatic publishing and completion uses its aggregate", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    issue.createPrAutomatically = true
+    api.hasChanges = true
+    api.automaticPrPublishError = new Error("Issue already has a pull request")
+    api.finishStatusOverride = "ready-for-review"
+
+    await processIssue(api, config, issue, deps)
+
+    assert.equal(api.automaticPrPublishRequests.length, 1)
+    assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
+    assert.equal(api.publishedRunStates.at(-1), "ready-for-review")
+  })
+})
+
 test("unpublished-change record failures do not fail completed turns", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.createPrAutomatically = true
@@ -814,6 +830,17 @@ test("publishes ready-for-review status when automatic publishing creates a PR",
 
     assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
     assert.deepEqual(api.publishedRunStates.at(-1), "ready-for-review")
+  })
+})
+
+test("publishes the Associated Pull Request aggregate returned by completion", async () => {
+  await withHarness(async ({ config, issue, api, deps }) => {
+    api.finishStatusOverride = "tests-failed"
+
+    await processIssue(api, config, issue, deps)
+
+    assert.deepEqual(api.finishedStatuses, ["tests-failed"])
+    assert.equal(api.publishedRunStates.at(-1), "tests-failed")
   })
 })
 
@@ -931,6 +958,7 @@ class FakeApi implements AgentApi {
   readonly controlChecks: string[] = []
   readonly claims: ClaimedIssue[] = []
   finishResults: boolean[] = [true]
+  finishStatusOverride: FinishRunResult["status"] | null = null
   onFinishAttempt: ((attempt: number) => void) | null = null
   controlResponse: () => WorkerControlResponse = () => ({
     worker: { banned: true },
@@ -974,14 +1002,15 @@ class FakeApi implements AgentApi {
   async finishRun(
     _issueId: string,
     fields: FinishRunFields
-  ): Promise<{ finished: boolean; status: typeof fields.status }> {
+  ): Promise<FinishRunResult> {
     this.finishAttempts += 1
     this.onFinishAttempt?.(this.finishAttempts)
     const result = this.finishResults.shift() ?? true
+    const status = this.finishStatusOverride ?? fields.status
     if (result) {
-      this.finishedStatuses.push(fields.status)
+      this.finishedStatuses.push(status)
     }
-    return { finished: result, status: fields.status }
+    return { finished: result, status }
   }
 
   async insertMessage(): Promise<string> {

@@ -1,4 +1,5 @@
 import type { AutomaticPrRequestStatus } from "@gentic/validators/agent"
+import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
 import type {
   AgentProvider,
   IssueModel,
@@ -557,11 +558,9 @@ export type AutomaticPrPublishResult = {
 }
 
 // Requests (or, on a duplicate/retried call, returns the already-requested)
-// automatic create-PR message for the issue's active run. The "at most one
-// request per run", active-run, publishing-preference, unpublished-change,
-// and associated-PR checks are repeated by the
-// `request_automatic_pr_publish` RPC so they remain correct under concurrent
-// callers.
+// automatic create-PR message for the issue's active run. The RPC serializes
+// on the Issue and revalidates every eligibility input, including
+// webhook-owned Associated Pull Requests, before creating a message.
 // Nothing here writes `create_pr_automatically`, so it stays `true` after an
 // automatic attempt for later auditing (the RPC's insert trigger also
 // snapshots it onto the request row).
@@ -596,7 +595,7 @@ export async function requestAutomaticPrPublish(
       "Issue is not opted into automatic PR creation"
     )
   }
-  if (issue.issue_pull_requests.length > 0) {
+  if (hasAttachedIssuePullRequest(issue)) {
     throw new ServiceError("validation", "Issue already has a pull request")
   }
   if (!issue.has_unpublished_agent_changes) {

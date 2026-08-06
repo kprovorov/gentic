@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(14);
+SELECT plan(16);
 
 INSERT INTO public.projects (
   id,
@@ -74,6 +74,17 @@ INSERT INTO public.issues (
   false,
   true,
   '40000000-0000-4000-8000-000000000205'
+), (
+  -- The webhook association is authoritative even when the legacy field is null.
+  '20000000-0000-4000-8000-000000000205',
+  '10000000-0000-4000-8000-000000000201',
+  'Webhook-associated issue',
+  'Body',
+  'in-progress',
+  5,
+  true,
+  true,
+  '40000000-0000-4000-8000-000000000206'
 );
 
 -- A stale legacy value must not affect eligibility; only an association does.
@@ -85,6 +96,13 @@ INSERT INTO public.issue_pull_requests (issue_id, url)
 VALUES (
   '20000000-0000-4000-8000-000000000202',
   'https://github.com/gentic/gamma/pull/1'
+);
+
+INSERT INTO public.issue_pull_requests (issue_id, url, state)
+VALUES (
+  '20000000-0000-4000-8000-000000000205',
+  'https://github.com/gentic/gamma/pull/5',
+  'open'
 );
 
 SELECT lives_ok(
@@ -206,6 +224,25 @@ SELECT is(
   'a duplicate request for the same run does not create a second message'
 );
 
+INSERT INTO public.issue_pull_requests (issue_id, url, state)
+VALUES (
+  '20000000-0000-4000-8000-000000000201',
+  'https://github.com/gentic/gamma/pull/6',
+  'open'
+);
+
+SELECT is(
+  (
+    SELECT created FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000201',
+      '40000000-0000-4000-8000-000000000201',
+      'Please open a pull request.'
+    )
+  ),
+  false,
+  'a retry returns the existing request after a webhook association arrives'
+);
+
 -- A stale/superseded run id (no longer the issue's active run) is rejected
 -- outright, matching the existing active-run trigger's contract.
 SELECT throws_ok(
@@ -262,6 +299,19 @@ SELECT throws_ok(
   '23514',
   null,
   'a request for an issue not opted into automatic PR creation is rejected'
+);
+
+SELECT throws_ok(
+  $$
+    SELECT * FROM public.request_automatic_pr_publish(
+      '20000000-0000-4000-8000-000000000205',
+      '40000000-0000-4000-8000-000000000206',
+      'Please open a pull request.'
+    )
+  $$,
+  '23514',
+  null,
+  'a webhook association suppresses a duplicate automatic publishing request'
 );
 
 SELECT * FROM finish();

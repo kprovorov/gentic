@@ -5,6 +5,7 @@ import {
   automaticPrPublishResponseSchema,
   automaticPrRequestSchema,
   claimedIssueSchema,
+  finishRunResponseSchema,
   insertMessageInputSchema,
   recordUnpublishedChangesInputSchema,
   requestAutomaticPrPublishInputSchema,
@@ -150,4 +151,13 @@ test("automaticPrPublishResponseSchema carries session-continuation context", ()
 
   assert.equal(response.created, true)
   assert.equal(response.issue.code, "GEN-42")
+})
+
+test("finishRunResponseSchema accepts a database-derived PR aggregate status", () => {
+  const response = finishRunResponseSchema.parse({
+    finished: true,
+    status: "changes-requested",
+  })
+
+  assert.equal(response.status, "changes-requested")
 })
