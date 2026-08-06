@@ -3,13 +3,13 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { createServiceClient } from "@gentic/supabase/service"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
-import type { IssueStatus } from "@gentic/validators/issues"
 
 import { resolveCheckSuiteStatus } from "@/lib/ci-status"
 import {
   fetchCheckSuitesForRef,
   fetchPullRequestNumbersForCommit,
   fetchPullRequestReviewComments,
+  fetchPullRequestSnapshot,
   resolvePullRequestState,
 } from "@/lib/github-app"
 
@@ -23,8 +23,10 @@ type PullRequestPayload = {
     draft: boolean
     merged: boolean
     merged_at: string | null
+    number: number
     head: {
       ref: string
+      sha: string
     }
     base: {
       repo: {
@@ -160,16 +162,15 @@ type PullRequestReviewCommentPayload = {
 
 type PullRequestEventServices = {
   associatePullRequestFromWebhook: typeof githubIntegrationsService.associatePullRequestFromWebhook
-  updatePullRequestStateByPrUrl: typeof issuesService.updatePullRequestStateByPrUrl
-  updateIssueStatusByPrUrl: typeof issuesService.updateIssueStatusByPrUrl
+  applyPullRequestDeliveryState: typeof githubIntegrationsService.applyPullRequestDeliveryState
   logIssueEvent: typeof issuesService.logIssueEvent
 }
 
 const defaultPullRequestEventServices: PullRequestEventServices = {
   associatePullRequestFromWebhook:
     githubIntegrationsService.associatePullRequestFromWebhook,
-  updatePullRequestStateByPrUrl: issuesService.updatePullRequestStateByPrUrl,
-  updateIssueStatusByPrUrl: issuesService.updateIssueStatusByPrUrl,
+  applyPullRequestDeliveryState:
+    githubIntegrationsService.applyPullRequestDeliveryState,
   logIssueEvent: issuesService.logIssueEvent,
 }
 
@@ -183,6 +184,7 @@ export async function handleGithubWebhookRequest(
     supabase?: ReturnType<typeof createServiceClient>
     webhookSecret?: string
     pullRequestServices?: PullRequestEventServices
+    pullRequestStateFetcher?: typeof fetchPullRequestSnapshot
   } = {}
 ) {
   const secret = options.webhookSecret ?? process.env.GITHUB_WEBHOOK_SECRET
@@ -208,12 +210,15 @@ export async function handleGithubWebhookRequest(
     await handlePullRequestEvent(
       supabase,
       payload as PullRequestPayload,
-      options.pullRequestServices ?? defaultPullRequestEventServices
+      options.pullRequestServices ?? defaultPullRequestEventServices,
+      options.pullRequestStateFetcher ?? fetchPullRequestSnapshot
     )
   } else if (event === "pull_request_review") {
     await handlePullRequestReviewEvent(
       supabase,
-      payload as PullRequestReviewPayload
+      payload as PullRequestReviewPayload,
+      options.pullRequestServices ?? defaultPullRequestEventServices,
+      options.pullRequestStateFetcher ?? fetchPullRequestSnapshot
     )
   } else if (event === "issue_comment") {
     await handleIssueCommentEvent(supabase, payload as IssueCommentPayload)
@@ -258,7 +263,8 @@ function verifySignature(
 async function handlePullRequestEvent(
   supabase: ReturnType<typeof createServiceClient>,
   payload: PullRequestPayload,
-  services: PullRequestEventServices
+  services: PullRequestEventServices,
+  pullRequestStateFetcher: typeof fetchPullRequestSnapshot
 ) {
   // The payload always carries the PR's full current state regardless of
   // action, so every delivery is a chance to refresh the cached pill state
@@ -273,6 +279,7 @@ async function handlePullRequestEvent(
     prUrl: payload.pull_request.html_url,
     prState,
     readyForReview: prState === "open" && payload.pull_request.draft === false,
+    headSha: payload.pull_request.head?.sha ?? null,
   })
 
   console.info(
@@ -284,38 +291,37 @@ async function handlePullRequestEvent(
     return
   }
 
-  if (prState !== "unknown") {
-    await services.updatePullRequestStateByPrUrl(
-      supabase,
-      payload.pull_request.html_url,
-      prState
-    )
+  const installationId = payload.installation?.id
+  const [owner, repo] = payload.pull_request.base.repo.full_name.split("/")
+
+  if (installationId && owner && repo) {
+    try {
+      const snapshot = await pullRequestStateFetcher(
+        String(installationId),
+        owner,
+        repo,
+        payload.pull_request.number
+      )
+      await services.applyPullRequestDeliveryState(supabase, {
+        prUrl: payload.pull_request.html_url,
+        ...snapshot,
+      })
+    } catch (error) {
+      if (diagnostic.outcome === "associated") {
+        // Association is the durable fact. A future PR/review/check delivery
+        // can repair these deliberately unknown hydrated fields.
+        console.error(
+          "[github-webhook] failed to hydrate associated pull request, preserving unknown state:",
+          error
+        )
+      } else {
+        throw error
+      }
+    }
   }
 
-  let status: IssueStatus | null = null
-
-  if (payload.action === "closed") {
-    status = payload.pull_request.merged ? "merged" : "cancelled"
-  } else if (payload.action === "reopened") {
-    status = "ready-for-review"
-  }
-
-  if (!status) {
-    return
-  }
-
-  if (payload.action === "reopened") {
-    return
-  }
-
-  const result = await services.updateIssueStatusByPrUrl(
-    supabase,
-    payload.pull_request.html_url,
-    status
-  )
-
-  if (result && payload.pull_request.merged) {
-    await services.logIssueEvent(supabase, result.id, "pr_merged", {
+  if (payload.pull_request.merged && diagnostic.statusChanged) {
+    await services.logIssueEvent(supabase, diagnostic.issueId, "pr_merged", {
       pr_url: payload.pull_request.html_url,
     })
   }
@@ -490,10 +496,14 @@ export function isPendingCheckAction(
   action: string
 ): boolean {
   if (event === "workflow_run") {
-    return action === "requested"
+    return action === "requested" || action === "in_progress"
   }
 
-  return action === "rerequested"
+  if (event === "check_suite") {
+    return action === "requested" || action === "rerequested"
+  }
+
+  return action === "created" || action === "rerequested"
 }
 
 async function resolveCompletedChecksForRef(
@@ -531,30 +541,28 @@ async function resolveCompletedChecksForRef(
   }
 
   const status = resolveCheckSuiteStatus(suites)
+  const ciState =
+    status === "testing"
+      ? "pending"
+      : status === "tests-failed"
+        ? "failure"
+        : "success"
 
-  if (status === "testing") {
-    return
-  }
-
-  // The commit is pushed before the PR is opened, so the very first
-  // check_suite/workflow_run "requested" event can arrive before any PR
-  // exists for the ref — `markPendingChecksForRef` then has no PR to move to
-  // `testing`, and the run can finish and land straight on `ready-for-review`
-  // (see `resolvePrFinishStatus`) before the checks it raced against
-  // complete. Accept those statuses here too so the completed event still
-  // corrects them instead of no-op'ing against a `testing` guard that was
-  // never set.
   for (const pullNumber of pullNumbers) {
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
-    const result = await issuesService.updateIssueStatusByPrUrlIfStatus(
-      supabase,
-      prUrl,
-      ["testing", "ready-for-review", "tests-failed"],
-      status
-    )
+    const result =
+      await githubIntegrationsService.applyPullRequestDeliveryState(supabase, {
+        prUrl,
+        ciState,
+        expectedHeadSha: headSha,
+      })
 
-    if (result && status === "tests-failed") {
-      await issuesService.applyTestsFailed(supabase, result.id, prUrl)
+    if (result?.issue_status_changed && status === "tests-failed") {
+      await issuesService.applyTestsFailed(
+        supabase,
+        result.associated_issue_id,
+        prUrl
+      )
     }
   }
 }
@@ -608,42 +616,45 @@ async function markPendingChecksForRef(
 
   for (const pullNumber of pullNumbers) {
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pullNumber}`
-    await issuesService.updateIssueStatusByPrUrlIfStatus(
-      supabase,
+    await githubIntegrationsService.applyPullRequestDeliveryState(supabase, {
       prUrl,
-      ["ready-for-review", "tests-failed"],
-      "testing"
-    )
+      ciState: "pending",
+      expectedHeadSha: headSha,
+    })
   }
 }
 
 async function handlePullRequestReviewEvent(
   supabase: ReturnType<typeof createServiceClient>,
-  payload: PullRequestReviewPayload
+  payload: PullRequestReviewPayload,
+  services: PullRequestEventServices,
+  pullRequestStateFetcher: typeof fetchPullRequestSnapshot
 ) {
-  if (payload.action !== "submitted") {
+  if (payload.action !== "submitted" && payload.action !== "dismissed") {
     return
   }
 
-  let status: IssueStatus | null = null
-
-  if (payload.review.state === "approved") {
-    status = "approved"
-  } else if (payload.review.state === "changes_requested") {
-    status = "changes-requested"
-  }
-
-  if (!status) {
+  const installationId = payload.installation?.id
+  if (!installationId) {
     return
   }
 
-  await issuesService.updateIssueStatusByPrUrl(
-    supabase,
-    payload.pull_request.html_url,
-    status
+  const snapshot = await pullRequestStateFetcher(
+    String(installationId),
+    payload.repository.owner.login,
+    payload.repository.name,
+    payload.pull_request.number
   )
 
-  if (payload.review.state === "changes_requested") {
+  await services.applyPullRequestDeliveryState(supabase, {
+    prUrl: payload.pull_request.html_url,
+    ...snapshot,
+  })
+
+  if (
+    payload.action === "submitted" &&
+    payload.review.state === "changes_requested"
+  ) {
     await applyChangesRequestedReview(supabase, payload)
   }
 }

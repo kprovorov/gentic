@@ -3,10 +3,54 @@ import test from "node:test"
 
 import { ServiceError } from "./errors"
 import {
+  applyPullRequestDeliveryState,
   associatePullRequestFromWebhook,
   parseCanonicalIssueBranch,
   upsertGithubIntegration,
 } from "./github-integrations"
+
+test("applyPullRequestDeliveryState maps one PR delivery to the atomic aggregate RPC", async () => {
+  const calls: Array<Record<string, unknown>> = []
+  const result = await applyPullRequestDeliveryState(
+    {
+      rpc(name: string, args: Record<string, unknown>) {
+        calls.push({ name, args })
+        return Promise.resolve({
+          data: [
+            {
+              associated_issue_id: "issue-42",
+              pull_request_updated: true,
+              issue_status_changed: true,
+              issue_status: "changes-requested",
+            },
+          ],
+          error: null,
+        })
+      },
+    } as never,
+    {
+      prUrl: "https://github.com/acme/base/pull/42",
+      headSha: "head-42",
+      ciState: "success",
+      reviewDecision: "changes_requested",
+    }
+  )
+
+  assert.equal(result?.issue_status, "changes-requested")
+  assert.deepEqual(calls, [
+    {
+      name: "apply_pull_request_delivery_state",
+      args: {
+        p_pr_url: "https://github.com/acme/base/pull/42",
+        p_state: undefined,
+        p_head_sha: "head-42",
+        p_ci_state: "success",
+        p_review_decision: "changes_requested",
+        p_expected_head_sha: undefined,
+      },
+    },
+  ])
+})
 
 type UpsertResult =
   | { data: Record<string, unknown>; error: null }
@@ -176,10 +220,7 @@ test("parseCanonicalIssueBranch recognizes only canonical codes at the final seg
 })
 
 type ScopeTable =
-  | "github_integrations"
-  | "projects"
-  | "issues"
-  | "issue_pull_requests"
+  "github_integrations" | "projects" | "issues" | "issue_pull_requests"
 type ScopeRow = Record<string, unknown>
 
 class ScopeQuery implements PromiseLike<{
@@ -218,8 +259,7 @@ class ScopeQuery implements PromiseLike<{
           const value = filter.column
             .split(".")
             .reduce<unknown>(
-              (current, part) =>
-                (current as ScopeRow | undefined)?.[part],
+              (current, part) => (current as ScopeRow | undefined)?.[part],
               row
             )
           return value === filter.value
@@ -297,6 +337,7 @@ const scopedAssociationInput = {
   prUrl: "https://github.com/acme/base/pull/42",
   prState: "open" as const,
   readyForReview: true,
+  headSha: "head-42",
 }
 
 test("associatePullRequestFromWebhook scopes by installation, base repository, project key, and issue number", async () => {
@@ -320,6 +361,7 @@ test("associatePullRequestFromWebhook scopes by installation, base repository, p
         p_pr_url: "https://github.com/acme/base/pull/42",
         p_pr_state: "open",
         p_ready_for_review: true,
+        p_head_sha: "head-42",
       },
     },
   ])
