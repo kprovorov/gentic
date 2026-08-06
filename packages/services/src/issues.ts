@@ -41,7 +41,6 @@ export {
   type PublishingRequestInput,
 } from "./issues/publish"
 export {
-  attachIssuePullRequest,
   type AutomaticPrPublishResult,
   bulkUpdateIssueAgentProvider,
   bulkUpdateIssuePriority,

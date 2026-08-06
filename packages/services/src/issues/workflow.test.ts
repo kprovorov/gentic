@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
-  attachIssuePullRequest,
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   recordUnpublishedAgentChanges,
@@ -936,37 +935,6 @@ test("updateIssueStatusByPrUrlIfStatus logs nothing when no guarded source statu
   )
 
   assert.deepEqual(db.issue_events, [])
-})
-
-test("attachIssuePullRequest logs pr_opened once, not again on a duplicate call", async () => {
-  const db = new EventLogDb()
-  const supabase = new EventLogSupabase(db)
-
-  await attachIssuePullRequest(
-    supabase as never,
-    "issue-7",
-    "https://github.com/acme/widget/pull/7"
-  )
-  await attachIssuePullRequest(
-    supabase as never,
-    "issue-7",
-    "https://github.com/acme/widget/pull/7"
-  )
-
-  assert.deepEqual(
-    db.issue_events.map((event) => ({
-      issue_id: event.issue_id,
-      type: event.type,
-      payload: event.payload,
-    })),
-    [
-      {
-        issue_id: "issue-7",
-        type: "pr_opened",
-        payload: { pr_url: "https://github.com/acme/widget/pull/7" },
-      },
-    ]
-  )
 })
 
 test("a raw run-state style status update does not log an event", async () => {

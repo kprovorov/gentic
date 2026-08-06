@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import {
   formatIssueKickoffMessage,
   GENTIC_AUTHORED_USER_MESSAGE,
+  generateFirstPublishBranchName,
   getIssueCode,
 } from "@gentic/services/issues"
 import { getWorker } from "@gentic/services/workers"
@@ -20,7 +21,7 @@ import {
 export const runtime = "nodejs"
 
 const CLAIM_ISSUE_SELECT =
-  "id, number, title, status, agent_provider, issue_model, session_id, pr_url, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
+  "id, number, title, status, agent_provider, issue_model, session_id, create_pr_automatically, has_unpublished_agent_changes, projects!inner(key,repo,setup_script,user_id), unfinished_blockers:issue_relations!issue_relations_target_issue_id_fkey(source_issue:issues!issue_relations_source_issue_id_fkey!inner(status))"
 
 function eligibleIssueFilter(now: string): string {
   return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
@@ -163,7 +164,11 @@ export async function claimNextQueuedIssue(
     repo: candidate.projects.repo,
     setupScript: candidate.projects.setup_script,
     sessionId: candidate.session_id,
-    prUrl: candidate.pr_url,
+    branchName: generateFirstPublishBranchName({
+      projectKey: candidate.projects.key,
+      issueNumber: candidate.number,
+      issueTitle: candidate.title,
+    }),
     createPrAutomatically: candidate.create_pr_automatically,
     hasUnpublishedAgentChanges: candidate.has_unpublished_agent_changes,
   }

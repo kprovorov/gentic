@@ -314,7 +314,6 @@ test("creates the automatic PR request and returns session-continuation context"
     activeRunId: runId1,
     createPrAutomatically: true,
     hasUnpublishedAgentChanges: true,
-    prUrl: null,
   })
   assert.equal(supabase.rpcCalls[0]?.name, "request_automatic_pr_publish")
   assert.equal(supabase.rpcCalls[0]?.args.p_issue_id, "issue-1")

@@ -311,7 +311,6 @@ export async function setRunState(
   if (channel && fields.status) {
     await channel.publishRunState({
       status: fields.status,
-      pr_url: fields.pr_url ?? null,
       usage_limit_reset_at: fields.usage_limit_reset_at ?? null,
       run_error: fields.run_error ?? null,
     }).catch((error) => {

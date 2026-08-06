@@ -454,7 +454,6 @@ export function useIssueChatState({
             }
             setStatus(event.data.status)
             setUsageLimitResetAt(event.data.usage_limit_reset_at)
-            setPrUrl(event.data.pr_url)
           }
         )
         .subscribe((subscribeStatus) => {

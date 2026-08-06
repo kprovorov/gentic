@@ -9,9 +9,8 @@ import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
 import {
   captureRepoBaseline,
-  checkoutPullRequest,
+  checkoutIssueBranch,
   cloneRepo,
-  getPullRequestUrl,
   hasChangesSinceBaseline,
   hasLocalCheckout,
   type RepoBaseline,
@@ -42,7 +41,7 @@ export const PROVIDER_CHECK_CACHE_MS = 5 * 60_000
 export interface ProcessIssueDeps {
   connectIssueChannel: typeof connectIssueChannel
   cloneRepo: typeof cloneRepo
-  checkoutPullRequest: typeof checkoutPullRequest
+  checkoutIssueBranch: typeof checkoutIssueBranch
   hasLocalCheckout: typeof hasLocalCheckout
   runSetupScript: typeof runSetupScript
   captureRepoBaseline: typeof captureRepoBaseline
@@ -50,7 +49,6 @@ export interface ProcessIssueDeps {
   setRunState: typeof setRunState
   buildAttachmentBlocks: typeof buildAttachmentBlocks
   runAgentSession: typeof runAgentSession
-  getPullRequestUrl: typeof getPullRequestUrl
 }
 
 export interface WorkerLoopDeps extends ProcessIssueDeps {
@@ -63,7 +61,7 @@ export interface WorkerLoopDeps extends ProcessIssueDeps {
 const defaultProcessIssueDeps: ProcessIssueDeps = {
   connectIssueChannel,
   cloneRepo,
-  checkoutPullRequest,
+  checkoutIssueBranch,
   hasLocalCheckout,
   runSetupScript,
   captureRepoBaseline,
@@ -71,7 +69,6 @@ const defaultProcessIssueDeps: ProcessIssueDeps = {
   setRunState,
   buildAttachmentBlocks,
   runAgentSession,
-  getPullRequestUrl,
 }
 
 const defaultWorkerLoopDeps: WorkerLoopDeps = {
@@ -380,7 +377,6 @@ export async function processIssue(
     // different worker machine claimed this follow-up).
     const resumingLocalCheckout =
       Boolean(issue.sessionId) && deps.hasLocalCheckout(dir)
-    let existingPrCheckedOut = resumingLocalCheckout && Boolean(issue.prUrl)
     if (!resumingLocalCheckout) {
       await deps.cloneRepo({
         remoteBase: config.GIT_REMOTE_BASE,
@@ -388,17 +384,7 @@ export async function processIssue(
         dir,
       })
 
-      if (issue.prUrl) {
-        existingPrCheckedOut = await deps.checkoutPullRequest({
-          prUrl: issue.prUrl,
-          dir,
-        })
-        if (!existingPrCheckedOut) {
-          logInfo(
-            `issue ${issue.id} previous pull request branch could not be checked out; agent will create a new pull request if changes are needed`
-          )
-        }
-      }
+      await deps.checkoutIssueBranch({ branchName: issue.branchName, dir })
     }
 
     if (issue.setupScript) {
@@ -428,8 +414,6 @@ export async function processIssue(
         credential: config.GENTIC_WORKER_CREDENTIAL,
       },
       resumeSessionId: issue.sessionId,
-      existingPrUrl: issue.prUrl,
-      existingPrCheckedOut,
       onSessionId: (sessionId) => {
         currentSessionId = sessionId
         return deps.setRunState(
@@ -455,7 +439,6 @@ export async function processIssue(
       dir,
       baseline,
     })
-    const prUrl = turnResult.prUrl
 
     if (
       await shouldContinueWithAutomaticPrPublish({
@@ -474,7 +457,6 @@ export async function processIssue(
         {
           ...issue,
           sessionId: currentSessionId,
-          prUrl: null,
           hasUnpublishedAgentChanges: true,
         },
         deps,
@@ -486,9 +468,8 @@ export async function processIssue(
 
     const { finished, status: finishedStatus } = await api.finishRun(issue.id, {
       active_run_id: issue.activeRunId,
-      status: prUrl ? "ready-for-review" : "waiting-for-input",
+      status: "waiting-for-input",
       run_finished_at: new Date().toISOString(),
-      ...(prUrl ? { pr_url: prUrl } : {}),
     })
     if (!finished) {
       logInfo(
@@ -503,7 +484,6 @@ export async function processIssue(
         {
           ...issue,
           sessionId: currentSessionId,
-          prUrl,
           hasUnpublishedAgentChanges: turnResult.hasUnpublishedAgentChanges,
         },
         deps,
@@ -516,7 +496,6 @@ export async function processIssue(
       throwIfAborted(options.signal)
       await channel.publishRunState({
         status: finishedStatus,
-        pr_url: prUrl ?? null,
         usage_limit_reset_at: null,
         run_error: null,
       })
@@ -659,25 +638,21 @@ function toolCapability(
 }
 
 type CompletedTurnState = {
-  prUrl: string | null
-  hasPublishableChanges: boolean
   hasUnpublishedAgentChanges: boolean
 }
 
 async function recordCompletedTurnState(input: {
   api: AgentApi
-  deps: Pick<ProcessIssueDeps, "getPullRequestUrl" | "hasChangesSinceBaseline">
+  deps: Pick<ProcessIssueDeps, "hasChangesSinceBaseline">
   issue: ClaimedIssue
   dir: string
   baseline: RepoBaseline
 }): Promise<CompletedTurnState> {
-  const prUrl =
-    (await input.deps.getPullRequestUrl(input.dir)) ?? input.issue.prUrl
   const hasPublishableChanges = await input.deps.hasChangesSinceBaseline(
     input.dir,
     input.baseline
   )
-  const hasUnpublishedAgentChanges = !prUrl && hasPublishableChanges
+  const hasUnpublishedAgentChanges = hasPublishableChanges
 
   await input.api
     .recordUnpublishedAgentChanges(input.issue.id, {
@@ -692,8 +667,6 @@ async function recordCompletedTurnState(input: {
     })
 
   return {
-    prUrl,
-    hasPublishableChanges,
     hasUnpublishedAgentChanges,
   }
 }

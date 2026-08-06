@@ -27,8 +27,6 @@ export function generateFirstPublishBranchName(input: {
 export interface PublishingRequestInput {
   /** Branch to create or switch to; reused as-is if it already exists. */
   branchName: string
-  /** URL of a pull request already open for this issue, if any. */
-  existingPrUrl?: string | null
 }
 
 /**
@@ -45,9 +43,7 @@ export function formatPublishingRequest(input: PublishingRequestInput): string {
     "2. If there are uncommitted changes, commit them with a descriptive Conventional Commit message (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `build:`, or `ci:`). Never create an empty commit; skip this step if there is nothing to commit.",
     "3. Push the branch to the remote.",
     "4. Open a pull request against the repository's default branch, ready for review — never a draft. Use the commit message as the pull request title, and include a Summary section and a Test plan section in the pull request body.",
-    input.existingPrUrl
-      ? `5. A pull request is already recorded for this issue: ${input.existingPrUrl}. If it is still open, step 4 is already done — return its URL rather than opening a duplicate.`
-      : "5. If a pull request is already open for this branch, do not open a duplicate — return its URL instead.",
+    "5. If a pull request is already open for this branch, do not open a duplicate — return its URL instead.",
   ]
 
   return [

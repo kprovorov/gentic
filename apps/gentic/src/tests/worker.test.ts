@@ -135,18 +135,15 @@ test("finish-window prompts keep the run open and are processed before final sta
   })
 })
 
-test("resumed runs reuse local checkout and existing pull request context", async () => {
+test("resumed runs reuse the local Issue Branch without pull request context", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.sessionId = "existing-session"
-    issue.prUrl = "https://github.com/acme/repo/pull/5"
     api.addMessage(issue.id, message("follow-up", "Follow-up", 1))
     deps.hasLocalCheckout = () => true
 
     const prompts: PromptTurn[] = []
     deps.runAgentSession = async (input) => {
       assert.equal(input.resumeSessionId, "existing-session")
-      assert.equal(input.existingPrUrl, issue.prUrl)
-      assert.equal(input.existingPrCheckedOut, true)
       await input.onSessionId("existing-session")
       prompts.push(await consumePrompt(input))
       assert.equal(await input.nextPrompt(), null)
@@ -211,20 +208,18 @@ test("MCP transport failures fail the run instead of silently dropping tools", a
   })
 })
 
-test("fresh follow-up continues when previous pull request branch is gone", async () => {
+test("fresh follow-up tries the canonical Issue Branch and continues when it is gone", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.sessionId = "existing-session"
-    issue.prUrl = "https://github.com/acme/repo/pull/5"
     api.addMessage(issue.id, message("follow-up", "Follow-up", 1))
-    deps.checkoutPullRequest = async () => {
+    deps.checkoutIssueBranch = async (input) => {
       api.checkoutCalls += 1
+      assert.equal(input.branchName, issue.branchName)
       return false
     }
 
     deps.runAgentSession = async (input) => {
       assert.equal(input.resumeSessionId, "existing-session")
-      assert.equal(input.existingPrUrl, issue.prUrl)
-      assert.equal(input.existingPrCheckedOut, false)
       await input.onSessionId("existing-session")
       assert.equal(await consumePrompt(input), "Follow-up")
       assert.equal(await input.nextPrompt(), null)
@@ -639,41 +634,23 @@ test("agent-created commits are publishable changes", async () => {
   })
 })
 
-test("agent-created pull requests are attached without automatic publishing", async () => {
+test("worker does not discover agent-created pull requests from the checkout", async () => {
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.createPrAutomatically = true
     api.hasChanges = true
-    deps.getPullRequestUrl = async () => "https://github.com/acme/repo/pull/12"
+    api.automaticPrPublishError = new Error("Issue already has a pull request")
+    api.finishStatusOverride = "ready-for-review"
 
     await processIssue(api, config, issue, deps)
 
-    assert.deepEqual(api.automaticPrPublishRequests, [])
+    assert.equal("getPullRequestUrl" in deps, false)
+    assert.equal(api.automaticPrPublishRequests.length, 1)
     assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
     assert.deepEqual(api.unpublishedChanges, [
       {
         issueId: issue.id,
         activeRunId: issue.activeRunId,
-        hasUnpublishedAgentChanges: false,
-      },
-    ])
-  })
-})
-
-test("pre-existing pull requests skip automatic publishing", async () => {
-  await withHarness(async ({ config, issue, api, deps }) => {
-    issue.createPrAutomatically = true
-    issue.prUrl = "https://github.com/acme/repo/pull/5"
-    api.hasChanges = true
-
-    await processIssue(api, config, issue, deps)
-
-    assert.deepEqual(api.automaticPrPublishRequests, [])
-    assert.deepEqual(api.finishedStatuses, ["ready-for-review"])
-    assert.deepEqual(api.unpublishedChanges, [
-      {
-        issueId: issue.id,
-        activeRunId: issue.activeRunId,
-        hasUnpublishedAgentChanges: false,
+        hasUnpublishedAgentChanges: true,
       },
     ])
   })
@@ -813,9 +790,7 @@ test("publishes ready-for-review status when automatic publishing creates a PR",
   await withHarness(async ({ config, issue, api, deps }) => {
     issue.createPrAutomatically = true
     api.hasChanges = true
-    let sessionRuns = 0
     deps.runAgentSession = async (input) => {
-      sessionRuns += 1
       await input.onSessionId("session-1")
       const next = await input.nextPrompt()
       if (next) {
@@ -823,8 +798,7 @@ test("publishes ready-for-review status when automatic publishing creates a PR",
       }
       assert.equal(await input.nextPrompt(), null)
     }
-    deps.getPullRequestUrl = async () =>
-      sessionRuns >= 2 ? "https://github.com/acme/repo/pull/44" : null
+    api.finishStatusOverride = "ready-for-review"
 
     await processIssue(api, config, issue, deps)
 
@@ -882,7 +856,7 @@ function fakeDeps(
     async cloneRepo() {
       api.cloneCalls += 1
     },
-    async checkoutPullRequest() {
+    async checkoutIssueBranch() {
       api.checkoutCalls += 1
       return true
     },
@@ -911,9 +885,6 @@ function fakeDeps(
         }
         await input.onPromptProcessed?.(normalizeDelivery(next).messageIds)
       }
-    },
-    async getPullRequestUrl() {
-      return null
     },
   }
 }
@@ -1069,7 +1040,6 @@ class FakeApi implements AgentApi {
       activeRunId: string
       createPrAutomatically: boolean
       hasUnpublishedAgentChanges: boolean
-      prUrl: string | null
     }
   }> {
     this.automaticPrPublishRequests.push({ issueId, activeRunId })
@@ -1098,7 +1068,6 @@ class FakeApi implements AgentApi {
         activeRunId,
         createPrAutomatically: true,
         hasUnpublishedAgentChanges: true,
-        prUrl: null,
       },
     }
   }
@@ -1254,7 +1223,7 @@ function claimedIssue(id: string): ClaimedIssue {
     repo: "acme/repo",
     setupScript: null,
     sessionId: null,
-    prUrl: null,
+    branchName: `test-${id}-issue`,
     createPrAutomatically: false,
     hasUnpublishedAgentChanges: false,
   }
