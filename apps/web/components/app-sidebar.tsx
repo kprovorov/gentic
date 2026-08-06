@@ -16,6 +16,7 @@ import {
 
 import { Logo } from "./logo"
 import { NavMain } from "./nav-main"
+import { NavTheme } from "./nav-theme"
 import { NavUser } from "./nav-user"
 
 const navMain = [
@@ -51,6 +52,9 @@ export function AppSidebar({
         <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
+        <div className="px-2 py-1">
+          <NavTheme />
+        </div>
         <NavUser />
       </SidebarFooter>
     </Sidebar>
