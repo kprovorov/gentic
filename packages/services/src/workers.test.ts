@@ -843,7 +843,6 @@ test("ban revokes access and atomically requeues active work", async () => {
       active_worker_id: "worker-1",
       active_run_id: "11111111-1111-4111-8111-111111111111",
       status: "in-progress",
-      pr_url: "https://github.com/acme/repo/pull/1",
       session_id: "session-1",
       run_error: "old",
     })
@@ -868,10 +867,6 @@ test("ban revokes access and atomically requeues active work", async () => {
   assert.equal(supabase.db.issues[0]?.status, "todo")
   assert.equal(supabase.db.issues[0]?.active_worker_id, null)
   assert.equal(supabase.db.issues[0]?.active_run_id, null)
-  assert.equal(
-    supabase.db.issues[0]?.pr_url,
-    "https://github.com/acme/repo/pull/1"
-  )
   assert.equal(supabase.db.issues[0]?.session_id, "session-1")
   assert.equal(supabase.db.issues[0]?.run_error, null)
   assert.equal(supabase.db.messages[0]?.consumed_by_run_id, null)
@@ -1228,7 +1223,6 @@ function issueRow(overrides: Row = {}): Row {
     active_worker_id: null,
     active_run_id: null,
     status: "todo",
-    pr_url: null,
     session_id: null,
     run_error: null,
     run_started_at: null,

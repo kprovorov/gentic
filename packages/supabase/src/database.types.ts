@@ -332,7 +332,6 @@ export type Database = {
           id: string
           issue_model: string | null
           number: number
-          pr_url: string | null
           priority: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           run_error: string | null
@@ -356,7 +355,6 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number: number
-          pr_url?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           run_error?: string | null
@@ -380,7 +378,6 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number?: number
-          pr_url?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id?: string
           run_error?: string | null
@@ -831,7 +828,6 @@ export type Database = {
       finish_issue_run_if_no_pending: {
         Args: {
           p_issue_id: string
-          p_pr_url?: string
           p_run_finished_at: string
           p_run_id: string
           p_status: string

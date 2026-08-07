@@ -62,11 +62,12 @@ SELECT throws_ok(
     )
   $$,
   '23505',
+  null,
   'rename rejects case-insensitive collisions for the same owner'
 );
 
-SELECT is_empty(
-  $$
+SELECT is(
+  (
     SELECT id
       FROM public.rename_worker(
         'user_alpha',
@@ -74,7 +75,8 @@ SELECT is_empty(
         'Hidden',
         '2026-07-29T20:03:00Z'
       )
-  $$,
+  ),
+  null,
   'rename does not reveal another user worker'
 );
 
@@ -93,6 +95,7 @@ SELECT throws_ok(
     )
   $$,
   '23514',
+  null,
   'worker names over 80 characters are rejected'
 );
 
@@ -120,7 +123,6 @@ INSERT INTO public.issues (
   active_worker_id,
   active_run_id,
   session_id,
-  pr_url,
   run_error,
   run_started_at
 ) VALUES
@@ -134,7 +136,6 @@ INSERT INTO public.issues (
     '00000000-0000-4000-8000-100000000001',
     '30000000-0000-4000-8000-100000000001',
     'session-1',
-    'https://github.com/gentic/alpha/pull/1',
     'old error',
     '2026-07-29T19:55:00Z'
   ),
@@ -148,9 +149,18 @@ INSERT INTO public.issues (
     '00000000-0000-4000-8000-100000000001',
     '30000000-0000-4000-8000-100000000002',
     'session-2',
-    'https://github.com/gentic/alpha/pull/2',
     'failed',
     '2026-07-29T19:50:00Z'
+  );
+
+INSERT INTO public.issue_pull_requests (issue_id, url) VALUES
+  (
+    '20000000-0000-4000-8000-100000000001',
+    'https://github.com/gentic/alpha/pull/1'
+  ),
+  (
+    '20000000-0000-4000-8000-100000000002',
+    'https://github.com/gentic/alpha/pull/2'
   );
 
 INSERT INTO public.messages (
@@ -234,12 +244,12 @@ SELECT is(
 
 SELECT is(
   (
-    SELECT pr_url
-      FROM public.issues
-     WHERE id = '20000000-0000-4000-8000-100000000001'
+    SELECT url
+      FROM public.issue_pull_requests
+     WHERE issue_id = '20000000-0000-4000-8000-100000000001'
   ),
   'https://github.com/gentic/alpha/pull/1',
-  'requeued issue retains pull request context'
+  'requeued issue retains its Associated Pull Request'
 );
 
 SELECT is(
@@ -424,27 +434,29 @@ SELECT is(
   'offline delete clears failed run lease'
 );
 
-SELECT is_empty(
-  $$
+SELECT is(
+  (
     SELECT id
       FROM public.ban_worker(
         'user_alpha',
         '00000000-0000-4000-8000-100000000003',
         '2026-07-29T20:08:00Z'
       )
-  $$,
+  ),
+  null,
   'ban does not reveal another user worker'
 );
 
-SELECT is_empty(
-  $$
+SELECT is(
+  (
     SELECT id
       FROM public.unban_worker(
         'user_alpha',
         '00000000-0000-4000-8000-100000000003',
         '2026-07-29T20:09:00Z'
       )
-  $$,
+  ),
+  null,
   'unban does not reveal another user worker'
 );
 

@@ -526,7 +526,6 @@ test("updateIssue persists automatic PR preference before a PR is attached", asy
     issueRow({
       id: "issue-automatic-pr",
       create_pr_automatically: true,
-      pr_url: null,
     })
   )
   const supabase = new EventLogSupabase(db)
@@ -557,7 +556,6 @@ test("updateIssue leaves automatic PR preference historical after a PR is attach
     issueRow({
       id: "issue-attached-pr",
       create_pr_automatically: true,
-      pr_url: null,
     })
   )
   db.issue_pull_requests.push({
@@ -809,29 +807,6 @@ test("updateIssueStatusByPrUrl logs a status_changed event when found via issue_
   )
 })
 
-test("updateIssueStatusByPrUrl ignores an unassociated legacy issues.pr_url", async () => {
-  const db = new EventLogDb()
-  db.issues.push(
-    issueRow({
-      id: "issue-3",
-      status: "in-progress",
-      pr_url: "https://github.com/acme/widget/pull/2",
-    })
-  )
-  const supabase = new EventLogSupabase(db)
-
-  await updateIssueStatusByPrUrl(
-    supabase as never,
-    "https://github.com/acme/widget/pull/2",
-    "merged"
-  )
-
-  assert.deepEqual(
-    db.issue_events.map((event) => event.payload),
-    []
-  )
-})
-
 test("updateIssueStatusByPrUrl logs nothing when no issue matches the PR url", async () => {
   const db = new EventLogDb()
   db.issues.push(issueRow({ id: "issue-4", status: "in-progress" }))
@@ -853,7 +828,6 @@ test("updateIssueStatusByPrUrlIfStatus logs a status_changed event when the guar
     issueRow({
       id: "issue-5",
       status: "testing",
-      pr_url: "https://github.com/acme/widget/pull/5",
     })
   )
   db.issue_pull_requests.push({
@@ -882,7 +856,6 @@ test("updateIssueStatusByPrUrlIfStatus accepts multiple guarded source statuses"
     issueRow({
       id: "issue-9",
       status: "ready-for-review",
-      pr_url: "https://github.com/acme/widget/pull/9",
     })
   )
   db.issue_pull_requests.push({
@@ -911,7 +884,6 @@ test("updateIssueStatusByPrUrlIfStatus logs nothing when the issue has moved pas
     issueRow({
       id: "issue-6",
       status: "changes-requested",
-      pr_url: "https://github.com/acme/widget/pull/6",
     })
   )
   const supabase = new EventLogSupabase(db)
@@ -932,7 +904,6 @@ test("updateIssueStatusByPrUrlIfStatus logs nothing when no guarded source statu
     issueRow({
       id: "issue-10",
       status: "changes-requested",
-      pr_url: "https://github.com/acme/widget/pull/10",
     })
   )
   const supabase = new EventLogSupabase(db)
@@ -1034,7 +1005,6 @@ function automaticPrIssueRow(overrides: Row = {}): Row {
     active_run_id: "run-1",
     create_pr_automatically: true,
     has_unpublished_agent_changes: true,
-    pr_url: null,
     title: "Fix the thing",
     projects: { user_id: "user-1", key: "ACME" },
     ...overrides,

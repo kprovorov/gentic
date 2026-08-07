@@ -200,15 +200,17 @@ INSERT INTO public.issues (
   body,
   status,
   number,
-  active_worker_id
+  active_worker_id,
+  active_run_id
 ) VALUES (
   '20000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000001',
   'Use a worker',
   'Body',
-  'todo',
+  'in-progress',
   1,
-  '00000000-0000-4000-8000-000000000001'
+  '00000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000001'
 );
 
 SELECT is(
