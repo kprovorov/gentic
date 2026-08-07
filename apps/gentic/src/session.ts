@@ -106,10 +106,6 @@ export interface RunSessionInput {
    * Omitted only when the worker has no usable connection details.
    */
   genticMcp?: GenticMcpAccess | null
-  /** Existing pull request for the issue, if a previous run already opened one. */
-  existingPrUrl?: string | null
-  /** Whether the existing pull request branch is checked out in `cwd`. */
-  existingPrCheckedOut?: boolean
   /** Called once with the ACP session id after the session starts. */
   onSessionId: (sessionId: string) => Promise<void>
   /**

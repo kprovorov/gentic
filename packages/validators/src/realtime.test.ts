@@ -107,6 +107,12 @@ test("runStateEventSchema broadcasts a database-derived PR aggregate status", ()
   })
 
   assert.equal(event.status, "tests-failed")
+  assert.throws(() =>
+    runStateEventSchema.parse({
+      ...event,
+      pr_url: "https://github.com/acme/repo/pull/42",
+    })
+  )
 })
 
 test("issueEventSchema parses a well-formed issue_events row", () => {

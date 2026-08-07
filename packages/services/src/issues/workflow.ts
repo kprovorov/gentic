@@ -459,33 +459,6 @@ export async function updateIssueStatusByPrUrlIfStatus(
   return result
 }
 
-// `ignoreDuplicates` makes this safe to call on every run-state update that
-// carries a `pr_url` (the worker resends it on each message), not just the
-// first. Only log `pr_opened` when the upsert actually inserted a row —
-// `.select()` on an ignored conflict returns no row — so repeat calls for an
-// already-tracked PR don't spam the timeline.
-export async function attachIssuePullRequest(
-  supabase: Supabase,
-  issueId: string,
-  prUrl: string
-) {
-  const result = unwrap(
-    await supabase
-      .from("issue_pull_requests")
-      .upsert(
-        { issue_id: issueId, url: prUrl },
-        { onConflict: "url", ignoreDuplicates: true }
-      )
-      .select("id")
-  )
-
-  if (result.length > 0) {
-    await logIssueEvent(supabase, issueId, "pr_opened", { pr_url: prUrl })
-  }
-
-  return result
-}
-
 export type PersistedPullRequestState =
   | "draft"
   | "open"

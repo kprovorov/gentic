@@ -20,20 +20,22 @@ export const claimIssueInputSchema = z.object({}).passthrough()
 
 export type ClaimIssueInput = z.infer<typeof claimIssueInputSchema>
 
-export const claimedIssueSchema = z.object({
-  id: z.string().uuid(),
-  activeRunId: z.string().uuid(),
-  code: z.string(),
-  title: z.string().nullable(),
-  agentProvider: agentProviderSchema,
-  issueModel: issueModelSchema,
-  repo: z.string(),
-  setupScript: z.string().nullable(),
-  sessionId: z.string().nullable(),
-  prUrl: z.string().nullable(),
-  createPrAutomatically: z.boolean(),
-  hasUnpublishedAgentChanges: z.boolean(),
-})
+export const claimedIssueSchema = z
+  .object({
+    id: z.string().uuid(),
+    activeRunId: z.string().uuid(),
+    code: z.string(),
+    title: z.string().nullable(),
+    agentProvider: agentProviderSchema,
+    issueModel: issueModelSchema,
+    repo: z.string(),
+    setupScript: z.string().nullable(),
+    sessionId: z.string().nullable(),
+    branchName: z.string(),
+    createPrAutomatically: z.boolean(),
+    hasUnpublishedAgentChanges: z.boolean(),
+  })
+  .strict()
 
 export type ClaimedIssue = z.infer<typeof claimedIssueSchema>
 
@@ -50,7 +52,6 @@ const runStateFieldsBaseSchema = z
     run_started_at: z.string().datetime().nullable().optional(),
     run_finished_at: z.string().datetime().nullable().optional(),
     usage_limit_reset_at: z.string().datetime().nullable().optional(),
-    pr_url: z.string().url().nullable().optional(),
   })
   .strict()
 

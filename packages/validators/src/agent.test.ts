@@ -5,10 +5,12 @@ import {
   automaticPrPublishResponseSchema,
   automaticPrRequestSchema,
   claimedIssueSchema,
+  finishRunFieldsSchema,
   finishRunResponseSchema,
   insertMessageInputSchema,
   recordUnpublishedChangesInputSchema,
   requestAutomaticPrPublishInputSchema,
+  runStateFieldsSchema,
 } from "./agent.js"
 
 const issueId = "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1"
@@ -27,7 +29,7 @@ test("claimedIssueSchema includes automatic PR foundation fields", () => {
       repo: "gentic/app",
       setupScript: null,
       sessionId: null,
-      prUrl: null,
+      branchName: "gen-42-fix-the-thing",
       createPrAutomatically: true,
       hasUnpublishedAgentChanges: false,
     }),
@@ -41,10 +43,52 @@ test("claimedIssueSchema includes automatic PR foundation fields", () => {
       repo: "gentic/app",
       setupScript: null,
       sessionId: null,
-      prUrl: null,
+      branchName: "gen-42-fix-the-thing",
       createPrAutomatically: true,
       hasUnpublishedAgentChanges: false,
     }
+  )
+})
+
+test("agent claim, run-state, and finish contracts reject pull request URLs", () => {
+  const claimedIssue = {
+    id: issueId,
+    activeRunId: runId,
+    code: "GEN-42",
+    title: "Fix the thing",
+    agentProvider: "codex",
+    issueModel: null,
+    repo: "gentic/app",
+    setupScript: null,
+    sessionId: null,
+    branchName: "gen-42-fix-the-thing",
+    createPrAutomatically: true,
+    hasUnpublishedAgentChanges: false,
+  }
+  assert.throws(() =>
+    claimedIssueSchema.parse({
+      ...claimedIssue,
+      prUrl: "https://github.com/acme/gentic/pull/42",
+    })
+  )
+
+  const runState = {
+    active_run_id: runId,
+    status: "in-progress" as const,
+  }
+  assert.throws(() =>
+    runStateFieldsSchema.parse({
+      ...runState,
+      pr_url: "https://github.com/acme/gentic/pull/42",
+    })
+  )
+  assert.throws(() =>
+    finishRunFieldsSchema.parse({
+      active_run_id: runId,
+      status: "waiting-for-input",
+      run_finished_at: "2026-08-06T10:00:00Z",
+      pr_url: "https://github.com/acme/gentic/pull/42",
+    })
   )
 })
 

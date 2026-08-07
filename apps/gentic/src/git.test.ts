@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, test } from "node:test"
 
 import {
   captureRepoBaseline,
+  checkoutIssueBranch,
   hasChangesSinceBaseline,
   hasLocalCheckout,
   hasNewCommitsSince,
@@ -40,6 +41,66 @@ test("hasLocalCheckout is false for a directory that doesn't exist", () => {
 test("hasLocalCheckout is true once a .git directory is present", () => {
   mkdirSync(join(dir, ".git"))
   assert.equal(hasLocalCheckout(dir), true)
+})
+
+test("checkoutIssueBranch resumes a canonical remote branch without a PR URL", async () => {
+  const remote = join(dir, "remote.git")
+  const source = join(dir, "source")
+  const checkout = join(dir, "checkout")
+  mkdirSync(source)
+  execFileSync("git", ["init", "--bare", "-q", remote])
+  execFileSync("git", ["init", "-q"], { cwd: source })
+  execFileSync("git", ["config", "user.email", "gentic-test@example.com"], {
+    cwd: source,
+  })
+  execFileSync("git", ["config", "user.name", "Gentic Test"], {
+    cwd: source,
+  })
+  writeFileSync(join(source, "README.md"), "default\n")
+  execFileSync("git", ["add", "README.md"], { cwd: source })
+  execFileSync("git", ["commit", "-q", "-m", "initial"], { cwd: source })
+  execFileSync("git", ["branch", "-M", "main"], { cwd: source })
+  execFileSync("git", ["remote", "add", "origin", remote], { cwd: source })
+  execFileSync("git", ["push", "-q", "-u", "origin", "main"], {
+    cwd: source,
+  })
+  execFileSync("git", ["switch", "-q", "-c", "gen-42-fix-the-thing"], {
+    cwd: source,
+  })
+  writeFileSync(join(source, "README.md"), "issue branch\n")
+  execFileSync("git", ["commit", "-q", "-am", "issue work"], {
+    cwd: source,
+  })
+  execFileSync("git", ["push", "-q", "origin", "gen-42-fix-the-thing"], {
+    cwd: source,
+  })
+  execFileSync("git", ["clone", "-q", "--branch", "main", remote, checkout])
+
+  assert.equal(
+    await checkoutIssueBranch({
+      branchName: "gen-42-fix-the-thing",
+      dir: checkout,
+    }),
+    true
+  )
+  assert.equal(
+    execFileSync("git", ["branch", "--show-current"], {
+      cwd: checkout,
+      encoding: "utf8",
+    }).trim(),
+    "gen-42-fix-the-thing"
+  )
+  assert.equal(
+    await checkoutIssueBranch({ branchName: "gen-42-missing", dir: checkout }),
+    false
+  )
+  assert.equal(
+    execFileSync("git", ["branch", "--show-current"], {
+      cwd: checkout,
+      encoding: "utf8",
+    }).trim(),
+    "gen-42-fix-the-thing"
+  )
 })
 
 describe("repo baseline helpers", () => {

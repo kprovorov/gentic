@@ -6,9 +6,45 @@ import {
   json,
   runStateSchema,
   ensureActiveWorkerRun,
+  type Supabase,
 } from "../../../_lib"
 
 export const runtime = "nodejs"
+
+export async function finishIssueRun(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  issueId: string,
+  body: unknown
+) {
+  const fields = finishRunSchema.parse(body)
+  await ensureActiveWorkerRun(
+    supabase,
+    userId,
+    workerId,
+    issueId,
+    fields.active_run_id
+  )
+
+  const { data, error } = await supabase
+    .rpc("finish_issue_run_if_no_pending", {
+      p_issue_id: issueId,
+      p_run_id: fields.active_run_id,
+      p_status: fields.status,
+      p_run_finished_at: fields.run_finished_at,
+    })
+    .single<{ finished: boolean; status: string }>()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return {
+    finished: data?.finished ?? false,
+    status: data?.status ?? fields.status,
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -26,33 +62,7 @@ export async function PATCH(
       typeof body === "object" &&
       "finish_if_no_pending" in body
     ) {
-      const fields = finishRunSchema.parse(body)
-      await ensureActiveWorkerRun(
-        supabase,
-        userId,
-        workerId,
-        id,
-        fields.active_run_id
-      )
-
-      const { data, error } = await supabase
-        .rpc("finish_issue_run_if_no_pending", {
-          p_issue_id: id,
-          p_run_id: fields.active_run_id,
-          p_status: fields.status,
-          p_run_finished_at: fields.run_finished_at,
-          p_pr_url: fields.pr_url ?? undefined,
-        })
-        .single<{ finished: boolean; status: string }>()
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return json({
-        finished: data?.finished ?? false,
-        status: data?.status ?? fields.status,
-      })
+      return json(await finishIssueRun(supabase, userId, workerId, id, body))
     }
 
     // Statuses that end a run (`run-failed`, `held`) are written here like any

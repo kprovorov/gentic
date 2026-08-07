@@ -88,16 +88,3 @@ test("formatPublishingRequest without an existing PR tells the agent to avoid du
     /if a pull request is already open for this branch, do not open a duplicate — return its url instead/i
   )
 })
-
-test("formatPublishingRequest with an existing PR points at it instead of duplicating it", () => {
-  const message = formatPublishingRequest({
-    branchName: "fit-45-create-settings-page",
-    existingPrUrl: "https://github.com/acme/repo/pull/7",
-  })
-
-  assert.match(
-    message,
-    /already recorded for this issue: https:\/\/github\.com\/acme\/repo\/pull\/7/
-  )
-  assert.match(message, /return its url rather than opening a duplicate/i)
-})

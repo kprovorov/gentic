@@ -30,17 +30,44 @@ export async function cloneRepo(options: {
 }
 
 /**
- * Checks out the branch for an existing pull request so follow-up runs can
- * update that PR instead of creating a second one. Returns false when GitHub
- * can no longer check out the branch, e.g. after the PR was merged and the
- * branch was deleted.
+ * Checks out the canonical remote branch for an issue when it exists so a
+ * fresh worker checkout can continue previously published work without
+ * knowing anything about the associated pull request.
  */
-export async function checkoutPullRequest(options: {
-  prUrl: string
+export async function checkoutIssueBranch(options: {
+  branchName: string
   dir: string
 }): Promise<boolean> {
   try {
-    await run("gh", ["pr", "checkout", options.prUrl], { cwd: options.dir })
+    const remoteRef = `refs/heads/${options.branchName}`
+    const remoteBranch = await runCapture(
+      "git",
+      ["ls-remote", "--heads", "origin", remoteRef],
+      { cwd: options.dir }
+    )
+    if (remoteBranch.trim().length === 0) {
+      return false
+    }
+    await run(
+      "git",
+      [
+        "fetch",
+        "origin",
+        `${remoteRef}:refs/remotes/origin/${options.branchName}`,
+      ],
+      { cwd: options.dir }
+    )
+    await run(
+      "git",
+      [
+        "switch",
+        "--track",
+        "-C",
+        options.branchName,
+        `origin/${options.branchName}`,
+      ],
+      { cwd: options.dir }
+    )
     return true
   } catch {
     return false
@@ -56,25 +83,6 @@ export async function runSetupScript(options: {
   dir: string
 }): Promise<void> {
   await run("sh", ["-c", options.script], { cwd: options.dir })
-}
-
-/**
- * Looks up the URL of the pull request open for the current branch of the
- * cloned repo, if the agent created one during its run. Returns `null` when
- * there is no such PR (e.g. the agent made no changes).
- */
-export async function getPullRequestUrl(dir: string): Promise<string | null> {
-  try {
-    const output = await runCapture(
-      "gh",
-      ["pr", "view", "--json", "url", "-q", ".url"],
-      { cwd: dir }
-    )
-    const url = output.trim()
-    return url.length > 0 ? url : null
-  } catch {
-    return null
-  }
 }
 
 /** Snapshot of a repo's commit history, taken once repository setup has finished. */
