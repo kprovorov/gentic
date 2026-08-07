@@ -15,7 +15,6 @@ type IssueRow = {
   active_run_id: string | null
   create_pr_automatically: boolean
   has_unpublished_agent_changes: boolean
-  pr_url: string | null
   issue_pull_requests: Array<{ id: string }>
   number: number
   title: string | null
@@ -70,7 +69,6 @@ class FakeIssuesQuery {
         active_run_id: row.active_run_id,
         create_pr_automatically: row.create_pr_automatically,
         has_unpublished_agent_changes: row.has_unpublished_agent_changes,
-        pr_url: row.pr_url,
         issue_pull_requests: row.issue_pull_requests,
         projects: { key: row.project_key },
       },
@@ -187,7 +185,6 @@ function issue(overrides: Partial<IssueRow> & Pick<IssueRow, "id">): IssueRow {
     active_run_id: runId1,
     create_pr_automatically: true,
     has_unpublished_agent_changes: true,
-    pr_url: null,
     issue_pull_requests: [],
     number: 7,
     title: "Fix the thing",
@@ -252,7 +249,7 @@ test("rejects when create_pr_automatically is not opted in", async () => {
 
 test("rejects when the issue already has a pull request", async () => {
   const supabase = new FakeSupabase([
-    issue({ id: "issue-1", pr_url: "https://github.com/acme/widget/pull/9" }),
+    issue({ id: "issue-1", issue_pull_requests: [{ id: "pr-9" }] }),
   ])
 
   await assert.rejects(

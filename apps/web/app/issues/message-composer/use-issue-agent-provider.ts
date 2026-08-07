@@ -35,7 +35,6 @@ export function useIssueAgentProvider({
             message,
             status: "todo",
             usageLimitResetAt: null,
-            prUrl: null,
             pullRequests: [],
           },
         })

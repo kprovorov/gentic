@@ -151,10 +151,9 @@ export const createIssueSchema = z.object({
 export type CreateIssueValues = z.infer<typeof createIssueSchema>
 
 export function hasAttachedIssuePullRequest(issue: {
-  pr_url: string | null
   issue_pull_requests?: readonly unknown[] | null
 }) {
-  return Boolean(issue.pr_url) || (issue.issue_pull_requests?.length ?? 0) > 0
+  return (issue.issue_pull_requests?.length ?? 0) > 0
 }
 
 export const updateIssueSchema = z.object({

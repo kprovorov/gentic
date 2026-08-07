@@ -19,20 +19,6 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     labels,
     archivedLabelIds,
   } = data
-  const displayedPullRequests =
-    pullRequests.length > 0
-      ? pullRequests
-      : issue.pr_url
-        ? [
-            {
-              id: "legacy-pr-url",
-              issue_id: issue.id,
-              url: issue.pr_url,
-              created_at: issue.updated_at,
-            },
-          ]
-        : []
-
   return (
     <div className="flex min-w-0 flex-col bg-background xl:h-[calc(100svh-3.5rem)] xl:overflow-hidden">
       <RealtimeRefresh
@@ -63,7 +49,6 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           initialMessages={messages}
           initialStatus={issue.status}
           initialUsageLimitResetAt={issue.usage_limit_reset_at}
-          initialPrUrl={issue.pr_url}
           initialPullRequests={pullRequests}
           attachments={attachments}
           events={events}
@@ -78,7 +63,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             priority={issue.priority}
             hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
             automaticPrPublishingInProgress={automaticPrPublishingInProgress}
-            pullRequests={displayedPullRequests}
+            pullRequests={pullRequests}
             relations={relations}
             relationCandidates={relationCandidates}
             labels={labels}

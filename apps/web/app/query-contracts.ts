@@ -62,7 +62,6 @@ export const issueEditSchema = z.object({
   type: issueTypeSchema,
   priority: issuePrioritySchema,
   create_pr_automatically: z.boolean(),
-  pr_url: z.string().nullable(),
   issue_pull_requests: z.array(z.object({ id: z.string() })).optional(),
   projects: projectOptionSchema.nullable(),
 })
@@ -81,7 +80,6 @@ export const issueDetailSchema = z.object({
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   has_unpublished_agent_changes: z.boolean(),
-  pr_url: z.string().nullable(),
   create_pr_automatically: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -132,7 +130,6 @@ export type IssueDetail = {
   usage_limit_reset_at: string | null
   run_started_at: string | null
   has_unpublished_agent_changes: boolean
-  pr_url: string | null
   create_pr_automatically: boolean
   created_at: string
   updated_at: string
@@ -241,7 +238,6 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     usage_limit_reset_at: issue.usage_limit_reset_at,
     run_started_at: issue.run_started_at,
     has_unpublished_agent_changes: issue.has_unpublished_agent_changes,
-    pr_url: issue.pr_url,
     create_pr_automatically: issue.create_pr_automatically,
     created_at: issue.created_at,
     updated_at: issue.updated_at,

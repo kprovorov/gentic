@@ -34,6 +34,7 @@ type FakeIssue = {
   issue_model: string | null
   session_id: string | null
   pr_url: string | null
+  issue_pull_requests: Array<{ url: string; created_at: string }>
   project_user_id: string
   project_key: string
   repo: string | null
@@ -382,6 +383,7 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
     issue_model: null,
     session_id: null,
     pr_url: null,
+    issue_pull_requests: [],
     project_user_id: "user-1",
     project_key: "ACME",
     repo: "acme/repo",
@@ -426,6 +428,8 @@ function toClaimCandidate(issue: FakeIssue) {
     agent_provider: issue.agent_provider,
     issue_model: issue.issue_model,
     session_id: issue.session_id,
+    pr_url: issue.pr_url,
+    issue_pull_requests: issue.issue_pull_requests,
     body: issue.body,
     projects: {
       key: issue.project_key,
@@ -483,11 +487,21 @@ test("claim includes the issue code inputs and current title the worker needs", 
   assert.equal(claimed?.branchName, "acme-42-fix-the-thing")
 })
 
-test("claim does not expose a legacy pull request URL", async () => {
+test("claim does not expose legacy or associated pull request URLs", async () => {
   const supabase = new FakeSupabase([], [
     issue({
       id: "associated",
       pr_url: "https://github.com/acme/repo/pull/42",
+      issue_pull_requests: [
+        {
+          url: "https://github.com/acme/repo/pull/41",
+          created_at: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          url: "https://github.com/acme/repo/pull/42",
+          created_at: "2026-07-02T00:00:00.000Z",
+        },
+      ],
     }),
   ])
 
