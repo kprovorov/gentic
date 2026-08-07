@@ -101,7 +101,6 @@ test("messageEventSchema requires generated actions to be Gentic-authored", () =
 test("runStateEventSchema broadcasts a database-derived PR aggregate status", () => {
   const event = runStateEventSchema.parse({
     status: "tests-failed",
-    pr_url: null,
     usage_limit_reset_at: null,
     run_error: null,
     ts: "2026-08-06T12:00:00.000Z",

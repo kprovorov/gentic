@@ -1,11 +1,13 @@
 import type { Tables } from "@gentic/supabase/types"
 import type { ChatMessageContract } from "@gentic/validators/realtime"
 
-export const ISSUE_WITH_PROJECT_SELECT =
-  "*, projects!inner(id,name,repo,user_id,key)"
+const ISSUE_SELECT =
+  "id,project_id,number,title,body,status,type,priority,agent_provider,issue_model,session_id,active_run_id,active_worker_id,run_started_at,run_finished_at,run_error,usage_limit_reset_at,create_pr_automatically,has_unpublished_agent_changes,created_at,updated_at"
+
+export const ISSUE_WITH_PROJECT_SELECT = `${ISSUE_SELECT}, projects!inner(id,name,repo,user_id,key)`
 
 export const ISSUE_WITH_PROJECT_AND_LABELS_SELECT =
-  "*, projects!inner(id,name,repo,user_id,key), issue_labels(labels!inner(id,name,color,state))"
+  `${ISSUE_SELECT}, projects!inner(id,name,repo,user_id,key), issue_labels(labels!inner(id,name,color,state))`
 
 export type AssignedIssueLabel = {
   id: string

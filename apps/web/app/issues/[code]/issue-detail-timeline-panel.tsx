@@ -38,7 +38,6 @@ export function IssueDetailTimelinePanel({
   initialMessages,
   initialStatus,
   initialUsageLimitResetAt,
-  initialPrUrl,
   initialPullRequests,
   attachments,
   events,
@@ -52,7 +51,6 @@ export function IssueDetailTimelinePanel({
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
-  initialPrUrl: string | null
   initialPullRequests: IssuePullRequest[]
   attachments: Attachment[]
   events: IssueEventContract[]
@@ -64,7 +62,6 @@ export function IssueDetailTimelinePanel({
     initialMessages,
     initialStatus,
     initialUsageLimitResetAt,
-    initialPrUrl,
     initialPullRequests,
   })
   const {

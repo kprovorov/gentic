@@ -516,7 +516,6 @@ export async function processIssue(
       throwIfAborted(options.signal)
       await channel.publishRunState({
         status: finishedStatus,
-        pr_url: prUrl ?? null,
         usage_limit_reset_at: null,
         run_error: null,
       })

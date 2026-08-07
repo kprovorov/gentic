@@ -24,7 +24,6 @@ const issueRow = {
   usage_limit_reset_at: null,
   run_started_at: null,
   has_unpublished_agent_changes: false,
-  pr_url: null,
   create_pr_automatically: true,
   issue_pull_requests: [
     {
@@ -134,16 +133,9 @@ test("edit issue query contract parses and maps priority", () => {
 })
 
 test("edit issue query contract marks attached pull requests as historical", () => {
-  const legacyIssue = toIssueEdit(
-    issueEditSchema.parse({
-      ...issueRow,
-      pr_url: "https://github.com/acme/gentic/pull/1",
-    })
-  )
   const attachedIssue = toIssueEdit(
     issueEditSchema.parse({
       ...issueRow,
-      pr_url: null,
       issue_pull_requests: [
         {
           id: "pull-request-1",
@@ -154,7 +146,6 @@ test("edit issue query contract marks attached pull requests as historical", () 
     })
   )
 
-  assert.equal(legacyIssue.has_attached_pull_request, true)
   assert.equal(attachedIssue.has_attached_pull_request, true)
 })
 

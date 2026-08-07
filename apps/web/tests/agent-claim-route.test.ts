@@ -33,7 +33,7 @@ type FakeIssue = {
   agent_provider: "codex" | "claude_code"
   issue_model: string | null
   session_id: string | null
-  pr_url: string | null
+  issue_pull_requests: Array<{ url: string; created_at: string }>
   project_user_id: string
   project_key: string
   repo: string | null
@@ -381,7 +381,7 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
     agent_provider: "codex",
     issue_model: null,
     session_id: null,
-    pr_url: null,
+    issue_pull_requests: [],
     project_user_id: "user-1",
     project_key: "ACME",
     repo: "acme/repo",
@@ -426,7 +426,7 @@ function toClaimCandidate(issue: FakeIssue) {
     agent_provider: issue.agent_provider,
     issue_model: issue.issue_model,
     session_id: issue.session_id,
-    pr_url: issue.pr_url,
+    issue_pull_requests: issue.issue_pull_requests,
     body: issue.body,
     projects: {
       key: issue.project_key,
@@ -481,6 +481,28 @@ test("claim includes the issue code inputs and current title the worker needs", 
 
   assert.equal(claimed?.code, "ACME-42")
   assert.equal(claimed?.title, "Fix the thing")
+})
+
+test("claim derives existing pull request context from the latest association", async () => {
+  const supabase = new FakeSupabase([], [
+    issue({
+      id: "associated",
+      issue_pull_requests: [
+        {
+          url: "https://github.com/acme/repo/pull/41",
+          created_at: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          url: "https://github.com/acme/repo/pull/42",
+          created_at: "2026-07-02T00:00:00.000Z",
+        },
+      ],
+    }),
+  ])
+
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+
+  assert.equal(claimed?.prUrl, "https://github.com/acme/repo/pull/42")
 })
 
 test("claim picks urgent before older lower-priority todo issues", async () => {

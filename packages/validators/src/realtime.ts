@@ -136,7 +136,6 @@ export type RealtimeRunStateStatus = z.infer<
 // Worker -> browser: mirror of the run-state PATCH, for instant UI updates.
 export const runStateEventSchema = z.object({
   status: issueStatusSchema,
-  pr_url: z.string().url().nullable(),
   usage_limit_reset_at: z.string().nullable(),
   run_error: z.string().nullable(),
   ts: z.string(),
@@ -144,7 +143,6 @@ export const runStateEventSchema = z.object({
 
 export type RunStateEvent = {
   status: IssueStatus
-  pr_url: string | null
   usage_limit_reset_at: string | null
   run_error: string | null
   ts: string
@@ -153,13 +151,11 @@ export type RunStateEvent = {
 export const issueRunStateRowSchema = z.object({
   status: issueStatusSchema,
   usage_limit_reset_at: z.string().nullable(),
-  pr_url: z.string().nullable(),
 })
 
 export type IssueRunStateRow = {
   status: IssueStatus
   usage_limit_reset_at: string | null
-  pr_url: string | null
 }
 
 export const issuePullRequestSchema = z.object({
@@ -167,6 +163,10 @@ export const issuePullRequestSchema = z.object({
   issue_id: z.string().uuid(),
   url: z.string(),
   created_at: z.string(),
+  state: z
+    .enum(["draft", "open", "merged", "closed", "queued"])
+    .nullable()
+    .transform((state) => state ?? undefined),
 })
 
 export type IssuePullRequestContract = z.infer<typeof issuePullRequestSchema>

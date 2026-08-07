@@ -1069,7 +1069,6 @@ class FakeApi implements AgentApi {
       activeRunId: string
       createPrAutomatically: boolean
       hasUnpublishedAgentChanges: boolean
-      prUrl: string | null
     }
   }> {
     this.automaticPrPublishRequests.push({ issueId, activeRunId })
@@ -1098,7 +1097,6 @@ class FakeApi implements AgentApi {
         activeRunId,
         createPrAutomatically: true,
         hasUnpublishedAgentChanges: true,
-        prUrl: null,
       },
     }
   }

@@ -323,7 +323,7 @@ export async function bulkUpdateIssueAgentProvider(
 // Called from the GitHub webhook route, which is trusted server code
 // authenticated by the webhook signature rather than a Clerk user. There is no
 // `userId` to check ownership against, so the exact PR URL is used to find a
-// tracked issue pull request, with a fallback to the legacy `issues.pr_url`.
+// tracked issue pull request.
 export async function updateIssueStatusByPrUrl(
   supabase: Supabase,
   prUrl: string,
@@ -339,17 +339,15 @@ export async function updateIssueStatusByPrUrl(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  const { data: current, error: fetchError } = await (pullRequest
-    ? supabase
-        .from("issues")
-        .select("id,status")
-        .eq("id", pullRequest.issue_id)
-        .maybeSingle()
-    : supabase
-        .from("issues")
-        .select("id,status")
-        .eq("pr_url", prUrl)
-        .maybeSingle())
+  if (!pullRequest) {
+    return null
+  }
+
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,status")
+    .eq("id", pullRequest.issue_id)
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -420,17 +418,15 @@ export async function updateIssueStatusByPrUrlIfStatus(
     throw new ServiceError("internal", pullRequestError.message)
   }
 
-  const { data: current, error: fetchError } = await (pullRequest
-    ? supabase
-        .from("issues")
-        .select("id,status")
-        .eq("id", pullRequest.issue_id)
-        .maybeSingle()
-    : supabase
-        .from("issues")
-        .select("id,status")
-        .eq("pr_url", prUrl)
-        .maybeSingle())
+  if (!pullRequest) {
+    return null
+  }
+
+  const { data: current, error: fetchError } = await supabase
+    .from("issues")
+    .select("id,status")
+    .eq("id", pullRequest.issue_id)
+    .maybeSingle()
 
   if (fetchError) {
     throw new ServiceError("internal", fetchError.message)
@@ -558,7 +554,6 @@ export type AutomaticPrPublishResult = {
     activeRunId: string
     createPrAutomatically: boolean
     hasUnpublishedAgentChanges: boolean
-    prUrl: string | null
   }
 }
 
@@ -580,7 +575,7 @@ export async function requestAutomaticPrPublish(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id, number, title, active_run_id, create_pr_automatically, has_unpublished_agent_changes, pr_url, issue_pull_requests(id), projects!inner(key)"
+      "id, number, title, active_run_id, create_pr_automatically, has_unpublished_agent_changes, issue_pull_requests(id), projects!inner(key)"
     )
     .eq("id", issueId)
     .maybeSingle()
@@ -646,7 +641,6 @@ export async function requestAutomaticPrPublish(
       activeRunId: runId,
       createPrAutomatically: issue.create_pr_automatically,
       hasUnpublishedAgentChanges: issue.has_unpublished_agent_changes,
-      prUrl: issue.pr_url,
     },
   }
 }

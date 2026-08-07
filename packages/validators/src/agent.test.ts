@@ -146,7 +146,6 @@ test("automaticPrPublishResponseSchema carries session-continuation context", ()
       activeRunId: runId,
       createPrAutomatically: true,
       hasUnpublishedAgentChanges: true,
-      prUrl: null,
     },
   })
 

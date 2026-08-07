@@ -105,23 +105,21 @@ test("updateIssueSchema preserves explicit automatic PR edits", () => {
   assert.equal(updateValues.create_pr_automatically, false)
 })
 
-test("hasAttachedIssuePullRequest detects legacy and tracked PRs", () => {
+test("hasAttachedIssuePullRequest detects associated PRs", () => {
   assert.equal(
     hasAttachedIssuePullRequest({
-      pr_url: null,
       issue_pull_requests: [],
     }),
     false
   )
   assert.equal(
     hasAttachedIssuePullRequest({
-      pr_url: "https://github.com/acme/widget/pull/1",
+      issue_pull_requests: undefined,
     }),
-    true
+    false
   )
   assert.equal(
     hasAttachedIssuePullRequest({
-      pr_url: null,
       issue_pull_requests: [{ id: "pull-request-1" }],
     }),
     true
