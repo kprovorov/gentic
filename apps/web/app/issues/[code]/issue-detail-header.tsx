@@ -189,12 +189,6 @@ export function IssueDetailHeader({
         <IssueStatusMenu issue={issue} />
 
         <div className="min-w-0 flex-1">
-          {issue.code ? (
-            <p className="font-mono text-xs font-semibold text-muted-foreground">
-              {issue.code}
-            </p>
-          ) : null}
-
           <h1>
             <EditableIssueTitle issue={issue} />
           </h1>
