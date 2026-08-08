@@ -104,19 +104,6 @@ export function AgentModelPicker({
           <div key={providerOption.value}>
             {index > 0 ? <DropdownMenuSeparator /> : null}
             <DropdownMenuLabel>{providerOption.label}</DropdownMenuLabel>
-            <DropdownMenuItem
-              onSelect={() => handleSelect(providerOption.value, null)}
-            >
-              <AgentProviderIcon
-                provider={providerOption.value}
-                className="size-4"
-              />
-              {defaultModelLabel(providerOption.value)}
-              {providerOption.value === agentProvider &&
-              issueModel === null ? (
-                <IconCheck className="ml-auto size-3.5" />
-              ) : null}
-            </DropdownMenuItem>
             {agentModelOptions[providerOption.value].map((option) => (
               <DropdownMenuItem
                 key={option.value}
