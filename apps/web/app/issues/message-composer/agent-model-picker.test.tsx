@@ -68,14 +68,14 @@ describe("AgentModelPicker", () => {
     render(
       <AgentModelPicker
         agentProvider="claude_code"
-        issueModel={null}
+        issueModel="claude-sonnet-5"
         hasMessages
         onAgentModelChange={onAgentModelChange}
       />
     )
 
     await user.click(
-      screen.getByRole("menuitem", { name: /Claude Code default/ })
+      screen.getByRole("menuitem", { name: /Claude Sonnet 5/ })
     )
 
     expect(confirmSpy).not.toHaveBeenCalled()
