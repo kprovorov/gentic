@@ -1,11 +1,14 @@
 "use client"
 
-import { IconCheck, IconChevronDown, IconCpu } from "@tabler/icons-react"
+import { IconCheck, IconChevronDown } from "@tabler/icons-react"
 
+import { AgentProviderIcon } from "@/components/agent-provider-icon"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import {
@@ -14,43 +17,72 @@ import {
   type IssueModel,
 } from "@gentic/validators/issues"
 
-const defaultModelLabel = "Default model"
+import {
+  agentProviderLabels,
+  agentProviderOptions,
+} from "../agent-provider-options"
+import {
+  buildAgentModelSwitchConfirmMessage,
+  resolveAgentModelSelection,
+} from "./agent-model-selection"
 
+function defaultModelLabel(agentProvider: AgentProvider): string {
+  return `${agentProviderLabels[agentProvider]} default`
+}
+
+// Single dropdown replacing the former separate agent + model pickers: every
+// model from every agent is listed here, grouped by agent, so picking a
+// model also picks the agent that runs it in one step.
 export function AgentModelPicker({
   agentProvider,
   issueModel,
   hasMessages,
   disabled,
-  onIssueModelChange,
+  onAgentModelChange,
 }: {
   agentProvider: AgentProvider
   issueModel: IssueModel
   hasMessages: boolean
   disabled?: boolean
-  onIssueModelChange: (
+  onAgentModelChange: (
+    agentProvider: AgentProvider,
     issueModel: IssueModel,
     info: { requiresReset: boolean }
   ) => void
 }) {
-  const options = agentModelOptions[agentProvider]
-  const selectedOption = options.find((option) => option.value === issueModel)
-  const label = selectedOption?.label ?? defaultModelLabel
+  const selectedOption = agentModelOptions[agentProvider].find(
+    (option) => option.value === issueModel
+  )
+  const label = selectedOption?.label ?? defaultModelLabel(agentProvider)
 
-  function handleSelect(nextModel: IssueModel) {
-    if (nextModel === issueModel) {
+  function handleSelect(nextProvider: AgentProvider, nextModel: IssueModel) {
+    const result = resolveAgentModelSelection({
+      currentProvider: agentProvider,
+      currentModel: issueModel,
+      nextProvider,
+      nextModel,
+      hasMessages,
+    })
+
+    if (result.type === "noop") {
       return
     }
 
     if (
-      hasMessages &&
+      result.requiresReset &&
       !window.confirm(
-        "Switch model? This resets the conversation and starts a fresh run."
+        buildAgentModelSwitchConfirmMessage({
+          providerChanged: nextProvider !== agentProvider,
+          agentLabel: agentProviderLabels[nextProvider],
+        })
       )
     ) {
       return
     }
 
-    onIssueModelChange(nextModel, { requiresReset: hasMessages })
+    onAgentModelChange(nextProvider, nextModel, {
+      requiresReset: result.requiresReset,
+    })
   }
 
   return (
@@ -59,33 +91,51 @@ export function AgentModelPicker({
         <button
           type="button"
           disabled={disabled}
-          aria-label="Choose model"
-          className="flex h-8 max-w-44 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          aria-label="Choose agent and model"
+          className="flex h-8 max-w-56 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
         >
-          <IconCpu className="size-3.5" />
+          <AgentProviderIcon provider={agentProvider} className="size-3.5" />
           <span className="truncate">{label}</span>
           <IconChevronDown className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-48">
-        <DropdownMenuItem onSelect={() => handleSelect(null)}>
-          <IconCpu className="size-4" />
-          {defaultModelLabel}
-          {issueModel === null ? (
-            <IconCheck className="ml-auto size-3.5" />
-          ) : null}
-        </DropdownMenuItem>
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => handleSelect(option.value)}
-          >
-            <IconCpu className="size-4" />
-            {option.label}
-            {option.value === issueModel ? (
-              <IconCheck className="ml-auto size-3.5" />
-            ) : null}
-          </DropdownMenuItem>
+      <DropdownMenuContent align="start" className="min-w-56">
+        {agentProviderOptions.map((providerOption, index) => (
+          <div key={providerOption.value}>
+            {index > 0 ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuLabel>{providerOption.label}</DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={() => handleSelect(providerOption.value, null)}
+            >
+              <AgentProviderIcon
+                provider={providerOption.value}
+                className="size-4"
+              />
+              {defaultModelLabel(providerOption.value)}
+              {providerOption.value === agentProvider &&
+              issueModel === null ? (
+                <IconCheck className="ml-auto size-3.5" />
+              ) : null}
+            </DropdownMenuItem>
+            {agentModelOptions[providerOption.value].map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onSelect={() =>
+                  handleSelect(providerOption.value, option.value)
+                }
+              >
+                <AgentProviderIcon
+                  provider={providerOption.value}
+                  className="size-4"
+                />
+                {option.label}
+                {providerOption.value === agentProvider &&
+                option.value === issueModel ? (
+                  <IconCheck className="ml-auto size-3.5" />
+                ) : null}
+              </DropdownMenuItem>
+            ))}
+          </div>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

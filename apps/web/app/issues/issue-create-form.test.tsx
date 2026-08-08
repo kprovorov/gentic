@@ -212,7 +212,9 @@ describe("IssueCreateForm", () => {
       <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
     )
 
-    expect(screen.getByText("Codex")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toHaveTextContent("Codex default")
     expect(screen.getByDisplayValue("codex")).toHaveAttribute(
       "name",
       "agent_provider"
@@ -226,10 +228,14 @@ describe("IssueCreateForm", () => {
       <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
     )
 
-    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
 
-    expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toHaveTextContent("GPT-5.6 Sol")
     expect(screen.getByDisplayValue("gpt-5.6-sol")).toHaveAttribute(
       "name",
       "issue_model"
@@ -293,7 +299,9 @@ describe("IssueCreateForm", () => {
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Priority" }))
     await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
-    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
     await user.click(
       screen.getByRole("checkbox", { name: "Create PR automatically" })
@@ -329,8 +337,9 @@ describe("IssueCreateForm", () => {
     await waitFor(() => {
       expect(screen.getByText("Gentic")).toBeVisible()
       expect(screen.getByText("Urgent")).toBeVisible()
-      expect(screen.getByText("Codex")).toBeVisible()
-      expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+      expect(
+        screen.getByRole("button", { name: "Choose agent and model" })
+      ).toHaveTextContent("GPT-5.6 Sol")
       expect(
         screen.getByRole("checkbox", { name: "Create PR automatically" })
       ).not.toBeChecked()

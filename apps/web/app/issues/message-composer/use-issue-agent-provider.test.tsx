@@ -23,29 +23,30 @@ vi.mock("@/app/query-keys", () => ({
 import { useIssueAgentProvider } from "./use-issue-agent-provider"
 
 function TestHarness({ issueId }: { issueId: string }) {
-  const { onAgentProviderChange, onIssueModelChange } = useIssueAgentProvider({
-    issueId,
-    agentProvider: "codex",
-  })
+  const { onAgentModelChange } = useIssueAgentProvider({ issueId })
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => onAgentProviderChange("codex", { requiresReset: false })}
+        onClick={() =>
+          onAgentModelChange("codex", null, { requiresReset: false })
+        }
       >
         set-only
       </button>
       <button
         type="button"
-        onClick={() => onAgentProviderChange("codex", { requiresReset: true })}
+        onClick={() =>
+          onAgentModelChange("codex", null, { requiresReset: true })
+        }
       >
         set-with-reset
       </button>
       <button
         type="button"
         onClick={() =>
-          onIssueModelChange("gpt-5.6-sol", { requiresReset: false })
+          onAgentModelChange("codex", "gpt-5.6-sol", { requiresReset: false })
         }
       >
         set-model-only
@@ -53,7 +54,7 @@ function TestHarness({ issueId }: { issueId: string }) {
       <button
         type="button"
         onClick={() =>
-          onIssueModelChange("gpt-5.6-sol", { requiresReset: true })
+          onAgentModelChange("codex", "gpt-5.6-sol", { requiresReset: true })
         }
       >
         set-model-with-reset

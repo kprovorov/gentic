@@ -65,11 +65,8 @@ export function IssueDetailTimelinePanel({
     initialUsageLimitResetAt,
     initialPullRequests,
   })
-  const {
-    onAgentProviderChange,
-    onIssueModelChange,
-    isPending: isAgentProviderPending,
-  } = useIssueAgentProvider({ issueId, agentProvider })
+  const { onAgentModelChange, isPending: isAgentProviderPending } =
+    useIssueAgentProvider({ issueId })
   const { user } = useUser()
   const currentUserName =
     user?.fullName ?? user?.primaryEmailAddress?.emailAddress
@@ -152,10 +149,8 @@ export function IssueDetailTimelinePanel({
             agentProvider={agentProvider}
             issueModel={issueModel}
             hasMessages={chat.displayedMessages.length > 0}
-            onAgentProviderChange={onAgentProviderChange}
-            onIssueModelChange={onIssueModelChange}
-            agentPickerDisabled={isAgentProviderPending}
-            modelPickerDisabled={isAgentProviderPending}
+            onAgentModelChange={onAgentModelChange}
+            pickerDisabled={isAgentProviderPending}
           />
         </div>
       </div>
