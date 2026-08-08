@@ -3,8 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import type React from "react"
+import { IconPlus } from "@tabler/icons-react"
 
+import { Button } from "@gentic/ui/button"
 import { SidebarTrigger } from "@gentic/ui/sidebar"
+
+import { useNewIssueDialog } from "@/components/new-issue-dialog-provider"
 
 function pageHeading(pathname: string): React.ReactNode {
   if (pathname === "/issues") return "Issues"
@@ -35,13 +39,25 @@ function pageHeading(pathname: string): React.ReactNode {
 
 export function SiteHeader() {
   const pathname = usePathname()
+  const { openDialog: openNewIssueDialog } = useNewIssueDialog()
 
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur transition-[width,height] ease-linear">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <div aria-hidden="true" className="mx-2 h-4 w-px shrink-0 bg-border" />
-        <h1 className="min-w-0 text-sm font-medium">{pageHeading(pathname)}</h1>
+        <h1 className="min-w-0 flex-1 text-sm font-medium">
+          {pageHeading(pathname)}
+        </h1>
+        {pathname === "/issues" ? (
+          <Button
+            size="icon"
+            aria-label="Create issue"
+            onClick={openNewIssueDialog}
+          >
+            <IconPlus />
+          </Button>
+        ) : null}
       </div>
     </header>
   )
