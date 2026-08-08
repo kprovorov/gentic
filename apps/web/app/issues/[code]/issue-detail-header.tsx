@@ -3,16 +3,7 @@
 import Link from "next/link"
 import { useLayoutEffect, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  IconBug,
-  IconBulb,
-  IconDotsVertical,
-  IconFileDescription,
-  IconMessage2,
-  IconPencil,
-  IconSparkles,
-  IconTrash,
-} from "@tabler/icons-react"
+import { IconDotsVertical, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import type { IssueDetailData, IssuePullRequest } from "@/app/queries"
 import { updateIssueTitle } from "@/app/issues/actions"
@@ -36,31 +27,6 @@ import {
 import { cn } from "@gentic/ui/utils"
 
 import { useIssueDelete } from "./issue-delete-button"
-
-const issueTypeIcons = {
-  issue: IconFileDescription,
-  feature: IconSparkles,
-  bug: IconBug,
-  feedback: IconMessage2,
-  idea: IconBulb,
-}
-
-const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
-  issue: "text-muted-foreground",
-  feature: "text-violet-700 dark:text-violet-300",
-  bug: "text-red-700 dark:text-red-300",
-  feedback: "text-sky-700 dark:text-sky-300",
-  idea: "text-amber-700 dark:text-amber-300",
-}
-
-const issueTypeBadgeStyles: Record<IssueDetailData["issue"]["type"], string> =
-  {
-    issue: "bg-muted",
-    feature: "bg-muted",
-    bug: "bg-muted",
-    feedback: "bg-muted",
-    idea: "bg-muted",
-  }
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -214,21 +180,13 @@ export function IssueDetailHeader({
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
 }) {
-  const TypeIcon = issueTypeIcons[issue.type]
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
 
   return (
     <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
       <div className="flex min-w-0 items-start gap-3">
-        <span
-          className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl",
-            issueTypeBadgeStyles[issue.type]
-          )}
-        >
-          <TypeIcon className={cn("size-4", issueTypeStyles[issue.type])} />
-        </span>
+        <IssueStatusMenu issue={issue} />
 
         <div className="min-w-0 flex-1">
           {issue.code ? (
