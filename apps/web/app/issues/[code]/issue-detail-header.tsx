@@ -17,6 +17,7 @@ import {
 } from "@/app/issues/issues-columns"
 import { getIssueEditHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
+import { SiteHeaderPortal } from "@/components/site-header-portal"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -185,15 +186,7 @@ export function IssueDetailHeader({
 
   return (
     <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <IssueStatusMenu issue={issue} />
-
-        <div className="min-w-0 flex-1">
-          <h1>
-            <EditableIssueTitle issue={issue} />
-          </h1>
-        </div>
-
+      <SiteHeaderPortal>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -225,6 +218,16 @@ export function IssueDetailHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </SiteHeaderPortal>
+
+      <div className="flex min-w-0 items-start gap-3">
+        <IssueStatusMenu issue={issue} />
+
+        <div className="min-w-0 flex-1">
+          <h1>
+            <EditableIssueTitle issue={issue} />
+          </h1>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:hidden">
