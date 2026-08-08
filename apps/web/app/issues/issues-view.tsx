@@ -284,7 +284,7 @@ function IssueRow({
         aria-label={`Select ${issue.code ?? issue.title ?? "issue"}`}
         className="mt-1"
       />
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_7rem] md:items-center md:gap-3">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_7rem] md:items-center md:gap-3">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <IssueStatusMenu issue={issue} />
@@ -338,14 +338,9 @@ function IssueRow({
               onLabelSelect={onLabelSelect}
             />
             {issue.projects?.repo ? (
-              <RepoBadge repo={issue.projects.repo} className="md:hidden" />
+              <RepoBadge repo={issue.projects.repo} />
             ) : null}
           </div>
-        </div>
-        <div className="hidden min-w-0 md:block">
-          {issue.projects?.repo ? (
-            <RepoBadge repo={issue.projects.repo} />
-          ) : null}
         </div>
         <div className="text-sm text-muted-foreground md:text-right">
           {formatDate(issue.created_at)}
