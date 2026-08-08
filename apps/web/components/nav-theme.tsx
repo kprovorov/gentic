@@ -42,7 +42,6 @@ export function NavTheme() {
           className="flex-1"
         >
           <Icon />
-          <span className="text-xs">{label}</span>
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
