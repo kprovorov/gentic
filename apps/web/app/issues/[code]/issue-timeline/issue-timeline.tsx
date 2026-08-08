@@ -9,7 +9,6 @@ import {
   IconChecks,
   IconChevronDown,
   IconFilePlus,
-  IconFileText,
   IconGitMerge,
   IconGitPullRequest,
   IconInfoCircle,
@@ -24,7 +23,7 @@ import {
   IconUserCircle,
 } from "@tabler/icons-react"
 
-import { AttachmentPreviews, type Attachment } from "../attachments"
+import { AttachmentPreviews } from "../attachments"
 import { Logo } from "@/components/logo"
 import { ChatMarkdown } from "../issue-chat/chat-markdown"
 import type { ChatMessage } from "../issue-chat-state"
@@ -84,15 +83,11 @@ const priorityIcons = {
 
 export function IssueTimeline({
   items,
-  issueBody,
-  attachments,
   archivedLabelIds,
   currentUserName,
   currentUserImageUrl,
 }: {
   items: TimelineItem[]
-  issueBody: string | null
-  attachments: Attachment[]
   // Label ids that are archived today. Historical event snapshots keep the
   // label's name and color so the entry stays readable; these ids tell the
   // timeline to render those references as gone from the active catalog.
@@ -108,20 +103,11 @@ export function IssueTimeline({
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
     return buildTimelineRows(displayItems, {
-      issueBody,
-      attachments,
       archivedLabelIds: archivedLabelIdSet,
       currentUserName,
       currentUserImageUrl,
     })
-  }, [
-    items,
-    issueBody,
-    attachments,
-    archivedLabelIdSet,
-    currentUserName,
-    currentUserImageUrl,
-  ])
+  }, [items, archivedLabelIdSet, currentUserName, currentUserImageUrl])
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -147,14 +133,10 @@ export function IssueTimeline({
 function buildTimelineRows(
   displayItems: TimelineDisplayItem[],
   {
-    issueBody,
-    attachments,
     archivedLabelIds,
     currentUserName,
     currentUserImageUrl,
   }: {
-    issueBody: string | null
-    attachments: Attachment[]
     archivedLabelIds: Set<string>
     currentUserName?: string | null
     currentUserImageUrl?: string | null
@@ -210,14 +192,6 @@ function buildTimelineRows(
           timestamp: item.timestamp,
           icon: <IconFilePlus />,
           content: "Issue created by you",
-        })
-        rows.push({
-          key: "request",
-          timestamp: item.timestamp,
-          icon: <IconFileText />,
-          content: (
-            <RequestContent body={issueBody} attachments={attachments} />
-          ),
         })
         break
       case "status-milestone": {
@@ -636,61 +610,6 @@ function ToolCallMessageContent({ message }: { message: ChatMessage }) {
         <ToolCallDiffView key={`${diff.path}-${index}`} diff={diff} />
       ))}
     </div>
-  )
-}
-
-function RequestContent({
-  body,
-  attachments,
-}: {
-  body: string | null
-  attachments: Attachment[]
-}) {
-  const [open, setOpen] = useState(true)
-  const hint = open
-    ? attachments.length > 0
-      ? `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`
-      : null
-    : firstLine(body ?? "")
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="flex w-full min-w-0 items-center gap-2"
-        >
-          <span className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
-            Request
-          </span>
-          {hint ? (
-            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
-              {hint}
-            </span>
-          ) : (
-            <span className="flex-1" />
-          )}
-          <IconChevronDown
-            className={cn(
-              "size-3.5 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-180"
-            )}
-          />
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-2 min-w-0 rounded-[20px] bg-muted/40 p-4">
-          <p className="text-sm leading-6 whitespace-pre-wrap">
-            {body || "No body provided."}
-          </p>
-          {attachments.length > 0 ? (
-            <div className="mt-3.5 border-t pt-3">
-              <AttachmentPreviews attachments={attachments} />
-            </div>
-          ) : null}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
   )
 }
 

@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import type { Attachment } from "../attachments"
 import type { ChatMessage } from "../issue-chat-state"
 import type { TimelineItem } from "./build-timeline"
 import { IssueTimeline } from "./issue-timeline"
@@ -42,16 +41,8 @@ function messageItem(overrides: Partial<ChatMessage> = {}): TimelineItem {
   }
 }
 
-const attachment: Attachment = {
-  id: "attachment-1",
-  fileName: "screenshot.png",
-  sizeBytes: 1024,
-  url: "https://files.example.com/screenshot.png",
-  thumbnailUrl: null,
-}
-
 describe("IssueTimeline", () => {
-  it("renders an expanded request node with the body and attachments", () => {
+  it("renders an issue-created node without an embedded request node", () => {
     render(
       <IssueTimeline
         items={[
@@ -61,66 +52,11 @@ describe("IssueTimeline", () => {
             timestamp: "2026-07-01T00:00:00.000Z",
           },
         ]}
-        issueBody="Fix the flaky test"
-        attachments={[attachment]}
       />
     )
 
     expect(screen.getByText("Issue created by you")).toBeInTheDocument()
-    expect(screen.getByText("Request")).toBeInTheDocument()
-    expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
-    expect(screen.getByText("screenshot.png")).toBeInTheDocument()
-  })
-
-  it("collapses and expands the request node on toggle", async () => {
-    const user = userEvent.setup()
-    render(
-      <IssueTimeline
-        items={[
-          {
-            kind: "issue-created",
-            key: "issue-created",
-            timestamp: "2026-07-01T00:00:00.000Z",
-          },
-        ]}
-        issueBody={"Fix the flaky test\nIt fails intermittently in CI."}
-        attachments={[]}
-      />
-    )
-
-    expect(
-      screen.getByText("It fails intermittently in CI.", { exact: false })
-    ).toBeVisible()
-    await user.click(screen.getByRole("button", { name: /Request/ }))
-    expect(
-      screen.queryByText("It fails intermittently in CI.", { exact: false })
-    ).not.toBeInTheDocument()
-  })
-
-  it("keeps the request body separate from the first chat message", () => {
-    render(
-      <IssueTimeline
-        items={[
-          {
-            kind: "issue-created",
-            key: "issue-created",
-            timestamp: "2026-07-01T00:00:00.000Z",
-          },
-          messageItem({
-            id: "user-1",
-            role: "user",
-            content: "Work on Gentic issue GEN-1.",
-          }),
-        ]}
-        issueBody="Fix the flaky test"
-        attachments={[]}
-      />
-    )
-
-    expect(screen.queryByText("Original request")).not.toBeInTheDocument()
-    expect(screen.getByText("Request")).toBeInTheDocument()
-    expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
-    expect(screen.getByText("Work on Gentic issue GEN-1.")).toBeInTheDocument()
+    expect(screen.queryByText("Request")).not.toBeInTheDocument()
   })
 
   it("renders the current user's avatar for user messages when available", () => {
@@ -133,8 +69,6 @@ describe("IssueTimeline", () => {
             content: "Fix the flaky test",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
       />
@@ -158,8 +92,6 @@ describe("IssueTimeline", () => {
             author_type: "gentic",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
       />
@@ -181,8 +113,6 @@ describe("IssueTimeline", () => {
             content: "Manual follow-up",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
       />
@@ -207,8 +137,6 @@ describe("IssueTimeline", () => {
             generated_action: "create_pr",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
         currentUserName="Kai Example"
         currentUserImageUrl="https://img.clerk.com/avatar.png"
       />
@@ -219,52 +147,6 @@ describe("IssueTimeline", () => {
       "src",
       "https://img.clerk.com/avatar.png"
     )
-  })
-
-  it("still shows the request node when the body is empty", () => {
-    render(
-      <IssueTimeline
-        items={[
-          {
-            kind: "issue-created",
-            key: "issue-created",
-            timestamp: "2026-07-01T00:00:00.000Z",
-          },
-          messageItem({
-            id: "user-1",
-            role: "user",
-            content: "Fix the flaky test",
-            attachments: [attachment],
-          }),
-        ]}
-        issueBody={null}
-        attachments={[attachment]}
-      />
-    )
-
-    expect(screen.queryByText("Original request")).not.toBeInTheDocument()
-    expect(screen.getByText("Request")).toBeInTheDocument()
-    expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
-  })
-
-  it("keeps request attachments when there is no user message yet", () => {
-    render(
-      <IssueTimeline
-        items={[
-          {
-            kind: "issue-created",
-            key: "issue-created",
-            timestamp: "2026-07-01T00:00:00.000Z",
-          },
-        ]}
-        issueBody={null}
-        attachments={[attachment]}
-      />
-    )
-
-    expect(screen.getByText("Request")).toBeInTheDocument()
-    expect(screen.getByText("No body provided.")).toBeInTheDocument()
-    expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
 
   it("renders a status milestone with from and to badges", () => {
@@ -279,8 +161,6 @@ describe("IssueTimeline", () => {
             to: "ready-for-review",
           },
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -304,8 +184,6 @@ describe("IssueTimeline", () => {
             content: "Editing file B",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -338,8 +216,6 @@ describe("IssueTimeline", () => {
             },
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -360,8 +236,6 @@ describe("IssueTimeline", () => {
             content: "Considering approach",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -387,8 +261,6 @@ describe("IssueTimeline", () => {
             content: "On it",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -413,8 +285,6 @@ describe("IssueTimeline", () => {
             created_at: "2026-07-01T00:05:00.000Z",
           }),
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -438,8 +308,6 @@ describe("IssueTimeline", () => {
             to: "urgent",
           },
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -459,8 +327,6 @@ describe("IssueTimeline", () => {
             removed: [{ id: "label-2", name: "Feature", color: "#00FF00" }],
           },
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -485,8 +351,6 @@ describe("IssueTimeline", () => {
             removed: [],
           },
         ]}
-        issueBody={null}
-        attachments={[]}
         archivedLabelIds={["label-archived"]}
       />
     )
@@ -518,8 +382,6 @@ describe("IssueTimeline", () => {
             removed: [],
           },
         ]}
-        issueBody={null}
-        attachments={[]}
         archivedLabelIds={[]}
       />
     )
@@ -546,8 +408,6 @@ describe("IssueTimeline", () => {
             removed: [],
           },
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -572,8 +432,6 @@ describe("IssueTimeline", () => {
             prUrl: "https://github.com/acme/repo/pull/42",
           },
         ]}
-        issueBody={null}
-        attachments={[]}
       />
     )
 
@@ -584,7 +442,7 @@ describe("IssueTimeline", () => {
   })
 
   it("renders a fallback when there is no timeline activity", () => {
-    render(<IssueTimeline items={[]} issueBody={null} attachments={[]} />)
+    render(<IssueTimeline items={[]} />)
 
     expect(screen.getByText("No activity yet.")).toBeInTheDocument()
   })

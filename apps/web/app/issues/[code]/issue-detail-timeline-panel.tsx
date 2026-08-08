@@ -21,6 +21,7 @@ import { MessageComposer } from "../message-composer/message-composer"
 import { useIssueAgentProvider } from "../message-composer/use-issue-agent-provider"
 import type { Attachment } from "./attachments"
 import type { ChatMessage } from "./issue-chat-state"
+import { IssueRequestBody } from "./issue-request-body"
 import { useIssueChatState } from "./issue-chat/use-issue-chat-state"
 import type { RealtimeConnectionStatus } from "./issue-chat/types"
 import { buildIssueTimeline } from "./issue-timeline/build-timeline"
@@ -95,6 +96,10 @@ export function IssueDetailTimelinePanel({
         {chat.liveMessage}
       </div>
 
+      <div className="flex-none border-b">
+        <IssueRequestBody body={issueBody} attachments={attachments} />
+      </div>
+
       <MessageScrollerProvider autoScroll>
         <ScrollToSubmittedMessage
           messageCount={chat.displayedMessages.length}
@@ -114,8 +119,6 @@ export function IssueDetailTimelinePanel({
               <MessageScrollerItem scrollAnchor>
                 <IssueTimeline
                   items={timelineItems}
-                  issueBody={issueBody}
-                  attachments={attachments}
                   archivedLabelIds={archivedLabelIds}
                   currentUserName={currentUserName}
                   currentUserImageUrl={currentUserImageUrl}
