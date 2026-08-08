@@ -228,7 +228,6 @@ export function IssueDetailHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:hidden">
-        <IssueStatusMenu issue={issue} showLabel />
         <IssueTypeBadge type={issue.type} />
         <AgentProviderBadge provider={issue.agent_provider} />
         {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
