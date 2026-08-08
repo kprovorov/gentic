@@ -251,20 +251,6 @@ function IssueIndicatorBadge({
   )
 }
 
-function RepoBadge({ repo, className }: { repo: string; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 max-w-full shrink-0 items-center justify-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground",
-        className
-      )}
-    >
-      <BrandIcon name="github" className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{repo}</span>
-    </span>
-  )
-}
-
 function IssueRow({
   issue,
   isBlocked,
