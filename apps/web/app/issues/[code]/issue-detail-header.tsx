@@ -14,8 +14,15 @@ import {
   IconTrash,
 } from "@tabler/icons-react"
 
-import type { IssueDetailData } from "@/app/queries"
+import type { IssueDetailData, IssuePullRequest } from "@/app/queries"
 import { updateIssueTitle } from "@/app/issues/actions"
+import {
+  AgentProviderBadge,
+  IssuePriorityMenu,
+  IssueStatusMenu,
+  IssueTypeBadge,
+  PullRequestPills,
+} from "@/app/issues/issues-columns"
 import { getIssueEditHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import { Button } from "@gentic/ui/button"
@@ -29,10 +36,6 @@ import { cn } from "@gentic/ui/utils"
 import { BrandIcon } from "@/components/agent-provider-icon"
 
 import { useIssueDelete } from "./issue-delete-button"
-import {
-  IssueDetailPriority,
-  IssueDetailStatus,
-} from "./issue-detail-status-priority"
 
 const issueTypeIcons = {
   issue: IconFileDescription,
@@ -206,8 +209,10 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
 
 export function IssueDetailHeader({
   issue,
+  pullRequests,
 }: {
   issue: IssueDetailData["issue"]
+  pullRequests: IssuePullRequest[]
 }) {
   const TypeIcon = issueTypeIcons[issue.type]
   const editHref = getIssueEditHref(issue) ?? "/issues"
@@ -285,16 +290,11 @@ export function IssueDetailHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:hidden">
-        <IssueDetailStatus
-          issueId={issue.id}
-          status={issue.status}
-          variant="pill"
-        />
-        <IssueDetailPriority
-          issueId={issue.id}
-          priority={issue.priority}
-          variant="pill"
-        />
+        <IssueStatusMenu issue={issue} showLabel />
+        <IssueTypeBadge type={issue.type} />
+        <AgentProviderBadge provider={issue.agent_provider} />
+        <PullRequestPills pullRequests={pullRequests} />
+        <IssuePriorityMenu issue={issue} showLabel />
       </div>
     </header>
   )
