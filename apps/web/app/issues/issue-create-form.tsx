@@ -276,7 +276,11 @@ export function IssueCreateForm({
             <label className="sr-only" id={projectLabelId}>
               Project
             </label>
-            <DropdownMenu>
+            {/* Non-modal: nested in the New Issue Dialog, whose default-modal
+                DropdownMenu would disable pointer events on the trigger
+                while open, so re-clicking it to close falls through to the
+                Dialog's overlay and closes the whole dialog instead. */}
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   ref={projectTriggerRef}
@@ -325,7 +329,7 @@ export function IssueCreateForm({
           <label className="sr-only" id={priorityLabelId}>
             Priority
           </label>
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"

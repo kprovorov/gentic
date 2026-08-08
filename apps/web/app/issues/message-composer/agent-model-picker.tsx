@@ -86,7 +86,11 @@ export function AgentModelPicker({
   }
 
   return (
-    <DropdownMenu>
+    // Non-modal: this picker can be nested inside a Dialog (New Issue),
+    // whose default-modal DropdownMenu would disable pointer events on the
+    // trigger while open, so a second click meant to close it falls through
+    // to the Dialog's overlay and closes the whole dialog instead.
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
