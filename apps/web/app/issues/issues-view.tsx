@@ -32,7 +32,6 @@ import type { HomeIssue, IssuesData } from "@/app/queries"
 import type { AssignedIssueLabel } from "@/app/query-contracts"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
-import { BrandIcon } from "@/components/agent-provider-icon"
 import { useNewIssueDialog } from "@/components/new-issue-dialog-provider"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
 import { Button } from "@gentic/ui/button"
@@ -68,6 +67,7 @@ import {
   IssueStatusMenu,
   IssueTypeBadge,
   PullRequestPills,
+  RepoBadge,
   issueTypeIcons,
   issueTypeOptions,
   priorityIconStyles,
@@ -340,10 +340,7 @@ function IssueRow({
         </div>
         <div className="min-w-0">
           {issue.projects?.repo ? (
-            <span className="inline-flex h-6 max-w-full items-center justify-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
-              <BrandIcon name="github" className="size-3.5 shrink-0" />
-              <span className="min-w-0 truncate">{issue.projects.repo}</span>
-            </span>
+            <RepoBadge repo={issue.projects.repo} />
           ) : null}
         </div>
         <div className="text-sm text-muted-foreground md:text-right">
