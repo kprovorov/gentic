@@ -97,7 +97,7 @@ describe("IssueTimeline", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("uses the first matching user message as the original request", () => {
+  it("keeps the request body separate from the first chat message", () => {
     render(
       <IssueTimeline
         items={[
@@ -109,7 +109,7 @@ describe("IssueTimeline", () => {
           messageItem({
             id: "user-1",
             role: "user",
-            content: "Fix the flaky test",
+            content: "Work on Gentic issue GEN-1.",
           }),
         ]}
         issueBody="Fix the flaky test"
@@ -117,9 +117,10 @@ describe("IssueTimeline", () => {
       />
     )
 
-    expect(screen.getByText("Original request")).toBeInTheDocument()
-    expect(screen.queryByText("Request")).not.toBeInTheDocument()
-    expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
+    expect(screen.queryByText("Original request")).not.toBeInTheDocument()
+    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
+    expect(screen.getByText("Work on Gentic issue GEN-1.")).toBeInTheDocument()
   })
 
   it("renders the current user's avatar for user messages when available", () => {
@@ -220,7 +221,7 @@ describe("IssueTimeline", () => {
     )
   })
 
-  it("uses the first user message as the original request when the body is empty", () => {
+  it("still shows the request node when the body is empty", () => {
     render(
       <IssueTimeline
         items={[
@@ -241,10 +242,9 @@ describe("IssueTimeline", () => {
       />
     )
 
-    expect(screen.getByText("Original request")).toBeInTheDocument()
-    expect(screen.queryByText("Request")).not.toBeInTheDocument()
-    expect(screen.getByText("screenshot.png")).toBeInTheDocument()
-    expect(screen.getAllByText("Fix the flaky test")).toHaveLength(1)
+    expect(screen.queryByText("Original request")).not.toBeInTheDocument()
+    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
   })
 
   it("keeps request attachments when there is no user message yet", () => {

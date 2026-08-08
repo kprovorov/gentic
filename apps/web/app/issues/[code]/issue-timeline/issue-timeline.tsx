@@ -161,11 +161,6 @@ function buildTimelineRows(
   }
 ): TimelineRowData[] {
   const rows: TimelineRowData[] = []
-  const originalRequestMessageKey = findOriginalRequestMessageKey(
-    displayItems,
-    issueBody
-  )
-  const shouldShowRequestBody = originalRequestMessageKey === null
 
   for (const displayItem of displayItems) {
     if (displayItem.kind === "tool-group") {
@@ -201,14 +196,7 @@ function buildTimelineRows(
             currentUserImageUrl={currentUserImageUrl}
           />
         ),
-        content: (
-          <MessageBody
-            message={message}
-            isOriginalRequest={
-              displayItem.item.key === originalRequestMessageKey
-            }
-          />
-        ),
+        content: <MessageBody message={message} />,
         markerClassName: messageMarkerClassName(message),
       })
       continue
@@ -223,19 +211,14 @@ function buildTimelineRows(
           icon: <IconFilePlus />,
           content: "Issue created by you",
         })
-        if (shouldShowRequestBody) {
-          rows.push({
-            key: "request",
-            timestamp: item.timestamp,
-            icon: <IconFileText />,
-            content: (
-              <RequestContent
-                body={shouldShowRequestBody ? issueBody : null}
-                attachments={attachments}
-              />
-            ),
-          })
-        }
+        rows.push({
+          key: "request",
+          timestamp: item.timestamp,
+          icon: <IconFileText />,
+          content: (
+            <RequestContent body={issueBody} attachments={attachments} />
+          ),
+        })
         break
       case "status-milestone": {
         const milestoneStatus = item.to ?? item.from
@@ -317,39 +300,6 @@ function buildTimelineRows(
   }
 
   return rows
-}
-
-function findOriginalRequestMessageKey(
-  displayItems: TimelineDisplayItem[],
-  issueBody: string | null
-): string | null {
-  const normalizedBody = normalizeRequestText(issueBody)
-
-  const firstUserMessage = displayItems.find(
-    (displayItem) =>
-      displayItem.kind === "message" && displayItem.item.message.role === "user"
-  )
-
-  if (firstUserMessage?.kind !== "message") {
-    return null
-  }
-
-  if (!normalizedBody) {
-    return firstUserMessage.item.key
-  }
-
-  if (
-    normalizeRequestText(firstUserMessage.item.message.content) ===
-    normalizedBody
-  ) {
-    return firstUserMessage.item.key
-  }
-
-  return null
-}
-
-function normalizeRequestText(value: string | null | undefined): string {
-  return (value ?? "").trim()
 }
 
 function TimelineRow({
@@ -482,13 +432,7 @@ function MessageIcon({
   return <IconSparkles />
 }
 
-function MessageBody({
-  message,
-  isOriginalRequest = false,
-}: {
-  message: ChatMessage
-  isOriginalRequest?: boolean
-}) {
+function MessageBody({ message }: { message: ChatMessage }) {
   const isStreaming = message.status === "streaming"
   const content = message.content ?? ""
   const isGenticAuthored = isGenticAuthoredMessage(message)
@@ -513,11 +457,6 @@ function MessageBody({
 
   return (
     <div className="min-w-0">
-      {isOriginalRequest ? (
-        <div className="mb-2 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
-          Original request
-        </div>
-      ) : null}
       {isGenticAuthored ? (
         <div className="mb-1.5 text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
           Gentic
