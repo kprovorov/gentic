@@ -490,7 +490,7 @@ export function IssueStatusMenu({
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
-            "inline-flex h-7 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex h-7 shrink-0 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
             showLabel ? "gap-1.5 px-2.5 text-xs font-medium" : "w-7",
             statusStyles[issue.status]
           )}
