@@ -264,14 +264,10 @@ export function IssueCreateForm({
       agentProvider={agentProvider}
       issueModel={issueModel}
       hasMessages={false}
-      onAgentProviderChange={(provider) => {
+      onAgentModelChange={(provider, model) => {
         setAgentProvider(provider)
-        setIssueModel(null)
-        persistSettings({ agentProvider: provider, issueModel: null })
-      }}
-      onIssueModelChange={(model) => {
         setIssueModel(model)
-        persistSettings({ issueModel: model })
+        persistSettings({ agentProvider: provider, issueModel: model })
       }}
       onSubmit={() => {}}
       footerStart={

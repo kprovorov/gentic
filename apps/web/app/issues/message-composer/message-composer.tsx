@@ -11,7 +11,6 @@ import type { AgentProvider } from "@gentic/validators/issues"
 import type { SlashCommand } from "../[code]/issue-chat/slash-commands"
 import { AttachmentPromptField } from "../attachment-prompt-field"
 import { AgentModelPicker } from "./agent-model-picker"
-import { AgentProviderPicker } from "./agent-provider-picker"
 
 // Reusable across an existing issue's chat and a "new issue" composer:
 // callers own all state (draft/files/agent) and pass callbacks in, so this
@@ -47,10 +46,8 @@ export function MessageComposer({
   agentProvider,
   issueModel,
   hasMessages,
-  onAgentProviderChange,
-  onIssueModelChange,
-  agentPickerDisabled,
-  modelPickerDisabled,
+  onAgentModelChange,
+  pickerDisabled,
   footerStart,
   footerEnd,
   belowField,
@@ -86,16 +83,12 @@ export function MessageComposer({
   agentProvider: AgentProvider
   issueModel: string | null
   hasMessages: boolean
-  onAgentProviderChange: (
-    provider: AgentProvider,
-    info: { requiresReset: boolean }
-  ) => void
-  onIssueModelChange: (
+  onAgentModelChange: (
+    agentProvider: AgentProvider,
     issueModel: string | null,
     info: { requiresReset: boolean }
   ) => void
-  agentPickerDisabled?: boolean
-  modelPickerDisabled?: boolean
+  pickerDisabled?: boolean
   footerStart?: React.ReactNode
   footerEnd?: React.ReactNode
   belowField?: React.ReactNode
@@ -140,18 +133,12 @@ export function MessageComposer({
             textareaClassName={cn("min-h-16 resize-none", textareaClassName)}
             footerStart={
               <>
-                <AgentProviderPicker
-                  agentProvider={agentProvider}
-                  hasMessages={hasMessages}
-                  disabled={disabled || agentPickerDisabled}
-                  onAgentProviderChange={onAgentProviderChange}
-                />
                 <AgentModelPicker
                   agentProvider={agentProvider}
                   issueModel={issueModel}
                   hasMessages={hasMessages}
-                  disabled={disabled || modelPickerDisabled}
-                  onIssueModelChange={onIssueModelChange}
+                  disabled={disabled || pickerDisabled}
+                  onAgentModelChange={onAgentModelChange}
                 />
                 {footerStart}
               </>
