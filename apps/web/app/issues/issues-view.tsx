@@ -18,6 +18,7 @@ import {
 import {
   IconArrowBarToRight,
   IconChevronDown,
+  IconFilter,
   IconList,
   IconLock,
   IconLockOpen,
@@ -915,8 +916,8 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                   }}
                 >
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Filters
+                    <Button variant="outline" size="sm" aria-label="Filters">
+                      <IconFilter className="size-3.5" />
                       {activeFilterCount > 0 ? (
                         <span className={activeFilterCountBadgeStyles}>
                           {activeFilterCount}
