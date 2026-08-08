@@ -87,18 +87,14 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     createIssueSchema.parse({ ...fields, status: "draft" })
   )
 
-  let message: { id: string; created_at: string } | null = null
-
   try {
-    message = await issuesService.createIssueUserMessage(
-      supabase,
-      created.id,
-      fields.body
-    )
-
-    // Files picked in the creation form belong to the issue, not to the
-    // message that carries its body: they stay available across agent and
-    // conversation resets, which wipe that message.
+    // The Body lives on the issue row itself (rendered above the timeline by
+    // `IssueRequestBody`) and is never copied into a chat message here: doing
+    // so used to seed the transcript, but it also left a `role: 'user'`
+    // message behind before `startIssueFromDraft` ran, which made that RPC's
+    // "no user message yet" idempotency check skip creating the Kickoff
+    // Message — so the agent's first prompt was the raw Body instead of
+    // `Work on Gentic issue {code}.`.
     await uploadIssueAttachments(
       supabase,
       created.id,
@@ -110,17 +106,6 @@ async function createIssue(status: IssueStatus, formData: FormData) {
       await issuesService.startIssueFromDraft(supabase, userId, created.id)
     }
   } catch (error) {
-    if (message) {
-      const messageId = message.id
-      await cleanupFailedMessage(supabase, created.id, messageId).catch(
-        (cleanupError) => {
-          console.error(
-            `Failed to clean up initial message ${messageId}:`,
-            cleanupError
-          )
-        }
-      )
-    }
     // The issue's own attachments outlive its messages now, so deleting the
     // issue below would leave their blobs behind without this.
     await cleanupIssueAttachments(supabase, created.id).catch(
