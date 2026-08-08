@@ -9,6 +9,7 @@ import { Button } from "@gentic/ui/button"
 import { SidebarTrigger } from "@gentic/ui/sidebar"
 
 import { useNewIssueDialog } from "@/components/new-issue-dialog-provider"
+import { registerSiteHeaderActionsSlot } from "@/components/site-header-actions-slot"
 
 function pageHeading(pathname: string): React.ReactNode {
   if (pathname === "/issues") return "Issues"
@@ -58,6 +59,10 @@ export function SiteHeader() {
             <IconPlus />
           </Button>
         ) : null}
+        <div
+          ref={registerSiteHeaderActionsSlot}
+          className="flex shrink-0 items-center"
+        />
       </div>
     </header>
   )
