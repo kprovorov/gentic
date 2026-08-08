@@ -409,7 +409,7 @@ export function IssueStatusMenu({
   issue,
   showLabel = false,
 }: {
-  issue: HomeIssue
+  issue: Pick<HomeIssue, "id" | "status">
   showLabel?: boolean
 }) {
   const queryClient = useQueryClient()
@@ -538,7 +538,7 @@ export function IssuePriorityMenu({
   issue,
   showLabel = false,
 }: {
-  issue: HomeIssue
+  issue: Pick<HomeIssue, "id" | "priority">
   showLabel?: boolean
 }) {
   const queryClient = useQueryClient()
