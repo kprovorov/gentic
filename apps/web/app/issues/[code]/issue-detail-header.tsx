@@ -22,6 +22,7 @@ import {
   IssueStatusMenu,
   IssueTypeBadge,
   PullRequestPills,
+  RepoBadge,
 } from "@/app/issues/issues-columns"
 import { getIssueEditHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
@@ -33,7 +34,6 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import { BrandIcon } from "@/components/agent-provider-icon"
 
 import { useIssueDelete } from "./issue-delete-button"
 
@@ -240,20 +240,6 @@ export function IssueDetailHeader({
           <h1>
             <EditableIssueTitle issue={issue} />
           </h1>
-
-          {issue.projects ? (
-            <Link
-              href={`https://github.com/${issue.projects.repo}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <BrandIcon name="github" className="size-3.5 shrink-0" />
-              <span className="min-w-0 truncate font-mono">
-                {issue.projects.repo}
-              </span>
-            </Link>
-          ) : null}
         </div>
 
         <DropdownMenu>
@@ -293,6 +279,7 @@ export function IssueDetailHeader({
         <IssueStatusMenu issue={issue} showLabel />
         <IssueTypeBadge type={issue.type} />
         <AgentProviderBadge provider={issue.agent_provider} />
+        {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
         <PullRequestPills pullRequests={pullRequests} />
         <IssuePriorityMenu issue={issue} showLabel />
       </div>

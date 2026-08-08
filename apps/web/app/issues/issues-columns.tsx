@@ -41,7 +41,7 @@ import type { HomeIssue, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
-import { AgentProviderIcon } from "@/components/agent-provider-icon"
+import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
 import {
@@ -248,6 +248,15 @@ export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
       <span className="whitespace-nowrap">
         {agentProviderLabels[provider]}
       </span>
+    </span>
+  )
+}
+
+export function RepoBadge({ repo }: { repo: string }) {
+  return (
+    <span className="inline-flex h-6 max-w-full shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+      <BrandIcon name="github" className="size-3.5 shrink-0" />
+      <span className="min-w-0 truncate">{repo}</span>
     </span>
   )
 }
