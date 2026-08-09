@@ -1,4 +1,5 @@
 import type { AssignedIssueLabel } from "@/app/query-contracts"
+import { IconTagFilled } from "@tabler/icons-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
 
@@ -40,9 +41,9 @@ export function IssueLabelChips({
             onLabelSelect(label.id)
           }}
         >
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: label.color }}
+          <IconTagFilled
+            className="size-3.5 shrink-0"
+            style={{ color: label.color }}
             aria-hidden="true"
           />
           <span className="truncate">{label.name}</span>

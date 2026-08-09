@@ -25,6 +25,7 @@ import {
   IconPlus,
   IconSearch,
   IconTable,
+  IconTagFilled,
   IconX,
 } from "@tabler/icons-react"
 
@@ -1004,9 +1005,9 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                         onCheckedChange={() => toggleLabelFilter(label.id)}
                         className="gap-2"
                       >
-                        <span
-                          className="size-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: label.color }}
+                        <IconTagFilled
+                          className="size-3.5 shrink-0"
+                          style={{ color: label.color }}
                           aria-hidden="true"
                         />
                         <span className="min-w-0 flex-1 truncate">

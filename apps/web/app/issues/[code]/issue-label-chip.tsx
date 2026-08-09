@@ -1,4 +1,5 @@
 import type { LabelSnapshot } from "@gentic/validators/realtime"
+import { IconTagFilled } from "@tabler/icons-react"
 import { cn } from "@gentic/ui/utils"
 
 export function IssueLabelChip({
@@ -15,10 +16,10 @@ export function IssueLabelChip({
         className
       )}
     >
-      <span
+      <IconTagFilled
         aria-hidden
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: label.color }}
+        className="size-3.5 shrink-0"
+        style={{ color: label.color }}
       />
       <span className="min-w-0 truncate">{label.name}</span>
     </span>
