@@ -151,7 +151,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
           }
         }}
         className={cn(
-          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
+          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight text-pretty break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
           !currentTitleState.draft && "text-muted-foreground italic"
         )}
       />
@@ -228,7 +228,9 @@ export function IssueDetailHeader({
         <IssueStatusMenu issue={issue} />
 
         <div className="min-w-0 flex-1">
-          <h1>
+          {/* Headings are `text-balance` globally, which wraps the title into
+              short balanced lines; the detail title should use the full row. */}
+          <h1 className="text-pretty">
             <EditableIssueTitle issue={issue} />
           </h1>
         </div>
