@@ -73,23 +73,13 @@ function IssueDetailPullRequests({
   issueId,
   pullRequests,
   issueStatus,
-  hasUnpublishedAgentChanges,
-  automaticPrPublishingInProgress,
+  showCreatePr,
 }: {
   issueId: string
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
-  hasUnpublishedAgentChanges: boolean
-  automaticPrPublishingInProgress: boolean
+  showCreatePr: boolean
 }) {
-  const hasAttachedPullRequest = pullRequests.length > 0
-  const showCreatePr = canShowManualCreatePrAction({
-    status: issueStatus,
-    hasUnpublishedAgentChanges,
-    hasAttachedPullRequest,
-    automaticPublishingInProgress: automaticPrPublishingInProgress,
-  })
-
   if (pullRequests.length === 0) {
     return (
       <div className="grid gap-2">
@@ -729,6 +719,12 @@ export function IssueDetailRail({
   labels: LabelSnapshot[]
   attachments: Attachment[]
 }) {
+  const showCreatePr = canShowManualCreatePrAction({
+    status,
+    hasUnpublishedAgentChanges,
+    hasAttachedPullRequest: pullRequests.length > 0,
+    automaticPublishingInProgress: automaticPrPublishingInProgress,
+  })
   const queryClient = useQueryClient()
   const addRelationMutation = useMutation({
     mutationFn: addIssueRelation,
@@ -754,13 +750,18 @@ export function IssueDetailRail({
         <IssueDetailLabels issueId={issueId} labels={labels} />
       </RailSection>
 
-      <RailSection title="Pull requests">
+      {/* Attached pull requests already show as pills in the mobile header, so
+          this section only earns its space below xl when it carries the manual
+          create-PR action. */}
+      <RailSection
+        title="Pull requests"
+        className={cn(!showCreatePr && "hidden xl:block")}
+      >
         <IssueDetailPullRequests
           issueId={issueId}
           pullRequests={pullRequests}
           issueStatus={status}
-          hasUnpublishedAgentChanges={hasUnpublishedAgentChanges}
-          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+          showCreatePr={showCreatePr}
         />
       </RailSection>
 
