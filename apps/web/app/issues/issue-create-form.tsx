@@ -150,6 +150,9 @@ export function IssueCreateForm({
   const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
   const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
+  const [pendingAction, setPendingAction] = useState<"draft" | "run" | null>(
+    null
+  )
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
   const selectedProject = projects.find((project) => project.id === projectId)
   const PriorityIcon = issuePriorityIcons[priority]
@@ -380,6 +383,8 @@ export function IssueCreateForm({
       }
       footerEnd={
         <SaveDraftButton
+          pendingAction={pendingAction}
+          onPendingActionChange={setPendingAction}
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -392,6 +397,8 @@ export function IssueCreateForm({
       submitButton={
         <RunIssueButton
           disabled={!body.trim()}
+          pendingAction={pendingAction}
+          onPendingActionChange={setPendingAction}
           onClick={(event) => {
             if (!requireProject()) {
               event.preventDefault()
@@ -416,12 +423,24 @@ export function IssueCreateForm({
   )
 }
 
+type PendingAction = "draft" | "run" | null
+
 function SaveDraftButton({
   onClick,
+  pendingAction,
+  onPendingActionChange,
 }: {
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  pendingAction: PendingAction
+  onPendingActionChange: (action: PendingAction) => void
 }) {
   const { pending } = useFormStatus()
+
+  useEffect(() => {
+    if (!pending) {
+      onPendingActionChange(null)
+    }
+  }, [pending, onPendingActionChange])
 
   return (
     <Button
@@ -431,9 +450,14 @@ function SaveDraftButton({
       size="sm"
       disabled={pending}
       className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-      onClick={onClick}
+      onClick={(event) => {
+        onClick(event)
+        if (!event.defaultPrevented) {
+          onPendingActionChange("draft")
+        }
+      }}
     >
-      {pending ? (
+      {pending && pendingAction === "draft" ? (
         <IconLoader2 className="animate-spin" />
       ) : (
         <IconDeviceFloppy />
@@ -446,11 +470,21 @@ function SaveDraftButton({
 function RunIssueButton({
   disabled,
   onClick,
+  pendingAction,
+  onPendingActionChange,
 }: {
   disabled: boolean
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  pendingAction: PendingAction
+  onPendingActionChange: (action: PendingAction) => void
 }) {
   const { pending } = useFormStatus()
+
+  useEffect(() => {
+    if (!pending) {
+      onPendingActionChange(null)
+    }
+  }, [pending, onPendingActionChange])
 
   return (
     <Button
@@ -460,9 +494,18 @@ function RunIssueButton({
       aria-label="Run issue"
       disabled={disabled || pending}
       className="shrink-0"
-      onClick={onClick}
+      onClick={(event) => {
+        onClick(event)
+        if (!event.defaultPrevented) {
+          onPendingActionChange("run")
+        }
+      }}
     >
-      {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />}
+      {pending && pendingAction === "run" ? (
+        <IconLoader2 className="animate-spin" />
+      ) : (
+        <IconSend />
+      )}
     </Button>
   )
 }
