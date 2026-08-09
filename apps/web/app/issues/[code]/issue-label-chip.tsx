@@ -11,7 +11,7 @@ export function IssueLabelChip({
   return (
     <span
       className={cn(
-        "inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 rounded-full bg-background px-2 text-[12.5px] font-medium ring-1 ring-border",
+        "inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 text-[12.5px] font-medium text-muted-foreground",
         className
       )}
     >
