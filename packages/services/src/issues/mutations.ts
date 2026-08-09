@@ -202,6 +202,27 @@ export async function updateIssue(
   return issue
 }
 
+export async function updateIssueType(
+  supabase: Supabase,
+  userId: string,
+  id: string,
+  type: IssueType
+) {
+  await ensureIssueOwned(supabase, userId, id)
+
+  const result = await supabase
+    .from("issues")
+    .update({
+      type,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select(ISSUE_WITH_PROJECT_SELECT)
+    .single()
+
+  return unwrap(result)
+}
+
 export async function updateIssueTitle(
   supabase: Supabase,
   userId: string,

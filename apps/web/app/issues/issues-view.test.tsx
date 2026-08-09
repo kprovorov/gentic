@@ -15,6 +15,7 @@ import {
   bulkRemoveIssueLabels,
   bulkUpdateIssuePriority,
   updateIssuePriority,
+  updateIssueType,
 } from "./actions"
 
 const replace = vi.fn()
@@ -42,6 +43,7 @@ vi.mock("./actions", () => ({
   bulkUpdateIssueStatus: vi.fn().mockResolvedValue(undefined),
   updateIssuePriority: vi.fn().mockResolvedValue(undefined),
   updateIssueStatus: vi.fn().mockResolvedValue(undefined),
+  updateIssueType: vi.fn().mockResolvedValue(undefined),
   runIssue: vi.fn().mockResolvedValue(undefined),
   saveIssueDraft: vi.fn().mockResolvedValue(undefined),
 }))
@@ -269,6 +271,46 @@ describe("IssuesView priority triage", () => {
     await waitFor(() => {
       expect(
         screen.getAllByRole("button", { name: "Change priority from Low" })[0]
+      ).toBeVisible()
+    })
+  })
+
+  it("optimistically updates an inline list type and rolls back on error", async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined
+    vi.mocked(updateIssueType).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectUpdate = reject
+        })
+    )
+    const { user } = renderIssuesView({
+      data: baseData([
+        issue({
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Feature issue",
+          type: "feature",
+        }),
+      ]),
+    })
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Change type from Feature" })[0]
+    )
+    await user.click(screen.getByRole("menuitem", { name: "Bug" }))
+
+    expect(updateIssueType).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(updateIssueType).mock.calls[0][0].get("type")).toBe("bug")
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: "Change type from Bug" })[0]
+      ).toBeVisible()
+    })
+
+    rejectUpdate(new Error("nope"))
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: "Change type from Feature" })[0]
       ).toBeVisible()
     })
   })

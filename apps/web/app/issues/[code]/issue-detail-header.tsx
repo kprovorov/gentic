@@ -11,7 +11,7 @@ import {
   AgentProviderBadge,
   IssuePriorityMenu,
   IssueStatusMenu,
-  IssueTypeBadge,
+  IssueTypeMenu,
   PullRequestPills,
   RepoBadge,
 } from "@/app/issues/issues-columns"
@@ -235,7 +235,7 @@ export function IssueDetailHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:hidden">
-        <IssueTypeBadge type={issue.type} />
+        <IssueTypeMenu issue={issue} />
         <AgentProviderBadge provider={issue.agent_provider} />
         {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
         <PullRequestPills pullRequests={pullRequests} />
