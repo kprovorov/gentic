@@ -61,6 +61,93 @@ function storeIssueDraft(body: string) {
   }
 }
 
+const ISSUE_CREATE_FILES_DB_NAME = "gentic-issue-draft"
+const ISSUE_CREATE_FILES_STORE_NAME = "files"
+const ISSUE_CREATE_FILES_KEY = "issue-create-draft-files:v1"
+
+type StoredIssueDraftFile = {
+  name: string
+  type: string
+  lastModified: number
+  buffer: ArrayBuffer
+}
+
+function openIssueDraftFilesDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(ISSUE_CREATE_FILES_DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(ISSUE_CREATE_FILES_STORE_NAME)
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function loadStoredIssueDraftFiles(): Promise<File[]> {
+  if (typeof window === "undefined" || !window.indexedDB) {
+    return []
+  }
+
+  try {
+    const db = await openIssueDraftFilesDb()
+    const stored = await new Promise<StoredIssueDraftFile[]>(
+      (resolve, reject) => {
+        const request = db
+          .transaction(ISSUE_CREATE_FILES_STORE_NAME, "readonly")
+          .objectStore(ISSUE_CREATE_FILES_STORE_NAME)
+          .get(ISSUE_CREATE_FILES_KEY)
+        request.onsuccess = () =>
+          resolve(
+            (request.result as StoredIssueDraftFile[] | undefined) ?? []
+          )
+        request.onerror = () => reject(request.error)
+      }
+    )
+    db.close()
+    return stored.map(
+      (file) =>
+        new File([file.buffer], file.name, {
+          type: file.type,
+          lastModified: file.lastModified,
+        })
+    )
+  } catch {
+    return []
+  }
+}
+
+async function storeIssueDraftFiles(files: File[]) {
+  if (typeof window === "undefined" || !window.indexedDB) {
+    return
+  }
+
+  try {
+    const stored: StoredIssueDraftFile[] = await Promise.all(
+      files.map(async (file) => ({
+        name: file.name,
+        type: file.type,
+        lastModified: file.lastModified,
+        buffer: await file.arrayBuffer(),
+      }))
+    )
+    const db = await openIssueDraftFilesDb()
+    await new Promise<void>((resolve, reject) => {
+      const store = db
+        .transaction(ISSUE_CREATE_FILES_STORE_NAME, "readwrite")
+        .objectStore(ISSUE_CREATE_FILES_STORE_NAME)
+      const request =
+        stored.length > 0
+          ? store.put(stored, ISSUE_CREATE_FILES_KEY)
+          : store.delete(ISSUE_CREATE_FILES_KEY)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+  } catch {
+    return
+  }
+}
+
 const ISSUE_CREATE_SETTINGS_STORAGE_KEY = "gentic:issue-create-settings:v1"
 
 type IssueCreateSettings = {
@@ -174,6 +261,20 @@ export function IssueCreateForm({
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+
+    loadStoredIssueDraftFiles().then((storedFiles) => {
+      if (!cancelled && storedFiles.length > 0) {
+        setFiles(storedFiles)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     const storedSettings = loadStoredIssueSettings()
 
     if (Object.keys(storedSettings).length === 0) {
@@ -221,8 +322,14 @@ export function IssueCreateForm({
     storeIssueDraft(value)
   }
 
-  const clearStoredBody = () => {
+  const updateFiles = (value: File[]) => {
+    setFiles(value)
+    void storeIssueDraftFiles(value)
+  }
+
+  const clearStoredDraft = () => {
     storeIssueDraft("")
+    void storeIssueDraftFiles([])
   }
 
   const requireProject = () => {
@@ -258,7 +365,7 @@ export function IssueCreateForm({
       draft={body}
       draftFiles={files}
       onDraftChange={updateBody}
-      onFilesChange={setFiles}
+      onFilesChange={updateFiles}
       rows={3}
       placeholder="Describe what you want built, fixed, or investigated."
       required
@@ -394,7 +501,7 @@ export function IssueCreateForm({
               event.preventDefault()
               return
             }
-            clearStoredBody()
+            clearStoredDraft()
           }}
         />
       }
@@ -408,7 +515,7 @@ export function IssueCreateForm({
               event.preventDefault()
               return
             }
-            clearStoredBody()
+            clearStoredDraft()
           }}
         />
       }

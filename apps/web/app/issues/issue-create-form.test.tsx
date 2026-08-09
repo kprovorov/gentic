@@ -83,10 +83,15 @@ function renderForm(ui: React.ReactElement) {
 }
 
 describe("IssueCreateForm", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubGlobal("ResizeObserver", TestResizeObserver)
     stubLabelsFetch(defaultLabels)
     window.localStorage.clear()
+    await new Promise<void>((resolve) => {
+      const request = window.indexedDB.deleteDatabase("gentic-issue-draft")
+      request.onsuccess = () => resolve()
+      request.onerror = () => resolve()
+    })
     vi.mocked(runIssue).mockClear()
     vi.mocked(saveIssueDraft).mockClear()
     vi.mocked(createLabel).mockReset()
@@ -138,6 +143,88 @@ describe("IssueCreateForm", () => {
     expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
       null
     )
+  })
+
+  it("restores attached files from browser storage", async () => {
+    const buffer = await new File(["contents"], "notes.txt", {
+      type: "text/plain",
+    }).arrayBuffer()
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = window.indexedDB.open("gentic-issue-draft", 1)
+      request.onupgradeneeded = () => request.result.createObjectStore("files")
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const request = db
+        .transaction("files", "readwrite")
+        .objectStore("files")
+        .put(
+          [{ name: "notes.txt", type: "text/plain", lastModified: 0, buffer }],
+          "issue-create-draft-files:v1"
+        )
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByText("notes.txt")).toBeVisible()
+    })
+  })
+
+  it("stores attached files in browser storage and clears them on submit", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const file = new File(["contents"], "screenshot.png", {
+      type: "image/png",
+    })
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    await user.upload(input, file)
+
+    await waitFor(() => {
+      expect(screen.getByText("screenshot.png")).toBeVisible()
+    })
+
+    const readStoredFiles = () =>
+      new Promise<{ name: string }[]>((resolve, reject) => {
+        const request = window.indexedDB.open("gentic-issue-draft", 1)
+        request.onsuccess = () => {
+          const db = request.result
+          const getRequest = db
+            .transaction("files", "readonly")
+            .objectStore("files")
+            .get("issue-create-draft-files:v1")
+          getRequest.onsuccess = () => {
+            resolve((getRequest.result as { name: string }[] | undefined) ?? [])
+            db.close()
+          }
+          getRequest.onerror = () => reject(getRequest.error)
+        }
+        request.onerror = () => reject(request.error)
+      })
+
+    await waitFor(async () => {
+      const stored = await readStoredFiles()
+      expect(stored).toHaveLength(1)
+      expect(stored[0]?.name).toBe("screenshot.png")
+    })
+
+    await user.type(screen.getByLabelText("Body"), "Fix the layout.")
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Run issue" }))
+
+    await waitFor(async () => {
+      const stored = await readStoredFiles()
+      expect(stored).toHaveLength(0)
+    })
   })
 
   it("stores the selected project from the dropdown", async () => {
