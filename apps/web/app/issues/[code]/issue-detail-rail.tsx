@@ -49,6 +49,7 @@ import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import { Attachments, type Attachment } from "./attachments"
+import { IssueLabelChip } from "./issue-label-chip"
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 import {
   IssueDetailPriority,
@@ -607,19 +608,6 @@ function IssueDetailRelations({
   )
 }
 
-function LabelChip({ label }: { label: LabelSnapshot }) {
-  return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-background px-2 text-[12.5px] font-medium ring-1 ring-border">
-      <span
-        aria-hidden
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: label.color }}
-      />
-      {label.name}
-    </span>
-  )
-}
-
 function IssueDetailLabels({
   issueId,
   labels,
@@ -678,7 +666,7 @@ function IssueDetailLabels({
       {displayedLabels.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {displayedLabels.map((label) => (
-            <LabelChip key={label.id} label={label} />
+            <IssueLabelChip key={label.id} label={label} />
           ))}
         </div>
       ) : (
