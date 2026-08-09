@@ -244,7 +244,7 @@ export function IssueTypeBadge({ type }: { type: IssueType }) {
 export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
   return (
     <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
-      <AgentProviderIcon provider={provider} tone="mono" className="size-3.5" />
+      <AgentProviderIcon provider={provider} className="size-3.5" />
       <span className="whitespace-nowrap">
         {agentProviderLabels[provider]}
       </span>
