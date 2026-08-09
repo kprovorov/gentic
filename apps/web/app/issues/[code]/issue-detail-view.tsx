@@ -37,7 +37,11 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         ]}
       />
       <IssueSlugUrlSync issue={issue} />
-      <IssueDetailHeader issue={issue} pullRequests={pullRequests} />
+      <IssueDetailHeader
+        issue={issue}
+        pullRequests={pullRequests}
+        labels={labels}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col border-t xl:min-h-0 xl:flex-row">
         <IssueDetailTimelinePanel

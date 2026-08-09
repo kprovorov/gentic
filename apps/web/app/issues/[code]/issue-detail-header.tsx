@@ -26,8 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
+import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import { useIssueDelete } from "./issue-delete-button"
+import { IssueLabelChip } from "./issue-label-chip"
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -177,9 +179,11 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
 export function IssueDetailHeader({
   issue,
   pullRequests,
+  labels,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
+  labels: LabelSnapshot[]
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
@@ -236,6 +240,9 @@ export function IssueDetailHeader({
         {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
         <PullRequestPills pullRequests={pullRequests} />
         <IssuePriorityMenu issue={issue} showLabel />
+        {labels.map((label) => (
+          <IssueLabelChip key={label.id} label={label} className="text-xs" />
+        ))}
       </div>
     </header>
   )
