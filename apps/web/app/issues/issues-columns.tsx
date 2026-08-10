@@ -2,43 +2,24 @@
 
 import type { ReactNode } from "react"
 import Link from "next/link"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
-  IconAlertCircle,
   IconAlertTriangle,
-  IconAlertOctagon,
   IconArrowBarToRight,
   IconArrowsSort,
   IconBug,
   IconBulb,
   IconCheck,
-  IconCircleCheck,
-  IconCircleDashed,
-  IconCircleX,
-  IconClock,
-  IconDownload,
-  IconEye,
   IconFileDescription,
-  IconFlask,
-  IconGitMerge,
   IconLock,
   IconMessage2,
-  IconMessageQuestion,
   IconMinus,
-  IconPencil,
-  IconPlayerPause,
-  IconRocket,
-  IconShieldCheck,
   IconSparkles,
-  IconThumbUp,
   IconTrendingDown,
   IconTrendingUp,
 } from "@tabler/icons-react"
-import { toast } from "sonner"
 
-import type { HomeIssue, IssueDetailData, IssuesData } from "@/app/queries"
-import { queryKeys } from "@/app/query-keys"
+import type { HomeIssue } from "@/app/queries"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
 import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
@@ -57,9 +38,9 @@ import {
   issuePriorityLabels,
   issuePriorityOptions,
   issuePriorityOrder,
+  issueTypeSchema,
   type AgentProvider,
   type IssuePriority,
-  type IssueStatus,
   type IssueType,
 } from "@gentic/validators/issues"
 
@@ -69,133 +50,24 @@ import {
   updateIssueType,
 } from "./actions"
 import { agentProviderLabels } from "./agent-provider-options"
-import { updateIssuesInCaches } from "./issues-cache"
+import { useIssueFieldMutation } from "./use-issue-field-mutation"
+import {
+  statusIconStyles,
+  statusIcons,
+  statusLabels,
+  statusOptions,
+  statusOrder,
+  statusStyles,
+} from "./issue-status-meta"
 
-export const statusLabels: Record<IssueStatus, string> = {
-  draft: "Draft",
-  todo: "To do",
-  queued: "Queued",
-  held: "On hold",
-  "in-progress": "In progress",
-  "waiting-for-input": "Waiting for input",
-  testing: "Testing",
-  "tests-failed": "Tests failed",
-  "ready-for-review": "Ready for review",
-  "changes-requested": "Changes requested",
-  approved: "Approved",
-  merged: "Merged",
-  deploying: "Deploying",
-  "deploy-failed": "Deploy failed",
-  validating: "Validating",
-  "run-failed": "Run failed",
-  completed: "Completed",
-  cancelled: "Cancelled",
-}
-
-export const statusStyles: Record<IssueStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  todo: "bg-muted text-muted-foreground",
-  queued: "bg-muted text-muted-foreground",
-  held: "bg-muted text-muted-foreground",
-  "in-progress": "bg-muted text-muted-foreground",
-  "waiting-for-input": "bg-muted text-muted-foreground",
-  testing: "bg-muted text-muted-foreground",
-  "tests-failed": "bg-muted text-muted-foreground",
-  "ready-for-review": "bg-muted text-muted-foreground",
-  "changes-requested": "bg-muted text-muted-foreground",
-  approved: "bg-muted text-muted-foreground",
-  merged: "bg-muted text-muted-foreground",
-  deploying: "bg-muted text-muted-foreground",
-  "deploy-failed": "bg-muted text-muted-foreground",
-  validating: "bg-muted text-muted-foreground",
-  "run-failed": "bg-muted text-muted-foreground",
-  completed: "bg-muted text-muted-foreground",
-  cancelled: "bg-muted text-muted-foreground",
-}
-
-export const statusIconStyles: Record<IssueStatus, string> = {
-  draft: "text-muted-foreground",
-  todo: "text-muted-foreground",
-  queued: "text-primary",
-  held: "text-amber-600 dark:text-amber-300",
-  "in-progress": "text-blue-600 dark:text-blue-300",
-  "waiting-for-input": "text-amber-600 dark:text-amber-300",
-  testing: "text-sky-600 dark:text-sky-300",
-  "tests-failed": "text-red-600 dark:text-red-300",
-  "ready-for-review": "text-violet-600 dark:text-violet-300",
-  "changes-requested": "text-orange-600 dark:text-orange-300",
-  approved: "text-teal-600 dark:text-teal-300",
-  merged: "text-indigo-600 dark:text-indigo-300",
-  deploying: "text-blue-600 dark:text-blue-300",
-  "deploy-failed": "text-rose-600 dark:text-rose-300",
-  validating: "text-cyan-600 dark:text-cyan-300",
-  "run-failed": "text-destructive",
-  completed: "text-emerald-600 dark:text-emerald-300",
-  cancelled: "text-muted-foreground",
-}
-
-export const statusIcons = {
-  draft: IconPencil,
-  todo: IconCircleDashed,
-  queued: IconDownload,
-  held: IconPlayerPause,
-  "in-progress": IconClock,
-  "waiting-for-input": IconMessageQuestion,
-  testing: IconFlask,
-  "tests-failed": IconAlertTriangle,
-  "ready-for-review": IconEye,
-  "changes-requested": IconMessage2,
-  approved: IconThumbUp,
-  merged: IconGitMerge,
-  deploying: IconRocket,
-  "deploy-failed": IconAlertOctagon,
-  validating: IconShieldCheck,
-  "run-failed": IconAlertCircle,
-  completed: IconCircleCheck,
-  cancelled: IconCircleX,
-}
-
-export const statusOrder: Record<IssueStatus, number> = {
-  "waiting-for-input": 0,
-  "tests-failed": 1,
-  "changes-requested": 2,
-  "deploy-failed": 3,
-  "run-failed": 4,
-  held: 5,
-  "in-progress": 6,
-  queued: 7,
-  testing: 8,
-  validating: 9,
-  deploying: 10,
-  "ready-for-review": 11,
-  approved: 12,
-  draft: 13,
-  todo: 14,
-  merged: 15,
-  completed: 16,
-  cancelled: 17,
-}
-
-export const statusOptions: { value: IssueStatus; label: string }[] = [
-  { value: "draft", label: statusLabels.draft },
-  { value: "todo", label: statusLabels.todo },
-  { value: "queued", label: statusLabels.queued },
-  { value: "held", label: statusLabels.held },
-  { value: "in-progress", label: statusLabels["in-progress"] },
-  { value: "waiting-for-input", label: statusLabels["waiting-for-input"] },
-  { value: "testing", label: statusLabels.testing },
-  { value: "tests-failed", label: statusLabels["tests-failed"] },
-  { value: "ready-for-review", label: statusLabels["ready-for-review"] },
-  { value: "changes-requested", label: statusLabels["changes-requested"] },
-  { value: "approved", label: statusLabels.approved },
-  { value: "merged", label: statusLabels.merged },
-  { value: "deploying", label: statusLabels.deploying },
-  { value: "deploy-failed", label: statusLabels["deploy-failed"] },
-  { value: "validating", label: statusLabels.validating },
-  { value: "run-failed", label: statusLabels["run-failed"] },
-  { value: "completed", label: statusLabels.completed },
-  { value: "cancelled", label: statusLabels.cancelled },
-]
+export {
+  statusIconStyles,
+  statusIcons,
+  statusLabels,
+  statusOptions,
+  statusOrder,
+  statusStyles,
+} from "./issue-status-meta"
 
 export const issueTypeLabels: Record<IssueType, string> = {
   issue: "Issue",
@@ -331,15 +203,12 @@ export function PullRequestPills({
   )
 }
 
-export const issueTypeOptions: { value: IssueType; label: string }[] = [
-  { value: "issue", label: issueTypeLabels.issue },
-  { value: "feature", label: issueTypeLabels.feature },
-  { value: "bug", label: issueTypeLabels.bug },
-  { value: "feedback", label: issueTypeLabels.feedback },
-  { value: "idea", label: issueTypeLabels.idea },
-]
+export const issueTypeOptions = issueTypeSchema.options.map((value) => ({
+  value,
+  label: issueTypeLabels[value],
+}))
 
-function IssueIndicatorBadge({
+export function IssueIndicatorBadge({
   label,
   className,
   children,
@@ -413,6 +282,47 @@ function SortableHeader({
   )
 }
 
+type IssueFieldIcon = typeof IconCheck
+
+/**
+ * The option list shared by the status, priority, and type dropdown menus: an
+ * icon, the label, and a check on whatever the issue is currently set to.
+ */
+function IssueFieldOptions<Value extends string>({
+  options,
+  icons,
+  iconStyles,
+  value,
+  disabled,
+  onSelect,
+}: {
+  options: readonly { value: Value; label: string }[]
+  icons: Record<Value, IssueFieldIcon>
+  iconStyles: Record<Value, string>
+  value: Value
+  disabled: boolean
+  onSelect: (value: Value) => void
+}) {
+  return options.map((option) => {
+    // Annotated because indexing a generic Record leaves TS with an unresolved
+    // indexed-access type that JSX can't accept props against.
+    const OptionIcon: IssueFieldIcon = icons[option.value]
+
+    return (
+      <DropdownMenuItem
+        key={option.value}
+        disabled={disabled}
+        onSelect={() => onSelect(option.value)}
+        className="gap-3"
+      >
+        <OptionIcon className={cn("size-4", iconStyles[option.value])} />
+        <span className="min-w-0 flex-1 truncate">{option.label}</span>
+        {option.value === value ? <IconCheck className="size-4" /> : null}
+      </DropdownMenuItem>
+    )
+  })
+}
+
 export function IssueStatusMenu({
   issue,
   showLabel = false,
@@ -420,82 +330,21 @@ export function IssueStatusMenu({
   issue: Pick<HomeIssue, "id" | "status">
   showLabel?: boolean
 }) {
-  const queryClient = useQueryClient()
   const StatusIcon = statusIcons[issue.status]
-  const mutation = useMutation({
-    mutationFn: updateIssueStatus,
-    onMutate: async (formData) => {
-      const nextStatus = formData.get("status")
-
-      if (typeof nextStatus !== "string") {
-        return
-      }
-
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
-        queryClient.cancelQueries({ queryKey: queryKeys.home }),
-      ])
-
-      const previousIssues = queryClient.getQueryData<IssuesData>(
-        queryKeys.issues
-      )
-      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
-      const updateData = (current: IssuesData | undefined) =>
-        current
-          ? {
-              ...current,
-              issues: current.issues.map((currentIssue) =>
-                currentIssue.id === issue.id
-                  ? {
-                      ...currentIssue,
-                      status: nextStatus as HomeIssue["status"],
-                    }
-                  : currentIssue
-              ),
-            }
-          : current
-
-      queryClient.setQueryData(queryKeys.issues, updateData)
-      queryClient.setQueryData(queryKeys.home, updateData)
-
-      return { previousHome, previousIssues }
-    },
-    onError: (_error, _formData, context) => {
-      if (context?.previousIssues) {
-        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
-      }
-
-      if (context?.previousHome) {
-        queryClient.setQueryData(queryKeys.home, context.previousHome)
-      }
-
-      toast.error("Failed to update issue status")
-    },
-    onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
-      ])
-    },
+  const { isPending, select } = useIssueFieldMutation({
+    issueId: issue.id,
+    field: "status",
+    value: issue.status,
+    action: updateIssueStatus,
+    errorMessage: "Failed to update issue status",
   })
-
-  function selectStatus(nextStatus: HomeIssue["status"]) {
-    if (nextStatus === issue.status || mutation.isPending) {
-      return
-    }
-
-    const formData = new FormData()
-    formData.set("id", issue.id)
-    formData.set("status", nextStatus)
-    mutation.mutate(formData)
-  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
             "inline-flex h-7 shrink-0 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
@@ -518,25 +367,14 @@ export function IssueStatusMenu({
         align="start"
         className="w-60 rounded-lg bg-popover before:hidden"
       >
-        {statusOptions.map((option) => {
-          const OptionIcon = statusIcons[option.value]
-          const isSelected = option.value === issue.status
-
-          return (
-            <DropdownMenuItem
-              key={option.value}
-              disabled={mutation.isPending}
-              onSelect={() => selectStatus(option.value)}
-              className="gap-3"
-            >
-              <OptionIcon
-                className={cn("size-4", statusIconStyles[option.value])}
-              />
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {isSelected ? <IconCheck className="size-4" /> : null}
-            </DropdownMenuItem>
-          )
-        })}
+        <IssueFieldOptions
+          options={statusOptions}
+          icons={statusIcons}
+          iconStyles={statusIconStyles}
+          value={issue.status}
+          disabled={isPending}
+          onSelect={select}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -549,74 +387,21 @@ export function IssuePriorityMenu({
   issue: Pick<HomeIssue, "id" | "priority">
   showLabel?: boolean
 }) {
-  const queryClient = useQueryClient()
   const PriorityIcon = priorityIcons[issue.priority]
-  const mutation = useMutation({
-    mutationFn: updateIssuePriority,
-    onMutate: async (formData) => {
-      const nextPriority = formData.get("priority")
-
-      if (typeof nextPriority !== "string") {
-        return
-      }
-
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
-        queryClient.cancelQueries({ queryKey: queryKeys.home }),
-      ])
-
-      const previousIssues = queryClient.getQueryData<IssuesData>(
-        queryKeys.issues
-      )
-      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
-
-      updateIssuesInCaches(
-        queryClient,
-        (currentIssue) => currentIssue.id === issue.id,
-        (currentIssue) => ({
-          ...currentIssue,
-          priority: nextPriority as HomeIssue["priority"],
-        })
-      )
-
-      return { previousHome, previousIssues }
-    },
-    onError: (_error, _formData, context) => {
-      if (context?.previousIssues) {
-        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
-      }
-
-      if (context?.previousHome) {
-        queryClient.setQueryData(queryKeys.home, context.previousHome)
-      }
-
-      toast.error("Failed to update issue priority")
-    },
-    onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
-      ])
-    },
+  const { isPending, select } = useIssueFieldMutation({
+    issueId: issue.id,
+    field: "priority",
+    value: issue.priority,
+    action: updateIssuePriority,
+    errorMessage: "Failed to update issue priority",
   })
-
-  function selectPriority(nextPriority: HomeIssue["priority"]) {
-    if (nextPriority === issue.priority || mutation.isPending) {
-      return
-    }
-
-    const formData = new FormData()
-    formData.set("id", issue.id)
-    formData.set("priority", nextPriority)
-    mutation.mutate(formData)
-  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={isPending}
           aria-label={`Change priority from ${
             issuePriorityLabels[issue.priority]
           }`}
@@ -643,25 +428,14 @@ export function IssuePriorityMenu({
         align="start"
         className="w-52 rounded-lg bg-popover before:hidden"
       >
-        {issuePriorityOptions.map((option) => {
-          const OptionIcon = priorityIcons[option.value]
-          const isSelected = option.value === issue.priority
-
-          return (
-            <DropdownMenuItem
-              key={option.value}
-              disabled={mutation.isPending}
-              onSelect={() => selectPriority(option.value)}
-              className="gap-3"
-            >
-              <OptionIcon
-                className={cn("size-4", priorityIconStyles[option.value])}
-              />
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {isSelected ? <IconCheck className="size-4" /> : null}
-            </DropdownMenuItem>
-          )
-        })}
+        <IssueFieldOptions
+          options={issuePriorityOptions}
+          icons={priorityIcons}
+          iconStyles={priorityIconStyles}
+          value={issue.priority}
+          disabled={isPending}
+          onSelect={select}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -672,99 +446,22 @@ export function IssueTypeMenu({
 }: {
   issue: Pick<HomeIssue, "id" | "type">
 }) {
-  const queryClient = useQueryClient()
   const TypeIcon = issueTypeIcons[issue.type]
-  const mutation = useMutation({
-    mutationFn: updateIssueType,
-    onMutate: async (formData) => {
-      const nextType = formData.get("type")
-
-      if (typeof nextType !== "string") {
-        return
-      }
-
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
-        queryClient.cancelQueries({ queryKey: queryKeys.home }),
-        queryClient.cancelQueries({ queryKey: queryKeys.issue(issue.id) }),
-      ])
-
-      const previousIssues = queryClient.getQueryData<IssuesData>(
-        queryKeys.issues
-      )
-      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
-      const previousIssue = queryClient.getQueryData<IssueDetailData>(
-        queryKeys.issue(issue.id)
-      )
-
-      updateIssuesInCaches(
-        queryClient,
-        (currentIssue) => currentIssue.id === issue.id,
-        (currentIssue) => ({
-          ...currentIssue,
-          type: nextType as IssueType,
-        })
-      )
-      queryClient.setQueryData<IssueDetailData>(
-        queryKeys.issue(issue.id),
-        (current) =>
-          current
-            ? {
-                ...current,
-                issue: { ...current.issue, type: nextType as IssueType },
-              }
-            : current
-      )
-
-      return { previousHome, previousIssue, previousIssues }
-    },
-    onError: (_error, _formData, context) => {
-      if (context?.previousIssues) {
-        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
-      }
-
-      if (context?.previousHome) {
-        queryClient.setQueryData(queryKeys.home, context.previousHome)
-      }
-
-      if (context?.previousIssue) {
-        queryClient.setQueryData(
-          queryKeys.issue(issue.id),
-          context.previousIssue
-        )
-      }
-
-      toast.error("Failed to update issue type")
-    },
-    onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issue.id) }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.issueEdit(issue.id),
-        }),
-      ])
-    },
+  const { isPending, select } = useIssueFieldMutation({
+    issueId: issue.id,
+    field: "type",
+    value: issue.type,
+    action: updateIssueType,
+    errorMessage: "Failed to update issue type",
+    syncsDetail: true,
   })
-
-  function selectType(nextType: IssueType) {
-    if (nextType === issue.type || mutation.isPending) {
-      return
-    }
-
-    const formData = new FormData()
-    formData.set("id", issue.id)
-    formData.set("type", nextType)
-    mutation.mutate(formData)
-  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={isPending}
           aria-label={`Change type from ${issueTypeLabels[issue.type]}`}
           className={cn(
             "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
@@ -784,29 +481,19 @@ export function IssueTypeMenu({
         align="start"
         className="w-52 rounded-lg bg-popover before:hidden"
       >
-        {issueTypeOptions.map((option) => {
-          const OptionIcon = issueTypeIcons[option.value]
-          const isSelected = option.value === issue.type
-
-          return (
-            <DropdownMenuItem
-              key={option.value}
-              disabled={mutation.isPending}
-              onSelect={() => selectType(option.value)}
-              className="gap-3"
-            >
-              <OptionIcon
-                className={cn("size-4", issueTypeIconStyles[option.value])}
-              />
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {isSelected ? <IconCheck className="size-4" /> : null}
-            </DropdownMenuItem>
-          )
-        })}
+        <IssueFieldOptions
+          options={issueTypeOptions}
+          icons={issueTypeIcons}
+          iconStyles={issueTypeIconStyles}
+          value={issue.type}
+          disabled={isPending}
+          onSelect={select}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
+
 
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,

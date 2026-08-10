@@ -37,7 +37,7 @@ import {
   statusIcons,
   statusLabels,
   statusStyles,
-} from "../issue-status-meta"
+} from "../../issue-status-meta"
 import { priorityIconStyles } from "../../issues-columns"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
