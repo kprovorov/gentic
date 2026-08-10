@@ -28,8 +28,8 @@ import {
 import { cn } from "@gentic/ui/utils"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
+import { IssueLabelChip } from "../issue-label-chip"
 import { useIssueDelete } from "./issue-delete-button"
-import { IssueLabelChip } from "./issue-label-chip"
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {

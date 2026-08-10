@@ -1,7 +1,8 @@
 import type { AssignedIssueLabel } from "@/app/query-contracts"
-import { IconTagFilled } from "@tabler/icons-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
+
+import { IssueLabelChip } from "./issue-label-chip"
 
 const visibleLabelCount = 3
 
@@ -31,22 +32,16 @@ export function IssueLabelChips({
           aria-label={`Filter by Label ${label.name}`}
           aria-pressed={selectedLabelIds.has(label.id)}
           className={cn(
-            "inline-flex h-6 max-w-40 items-center gap-1.5 rounded-full border bg-background px-2 text-xs font-medium transition-[box-shadow,background-color] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none",
+            "inline-flex max-w-40 shrink-0 rounded-full transition-[box-shadow] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
             selectedLabelIds.has(label.id) && "ring-2 ring-ring/40"
           )}
-          style={{ borderColor: label.color }}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
             onLabelSelect(label.id)
           }}
         >
-          <IconTagFilled
-            className="size-3.5 shrink-0"
-            style={{ color: label.color }}
-            aria-hidden="true"
-          />
-          <span className="truncate">{label.name}</span>
+          <IssueLabelChip label={label} className="text-xs" />
         </button>
       ))}
       {overflowLabels.length > 0 ? (

@@ -48,8 +48,8 @@ import type {
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
+import { IssueLabelChip } from "../issue-label-chip"
 import { Attachments, type Attachment } from "./attachments"
-import { IssueLabelChip } from "./issue-label-chip"
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 import {
   IssueDetailPriority,
