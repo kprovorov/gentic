@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconSearch,
   IconTag,
+  IconTagFilled,
 } from "@tabler/icons-react"
 
 import { createLabel } from "@/app/settings/actions"
@@ -142,10 +143,10 @@ export function IssueLabelsField({
                   disabled={disabled}
                   onCheckedChange={() => toggleLabel(label.id)}
                 />
-                <span
+                <IconTagFilled
                   aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: label.color }}
+                  className="size-3.5 shrink-0"
+                  style={{ color: label.color }}
                 />
                 <span className="min-w-0 flex-1 truncate">{label.name}</span>
                 {checked ? <IconCheck className="size-3.5 shrink-0" /> : null}

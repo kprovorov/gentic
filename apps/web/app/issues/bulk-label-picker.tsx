@@ -1,7 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react"
+import {
+  IconCheck,
+  IconChevronDown,
+  IconSearch,
+  IconTagFilled,
+} from "@tabler/icons-react"
 
 import type { AssignedIssueLabel } from "@/app/query-contracts"
 import { Button } from "@gentic/ui/button"
@@ -117,10 +122,10 @@ export function BulkLabelPicker({
                   checked={checked}
                   onCheckedChange={() => toggle(option.id)}
                 />
-                <span
+                <IconTagFilled
                   aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: option.color }}
+                  className="size-3.5 shrink-0"
+                  style={{ color: option.color }}
                 />
                 <span className="min-w-0 flex-1 truncate">{option.name}</span>
                 {checked ? <IconCheck className="size-3.5 shrink-0" /> : null}
