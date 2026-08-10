@@ -66,7 +66,7 @@ import {
   getIssuesColumns,
   IssuePriorityMenu,
   IssueStatusMenu,
-  IssueTypeBadge,
+  IssueTypeMenu,
   PullRequestPills,
   RepoBadge,
   issueTypeIcons,
@@ -308,7 +308,7 @@ function IssueRow({
             </Link>
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <IssueTypeBadge type={issue.type} />
+            <IssueTypeMenu issue={issue} />
             <AgentProviderBadge provider={issue.agent_provider} />
             {isBlocked ? (
               <IssueIndicatorBadge

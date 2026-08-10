@@ -37,7 +37,7 @@ import {
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import type { HomeIssue, IssuesData } from "@/app/queries"
+import type { HomeIssue, IssueDetailData, IssuesData } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
@@ -63,7 +63,11 @@ import {
   type IssueType,
 } from "@gentic/validators/issues"
 
-import { updateIssuePriority, updateIssueStatus } from "./actions"
+import {
+  updateIssuePriority,
+  updateIssueStatus,
+  updateIssueType,
+} from "./actions"
 import { agentProviderLabels } from "./agent-provider-options"
 import { updateIssuesInCaches } from "./issues-cache"
 
@@ -223,22 +227,6 @@ export const issueTypeIconStyles: Record<IssueType, string> = {
   bug: "text-red-600 dark:text-red-300",
   feedback: "text-sky-600 dark:text-sky-300",
   idea: "text-amber-600 dark:text-amber-300",
-}
-
-export function IssueTypeBadge({ type }: { type: IssueType }) {
-  const TypeIcon = issueTypeIcons[type]
-
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium",
-        issueTypeStyles[type]
-      )}
-    >
-      <TypeIcon className={cn("size-3.5", issueTypeIconStyles[type])} />
-      <span className="whitespace-nowrap">{issueTypeLabels[type]}</span>
-    </span>
-  )
 }
 
 export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
@@ -679,6 +667,147 @@ export function IssuePriorityMenu({
   )
 }
 
+export function IssueTypeMenu({
+  issue,
+}: {
+  issue: Pick<HomeIssue, "id" | "type">
+}) {
+  const queryClient = useQueryClient()
+  const TypeIcon = issueTypeIcons[issue.type]
+  const mutation = useMutation({
+    mutationFn: updateIssueType,
+    onMutate: async (formData) => {
+      const nextType = formData.get("type")
+
+      if (typeof nextType !== "string") {
+        return
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.issues }),
+        queryClient.cancelQueries({ queryKey: queryKeys.home }),
+        queryClient.cancelQueries({ queryKey: queryKeys.issue(issue.id) }),
+      ])
+
+      const previousIssues = queryClient.getQueryData<IssuesData>(
+        queryKeys.issues
+      )
+      const previousHome = queryClient.getQueryData<IssuesData>(queryKeys.home)
+      const previousIssue = queryClient.getQueryData<IssueDetailData>(
+        queryKeys.issue(issue.id)
+      )
+
+      updateIssuesInCaches(
+        queryClient,
+        (currentIssue) => currentIssue.id === issue.id,
+        (currentIssue) => ({
+          ...currentIssue,
+          type: nextType as IssueType,
+        })
+      )
+      queryClient.setQueryData<IssueDetailData>(
+        queryKeys.issue(issue.id),
+        (current) =>
+          current
+            ? {
+                ...current,
+                issue: { ...current.issue, type: nextType as IssueType },
+              }
+            : current
+      )
+
+      return { previousHome, previousIssue, previousIssues }
+    },
+    onError: (_error, _formData, context) => {
+      if (context?.previousIssues) {
+        queryClient.setQueryData(queryKeys.issues, context.previousIssues)
+      }
+
+      if (context?.previousHome) {
+        queryClient.setQueryData(queryKeys.home, context.previousHome)
+      }
+
+      if (context?.previousIssue) {
+        queryClient.setQueryData(
+          queryKeys.issue(issue.id),
+          context.previousIssue
+        )
+      }
+
+      toast.error("Failed to update issue type")
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issue.id) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.issueEdit(issue.id),
+        }),
+      ])
+    },
+  })
+
+  function selectType(nextType: IssueType) {
+    if (nextType === issue.type || mutation.isPending) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.set("id", issue.id)
+    formData.set("type", nextType)
+    mutation.mutate(formData)
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          aria-label={`Change type from ${issueTypeLabels[issue.type]}`}
+          className={cn(
+            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            issueTypeStyles[issue.type]
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <TypeIcon
+            className={cn("size-3.5 shrink-0", issueTypeIconStyles[issue.type])}
+          />
+          <span className="whitespace-nowrap">
+            {issueTypeLabels[issue.type]}
+          </span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-52 rounded-lg bg-popover before:hidden"
+      >
+        {issueTypeOptions.map((option) => {
+          const OptionIcon = issueTypeIcons[option.value]
+          const isSelected = option.value === issue.type
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              disabled={mutation.isPending}
+              onSelect={() => selectType(option.value)}
+              className="gap-3"
+            >
+              <OptionIcon
+                className={cn("size-4", issueTypeIconStyles[option.value])}
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {isSelected ? <IconCheck className="size-4" /> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,
   blockingIssueIds: Set<string>,
@@ -749,7 +878,7 @@ export function getIssuesColumns(
       id: "type",
       accessorFn: (issue) => issueTypeLabels[issue.type],
       header: ({ column }) => <SortableHeader label="Type" column={column} />,
-      cell: ({ row }) => <IssueTypeBadge type={row.original.type} />,
+      cell: ({ row }) => <IssueTypeMenu issue={row.original} />,
     },
     {
       id: "agent_provider",

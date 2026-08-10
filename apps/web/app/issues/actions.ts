@@ -22,6 +22,7 @@ import {
   updateIssueAgentProviderSchema,
   updateIssuePrioritySchema,
   updateIssueSchema,
+  updateIssueTypeSchema,
   type IssueStatus,
 } from "@gentic/validators/issues"
 
@@ -292,6 +293,20 @@ export async function updateIssuePriority(formData: FormData) {
     id,
     priority
   )
+  revalidatePath("/issues")
+  revalidateIssuePath(issue)
+
+  return issue
+}
+
+export async function updateIssueType(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, type } = updateIssueTypeSchema.parse({
+    id: getString(formData, "id"),
+    type: getString(formData, "type"),
+  })
+
+  const issue = await issuesService.updateIssueType(supabase, userId, id, type)
   revalidatePath("/issues")
   revalidateIssuePath(issue)
 

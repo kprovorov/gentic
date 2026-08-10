@@ -185,6 +185,13 @@ export type UpdateIssuePriorityValues = z.infer<
   typeof updateIssuePrioritySchema
 >
 
+export const updateIssueTypeSchema = z.object({
+  id: z.string().uuid(),
+  type: issueTypeSchema,
+})
+
+export type UpdateIssueTypeValues = z.infer<typeof updateIssueTypeSchema>
+
 export const updateIssueAgentProviderSchema = z.object({
   id: z.string().uuid(),
   agent_provider: agentProviderSchema,
