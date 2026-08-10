@@ -236,7 +236,9 @@ export function IssueDetailHeader({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 xl:hidden">
+      {/* Grouping the pills on a tinted panel keeps them readable as one
+          metadata block on mobile, where the rail is hidden. */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
         <IssueTypeMenu issue={issue} />
         <AgentProviderBadge provider={issue.agent_provider} />
         {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
