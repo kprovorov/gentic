@@ -19,10 +19,10 @@ import {
   IconThumbUp,
 } from "@tabler/icons-react"
 
-import type { IssueStatus } from "@gentic/validators/issues"
+import { issueStatusSchema, type IssueStatus } from "@gentic/validators/issues"
 
-// Shared with the status dropdown (`issue-detail-view.tsx`) so status
-// milestones elsewhere (e.g. the timeline) stay visually consistent.
+// The single source of truth for how a status is presented, so the issues
+// table, the status dropdowns, and the timeline stay visually consistent.
 export const statusLabels: Record<IssueStatus, string> = {
   draft: "Draft",
   todo: "To do",
@@ -106,3 +106,31 @@ export const statusIcons: Record<IssueStatus, typeof IconClock> = {
   completed: IconCircleCheck,
   cancelled: IconCircleX,
 }
+
+// Ranks statuses by how much attention they need, so grouped and sorted issue
+// lists surface blocked or failing work above settled work.
+export const statusOrder: Record<IssueStatus, number> = {
+  "waiting-for-input": 0,
+  "tests-failed": 1,
+  "changes-requested": 2,
+  "deploy-failed": 3,
+  "run-failed": 4,
+  held: 5,
+  "in-progress": 6,
+  queued: 7,
+  testing: 8,
+  validating: 9,
+  deploying: 10,
+  "ready-for-review": 11,
+  approved: 12,
+  draft: 13,
+  todo: 14,
+  merged: 15,
+  completed: 16,
+  cancelled: 17,
+}
+
+export const statusOptions = issueStatusSchema.options.map((value) => ({
+  value,
+  label: statusLabels[value],
+}))
