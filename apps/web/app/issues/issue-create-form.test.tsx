@@ -4,7 +4,11 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import {
+  abandonIssueCreation,
+  finishIssueCreation,
+  startIssueCreation,
+} from "@/app/issues/actions"
 import { createLabel } from "@/app/settings/actions"
 import type { SettingsLabelsData } from "@/app/queries"
 import { TooltipProvider } from "@gentic/ui/tooltip"
@@ -12,12 +16,27 @@ import { TooltipProvider } from "@gentic/ui/tooltip"
 import { IssueCreateForm } from "./issue-create-form"
 
 vi.mock("@/app/issues/actions", () => ({
-  runIssue: vi.fn(),
-  saveIssueDraft: vi.fn(),
+  startIssueCreation: vi.fn(),
+  finishIssueCreation: vi.fn(),
+  abandonIssueCreation: vi.fn(),
 }))
 
 vi.mock("@/app/settings/actions", () => ({
   createLabel: vi.fn(),
+}))
+
+const push = vi.fn()
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}))
+
+const uploadToSignedUrl = vi.fn().mockResolvedValue({ error: null })
+
+vi.mock("@gentic/supabase/client", () => ({
+  useSupabaseClient: () => ({
+    storage: { from: () => ({ uploadToSignedUrl }) },
+  }),
 }))
 
 const projects = [
@@ -92,8 +111,28 @@ describe("IssueCreateForm", () => {
       request.onsuccess = () => resolve()
       request.onerror = () => resolve()
     })
-    vi.mocked(runIssue).mockClear()
-    vi.mocked(saveIssueDraft).mockClear()
+    push.mockClear()
+    uploadToSignedUrl.mockClear()
+    vi.mocked(startIssueCreation).mockReset()
+    // Mint one ticket per declared attachment, the way the real action does:
+    // the form pairs tickets to files by index and refuses to upload if the
+    // two ever disagree.
+    vi.mocked(startIssueCreation).mockImplementation(async (formData) => ({
+      issueId: "22222222-2222-4222-8222-222222222222",
+      href: "/issues/GEN-1",
+      uploads: (
+        JSON.parse(String(formData.get("attachments") ?? "[]")) as Array<{
+          type: string
+        }>
+      ).map((descriptor, index) => ({
+        attachmentId: `33333333-3333-4333-8333-00000000000${index}`,
+        path: `issue/file-${index}`,
+        token: `token-${index}`,
+        contentType: descriptor.type,
+      })),
+    }))
+    vi.mocked(finishIssueCreation).mockReset()
+    vi.mocked(abandonIssueCreation).mockReset()
     vi.mocked(createLabel).mockReset()
   })
 
@@ -376,9 +415,16 @@ describe("IssueCreateForm", () => {
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
-    await waitFor(() => expect(runIssue).toHaveBeenCalled())
-    const formData = vi.mocked(runIssue).mock.calls[0][0] as FormData
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
     expect(formData.get("create_pr_automatically")).toBe("true")
+
+    // Queuing is the second phase's job, so an issue is never claimable
+    // before its attachments have finished uploading.
+    await waitFor(() => expect(finishIssueCreation).toHaveBeenCalled())
+    const finishData = vi.mocked(finishIssueCreation).mock
+      .calls[0][0] as FormData
+    expect(finishData.get("status")).toBe("todo")
   })
 
   it("submits automatic PR creation unchecked when saving a draft", async () => {
@@ -401,9 +447,14 @@ describe("IssueCreateForm", () => {
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Save Draft" }))
 
-    await waitFor(() => expect(saveIssueDraft).toHaveBeenCalled())
-    const formData = vi.mocked(saveIssueDraft).mock.calls[0][0] as FormData
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
     expect(formData.get("create_pr_automatically")).toBe("false")
+
+    await waitFor(() => expect(finishIssueCreation).toHaveBeenCalled())
+    const finishData = vi.mocked(finishIssueCreation).mock
+      .calls[0][0] as FormData
+    expect(finishData.get("status")).toBe("draft")
   })
 
   it("stores the selected project, priority, agent, model, and PR preference as settings", async () => {

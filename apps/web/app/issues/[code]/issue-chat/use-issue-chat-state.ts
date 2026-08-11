@@ -14,7 +14,16 @@ import {
   type UserMessageEvent,
 } from "@gentic/validators/realtime"
 
-import { sendIssueMessage } from "@/app/issues/actions"
+import {
+  abandonIssueMessage,
+  finishIssueMessage,
+  startIssueMessage,
+} from "@/app/issues/actions"
+import {
+  appendAttachmentDescriptors,
+  appendAttachmentIds,
+  uploadAttachmentFiles,
+} from "@/app/issues/attachment-uploads"
 import type { IssuePullRequest } from "@/app/queries"
 import { queryKeys } from "@/app/query-keys"
 
@@ -125,8 +134,48 @@ export function useIssueChatState({
     }
   }
 
+  // The form data below is a purely client-side carrier: the `files` it holds
+  // feed the optimistic bubble and the retry path, but the bytes are uploaded
+  // straight to Storage rather than posted to a Server Action, whose body
+  // limit sits far below the 25MB a single attachment may be. The actions
+  // therefore only ever see metadata and attachment ids.
+  async function sendMessageWithAttachments(formData: FormData) {
+    const files = formData
+      .getAll("files")
+      .filter((value): value is File => value instanceof File)
+
+    const start = new FormData()
+    start.set("issue_id", issueId)
+    start.set("content", String(formData.get("content") ?? ""))
+    appendAttachmentDescriptors(start, files)
+
+    const { uploads, ...message } = await startIssueMessage(start)
+
+    try {
+      const attachmentIds = await uploadAttachmentFiles(
+        supabase,
+        uploads,
+        files
+      )
+      const finish = new FormData()
+      finish.set("issue_id", issueId)
+      appendAttachmentIds(finish, attachmentIds)
+      const { attachments } = await finishIssueMessage(finish)
+
+      return { ...message, attachments }
+    } catch (error) {
+      // Drop the turn the agent never received, so retrying re-sends it once
+      // instead of stacking a second copy on top.
+      const abandon = new FormData()
+      abandon.set("issue_id", issueId)
+      abandon.set("message_id", message.id)
+      await abandonIssueMessage(abandon).catch(() => {})
+      throw error
+    }
+  }
+
   const mutation = useMutation({
-    mutationFn: sendIssueMessage,
+    mutationFn: sendMessageWithAttachments,
     onMutate: (formData) => {
       const content = String(formData.get("content") ?? "")
       const retryId = String(formData.get("client_message_id") ?? "")

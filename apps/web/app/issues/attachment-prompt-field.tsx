@@ -38,7 +38,6 @@ export function AttachmentPromptField({
   disabled,
   className,
   textareaClassName,
-  fileInputName = "files",
   files,
   onFilesChange,
   onKeyDown,
@@ -57,7 +56,6 @@ export function AttachmentPromptField({
   disabled?: boolean
   className?: string
   textareaClassName?: string
-  fileInputName?: string
   files?: File[]
   onFilesChange?: (files: File[]) => void
   onKeyDown?: React.KeyboardEventHandler<HTMLTextAreaElement>
@@ -81,24 +79,6 @@ export function AttachmentPromptField({
     }
     onFilesChange?.(next)
   }
-
-  useEffect(() => {
-    const input = fileInputRef.current
-    if (!input) {
-      return
-    }
-
-    const transfer = new DataTransfer()
-    for (const file of selectedFiles) {
-      transfer.items.add(file)
-    }
-    try {
-      input.files = transfer.files
-    } catch {
-      // jsdom cannot synthesize a real FileList; the controlled file state
-      // remains authoritative for retries and client-side form construction.
-    }
-  }, [selectedFiles])
 
   function addFiles(fileList: FileList | null) {
     if (!fileList) {
@@ -207,14 +187,21 @@ export function AttachmentPromptField({
             : "border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3"
         )}
       >
+        {/* Deliberately unnamed: the selection lives in `selectedFiles` and
+            the bytes are uploaded straight to Storage, so a file input that
+            could ride along in a form post would only be a way to blow the
+            Server Action body limit. Clearing `value` lets the same file be
+            re-picked after it was removed from the list. */}
         <input
           ref={fileInputRef}
           type="file"
-          name={fileInputName}
           multiple
           className="sr-only"
           tabIndex={-1}
-          onChange={(event) => addFiles(event.currentTarget.files)}
+          onChange={(event) => {
+            addFiles(event.currentTarget.files)
+            event.currentTarget.value = ""
+          }}
         />
         <Button
           type="button"

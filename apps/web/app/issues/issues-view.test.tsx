@@ -44,8 +44,13 @@ vi.mock("./actions", () => ({
   updateIssuePriority: vi.fn().mockResolvedValue(undefined),
   updateIssueStatus: vi.fn().mockResolvedValue(undefined),
   updateIssueType: vi.fn().mockResolvedValue(undefined),
-  runIssue: vi.fn().mockResolvedValue(undefined),
-  saveIssueDraft: vi.fn().mockResolvedValue(undefined),
+  startIssueCreation: vi.fn().mockResolvedValue({
+    issueId: "issue-1",
+    href: "/issues/GEN-1",
+    uploads: [],
+  }),
+  finishIssueCreation: vi.fn().mockResolvedValue(undefined),
+  abandonIssueCreation: vi.fn().mockResolvedValue(undefined),
 }))
 
 const toastErrorMock = vi.fn()
