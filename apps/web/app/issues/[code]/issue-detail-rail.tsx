@@ -670,19 +670,17 @@ function IssueDetailLabels({
   )
 }
 
-function RailSection({
+export function RailSection({
   title,
   action,
-  className,
   children,
 }: {
   title: string
   action?: React.ReactNode
-  className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("px-[18px] py-4", className)}>
+    <div className="px-[18px] py-4">
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
           {title}
@@ -739,7 +737,7 @@ export function IssueDetailRail({
 
   return (
     <div className="min-w-0 divide-y divide-border/70">
-      <RailSection title="Status" className="hidden xl:block">
+      <RailSection title="Status">
         <div className="grid gap-2">
           <IssueDetailStatus issueId={issueId} status={status} />
           <IssueDetailPriority issueId={issueId} priority={priority} />
@@ -750,13 +748,7 @@ export function IssueDetailRail({
         <IssueDetailLabels issueId={issueId} labels={labels} />
       </RailSection>
 
-      {/* Attached pull requests already show as pills in the mobile header, so
-          this section only earns its space below xl when it carries the manual
-          create-PR action. */}
-      <RailSection
-        title="Pull requests"
-        className={cn(!showCreatePr && "hidden xl:block")}
-      >
+      <RailSection title="Pull requests">
         <IssueDetailPullRequests
           issueId={issueId}
           pullRequests={pullRequests}

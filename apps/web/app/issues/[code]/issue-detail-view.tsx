@@ -40,7 +40,11 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
       <IssueDetailHeader
         issue={issue}
         pullRequests={pullRequests}
+        automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+        relations={relations}
+        relationCandidates={relationCandidates}
         labels={labels}
+        attachments={attachments}
       />
 
       <div className="flex min-w-0 flex-1 flex-col border-t xl:min-h-0 xl:flex-row">
@@ -59,7 +63,9 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           archivedLabelIds={archivedLabelIds}
         />
 
-        <aside className="min-w-0 border-t bg-muted/25 xl:w-[19rem] xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+        {/* Below xl the rail's contents move into the header's properties
+            dialog rather than stacking underneath the chat. */}
+        <aside className="hidden min-w-0 bg-muted/25 xl:block xl:w-[19rem] xl:shrink-0 xl:overflow-y-auto xl:border-l">
           <IssueDetailRail
             issueId={issue.id}
             issueCode={issue.code}
