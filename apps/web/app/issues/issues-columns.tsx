@@ -35,6 +35,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
 import { cn } from "@gentic/ui/utils"
 import { IssueLabelChips } from "./issue-label-chips"
 import {
+  interactiveIssueBadgeClassName,
+  issueBadgeClassName,
+  issueBadgeMenuClassName,
+} from "./issue-badge-styles"
+import {
   issuePriorityLabels,
   issuePriorityOptions,
   issuePriorityOrder,
@@ -50,6 +55,7 @@ import {
   updateIssueType,
 } from "./actions"
 import { agentProviderLabels } from "./agent-provider-options"
+import { priorityIconStyles } from "./issue-priority-meta"
 import { useIssueFieldMutation } from "./use-issue-field-mutation"
 import {
   statusIconStyles,
@@ -68,6 +74,7 @@ export {
   statusOrder,
   statusStyles,
 } from "./issue-status-meta"
+export { priorityIconStyles } from "./issue-priority-meta"
 
 export const issueTypeLabels: Record<IssueType, string> = {
   issue: "Issue",
@@ -103,11 +110,9 @@ export const issueTypeIconStyles: Record<IssueType, string> = {
 
 export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
   return (
-    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
+    <span className={issueBadgeClassName}>
       <AgentProviderIcon provider={provider} className="size-3.5" />
-      <span className="whitespace-nowrap">
-        {agentProviderLabels[provider]}
-      </span>
+      <span className="whitespace-nowrap">{agentProviderLabels[provider]}</span>
     </span>
   )
 }
@@ -120,12 +125,7 @@ export function RepoBadge({
   className?: string
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 max-w-full shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground",
-        className
-      )}
-    >
+    <span className={cn(issueBadgeClassName, "max-w-full", className)}>
       <BrandIcon name="github" className="size-3.5 shrink-0" />
       <span className="min-w-0 truncate">{repo}</span>
     </span>
@@ -236,13 +236,6 @@ export function IssueIndicatorBadge({
   )
 }
 
-export const priorityIconStyles: Record<IssuePriority, string> = {
-  low: "text-gray-600 dark:text-gray-300",
-  medium: "text-blue-600 dark:text-blue-300",
-  high: "text-amber-600 dark:text-amber-300",
-  urgent: "text-red-600 dark:text-red-300",
-}
-
 export const priorityIcons = {
   low: IconTrendingDown,
   medium: IconMinus,
@@ -347,7 +340,8 @@ export function IssueStatusMenu({
           disabled={isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
           className={cn(
-            "inline-flex h-7 shrink-0 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            "inline-flex h-7 shrink-0 items-center justify-center rounded-full",
+            interactiveIssueBadgeClassName,
             showLabel ? "gap-1.5 px-2.5 text-xs font-medium" : "w-7",
             statusStyles[issue.status]
           )}
@@ -365,7 +359,7 @@ export function IssueStatusMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-60 rounded-lg bg-popover before:hidden"
+        className={cn("w-60", issueBadgeMenuClassName)}
       >
         <IssueFieldOptions
           options={statusOptions}
@@ -406,8 +400,10 @@ export function IssuePriorityMenu({
             issuePriorityLabels[issue.priority]
           }`}
           className={cn(
-            "inline-flex h-6 shrink-0 items-center justify-center self-start rounded-full bg-muted text-muted-foreground transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            showLabel ? "gap-1 px-2 text-xs font-medium" : "w-6"
+            issueBadgeClassName,
+            interactiveIssueBadgeClassName,
+            "justify-center self-start",
+            !showLabel && "w-6 px-0"
           )}
           onClick={(event) => event.stopPropagation()}
         >
@@ -426,7 +422,7 @@ export function IssuePriorityMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-52 rounded-lg bg-popover before:hidden"
+        className={cn("w-52", issueBadgeMenuClassName)}
       >
         <IssueFieldOptions
           options={issuePriorityOptions}
@@ -464,7 +460,8 @@ export function IssueTypeMenu({
           disabled={isPending}
           aria-label={`Change type from ${issueTypeLabels[issue.type]}`}
           className={cn(
-            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
+            issueBadgeClassName,
+            interactiveIssueBadgeClassName,
             issueTypeStyles[issue.type]
           )}
           onClick={(event) => event.stopPropagation()}
@@ -479,7 +476,7 @@ export function IssueTypeMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-52 rounded-lg bg-popover before:hidden"
+        className={cn("w-52", issueBadgeMenuClassName)}
       >
         <IssueFieldOptions
           options={issueTypeOptions}
@@ -493,7 +490,6 @@ export function IssueTypeMenu({
     </DropdownMenu>
   )
 }
-
 
 export function getIssuesColumns(
   blockedIssueIds: Set<string>,

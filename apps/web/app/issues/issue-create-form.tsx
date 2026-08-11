@@ -12,8 +12,6 @@ import {
   IconDots,
   IconLoader2,
   IconSend,
-  IconTagFilled,
-  IconX,
 } from "@tabler/icons-react"
 
 import { fetchSettingsLabelsData } from "@/app/client-queries"
@@ -41,11 +39,17 @@ import {
 
 import { AttachmentPromptField } from "./attachment-prompt-field"
 import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
+import {
+  interactiveIssueBadgeClassName,
+  issueBadgeClassName,
+} from "./issue-badge-styles"
+import { IssueLabelChip } from "./issue-label-chip"
 import { IssueLabelsPicker } from "./issue-labels-field"
 import {
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
+  priorityIconStyles,
 } from "./issue-priority-meta"
 import { AgentModelPicker } from "./message-composer/agent-model-picker"
 
@@ -223,11 +227,12 @@ function storeIssueSettings(settings: IssueCreateSettings) {
   }
 }
 
-// Filled, neutral pill styling shared by the interactive controls in the
-// composer's meta row (model, priority, and the overflow menu). The selected
-// label chips reuse the same fill without the hover state, since only their
-// remove button is clickable.
-const metaPillClassName = "bg-muted/60 text-foreground hover:bg-muted"
+// The composer's controls wear the same badges the issue will wear once it
+// exists, so the meta row reads as a preview of the list row.
+const metaControlClassName = cn(
+  issueBadgeClassName,
+  interactiveIssueBadgeClassName
+)
 
 export function IssueCreateForm({
   projects,
@@ -437,10 +442,13 @@ export function IssueCreateForm({
               aria-labelledby={projectLabelId}
               aria-describedby={projectError ? projectErrorId : undefined}
               data-invalid={projectError ? true : undefined}
-              className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 self-start rounded-full border border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted data-invalid:border-destructive data-invalid:ring-1 data-invalid:ring-destructive"
+              className={cn(
+                metaControlClassName,
+                "max-w-full self-start data-invalid:text-destructive data-invalid:ring-2 data-invalid:ring-destructive"
+              )}
             >
               <BrandIcon name="github" className="size-3.5 shrink-0" />
-              <span className="truncate">
+              <span className="min-w-0 truncate">
                 {selectedProject ? selectedProject.repo : "Select repository"}
               </span>
               <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
@@ -503,7 +511,7 @@ export function IssueCreateForm({
                 setIssueModel(model)
                 persistSettings({ agentProvider: provider, issueModel: model })
               }}
-              className={metaPillClassName}
+              className={metaControlClassName}
             />
 
             <label className="sr-only" id={priorityLabelId}>
@@ -514,17 +522,21 @@ export function IssueCreateForm({
                 <button
                   type="button"
                   aria-labelledby={priorityLabelId}
-                  className={cn(
-                    "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium",
-                    metaPillClassName
-                  )}
+                  className={metaControlClassName}
                 >
-                  <PriorityIcon className="size-3.5" />
-                  <span>{issuePriorityLabels[priority]}</span>
-                  <IconChevronDown className="size-3.5 opacity-70" />
+                  <PriorityIcon
+                    className={cn(
+                      "size-3.5 shrink-0",
+                      priorityIconStyles[priority]
+                    )}
+                  />
+                  <span className="whitespace-nowrap">
+                    {issuePriorityLabels[priority]}
+                  </span>
+                  <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuContent align="start" className="w-52">
                 {issuePriorityOptions.map((option) => {
                   const OptionIcon = issuePriorityIcons[option.value]
                   const isSelected = option.value === priority
@@ -538,7 +550,12 @@ export function IssueCreateForm({
                       }}
                       className="gap-3"
                     >
-                      <OptionIcon className="size-4" />
+                      <OptionIcon
+                        className={cn(
+                          "size-4",
+                          priorityIconStyles[option.value]
+                        )}
+                      />
                       <span className="min-w-0 flex-1 truncate">
                         {option.label}
                       </span>
@@ -555,8 +572,8 @@ export function IssueCreateForm({
                   type="button"
                   aria-label="More options"
                   className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground",
-                    metaPillClassName
+                    metaControlClassName,
+                    "size-6 justify-center px-0"
                   )}
                 >
                   <IconDots className="size-4" />
@@ -582,27 +599,14 @@ export function IssueCreateForm({
             </Popover>
 
             {selectedLabels.map((label) => (
-              <span
+              <IssueLabelChip
                 key={label.id}
-                className="flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full bg-muted/60 pr-1 pl-2.5 text-xs font-medium text-foreground"
-              >
-                <IconTagFilled
-                  aria-hidden
-                  className="size-3.5 shrink-0"
-                  style={{ color: label.color }}
-                />
-                <span className="min-w-0 truncate">{label.name}</span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${label.name} label`}
-                  onClick={() =>
-                    setLabelIds(labelIds.filter((id) => id !== label.id))
-                  }
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-                >
-                  <IconX className="size-3.5" />
-                </button>
-              </span>
+                label={label}
+                className="text-xs"
+                onRemove={() =>
+                  setLabelIds(labelIds.filter((id) => id !== label.id))
+                }
+              />
             ))}
           </>
         }
