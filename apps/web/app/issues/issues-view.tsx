@@ -62,7 +62,6 @@ import {
   AgentProviderBadge,
   blockingBadgeStyles,
   blockingIconStyles,
-  formatDate,
   getIssuesColumns,
   IssueIndicatorBadge,
   IssuePriorityMenu,
@@ -350,9 +349,6 @@ function IssueRow({
               <RepoBadge repo={issue.projects.repo} />
             ) : null}
           </div>
-        </div>
-        <div className="text-sm text-muted-foreground md:text-right">
-          {formatDate(issue.created_at)}
         </div>
       </div>
     </div>
