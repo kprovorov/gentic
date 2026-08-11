@@ -40,6 +40,7 @@ import type { IssuePullRequest } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
 import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
+import { Pill } from "@gentic/ui/pill"
 import { cn } from "@gentic/ui/utils"
 import type {
   IssueRelation,
@@ -110,14 +111,9 @@ function IssueDetailPullRequests({
               rel="noreferrer"
               className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-1.5 ring-1 ring-border hover:bg-muted/40"
             >
-              <span
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full",
-                  stateMeta.className
-                )}
-              >
-                <StateIcon className={cn("size-4", stateMeta.iconClassName)} />
-              </span>
+              <Pill size="icon-sm">
+                <StateIcon className={stateMeta.iconClassName} />
+              </Pill>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-[12.5px] leading-none font-medium">
                   {repo}

@@ -21,6 +21,7 @@
     "./message": "./src/ui/message.tsx",
     "./message-scroller": "./src/ui/message-scroller.tsx",
     "./native-select": "./src/ui/native-select.tsx",
+    "./pill": "./src/ui/pill.tsx",
     "./popover": "./src/ui/popover.tsx",
     "./select": "./src/ui/select.tsx",
     "./separator": "./src/ui/separator.tsx",

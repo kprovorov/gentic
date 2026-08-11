@@ -1,6 +1,17 @@
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 import { IconTagFilled } from "@tabler/icons-react"
-import { cn } from "@gentic/ui/utils"
+import { Pill, PillLabel } from "@gentic/ui/pill"
+
+// The inside of a label pill, shared so the clickable filter chips in
+// IssueLabelChips look identical to the read-only ones.
+export function IssueLabelChipContent({ label }: { label: LabelSnapshot }) {
+  return (
+    <>
+      <IconTagFilled aria-hidden style={{ color: label.color }} />
+      <PillLabel>{label.name}</PillLabel>
+    </>
+  )
+}
 
 export function IssueLabelChip({
   label,
@@ -10,18 +21,8 @@ export function IssueLabelChip({
   className?: string
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 text-[12.5px] font-medium text-muted-foreground",
-        className
-      )}
-    >
-      <IconTagFilled
-        aria-hidden
-        className="size-3.5 shrink-0"
-        style={{ color: label.color }}
-      />
-      <span className="min-w-0 truncate">{label.name}</span>
-    </span>
+    <Pill className={className}>
+      <IssueLabelChipContent label={label} />
+    </Pill>
   )
 }

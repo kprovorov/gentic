@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { PillButton, PillLabel } from "@gentic/ui/pill"
 import { cn } from "@gentic/ui/utils"
 import {
   agentModelOptions,
@@ -95,19 +96,16 @@ export function AgentModelPicker({
     // to the Dialog's overlay and closes the whole dialog instead.
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
+          size="sm"
           disabled={disabled}
           aria-label="Choose agent and model"
-          className={cn(
-            "flex h-8 max-w-56 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50",
-            className
-          )}
+          className={cn("max-w-56", className)}
         >
-          <AgentProviderIcon provider={agentProvider} className="size-3.5" />
-          <span className="truncate">{label}</span>
-          <IconChevronDown className="size-3.5" />
-        </button>
+          <AgentProviderIcon provider={agentProvider} />
+          <PillLabel>{label}</PillLabel>
+          <IconChevronDown className="opacity-70" />
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
         {agentProviderOptions.map((providerOption, index) => (

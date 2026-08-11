@@ -10,7 +10,6 @@ import {
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
-  issuePriorityStyles,
 } from "@/app/issues/issue-priority-meta"
 import {
   priorityIconStyles,
@@ -27,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { PillButton, PillLabel } from "@gentic/ui/pill"
 import { cn } from "@gentic/ui/utils"
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 
@@ -67,23 +67,19 @@ export function IssueDetailStatus({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
+          variant="outline"
+          size="default"
           disabled={mutation.isPending}
           aria-label={`Change status from ${statusLabels[status]}`}
-          className={cn(
-            "flex h-9 items-center gap-2.5 rounded-2xl border border-border bg-background px-3 text-[13px] text-foreground transition-[color,box-shadow,background-color] hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            variant === "block" ? "w-full" : "w-auto"
-          )}
+          className={cn(variant === "block" && "w-full")}
         >
-          <StatusIcon
-            className={cn("size-[15px] shrink-0", statusIconStyles[status])}
-          />
-          <span className="min-w-0 flex-1 truncate text-left">
+          <StatusIcon className={statusIconStyles[status]} />
+          <PillLabel className="flex-1 text-left">
             {statusLabels[status]}
-          </span>
-          <IconChevronDown className="size-[15px] shrink-0 opacity-65" />
-        </button>
+          </PillLabel>
+          <IconChevronDown className="opacity-65" />
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         {statusOptions.map((option) => {
@@ -232,27 +228,19 @@ export function IssueDetailPriority({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
+          variant="outline"
+          size="default"
           disabled={mutation.isPending}
           aria-label={`Change priority from ${issuePriorityLabels[displayedPriority]}`}
-          className={cn(
-            "flex h-9 items-center gap-2.5 rounded-2xl border px-3 text-[13px] transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            issuePriorityStyles[displayedPriority],
-            variant === "block" ? "w-full" : "w-auto"
-          )}
+          className={cn(variant === "block" && "w-full")}
         >
-          <PriorityIcon
-            className={cn(
-              "size-[15px] shrink-0",
-              priorityIconStyles[displayedPriority]
-            )}
-          />
-          <span className="min-w-0 flex-1 truncate text-left">
+          <PriorityIcon className={priorityIconStyles[displayedPriority]} />
+          <PillLabel className="flex-1 text-left">
             {issuePriorityLabels[displayedPriority]}
-          </span>
-          <IconChevronDown className="size-[15px] shrink-0 opacity-65" />
-        </button>
+          </PillLabel>
+          <IconChevronDown className="opacity-65" />
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         {issuePriorityOptions.map((option) => {

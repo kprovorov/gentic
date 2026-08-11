@@ -245,7 +245,7 @@ export function IssueDetailHeader({
         <PullRequestPills pullRequests={pullRequests} />
         <IssuePriorityMenu issue={issue} showLabel />
         {labels.map((label) => (
-          <IssueLabelChip key={label.id} label={label} className="text-xs" />
+          <IssueLabelChip key={label.id} label={label} />
         ))}
       </div>
     </header>

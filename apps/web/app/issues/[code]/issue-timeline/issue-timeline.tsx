@@ -19,7 +19,6 @@ import {
   IconMinus,
   IconSparkles,
   IconTag,
-  IconTagFilled,
   IconTool,
   IconUserCircle,
 } from "@tabler/icons-react"
@@ -38,6 +37,7 @@ import {
   statusLabels,
   statusStyles,
 } from "../../issue-status-meta"
+import { IssueLabelChip } from "../../issue-label-chip"
 import { priorityIconStyles } from "../../issues-columns"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
@@ -46,6 +46,7 @@ import {
   CollapsibleTrigger,
 } from "@gentic/ui/collapsible"
 import { MarkerContent, MarkerIcon } from "@gentic/ui/marker"
+import { Pill, PillLabel } from "@gentic/ui/pill"
 import { cn } from "@gentic/ui/utils"
 import {
   issuePriorityLabels,
@@ -637,28 +638,17 @@ function StatusMilestoneContent({
 function StatusBadge({ status }: { status: string | null }) {
   const isKnownStatus = status !== null && status in statusLabels
   if (!isKnownStatus) {
-    return (
-      <span className="inline-flex h-6 items-center rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
-        {status ?? "Unknown"}
-      </span>
-    )
+    return <Pill>{status ?? "Unknown"}</Pill>
   }
 
   const knownStatus = status as IssueStatus
   const StatusIcon = statusIcons[knownStatus]
 
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium",
-        statusStyles[knownStatus]
-      )}
-    >
-      <StatusIcon
-        className={cn("size-3.5", statusIconStyles[knownStatus])}
-      />
-      {statusLabels[knownStatus]}
-    </span>
+    <Pill>
+      <StatusIcon className={statusIconStyles[knownStatus]} />
+      <PillLabel>{statusLabels[knownStatus]}</PillLabel>
+    </Pill>
   )
 }
 
@@ -685,28 +675,17 @@ function PriorityMilestoneContent({
 function PriorityBadge({ priority }: { priority: string | null }) {
   const isKnownPriority = priority !== null && priority in issuePriorityLabels
   if (!isKnownPriority) {
-    return (
-      <span className="inline-flex h-6 items-center rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
-        {priority ?? "Unknown"}
-      </span>
-    )
+    return <Pill>{priority ?? "Unknown"}</Pill>
   }
 
   const knownPriority = priority as IssuePriority
   const PriorityIcon = priorityIcons[knownPriority]
 
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium",
-        issuePriorityStyles[knownPriority]
-      )}
-    >
-      <PriorityIcon
-        className={cn("size-3.5", priorityIconStyles[knownPriority])}
-      />
-      {issuePriorityLabels[knownPriority]}
-    </span>
+    <Pill>
+      <PriorityIcon className={priorityIconStyles[knownPriority]} />
+      <PillLabel>{issuePriorityLabels[knownPriority]}</PillLabel>
+    </Pill>
   )
 }
 
@@ -781,19 +760,10 @@ function LabelChip({
   muted?: boolean
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-full bg-muted px-2 text-xs font-medium",
-        muted ? "text-muted-foreground line-through" : "text-foreground"
-      )}
-    >
-      <IconTagFilled
-        aria-hidden
-        className="size-3.5 shrink-0"
-        style={{ color: label.color }}
-      />
-      {label.name}
-    </span>
+    <IssueLabelChip
+      label={label}
+      className={cn(muted && "text-muted-foreground line-through")}
+    />
   )
 }
 

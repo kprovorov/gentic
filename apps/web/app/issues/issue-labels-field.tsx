@@ -16,6 +16,7 @@ import { fetchSettingsLabelsData } from "@/app/client-queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { Checkbox } from "@gentic/ui/checkbox"
 import { Input } from "@gentic/ui/input"
+import { PillButton, PillLabel } from "@gentic/ui/pill"
 import { Popover, PopoverContent, PopoverTrigger } from "@gentic/ui/popover"
 import { cn } from "@gentic/ui/utils"
 
@@ -38,21 +39,15 @@ export function IssueLabelsField({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted",
-            className
-          )}
-        >
-          <IconTag className="size-3.5" />
-          <span>
+        <PillButton size="sm" className={className}>
+          <IconTag />
+          <PillLabel>
             {selectedIds.length > 0
               ? `${selectedIds.length} label${selectedIds.length === 1 ? "" : "s"}`
               : "Labels"}
-          </span>
-          <IconChevronDown className="size-3.5 opacity-70" />
-        </button>
+          </PillLabel>
+          <IconChevronDown className="opacity-70" />
+        </PillButton>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
         <IssueLabelsPicker

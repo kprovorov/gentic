@@ -25,6 +25,7 @@ import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
 import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
+import { Pill, PillButton, PillLabel } from "@gentic/ui/pill"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +58,6 @@ import {
   statusLabels,
   statusOptions,
   statusOrder,
-  statusStyles,
 } from "./issue-status-meta"
 
 export {
@@ -85,14 +85,6 @@ export const issueTypeIcons = {
   idea: IconBulb,
 }
 
-export const issueTypeStyles: Record<IssueType, string> = {
-  issue: "bg-muted text-muted-foreground",
-  feature: "bg-muted text-muted-foreground",
-  bug: "bg-muted text-muted-foreground",
-  feedback: "bg-muted text-muted-foreground",
-  idea: "bg-muted text-muted-foreground",
-}
-
 export const issueTypeIconStyles: Record<IssueType, string> = {
   issue: "text-muted-foreground",
   feature: "text-violet-600 dark:text-violet-300",
@@ -103,12 +95,10 @@ export const issueTypeIconStyles: Record<IssueType, string> = {
 
 export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
   return (
-    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
-      <AgentProviderIcon provider={provider} className="size-3.5" />
-      <span className="whitespace-nowrap">
-        {agentProviderLabels[provider]}
-      </span>
-    </span>
+    <Pill>
+      <AgentProviderIcon provider={provider} />
+      <PillLabel>{agentProviderLabels[provider]}</PillLabel>
+    </Pill>
   )
 }
 
@@ -120,15 +110,10 @@ export function RepoBadge({
   className?: string
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 max-w-full shrink-0 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground",
-        className
-      )}
-    >
-      <BrandIcon name="github" className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{repo}</span>
-    </span>
+    <Pill className={className}>
+      <BrandIcon name="github" />
+      <PillLabel>{repo}</PillLabel>
+    </Pill>
   )
 }
 
@@ -177,21 +162,17 @@ export function PullRequestPills({
         return (
           <Tooltip key={pullRequest.id}>
             <TooltipTrigger asChild>
-              <Link
-                href={pullRequest.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Open ${label.full}`}
-                className={cn(
-                  "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
-                  stateMeta.className
-                )}
-              >
-                <StateIcon
-                  className={cn("size-3.5", stateMeta.iconClassName)}
-                />
-                <span className="whitespace-nowrap">{label.short}</span>
-              </Link>
+              <PillButton asChild>
+                <Link
+                  href={pullRequest.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${label.full}`}
+                >
+                  <StateIcon className={stateMeta.iconClassName} />
+                  <PillLabel>{label.short}</PillLabel>
+                </Link>
+              </PillButton>
             </TooltipTrigger>
             <TooltipContent side="top">
               {label.full} · {stateMeta.label}
@@ -210,26 +191,17 @@ export const issueTypeOptions = issueTypeSchema.options.map((value) => ({
 
 export function IssueIndicatorBadge({
   label,
-  className,
   children,
 }: {
   label: string
-  className: string
   children: ReactNode
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          aria-label={label}
-          className={cn(
-            "inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-            className
-          )}
-        >
+        <Pill size="icon-xs" tabIndex={0} aria-label={label}>
           {children}
-        </span>
+        </Pill>
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>
     </Tooltip>
@@ -342,26 +314,17 @@ export function IssueStatusMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
+          size={showLabel ? "xs" : "icon-xs"}
           disabled={isPending}
           aria-label={`Change status from ${statusLabels[issue.status]}`}
-          className={cn(
-            "inline-flex h-7 shrink-0 items-center justify-center rounded-full transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            showLabel ? "gap-1.5 px-2.5 text-xs font-medium" : "w-7",
-            statusStyles[issue.status]
-          )}
           onClick={(event) => event.stopPropagation()}
         >
-          <StatusIcon
-            className={cn("size-3.5 shrink-0", statusIconStyles[issue.status])}
-          />
+          <StatusIcon className={statusIconStyles[issue.status]} />
           {showLabel ? (
-            <span className="whitespace-nowrap">
-              {statusLabels[issue.status]}
-            </span>
+            <PillLabel>{statusLabels[issue.status]}</PillLabel>
           ) : null}
-        </button>
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -399,30 +362,20 @@ export function IssuePriorityMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
+          size={showLabel ? "xs" : "icon-xs"}
           disabled={isPending}
           aria-label={`Change priority from ${
             issuePriorityLabels[issue.priority]
           }`}
-          className={cn(
-            "inline-flex h-6 shrink-0 items-center justify-center self-start rounded-full bg-muted text-muted-foreground transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            showLabel ? "gap-1 px-2 text-xs font-medium" : "w-6"
-          )}
+          className="self-start"
           onClick={(event) => event.stopPropagation()}
         >
-          <PriorityIcon
-            className={cn(
-              "size-3.5 shrink-0",
-              priorityIconStyles[issue.priority]
-            )}
-          />
+          <PriorityIcon className={priorityIconStyles[issue.priority]} />
           {showLabel ? (
-            <span className="whitespace-nowrap">
-              {issuePriorityLabels[issue.priority]}
-            </span>
+            <PillLabel>{issuePriorityLabels[issue.priority]}</PillLabel>
           ) : null}
-        </button>
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -459,23 +412,14 @@ export function IssueTypeMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <PillButton
           disabled={isPending}
           aria-label={`Change type from ${issueTypeLabels[issue.type]}`}
-          className={cn(
-            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium transition-[color,box-shadow,background-color] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=open]:ring-2 data-[state=open]:ring-ring/30",
-            issueTypeStyles[issue.type]
-          )}
           onClick={(event) => event.stopPropagation()}
         >
-          <TypeIcon
-            className={cn("size-3.5 shrink-0", issueTypeIconStyles[issue.type])}
-          />
-          <span className="whitespace-nowrap">
-            {issueTypeLabels[issue.type]}
-          </span>
-        </button>
+          <TypeIcon className={issueTypeIconStyles[issue.type]} />
+          <PillLabel>{issueTypeLabels[issue.type]}</PillLabel>
+        </PillButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -591,11 +535,10 @@ export function getIssuesColumns(
       id: "repo",
       accessorFn: (issue) => issue.projects?.repo ?? "",
       header: "Repository",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.projects?.repo ?? ""}
-        </span>
-      ),
+      cell: ({ row }) =>
+        row.original.projects?.repo ? (
+          <RepoBadge repo={row.original.projects.repo} />
+        ) : null,
     },
     {
       id: "labels",
@@ -634,11 +577,8 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockedIssueIds.has(row.original.id) ? (
-          <IssueIndicatorBadge
-            label="Blocked"
-            className={blockingBadgeStyles.blocked}
-          >
-            <IconLock className={cn("size-3.5", blockingIconStyles.blocked)} />
+          <IssueIndicatorBadge label="Blocked">
+            <IconLock className={blockingIconStyles.blocked} />
           </IssueIndicatorBadge>
         ) : null,
     },
@@ -650,13 +590,8 @@ export function getIssuesColumns(
       ),
       cell: ({ row }) =>
         blockingIssueIds.has(row.original.id) ? (
-          <IssueIndicatorBadge
-            label="Blocking"
-            className={blockingBadgeStyles.blocking}
-          >
-            <IconArrowBarToRight
-              className={cn("size-3.5", blockingIconStyles.blocking)}
-            />
+          <IssueIndicatorBadge label="Blocking">
+            <IconArrowBarToRight className={blockingIconStyles.blocking} />
           </IssueIndicatorBadge>
         ) : null,
     },

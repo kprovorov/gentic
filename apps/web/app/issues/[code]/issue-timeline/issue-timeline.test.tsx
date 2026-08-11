@@ -355,14 +355,14 @@ describe("IssueTimeline", () => {
       />
     )
 
-    const archivedChip = screen.getByText("Retired")
+    const archivedChip = screen.getByText("Retired").closest("[data-slot=pill]")
     expect(archivedChip).toBeVisible()
     expect(archivedChip).toHaveClass("line-through")
     expect(archivedChip).toHaveClass("text-muted-foreground")
 
-    const activeChip = screen.getByText("Bug")
+    const activeChip = screen.getByText("Bug").closest("[data-slot=pill]")
     expect(activeChip).not.toHaveClass("line-through")
-    expect(activeChip).toHaveClass("text-foreground")
+    expect(activeChip).toHaveClass("text-secondary-foreground")
   })
 
   it("drops archived styling once a label is restored while preserving event text and timestamp", () => {
@@ -386,10 +386,10 @@ describe("IssueTimeline", () => {
       />
     )
 
-    const restoredChip = screen.getByText("Retired")
+    const restoredChip = screen.getByText("Retired").closest("[data-slot=pill]")
     expect(restoredChip).toBeVisible()
     expect(restoredChip).not.toHaveClass("line-through")
-    expect(restoredChip).toHaveClass("text-foreground")
+    expect(restoredChip).toHaveClass("text-secondary-foreground")
 
     // Event text and timestamp are untouched by the restore.
     const timestamp = document.querySelector("time")

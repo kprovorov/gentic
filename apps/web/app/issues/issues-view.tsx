@@ -319,23 +319,13 @@ function IssueRow({
             <IssueTypeMenu issue={issue} />
             <AgentProviderBadge provider={issue.agent_provider} />
             {isBlocked ? (
-              <IssueIndicatorBadge
-                label="Blocked"
-                className={blockingBadgeStyles.blocked}
-              >
-                <IconLock
-                  className={cn("size-3.5", blockingIconStyles.blocked)}
-                />
+              <IssueIndicatorBadge label="Blocked">
+                <IconLock className={blockingIconStyles.blocked} />
               </IssueIndicatorBadge>
             ) : null}
             {isBlocking ? (
-              <IssueIndicatorBadge
-                label="Blocking"
-                className={blockingBadgeStyles.blocking}
-              >
-                <IconArrowBarToRight
-                  className={cn("size-3.5", blockingIconStyles.blocking)}
-                />
+              <IssueIndicatorBadge label="Blocking">
+                <IconArrowBarToRight className={blockingIconStyles.blocking} />
               </IssueIndicatorBadge>
             ) : null}
             <PullRequestPills pullRequests={issue.pullRequests} />

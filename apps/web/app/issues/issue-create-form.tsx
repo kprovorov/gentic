@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { PillButton, PillLabel } from "@gentic/ui/pill"
 import { Popover, PopoverContent, PopoverTrigger } from "@gentic/ui/popover"
 import { cn } from "@gentic/ui/utils"
 import {
@@ -218,10 +219,6 @@ function storeIssueSettings(settings: IssueCreateSettings) {
   }
 }
 
-// Filled, neutral pill styling shared by the option controls in the composer's
-// meta row (model, priority, labels, and the overflow menu).
-const metaPillClassName = "bg-muted/60 text-foreground hover:bg-muted"
-
 export function IssueCreateForm({
   projects,
   defaultAgentProvider = "claude_code",
@@ -403,20 +400,21 @@ export function IssueCreateForm({
             overlay and closes the whole dialog instead. */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button
+            <PillButton
               ref={projectTriggerRef}
-              type="button"
+              variant="outline"
+              size="sm"
               aria-labelledby={projectLabelId}
               aria-describedby={projectError ? projectErrorId : undefined}
-              data-invalid={projectError ? true : undefined}
-              className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 self-start rounded-full border border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted data-invalid:border-destructive data-invalid:ring-1 data-invalid:ring-destructive"
+              aria-invalid={projectError ? true : undefined}
+              className="self-start"
             >
-              <BrandIcon name="github" className="size-3.5 shrink-0" />
-              <span className="truncate">
+              <BrandIcon name="github" />
+              <PillLabel>
                 {selectedProject ? selectedProject.repo : "Select repository"}
-              </span>
-              <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
-            </button>
+              </PillLabel>
+              <IconChevronDown className="opacity-70" />
+            </PillButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-64">
             {projects.map((project) => (
@@ -471,7 +469,6 @@ export function IssueCreateForm({
                 setIssueModel(model)
                 persistSettings({ agentProvider: provider, issueModel: model })
               }}
-              className={metaPillClassName}
             />
 
             <label className="sr-only" id={priorityLabelId}>
@@ -479,18 +476,11 @@ export function IssueCreateForm({
             </label>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-labelledby={priorityLabelId}
-                  className={cn(
-                    "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium",
-                    metaPillClassName
-                  )}
-                >
-                  <PriorityIcon className="size-3.5" />
-                  <span>{issuePriorityLabels[priority]}</span>
-                  <IconChevronDown className="size-3.5 opacity-70" />
-                </button>
+                <PillButton size="sm" aria-labelledby={priorityLabelId}>
+                  <PriorityIcon />
+                  <PillLabel>{issuePriorityLabels[priority]}</PillLabel>
+                  <IconChevronDown className="opacity-70" />
+                </PillButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
                 {issuePriorityOptions.map((option) => {
@@ -519,24 +509,16 @@ export function IssueCreateForm({
 
             <Popover>
               <PopoverTrigger asChild>
-                <button
-                  type="button"
+                <PillButton
+                  size="sm"
                   aria-label="More options"
-                  className={cn(
-                    "flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-full px-2",
-                    metaPillClassName,
-                    labelIds.length > 0
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                  )}
+                  className="min-w-8 px-2"
                 >
                   {labelIds.length > 0 ? (
-                    <span className="text-xs font-medium tabular-nums">
-                      {labelIds.length}
-                    </span>
+                    <span className="tabular-nums">{labelIds.length}</span>
                   ) : null}
                   <IconDots className="size-4" />
-                </button>
+                </PillButton>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-72 p-0">
                 <IssueLabelsPicker

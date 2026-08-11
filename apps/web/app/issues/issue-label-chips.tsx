@@ -1,8 +1,8 @@
 import type { AssignedIssueLabel } from "@/app/query-contracts"
+import { Pill, PillButton } from "@gentic/ui/pill"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gentic/ui/tooltip"
-import { cn } from "@gentic/ui/utils"
 
-import { IssueLabelChip } from "./issue-label-chip"
+import { IssueLabelChipContent } from "./issue-label-chip"
 
 const visibleLabelCount = 3
 
@@ -26,34 +26,30 @@ export function IssueLabelChips({
       aria-label="Labels"
     >
       {visibleLabels.map((label) => (
-        <button
+        <PillButton
           key={label.id}
-          type="button"
           aria-label={`Filter by Label ${label.name}`}
           aria-pressed={selectedLabelIds.has(label.id)}
-          className={cn(
-            "inline-flex max-w-40 shrink-0 rounded-full transition-[box-shadow] hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-            selectedLabelIds.has(label.id) && "ring-2 ring-ring/40"
-          )}
+          selected={selectedLabelIds.has(label.id)}
+          className="max-w-40"
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
             onLabelSelect(label.id)
           }}
         >
-          <IssueLabelChip label={label} className="text-xs" />
-        </button>
+          <IssueLabelChipContent label={label} />
+        </PillButton>
       ))}
       {overflowLabels.length > 0 ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
+            <Pill
               tabIndex={0}
               aria-label={`${overflowLabels.length} more Labels. All Labels: ${labels.map((label) => label.name).join(", ")}`}
-              className="inline-flex h-6 shrink-0 items-center rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               +{overflowLabels.length}
-            </span>
+            </Pill>
           </TooltipTrigger>
           <TooltipContent side="top">
             {labels.map((label) => label.name).join(", ")}
