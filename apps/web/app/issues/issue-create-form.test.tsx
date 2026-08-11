@@ -138,7 +138,7 @@ describe("IssueCreateForm", () => {
     })
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
       null
@@ -219,7 +219,7 @@ describe("IssueCreateForm", () => {
     await user.type(screen.getByLabelText("Body"), "Fix the layout.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     await waitFor(async () => {
       const stored = await readStoredFiles()
@@ -239,7 +239,7 @@ describe("IssueCreateForm", () => {
       "name",
       "project_id"
     )
-    expect(screen.getByText("Gentic")).toBeVisible()
+    expect(screen.getByText("openai/gentic")).toBeVisible()
   })
 
   it("defaults new issues to medium priority", () => {
@@ -265,10 +265,10 @@ describe("IssueCreateForm", () => {
 
     expect(priorityInput).toHaveAttribute("name", "priority")
     expect(form).toContainElement(
-      screen.getByRole("button", { name: "Save draft" })
+      screen.getByRole("button", { name: "Save Draft" })
     )
     expect(form).toContainElement(
-      screen.getByRole("button", { name: "Run issue" })
+      screen.getByRole("button", { name: "Run Agent" })
     )
   })
 
@@ -281,7 +281,7 @@ describe("IssueCreateForm", () => {
       screen.getByLabelText("Body"),
       "Fix the new issue form validation."
     )
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     const projectSelect = screen.getByRole("button", { name: "Project" })
 
@@ -334,18 +334,20 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
-    expect(
-      screen.getByRole("checkbox", { name: "Create PR automatically" })
-    ).toBeChecked()
     expect(screen.getByDisplayValue("true")).toHaveAttribute(
       "name",
       "create_pr_automatically"
     )
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    expect(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    ).toBeChecked()
+    await user.keyboard("{Escape}")
 
     await user.type(screen.getByLabelText("Body"), "Open a PR.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     await waitFor(() => expect(runIssue).toHaveBeenCalled())
     const formData = vi.mocked(runIssue).mock.calls[0][0] as FormData
@@ -357,6 +359,7 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await user.click(
       screen.getByRole("checkbox", { name: "Create PR automatically" })
     )
@@ -364,11 +367,12 @@ describe("IssueCreateForm", () => {
       "name",
       "create_pr_automatically"
     )
+    await user.keyboard("{Escape}")
 
     await user.type(screen.getByLabelText("Body"), "Keep this as a draft.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Save draft" }))
+    await user.click(screen.getByRole("button", { name: "Save Draft" }))
 
     await waitFor(() => expect(saveIssueDraft).toHaveBeenCalled())
     const formData = vi.mocked(saveIssueDraft).mock.calls[0][0] as FormData
@@ -390,6 +394,7 @@ describe("IssueCreateForm", () => {
       screen.getByRole("button", { name: "Choose agent and model" })
     )
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await user.click(
       screen.getByRole("checkbox", { name: "Create PR automatically" })
     )
@@ -419,18 +424,20 @@ describe("IssueCreateForm", () => {
       })
     )
 
-    renderForm(<IssueCreateForm projects={projects} />)
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByText("Gentic")).toBeVisible()
+      expect(screen.getByText("openai/gentic")).toBeVisible()
       expect(screen.getByText("Urgent")).toBeVisible()
       expect(
         screen.getByRole("button", { name: "Choose agent and model" })
       ).toHaveTextContent("GPT-5.6 Sol")
-      expect(
-        screen.getByRole("checkbox", { name: "Create PR automatically" })
-      ).not.toBeChecked()
     })
+
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    expect(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    ).not.toBeChecked()
   })
 
   it("does not restore a stored project that no longer exists", async () => {
@@ -442,7 +449,7 @@ describe("IssueCreateForm", () => {
     renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByText("Select project")).toBeVisible()
+      expect(screen.getByText("Select repository")).toBeVisible()
     })
   })
 
@@ -451,6 +458,7 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
+    await user.click(screen.getByRole("button", { name: "More options" }))
     const info = screen.getByRole("button", {
       name: "About Create PR automatically",
     })
@@ -474,7 +482,7 @@ describe("IssueCreateForm", () => {
   it("filters the label picker by search", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -488,10 +496,10 @@ describe("IssueCreateForm", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("selects and deselects a label, toggling its hidden input", async () => {
+  it("selects and deselects a label from the overflow menu, toggling its hidden input", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -502,12 +510,12 @@ describe("IssueCreateForm", () => {
       "name",
       "label_id"
     )
-    expect(screen.getByRole("button", { name: "1 label" })).toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Bug" })).toBeChecked()
 
     await user.click(screen.getByRole("checkbox", { name: "Bug" }))
 
     expect(screen.queryByDisplayValue("label-bug")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Labels" })).toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Bug" })).not.toBeChecked()
   })
 
   it("creates a label inline, auto-selects it, and shows no color chooser", async () => {
@@ -517,7 +525,7 @@ describe("IssueCreateForm", () => {
     })
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -555,11 +563,9 @@ describe("IssueCreateForm", () => {
     stubLabelsFetch(manyLabels)
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
-      expect(
-        screen.getByRole("checkbox", { name: "Label 01" })
-      ).toBeVisible()
+      expect(screen.getByRole("checkbox", { name: "Label 01" })).toBeVisible()
     })
 
     for (let index = 1; index <= 20; index += 1) {
@@ -586,7 +592,7 @@ describe("IssueCreateForm", () => {
   it("keeps selected labels selected when the project changes", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
