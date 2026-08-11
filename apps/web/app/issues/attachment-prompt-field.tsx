@@ -50,8 +50,10 @@ export function AttachmentPromptField({
   files,
   onFilesChange,
   onKeyDown,
+  metaRow,
   footerStart,
   footerEnd,
+  variant = "boxed",
 }: {
   id?: string
   name?: string
@@ -67,8 +69,14 @@ export function AttachmentPromptField({
   files?: File[]
   onFilesChange?: (files: File[]) => void
   onKeyDown?: React.KeyboardEventHandler<HTMLTextAreaElement>
+  // Rendered as its own row between the textarea and the action row. Used by
+  // the new-issue composer to stack option pills above the attach/submit bar.
+  metaRow?: React.ReactNode
   footerStart?: React.ReactNode
   footerEnd?: React.ReactNode
+  // "bare" drops the container's border/background so the field blends into a
+  // surrounding surface (e.g. the New Issue dialog, which is the card itself).
+  variant?: "boxed" | "bare"
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [internalFiles, setInternalFiles] = useState<File[]>([])
@@ -117,11 +125,17 @@ export function AttachmentPromptField({
     addFiles(event.dataTransfer.files)
   }
 
+  const isBare = variant === "bare"
+
   return (
     <div
       className={cn(
-        "relative rounded-[22px] border border-transparent bg-input/50 transition-[color,box-shadow,background-color] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30",
-        isDragging && "border-ring ring-3 ring-ring/30",
+        "relative transition-[color,box-shadow,background-color]",
+        isBare
+          ? "rounded-2xl"
+          : "rounded-[22px] border border-transparent bg-input/50 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30",
+        isDragging &&
+          (isBare ? "ring-3 ring-ring/30" : "border-ring ring-3 ring-ring/30"),
         className
       )}
       onDragEnter={(event) => {
@@ -154,12 +168,31 @@ export function AttachmentPromptField({
         required={required}
         disabled={disabled}
         className={cn(
-          "w-full resize-y bg-transparent px-4 pt-3 pb-1 text-base outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
+          "w-full resize-y bg-transparent text-base outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
+          isBare ? "px-1 pt-1 pb-2" : "px-4 pt-3 pb-1",
           textareaClassName
         )}
       />
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2 overflow-hidden border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3">
+      {metaRow ? (
+        <div
+          className={cn(
+            "flex min-w-0 flex-wrap items-center gap-2",
+            isBare ? "px-1 pb-2" : "px-3 pb-1"
+          )}
+        >
+          {metaRow}
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          "flex min-w-0 flex-wrap items-center gap-2 overflow-hidden",
+          isBare
+            ? "px-0.5"
+            : "border-t border-border/50 pt-1.5 pr-2.5 pb-2 pl-3"
+        )}
+      >
         <input
           ref={fileInputRef}
           type="file"

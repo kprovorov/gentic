@@ -891,9 +891,7 @@ describe("IssuesView new issue dialog", () => {
       within(dialog).getByRole("heading", { name: "New issue" })
     ).toBeVisible()
     expect(
-      await within(dialog).findByPlaceholderText(
-        "Describe what you want built, fixed, or investigated."
-      )
+      await within(dialog).findByPlaceholderText("Describe your task…")
     ).toBeVisible()
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }))

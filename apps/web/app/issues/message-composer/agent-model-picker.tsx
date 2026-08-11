@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { cn } from "@gentic/ui/utils"
 import {
   agentModelOptions,
   type AgentProvider,
@@ -39,6 +40,7 @@ export function AgentModelPicker({
   hasMessages,
   disabled,
   onAgentModelChange,
+  className,
 }: {
   agentProvider: AgentProvider
   issueModel: IssueModel
@@ -49,6 +51,7 @@ export function AgentModelPicker({
     issueModel: IssueModel,
     info: { requiresReset: boolean }
   ) => void
+  className?: string
 }) {
   const selectedOption = agentModelOptions[agentProvider].find(
     (option) => option.value === issueModel
@@ -96,7 +99,10 @@ export function AgentModelPicker({
           type="button"
           disabled={disabled}
           aria-label="Choose agent and model"
-          className="flex h-8 max-w-56 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          className={cn(
+            "flex h-8 max-w-56 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50",
+            className
+          )}
         >
           <AgentProviderIcon provider={agentProvider} className="size-3.5" />
           <span className="truncate">{label}</span>

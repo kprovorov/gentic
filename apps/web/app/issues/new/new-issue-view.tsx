@@ -8,11 +8,7 @@ import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 
 import { IssueCreateForm } from "../issue-create-form"
 
-export function NewIssueView({
-  initialData,
-}: {
-  initialData: NewIssueData
-}) {
+export function NewIssueView({ initialData }: { initialData: NewIssueData }) {
   const { data } = useQuery({
     queryKey: queryKeys.newIssue,
     queryFn: fetchNewIssueData,
@@ -23,12 +19,14 @@ export function NewIssueView({
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
-      <div className="mx-auto flex min-h-[calc(100svh-10rem)] w-full max-w-3xl flex-col justify-center">
-        <IssueCreateForm
-          projects={projects}
-          defaultAgentProvider={defaultAgentProvider}
-          className="w-full"
-        />
+      <div className="mx-auto flex min-h-[calc(100svh-10rem)] w-full max-w-2xl flex-col justify-center">
+        <div className="rounded-3xl border bg-background p-4 shadow-sm sm:p-6">
+          <IssueCreateForm
+            projects={projects}
+            defaultAgentProvider={defaultAgentProvider}
+            className="w-full"
+          />
+        </div>
       </div>
     </div>
   )
