@@ -1,7 +1,12 @@
 "use client"
 
-import Link from "next/link"
-import { IconArrowsDiagonal, IconLoader2, IconX } from "@tabler/icons-react"
+import { useState } from "react"
+import {
+  IconArrowsDiagonal,
+  IconArrowsDiagonalMinimize2,
+  IconLoader2,
+  IconX,
+} from "@tabler/icons-react"
 import { useQuery } from "@tanstack/react-query"
 
 import { fetchNewIssueData } from "@/app/client-queries"
@@ -15,11 +20,13 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@gentic/ui/dialog"
+import { cn } from "@gentic/ui/utils"
 
 import { useNewIssueDialog } from "./new-issue-dialog-provider"
 
 export function NewIssueDialog() {
   const { open, setOpen } = useNewIssueDialog()
+  const [expanded, setExpanded] = useState(false)
   const { data } = useQuery({
     queryKey: queryKeys.newIssue,
     queryFn: fetchNewIssueData,
@@ -28,8 +35,19 @@ export function NewIssueDialog() {
   })
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent showCloseButton={false} className="max-w-2xl gap-0 p-4">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (!nextOpen) {
+          setExpanded(false)
+        }
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className={cn("max-w-2xl gap-0 p-4", expanded && "h-[85svh]")}
+      >
         <DialogTitle className="sr-only">New issue</DialogTitle>
         <DialogDescription className="sr-only">
           Describe the work and choose the repository before saving or running
@@ -38,15 +56,17 @@ export function NewIssueDialog() {
 
         <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5">
           <Button
-            asChild
+            type="button"
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
-            onClick={() => setOpen(false)}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
           >
-            <Link href="/issues/new" aria-label="Open in full page">
-              <IconArrowsDiagonal />
-            </Link>
+            {expanded ? <IconArrowsDiagonalMinimize2 /> : <IconArrowsDiagonal />}
+            <span className="sr-only">
+              {expanded ? "Collapse composer" : "Expand composer"}
+            </span>
           </Button>
           <DialogClose asChild>
             <Button
@@ -65,6 +85,7 @@ export function NewIssueDialog() {
           <IssueCreateForm
             projects={data.projects}
             defaultAgentProvider={data.defaultAgentProvider}
+            fillHeight={expanded}
             className="w-full"
           />
         ) : (

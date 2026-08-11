@@ -225,10 +225,14 @@ const metaPillClassName = "bg-muted/60 text-foreground hover:bg-muted"
 export function IssueCreateForm({
   projects,
   defaultAgentProvider = "claude_code",
+  fillHeight = false,
   className,
 }: {
   projects: ProjectOption[]
   defaultAgentProvider?: AgentProvider
+  // Stretch the body field to consume the container's height instead of sizing
+  // to its content. Used by the New Issue dialog's expanded state.
+  fillHeight?: boolean
   className?: string
 }) {
   const [body, setBody] = useState("")
@@ -372,7 +376,11 @@ export function IssueCreateForm({
     <form
       id="new-issue-form"
       action={saveIssueDraft}
-      className={cn("flex min-w-0 flex-col gap-3", className)}
+      className={cn(
+        "flex min-w-0 flex-col gap-3",
+        fillHeight && "min-h-0 flex-1",
+        className
+      )}
     >
       <input type="hidden" name="project_id" value={projectId} />
       <input type="hidden" name="priority" value={priority} />
@@ -459,7 +467,11 @@ export function IssueCreateForm({
         rows={3}
         placeholder="Describe your task…"
         required
-        textareaClassName="min-h-20 resize-none"
+        className={cn(fillHeight && "flex min-h-0 flex-1 flex-col")}
+        textareaClassName={cn(
+          "resize-none",
+          fillHeight ? "min-h-0 flex-1" : "min-h-20"
+        )}
         metaRow={
           <>
             <AgentModelPicker
