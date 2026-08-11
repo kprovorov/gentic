@@ -4,9 +4,7 @@ import type React from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconDownload,
-  IconFileText,
   IconPaperclip,
-  IconPhoto,
   IconTrash,
   IconUpload,
 } from "@tabler/icons-react"
@@ -14,6 +12,10 @@ import {
 import { Button } from "@gentic/ui/button"
 
 import { deleteAttachment, uploadAttachments } from "@/app/issues/actions"
+import {
+  AttachmentChip,
+  formatAttachmentSize,
+} from "@/app/issues/attachment-chip"
 import { queryKeys } from "@/app/query-keys"
 
 export type Attachment = {
@@ -22,24 +24,6 @@ export type Attachment = {
   sizeBytes: number | null
   url: string | null
   thumbnailUrl: string | null
-}
-
-function formatSize(bytes: number | null): string {
-  if (!bytes) {
-    return ""
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function fileExtension(fileName: string): string {
-  const dotIndex = fileName.lastIndexOf(".")
-  return dotIndex === -1 ? "" : fileName.slice(dotIndex + 1).toUpperCase()
 }
 
 // Read-only attachment list, reused wherever attachments are shown alongside
@@ -55,45 +39,14 @@ export function AttachmentPreviews({
 
   return (
     <div className="mt-2 flex max-w-full flex-wrap items-center gap-2">
-      {attachments.map((attachment) => {
-        const meta = [fileExtension(attachment.fileName), formatSize(attachment.sizeBytes)]
-          .filter(Boolean)
-          .join(" · ")
-
-        return (
-          <span
-            key={attachment.id}
-            className="flex max-w-full items-center gap-2.5 rounded-2xl bg-background p-1.5 text-xs ring-1 ring-border"
-          >
-            {attachment.thumbnailUrl ? (
-              // Supabase signs this URL with Image Transformation options.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={attachment.thumbnailUrl}
-                alt=""
-                className="size-[34px] shrink-0 rounded-[9px] object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-muted-foreground">
-                {/\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.fileName) ? (
-                  <IconPhoto className="size-4" />
-                ) : (
-                  <IconFileText className="size-4" />
-                )}
-              </span>
-            )}
-            <span className="grid min-w-0 pr-0.5 leading-[1.35]">
-              <span className="min-w-0 truncate font-medium">
-                {attachment.fileName}
-              </span>
-              {meta ? (
-                <span className="text-[11px] text-muted-foreground">
-                  {meta}
-                </span>
-              ) : null}
-            </span>
-            {attachment.url ? (
+      {attachments.map((attachment) => (
+        <AttachmentChip
+          key={attachment.id}
+          fileName={attachment.fileName}
+          sizeBytes={attachment.sizeBytes}
+          thumbnailUrl={attachment.thumbnailUrl}
+          action={
+            attachment.url ? (
               <Button asChild variant="ghost" size="icon-xs">
                 <a
                   href={attachment.url}
@@ -104,10 +57,10 @@ export function AttachmentPreviews({
                   <IconDownload />
                 </a>
               </Button>
-            ) : null}
-          </span>
-        )
-      })}
+            ) : null
+          }
+        />
+      ))}
     </div>
   )
 }
@@ -126,7 +79,9 @@ export function Attachments({
   const uploadMutation = useMutation({
     mutationFn: uploadAttachments,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.issue(issueId),
+      })
     },
   })
 
@@ -193,7 +148,9 @@ function AttachmentRow({
   const mutation = useMutation({
     mutationFn: deleteAttachment,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.issue(issueId),
+      })
     },
   })
 
@@ -231,7 +188,7 @@ function AttachmentRow({
         <div className="min-w-0">
           <p className="truncate">{attachment.fileName}</p>
           <p className="text-xs text-muted-foreground">
-            {formatSize(attachment.sizeBytes)}
+            {formatAttachmentSize(attachment.sizeBytes)}
           </p>
         </div>
       </div>

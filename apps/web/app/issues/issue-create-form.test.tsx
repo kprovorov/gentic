@@ -227,6 +227,33 @@ describe("IssueCreateForm", () => {
     })
   })
 
+  it("previews attached files between the body and the option pills", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    await user.upload(
+      input,
+      new File(["contents"], "screenshot.png", { type: "image/png" })
+    )
+
+    const chip = await screen.findByText("screenshot.png")
+    expect(screen.getByText("PNG · 8 B")).toBeVisible()
+
+    const following = (from: Element, to: Element) =>
+      Boolean(
+        from.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+
+    expect(following(screen.getByLabelText("Body"), chip)).toBe(true)
+    expect(
+      following(chip, screen.getByRole("button", { name: "Priority" }))
+    ).toBe(true)
+  })
+
   it("stores the selected project from the dropdown", async () => {
     const user = userEvent.setup()
 
