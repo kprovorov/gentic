@@ -502,23 +502,22 @@ export function IssueCreateForm({
             overlay and closes the whole dialog instead. */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button
+            <Button
               ref={projectTriggerRef}
               type="button"
+              variant="outline"
+              size="xs"
               aria-labelledby={projectLabelId}
               aria-describedby={projectError ? projectErrorId : undefined}
-              data-invalid={projectError ? true : undefined}
-              className={cn(
-                metaControlClassName,
-                "max-w-full self-start data-invalid:text-destructive data-invalid:ring-2 data-invalid:ring-destructive"
-              )}
+              aria-invalid={projectError ? true : undefined}
+              className="max-w-full self-start aria-invalid:text-destructive"
             >
               <BrandIcon name="github" className="size-3.5 shrink-0" />
               <span className="min-w-0 truncate">
                 {selectedProject ? selectedProject.repo : "Select repository"}
               </span>
               <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-64">
             {projects.map((project) => (
