@@ -7,17 +7,9 @@ import { IconPaperclip, IconTrash } from "@tabler/icons-react"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+import { AttachmentChip } from "./attachment-chip"
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 function mergeFiles(current: File[], incoming: File[]) {
   const next = [...current]
@@ -174,6 +166,28 @@ export function AttachmentPromptField({
         )}
       />
 
+      {selectedFiles.length > 0 ? (
+        <ul
+          className={cn(
+            "flex min-w-0 flex-wrap gap-2",
+            isBare ? "px-1 pb-2" : "px-3 pb-2"
+          )}
+        >
+          {selectedFiles.map((file, index) => (
+            <li
+              key={`${file.name}-${file.size}-${file.lastModified}`}
+              className="flex max-w-full min-w-0"
+            >
+              <PendingAttachmentChip
+                file={file}
+                disabled={disabled}
+                onRemove={() => removeFile(index)}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {metaRow ? (
         <div
           className={cn(
@@ -214,40 +228,64 @@ export function AttachmentPromptField({
           <IconPaperclip />
         </Button>
         {footerStart}
-        {selectedFiles.length === 0 ? (
-          <span className="min-h-8 min-w-0 flex-1" aria-hidden="true" />
-        ) : (
-          <ul className="order-last flex min-w-0 basis-full flex-wrap gap-1.5 sm:order-none sm:basis-auto sm:flex-1">
-            {selectedFiles.map((file, index) => (
-              <li
-                key={`${file.name}-${file.size}-${file.lastModified}`}
-                className={cn(
-                  "flex max-w-full min-w-0 items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs ring-1 ring-border",
-                  file.size > MAX_ATTACHMENT_BYTES && "text-destructive"
-                )}
-              >
-                <IconPaperclip className="size-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate sm:max-w-48">
-                  {file.name}
-                </span>
-                <span className="shrink-0 text-muted-foreground">
-                  {formatSize(file.size)}
-                </span>
-                <button
-                  type="button"
-                  className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onClick={() => removeFile(index)}
-                  aria-label={`Remove ${file.name}`}
-                  disabled={disabled}
-                >
-                  <IconTrash className="size-3" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <span className="min-h-8 min-w-0 flex-1" aria-hidden="true" />
         {footerEnd}
       </div>
     </div>
   )
+}
+
+function PendingAttachmentChip({
+  file,
+  disabled,
+  onRemove,
+}: {
+  file: File
+  disabled?: boolean
+  onRemove: () => void
+}) {
+  const previewUrl = useImagePreviewUrl(file)
+
+  return (
+    <AttachmentChip
+      fileName={file.name}
+      sizeBytes={file.size}
+      thumbnailUrl={previewUrl}
+      invalid={file.size > MAX_ATTACHMENT_BYTES}
+      className="min-w-0"
+      action={
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={onRemove}
+          aria-label={`Remove ${file.name}`}
+          disabled={disabled}
+        >
+          <IconTrash />
+        </Button>
+      }
+    />
+  )
+}
+
+// Previews an image the user just picked, before it has any remote URL. Each
+// chip is keyed by file identity, so the URL is created once on mount and
+// revoked when the file is removed or sent.
+function useImagePreviewUrl(file: File): string | null {
+  const [previewUrl] = useState(() =>
+    // jsdom (and any environment without blob URLs) simply gets the icon.
+    file.type.startsWith("image/") && URL.createObjectURL
+      ? URL.createObjectURL(file)
+      : null
+  )
+
+  useEffect(() => {
+    if (!previewUrl) {
+      return
+    }
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
+
+  return previewUrl
 }
