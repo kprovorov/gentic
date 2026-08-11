@@ -351,7 +351,7 @@ describe("IssueCreateForm", () => {
 
     const projectSelect = screen.getByRole("button", { name: "Project" })
 
-    expect(projectSelect).toHaveAttribute("data-invalid", "true")
+    expect(projectSelect).toHaveAttribute("aria-invalid", "true")
     expect(projectSelect).toHaveAccessibleDescription(
       "Select a project before running this issue."
     )
