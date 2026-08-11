@@ -11,7 +11,8 @@ const createManualIssuePullRequestMock = vi.fn()
 const deleteIssueRelationMock = vi.fn()
 const addIssueLabelsMock = vi.fn()
 const removeIssueLabelsMock = vi.fn()
-const uploadAttachmentsMock = vi.fn()
+const startAttachmentUploadsMock = vi.fn()
+const finishAttachmentUploadsMock = vi.fn()
 const deleteAttachmentMock = vi.fn()
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
@@ -27,7 +28,10 @@ vi.mock("@/app/issues/actions", () => ({
   updateIssueStatus: (formData: FormData) => updateIssueStatusMock(formData),
   addIssueLabels: (formData: FormData) => addIssueLabelsMock(formData),
   removeIssueLabels: (formData: FormData) => removeIssueLabelsMock(formData),
-  uploadAttachments: (formData: FormData) => uploadAttachmentsMock(formData),
+  startAttachmentUploads: (formData: FormData) =>
+    startAttachmentUploadsMock(formData),
+  finishAttachmentUploads: (formData: FormData) =>
+    finishAttachmentUploadsMock(formData),
   deleteAttachment: (formData: FormData) => deleteAttachmentMock(formData),
 }))
 
@@ -474,7 +478,17 @@ describe("IssueDetailRail issue attachments", () => {
 
   it("uploads to the issue without sending a chat message", async () => {
     const user = userEvent.setup()
-    uploadAttachmentsMock.mockResolvedValue(undefined)
+    startAttachmentUploadsMock.mockResolvedValue({
+      uploads: [
+        {
+          attachmentId: "attachment-1",
+          path: `${issueId}/notes.txt`,
+          token: "upload-token",
+          contentType: "text/plain",
+        },
+      ],
+    })
+    finishAttachmentUploadsMock.mockResolvedValue(undefined)
     renderRail(createQueryClient())
 
     expect(
@@ -486,20 +500,29 @@ describe("IssueDetailRail issue attachments", () => {
       "Attach files to this issue"
     ) as HTMLInputElement
     await user.upload(input, file)
-    // jsdom drops file inputs when constructing FormData from a form, so the
-    // selection itself is asserted on the input.
     expect(input.files?.[0]?.name).toBe("notes.txt")
 
     await user.click(screen.getByRole("button", { name: "Upload" }))
 
     await waitFor(() => {
-      expect(uploadAttachmentsMock).toHaveBeenCalledTimes(1)
+      expect(finishAttachmentUploadsMock).toHaveBeenCalledTimes(1)
     })
 
-    const formData = uploadAttachmentsMock.mock.calls[0]?.[0] as FormData
-    expect(formData.get("issue_id")).toBe(issueId)
+    // Only metadata crosses the action boundary — the bytes went to Storage
+    // under the signed ticket, which is what keeps a 25MB file under the
+    // Server Action body limit.
+    const startData = startAttachmentUploadsMock.mock.calls[0]?.[0] as FormData
+    expect(startData.get("issue_id")).toBe(issueId)
+    expect(startData.getAll("files")).toEqual([])
+    expect(JSON.parse(String(startData.get("attachments")))).toEqual([
+      { name: "notes.txt", type: "text/plain", size: 5 },
+    ])
+
+    const finishData = finishAttachmentUploadsMock.mock
+      .calls[0]?.[0] as FormData
+    expect(finishData.getAll("attachment_id")).toEqual(["attachment-1"])
     // Nothing in this upload creates a message or wakes the agent.
-    expect(formData.get("content")).toBeNull()
-    expect(formData.get("client_message_id")).toBeNull()
+    expect(finishData.get("content")).toBeNull()
+    expect(finishData.get("client_message_id")).toBeNull()
   })
 })

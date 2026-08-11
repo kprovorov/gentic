@@ -16,7 +16,8 @@ vi.mock("streamdown", () => ({
 // suite only exercises the read-only `AttachmentPreviews` list.
 vi.mock("@/app/issues/actions", () => ({
   deleteAttachment: vi.fn(),
-  uploadAttachments: vi.fn(),
+  startAttachmentUploads: vi.fn(),
+  finishAttachmentUploads: vi.fn(),
 }))
 
 function message(overrides: Partial<ChatMessage> = {}): ChatMessage {

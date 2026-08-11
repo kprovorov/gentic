@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
-import { useFormStatus } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import {
   IconCheck,
@@ -17,10 +17,15 @@ import {
 } from "@tabler/icons-react"
 
 import { fetchSettingsLabelsData } from "@/app/client-queries"
-import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import {
+  abandonIssueCreation,
+  finishIssueCreation,
+  startIssueCreation,
+} from "@/app/issues/actions"
 import type { ProjectOption } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { BrandIcon } from "@/components/agent-provider-icon"
+import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -40,6 +45,11 @@ import {
 } from "@gentic/validators/issues"
 
 import { AttachmentPromptField } from "./attachment-prompt-field"
+import {
+  appendAttachmentDescriptors,
+  appendAttachmentIds,
+  uploadAttachmentFiles,
+} from "./attachment-uploads"
 import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
 import { IssueLabelsPicker } from "./issue-labels-field"
 import {
@@ -253,10 +263,15 @@ export function IssueCreateForm({
   const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
   const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
-  const [pendingAction, setPendingAction] = useState<"draft" | "run" | null>(
-    null
-  )
+  const [submitError, setSubmitError] = useState("")
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
+  // Which submit button was pressed. Both are `type="submit"` so the browser
+  // still enforces the textarea's `required` before `handleSubmit` runs, which
+  // leaves no room for the action to be an argument.
+  const intentRef = useRef<PendingAction>("draft")
+  const router = useRouter()
+  const supabase = useSupabaseClient()
   // Shares the picker's query key, so the chips resolve from the same cache
   // entry the overflow menu already fetches.
   const labelsQuery = useQuery({
@@ -384,18 +399,69 @@ export function IssueCreateForm({
     )
   }
 
-  const handleActionClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleActionClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    action: Exclude<PendingAction, null>
+  ) => {
+    intentRef.current = action
+
     if (!requireProject()) {
       event.preventDefault()
+    }
+  }
+
+  // Attachments are uploaded from here rather than posted with the form: a
+  // Server Action body is capped well below the 25MB a single attachment may
+  // be, so the actions only exchange metadata and signed upload tickets while
+  // the bytes go straight to Storage.
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (pendingAction || !requireProject()) {
       return
     }
-    clearStoredDraft()
+
+    const action = intentRef.current
+    const status = action === "run" ? "todo" : "draft"
+    setPendingAction(action)
+    setSubmitError("")
+
+    const start = new FormData(event.currentTarget)
+    appendAttachmentDescriptors(start, files)
+
+    try {
+      const { issueId, href, uploads } = await startIssueCreation(start)
+
+      try {
+        const attachmentIds = await uploadAttachmentFiles(
+          supabase,
+          uploads,
+          files
+        )
+        const finish = new FormData()
+        finish.set("issue_id", issueId)
+        finish.set("status", status)
+        appendAttachmentIds(finish, attachmentIds)
+        await finishIssueCreation(finish)
+      } catch (error) {
+        const abandon = new FormData()
+        abandon.set("issue_id", issueId)
+        await abandonIssueCreation(abandon).catch(() => {})
+        throw error
+      }
+
+      clearStoredDraft()
+      router.push(href)
+    } catch (error) {
+      setPendingAction(null)
+      setSubmitError(getCreateErrorMessage(error))
+    }
   }
 
   return (
     <form
       id="new-issue-form"
-      action={saveIssueDraft}
+      onSubmit={handleSubmit}
       className={cn(
         "flex min-w-0 flex-col gap-3",
         fillHeight && "min-h-0 flex-1",
@@ -610,20 +676,31 @@ export function IssueCreateForm({
           <div className="ml-auto flex items-center gap-1">
             <SaveDraftButton
               pendingAction={pendingAction}
-              onPendingActionChange={setPendingAction}
-              onClick={handleActionClick}
+              onClick={(event) => handleActionClick(event, "draft")}
             />
             <RunIssueButton
               disabled={!body.trim()}
               pendingAction={pendingAction}
-              onPendingActionChange={setPendingAction}
-              onClick={handleActionClick}
+              onClick={(event) => handleActionClick(event, "run")}
             />
           </div>
         }
       />
+
+      {submitError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {submitError}
+        </p>
+      ) : null}
     </form>
   )
+}
+
+function getCreateErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Could not create this issue. Please try again."
 }
 
 type PendingAction = "draft" | "run" | null
@@ -631,37 +708,21 @@ type PendingAction = "draft" | "run" | null
 function SaveDraftButton({
   onClick,
   pendingAction,
-  onPendingActionChange,
 }: {
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   pendingAction: PendingAction
-  onPendingActionChange: (action: PendingAction) => void
 }) {
-  const { pending } = useFormStatus()
-
-  useEffect(() => {
-    if (!pending) {
-      onPendingActionChange(null)
-    }
-  }, [pending, onPendingActionChange])
-
   return (
     <Button
       type="submit"
-      formAction={saveIssueDraft}
       variant="ghost"
       size="sm"
-      disabled={pending}
+      disabled={pendingAction !== null}
       className="text-muted-foreground hover:text-foreground"
-      onClick={(event) => {
-        onClick(event)
-        if (!event.defaultPrevented) {
-          onPendingActionChange("draft")
-        }
-      }}
+      onClick={onClick}
     >
       Save Draft
-      {pending && pendingAction === "draft" ? (
+      {pendingAction === "draft" ? (
         <IconLoader2 className="animate-spin" />
       ) : (
         <IconDeviceFloppy />
@@ -674,37 +735,21 @@ function RunIssueButton({
   disabled,
   onClick,
   pendingAction,
-  onPendingActionChange,
 }: {
   disabled: boolean
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   pendingAction: PendingAction
-  onPendingActionChange: (action: PendingAction) => void
 }) {
-  const { pending } = useFormStatus()
-
-  useEffect(() => {
-    if (!pending) {
-      onPendingActionChange(null)
-    }
-  }, [pending, onPendingActionChange])
-
   return (
     <Button
       type="submit"
-      formAction={runIssue}
       size="sm"
-      disabled={disabled || pending}
+      disabled={disabled || pendingAction !== null}
       className="shrink-0 px-3.5"
-      onClick={(event) => {
-        onClick(event)
-        if (!event.defaultPrevented) {
-          onPendingActionChange("run")
-        }
-      }}
+      onClick={onClick}
     >
       Run Agent
-      {pending && pendingAction === "run" ? (
+      {pendingAction === "run" ? (
         <IconLoader2 className="animate-spin" />
       ) : (
         <IconSend />

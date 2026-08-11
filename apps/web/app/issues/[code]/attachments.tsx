@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useRef } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconDownload,
@@ -9,13 +10,23 @@ import {
   IconUpload,
 } from "@tabler/icons-react"
 
+import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 
-import { deleteAttachment, uploadAttachments } from "@/app/issues/actions"
+import {
+  deleteAttachment,
+  finishAttachmentUploads,
+  startAttachmentUploads,
+} from "@/app/issues/actions"
 import {
   AttachmentChip,
   formatAttachmentSize,
 } from "@/app/issues/attachment-chip"
+import {
+  appendAttachmentDescriptors,
+  appendAttachmentIds,
+  uploadAttachmentFiles,
+} from "@/app/issues/attachment-uploads"
 import { queryKeys } from "@/app/query-keys"
 
 export type Attachment = {
@@ -76,8 +87,32 @@ export function Attachments({
   attachments: Attachment[]
 }) {
   const queryClient = useQueryClient()
+  const supabase = useSupabaseClient()
+  // Read straight off the input rather than through `new FormData(form)`: the
+  // bytes go to Storage, never into an action payload, so the form is only
+  // here for its submit semantics.
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadMutation = useMutation({
-    mutationFn: uploadAttachments,
+    // Bytes go browser → Storage under a signed ticket; the Server Actions
+    // only reserve the rows and then publish them, since an action body is
+    // capped well below the 25MB a single attachment may be.
+    mutationFn: async (files: File[]) => {
+      const start = new FormData()
+      start.set("issue_id", issueId)
+      appendAttachmentDescriptors(start, files)
+
+      const { uploads } = await startAttachmentUploads(start)
+      const attachmentIds = await uploadAttachmentFiles(
+        supabase,
+        uploads,
+        files
+      )
+
+      const finish = new FormData()
+      finish.set("issue_id", issueId)
+      appendAttachmentIds(finish, attachmentIds)
+      await finishAttachmentUploads(finish)
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.issue(issueId),
@@ -87,7 +122,13 @@ export function Attachments({
 
   function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    uploadMutation.mutate(new FormData(event.currentTarget))
+    const files = Array.from(fileInputRef.current?.files ?? []).filter(
+      (file) => file.size > 0
+    )
+
+    if (files.length > 0) {
+      uploadMutation.mutate(files)
+    }
     event.currentTarget.reset()
   }
 
@@ -115,10 +156,9 @@ export function Attachments({
         encType="multipart/form-data"
         className="flex flex-wrap items-center gap-2"
       >
-        <input type="hidden" name="issue_id" value={issueId} />
         <input
+          ref={fileInputRef}
           type="file"
-          name="files"
           multiple
           aria-label="Attach files to this issue"
           className="min-w-0 text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
