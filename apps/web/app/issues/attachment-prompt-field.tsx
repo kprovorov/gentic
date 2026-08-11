@@ -91,6 +91,21 @@ export function AttachmentPromptField({
     updateFiles(selectedFiles.filter((_, fileIndex) => fileIndex !== index))
   }
 
+  // Reset the selection on the way *into* the picker, never on the way out: a
+  // file picked on iOS is backed by a temporary file WebKit only materializes
+  // when the bytes are read, and clearing the input's selection releases it, so
+  // resetting `value` from `onChange` leaves the kept `File`s unreadable — no
+  // preview, and a failing upload. Clearing here still lets the same file be
+  // re-picked after it was removed from the list.
+  function openFilePicker() {
+    const input = fileInputRef.current
+    if (!input) {
+      return
+    }
+    input.value = ""
+    input.click()
+  }
+
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault()
     setIsDragging(false)
@@ -190,25 +205,21 @@ export function AttachmentPromptField({
         {/* Deliberately unnamed: the selection lives in `selectedFiles` and
             the bytes are uploaded straight to Storage, so a file input that
             could ride along in a form post would only be a way to blow the
-            Server Action body limit. Clearing `value` lets the same file be
-            re-picked after it was removed from the list. */}
+            Server Action body limit. */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
           className="sr-only"
           tabIndex={-1}
-          onChange={(event) => {
-            addFiles(event.currentTarget.files)
-            event.currentTarget.value = ""
-          }}
+          onChange={(event) => addFiles(event.currentTarget.files)}
         />
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           disabled={disabled}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => openFilePicker()}
           aria-label="Attach files"
           className="rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
         >

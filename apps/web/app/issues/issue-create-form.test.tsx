@@ -266,6 +266,40 @@ describe("IssueCreateForm", () => {
     })
   })
 
+  it("keeps the picked file readable and re-pickable after removing it", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    const file = () =>
+      new File(["contents"], "screenshot.png", { type: "image/png" })
+
+    await user.click(screen.getByRole("button", { name: "Attach files" }))
+    await user.upload(input, file())
+
+    // The picked file must stay on the input: iOS hands back a `File` backed by
+    // a temp file that WebKit releases once the selection is cleared, so
+    // clearing it here would leave the preview and the upload with no bytes.
+    expect(await screen.findByText("screenshot.png")).toBeVisible()
+    expect(input.files).toHaveLength(1)
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove screenshot.png" })
+    )
+    expect(screen.queryByText("screenshot.png")).not.toBeInTheDocument()
+
+    // Opening the picker resets the input, so the same file counts as a new
+    // pick and fires `change` again.
+    await user.click(screen.getByRole("button", { name: "Attach files" }))
+    expect(input.files).toHaveLength(0)
+    await user.upload(input, file())
+
+    expect(await screen.findByText("screenshot.png")).toBeVisible()
+  })
+
   it("previews attached files between the body and the option pills", async () => {
     const user = userEvent.setup()
 
