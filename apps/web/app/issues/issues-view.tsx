@@ -18,7 +18,7 @@ import {
 import {
   IconArrowBarToRight,
   IconChevronDown,
-  IconFilter,
+  IconFilter2,
   IconList,
   IconLock,
   IconLockOpen,
@@ -860,7 +860,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                     aria-label="Filters"
                     className="shrink-0"
                   >
-                    <IconFilter className="size-3.5" />
+                    <IconFilter2 className="size-3.5" />
                     {activeFilterCount > 0 ? (
                       <span className={activeFilterCountBadgeStyles}>
                         {activeFilterCount}
