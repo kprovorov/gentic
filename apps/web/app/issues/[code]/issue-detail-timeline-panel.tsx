@@ -83,7 +83,7 @@ export function IssueDetailTimelinePanel({
   )
 
   return (
-    <div className="flex h-[calc(100svh-10rem)] min-h-96 min-w-0 flex-1 flex-col xl:h-auto xl:min-h-0">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         className="sr-only"
         role="status"
@@ -93,7 +93,9 @@ export function IssueDetailTimelinePanel({
         {chat.liveMessage}
       </div>
 
-      <div className="flex-none border-b">
+      {/* Capped so a long request can't eat the timeline and push the
+          composer off the bottom of a viewport-height column. */}
+      <div className="max-h-[40%] flex-none overflow-y-auto border-b">
         <IssueRequestBody body={issueBody} attachments={attachments} />
       </div>
 
