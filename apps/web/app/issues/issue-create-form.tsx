@@ -4,6 +4,7 @@ import Link from "next/link"
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom"
+import { useQuery } from "@tanstack/react-query"
 import {
   IconCheck,
   IconChevronDown,
@@ -11,10 +12,14 @@ import {
   IconDots,
   IconLoader2,
   IconSend,
+  IconTagFilled,
+  IconX,
 } from "@tabler/icons-react"
 
+import { fetchSettingsLabelsData } from "@/app/client-queries"
 import { runIssue, saveIssueDraft } from "@/app/issues/actions"
 import type { ProjectOption } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { BrandIcon } from "@/components/agent-provider-icon"
 import { Button } from "@gentic/ui/button"
 import {
@@ -218,8 +223,10 @@ function storeIssueSettings(settings: IssueCreateSettings) {
   }
 }
 
-// Filled, neutral pill styling shared by the option controls in the composer's
-// meta row (model, priority, labels, and the overflow menu).
+// Filled, neutral pill styling shared by the interactive controls in the
+// composer's meta row (model, priority, and the overflow menu). The selected
+// label chips reuse the same fill without the hover state, since only their
+// remove button is clickable.
 const metaPillClassName = "bg-muted/60 text-foreground hover:bg-muted"
 
 export function IssueCreateForm({
@@ -246,6 +253,19 @@ export function IssueCreateForm({
     null
   )
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
+  // Shares the picker's query key, so the chips resolve from the same cache
+  // entry the overflow menu already fetches.
+  const labelsQuery = useQuery({
+    queryKey: queryKeys.settingsLabels(""),
+    queryFn: () => fetchSettingsLabelsData(),
+    staleTime: queryStaleTimes.formOptions,
+  })
+  const labelsById = new Map(
+    (labelsQuery.data?.labels ?? []).map((label) => [label.id, label])
+  )
+  const selectedLabels = labelIds
+    .map((id) => labelsById.get(id))
+    .filter((label) => label !== undefined)
   const selectedProject = projects.find((project) => project.id === projectId)
   const PriorityIcon = issuePriorityIcons[priority]
   const projectLabelId = "issue-project-label"
@@ -523,18 +543,10 @@ export function IssueCreateForm({
                   type="button"
                   aria-label="More options"
                   className={cn(
-                    "flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-full px-2",
-                    metaPillClassName,
-                    labelIds.length > 0
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                    "flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+                    metaPillClassName
                   )}
                 >
-                  {labelIds.length > 0 ? (
-                    <span className="text-xs font-medium tabular-nums">
-                      {labelIds.length}
-                    </span>
-                  ) : null}
                   <IconDots className="size-4" />
                 </button>
               </PopoverTrigger>
@@ -556,6 +568,30 @@ export function IssueCreateForm({
                 </div>
               </PopoverContent>
             </Popover>
+
+            {selectedLabels.map((label) => (
+              <span
+                key={label.id}
+                className="flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full bg-muted/60 pr-1 pl-2.5 text-xs font-medium text-foreground"
+              >
+                <IconTagFilled
+                  aria-hidden
+                  className="size-3.5 shrink-0"
+                  style={{ color: label.color }}
+                />
+                <span className="min-w-0 truncate">{label.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label.name} label`}
+                  onClick={() =>
+                    setLabelIds(labelIds.filter((id) => id !== label.id))
+                  }
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                >
+                  <IconX className="size-3.5" />
+                </button>
+              </span>
+            ))}
           </>
         }
         footerEnd={
