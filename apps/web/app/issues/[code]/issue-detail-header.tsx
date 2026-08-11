@@ -26,10 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
+import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import { IssueLabelChip } from "../issue-label-chip"
+import type { Attachment } from "./attachments"
 import { useIssueDelete } from "./issue-delete-button"
+import { IssuePropertiesDialog } from "./issue-properties-dialog"
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -179,11 +182,19 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
 export function IssueDetailHeader({
   issue,
   pullRequests,
+  automaticPrPublishingInProgress,
+  relations,
+  relationCandidates,
   labels,
+  attachments,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
+  automaticPrPublishingInProgress: boolean
+  relations: IssueRelation[]
+  relationCandidates: IssueRelationIssue[]
   labels: LabelSnapshot[]
+  attachments: Attachment[]
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
@@ -237,7 +248,8 @@ export function IssueDetailHeader({
       </div>
 
       {/* Grouping the pills on a tinted panel keeps them readable as one
-          metadata block on mobile, where the rail is hidden. */}
+          metadata block on mobile, where the rail is hidden. The trailing "+"
+          opens everything the rail would otherwise hold. */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
         <IssueTypeMenu issue={issue} />
         <AgentProviderBadge provider={issue.agent_provider} />
@@ -247,6 +259,15 @@ export function IssueDetailHeader({
         {labels.map((label) => (
           <IssueLabelChip key={label.id} label={label} className="text-xs" />
         ))}
+        <IssuePropertiesDialog
+          issue={issue}
+          pullRequests={pullRequests}
+          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+          relations={relations}
+          relationCandidates={relationCandidates}
+          labels={labels}
+          attachments={attachments}
+        />
       </div>
     </header>
   )
