@@ -589,6 +589,36 @@ describe("IssueCreateForm", () => {
     expect(screen.getByText("19/20")).toBeVisible()
   })
 
+  it("shows each selected label as a chip in the meta row and removes it from there", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+    await user.click(screen.getByRole("checkbox", { name: "Bug" }))
+    await user.click(screen.getByRole("checkbox", { name: "Feature" }))
+    await user.keyboard("{Escape}")
+
+    const removeBug = await screen.findByRole("button", {
+      name: "Remove Bug label",
+    })
+    expect(
+      screen.getByRole("button", { name: "Remove Feature label" })
+    ).toBeVisible()
+
+    await user.click(removeBug)
+
+    expect(screen.queryByDisplayValue("label-bug")).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Remove Bug label" })
+    ).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue("label-feature")).toHaveAttribute(
+      "name",
+      "label_id"
+    )
+  })
+
   it("keeps selected labels selected when the project changes", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
