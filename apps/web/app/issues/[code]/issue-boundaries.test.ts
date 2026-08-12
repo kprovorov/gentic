@@ -68,13 +68,16 @@ test("message realtime stays inside the timeline island", () => {
   assert.doesNotMatch(detailView, /queryKey=\{queryKeys\.issue/)
 })
 
-test("the issue body is only serialized into the timeline island", () => {
+test("the issue body renders inside the header's collapsible section", () => {
   const header = readRouteFile("issue-detail-header.tsx")
   const rail = readRouteFile("issue-detail-rail.tsx")
   const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
 
-  assert.match(timelinePanel, /issueBody/)
-  assert.doesNotMatch(header, /issueBody/)
+  // Title/status/pills/request collapse as one section, so the request card
+  // lives in the header island rather than above the timeline.
+  assert.match(header, /<IssueRequestBody body=\{issue\.body\}/)
+  assert.match(header, /<CollapsibleContent/)
+  assert.doesNotMatch(timelinePanel, /IssueRequestBody|issueBody/)
   assert.doesNotMatch(rail, /issueBody/)
 })
 

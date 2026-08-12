@@ -3,7 +3,12 @@
 import Link from "next/link"
 import { useLayoutEffect, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { IconDotsVertical, IconPencil, IconTrash } from "@tabler/icons-react"
+import {
+  IconChevronDown,
+  IconDotsVertical,
+  IconPencil,
+  IconTrash,
+} from "@tabler/icons-react"
 
 import type { IssueDetailData, IssuePullRequest } from "@/app/queries"
 import { updateIssueTitle } from "@/app/issues/actions"
@@ -20,6 +25,11 @@ import { queryKeys } from "@/app/query-keys"
 import { SiteHeaderPortal } from "@/components/site-header-portal"
 import { Button } from "@gentic/ui/button"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@gentic/ui/collapsible"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -33,6 +43,7 @@ import { IssueLabelChip } from "../issue-label-chip"
 import type { Attachment } from "./attachments"
 import { useIssueDelete } from "./issue-delete-button"
 import { IssuePropertiesDialog } from "./issue-properties-dialog"
+import { IssueRequestBody } from "./issue-request-body"
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -198,77 +209,110 @@ export function IssueDetailHeader({
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
+  // Title and status stay pinned; everything else about the issue — the
+  // metadata pills and the request that kicked it off — collapses together so
+  // the timeline can take the whole screen when the details aren't needed.
+  const [open, setOpen] = useState(true)
 
   return (
-    <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
-      <SiteHeaderPortal>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
+      <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
+        <SiteHeaderPortal>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Issue actions"
+                className="shrink-0"
+              >
+                <IconDotsVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={editHref}>
+                  <IconPencil />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={isPending}
+                onSelect={(event) => {
+                  event.preventDefault()
+                  handleDelete()
+                }}
+              >
+                <IconTrash />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SiteHeaderPortal>
+
+        <div className="flex min-w-0 items-start gap-3">
+          <IssueStatusMenu issue={issue} />
+
+          <div className="min-w-0 flex-1">
+            {/* Headings are `text-balance` globally, which wraps the title into
+                short balanced lines; the detail title should use the full row. */}
+            <h1 className="text-pretty">
+              <EditableIssueTitle issue={issue} />
+            </h1>
+          </div>
+
+          {/* The title itself is click-to-edit, so the toggle has to be its own
+              control rather than the whole row. */}
+          <CollapsibleTrigger asChild>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Issue actions"
-              className="shrink-0"
+              aria-label={open ? "Hide issue details" : "Show issue details"}
+              className="shrink-0 text-muted-foreground"
             >
-              <IconDotsVertical />
+              <IconChevronDown
+                className={cn("transition-transform", open && "rotate-180")}
+              />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={editHref}>
-                <IconPencil />
-                Edit
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={isPending}
-              onSelect={(event) => {
-                event.preventDefault()
-                handleDelete()
-              }}
-            >
-              <IconTrash />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SiteHeaderPortal>
-
-      <div className="flex min-w-0 items-start gap-3">
-        <IssueStatusMenu issue={issue} />
-
-        <div className="min-w-0 flex-1">
-          {/* Headings are `text-balance` globally, which wraps the title into
-              short balanced lines; the detail title should use the full row. */}
-          <h1 className="text-pretty">
-            <EditableIssueTitle issue={issue} />
-          </h1>
+          </CollapsibleTrigger>
         </div>
-      </div>
 
-      {/* Grouping the pills on a tinted panel keeps them readable as one
-          metadata block on mobile, where the rail is hidden. The trailing "+"
-          opens everything the rail would otherwise hold. */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
-        <IssueTypeMenu issue={issue} />
-        <AgentProviderBadge provider={issue.agent_provider} />
-        {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
-        <PullRequestPills pullRequests={pullRequests} />
-        <IssuePriorityMenu issue={issue} showLabel />
-        {labels.map((label) => (
-          <IssueLabelChip key={label.id} label={label} className="text-xs" />
-        ))}
-        <IssuePropertiesDialog
-          issue={issue}
-          pullRequests={pullRequests}
-          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
-          relations={relations}
-          relationCandidates={relationCandidates}
-          labels={labels}
-          attachments={attachments}
-        />
-      </div>
-    </header>
+        <CollapsibleContent className="flex min-w-0 flex-col gap-3">
+          {/* Grouping the pills on a tinted panel keeps them readable as one
+              metadata block on mobile, where the rail is hidden. The trailing
+              "+" opens everything the rail would otherwise hold. */}
+          <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
+            <IssueTypeMenu issue={issue} />
+            <AgentProviderBadge provider={issue.agent_provider} />
+            {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
+            <PullRequestPills pullRequests={pullRequests} />
+            <IssuePriorityMenu issue={issue} showLabel />
+            {labels.map((label) => (
+              <IssueLabelChip
+                key={label.id}
+                label={label}
+                className="text-xs"
+              />
+            ))}
+            <IssuePropertiesDialog
+              issue={issue}
+              pullRequests={pullRequests}
+              automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+              relations={relations}
+              relationCandidates={relationCandidates}
+              labels={labels}
+              attachments={attachments}
+            />
+          </div>
+
+          {/* Capped so a long request can't eat the timeline and push the
+              composer off the bottom of a viewport-height column. */}
+          <div className="max-h-[38dvh] min-w-0 overflow-y-auto">
+            <IssueRequestBody body={issue.body} attachments={attachments} />
+          </div>
+        </CollapsibleContent>
+      </header>
+    </Collapsible>
   )
 }
