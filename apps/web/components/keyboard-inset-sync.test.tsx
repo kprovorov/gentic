@@ -58,10 +58,19 @@ function setDocument({
   }
 }
 
+// `layoutHeight` is the height `dvh` and `window.innerHeight` agree on — the
+// screen, keyboard or no keyboard, unless the browser resizes the layout
+// viewport for one.
 function setupViewport(
   options: { height: number; scale?: number } | null,
   { layoutHeight = 800 }: { layoutHeight?: number } = {}
 ) {
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    writable: true,
+    value: layoutHeight,
+  })
+
   Object.defineProperty(window, "scrollTo", {
     configurable: true,
     writable: true,
@@ -140,16 +149,26 @@ describe("KeyboardInsetSync", () => {
 
   it("charges nothing for a keyboard the layout viewport already gave up", () => {
     // A browser that honours `interactiveWidget: resizes-content` shrinks the
-    // layout viewport itself, so `dvh` has already lost the covered space;
-    // subtracting it again would strand the composer a keyboard's height above
-    // the keyboard, with the page's own background filling the gap.
+    // layout viewport itself, and `innerHeight` shrinks with it, so `dvh` has
+    // already lost the covered space and there is nothing left to subtract.
+    setupViewport({ height: 460 }, { layoutHeight: 460 })
+
+    render(<KeyboardInsetSync />)
+
+    expect(keyboardInset()).toBe("0px")
+  })
+
+  it("still reports a keyboard iOS has already taken out of the root's box", () => {
+    // iOS shrinks the root element to the visible area while `dvh` keeps its
+    // full-screen value, so the composer needs the inset precisely when the
+    // root's own height says the keyboard isn't there.
     const viewport = setupViewport({ height: 800 })
     render(<KeyboardInsetSync />)
 
     setDocument({ clientHeight: 460, scrollHeight: 460 })
     viewport!.resizeTo({ height: 460 })
 
-    expect(keyboardInset()).toBe("0px")
+    expect(keyboardInset()).toBe("340px")
   })
 
   it("clears the variable on unmount", () => {
