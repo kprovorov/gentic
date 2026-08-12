@@ -21,6 +21,7 @@ Gentic's status enum (`draft → todo → queued → held → in-progress → wa
 - `draft` = created, not yet handed to an agent.
 - Moving status from `draft` to `todo` **starts a background coding-agent run immediately** (it claims the issue, seeds the kickoff message `Work on Gentic issue {Issue Code}.` — the agent reads the `body` itself via the Gentic MCP `get_issue` tool — and a worker begins work). Never do this just to mean "ready-for-agent" as a passive label — only do it when you actually want the agent to start now.
 - `held` is a system-imposed pause (agent hit a usage/rate limit), not a manual "waiting on human" state — don't use it for triage purposes.
+- `type: spec` is the one exception to all of the above: a spec issue is documentation, never agent work. No worker claims it whatever its status, `draft → todo` on one starts nothing, and it has no conversation. Use it for a requirement or brief that other issues implement.
 - An issue has no assignee field. Its fields are `status`, `type`, `priority`, `body`/`title`, plus account-scoped **Labels** — reusable, passive classifications managed with the `mcp__gentic__*` Label tools (`list_labels`, `create_label`, `add_issue_labels`, `remove_issue_labels`, …). Labels never change status, priority, or workflow and never start an agent. See `docs/agents/triage-labels.md` and `docs/web/labels.mdx`.
 
 ## When a skill says "publish to the issue tracker"

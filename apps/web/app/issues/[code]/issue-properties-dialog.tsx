@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@gentic/ui/dialog"
 import { cn } from "@gentic/ui/utils"
+import { isSpecIssueType } from "@gentic/validators/issues"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
@@ -49,6 +50,8 @@ export function IssuePropertiesDialog({
   labels: LabelSnapshot[]
   attachments: Attachment[]
 }) {
+  const isSpec = isSpecIssueType(issue.type)
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -77,7 +80,9 @@ export function IssuePropertiesDialog({
           <RailSection title="Details">
             <div className="flex flex-wrap items-center gap-1.5">
               <IssueTypeMenu issue={issue} />
-              <AgentProviderBadge provider={issue.agent_provider} />
+              {isSpec ? null : (
+                <AgentProviderBadge provider={issue.agent_provider} />
+              )}
               {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
             </div>
           </RailSection>
@@ -87,6 +92,7 @@ export function IssuePropertiesDialog({
             issueCode={issue.code}
             status={issue.status}
             priority={issue.priority}
+            isSpec={isSpec}
             hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
             automaticPrPublishingInProgress={automaticPrPublishingInProgress}
             pullRequests={pullRequests}

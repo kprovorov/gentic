@@ -69,6 +69,9 @@ export async function claimNextQueuedIssue(
     .select(CLAIM_ISSUE_SELECT)
     .or(eligibleIssueFilter(now))
     .eq("projects.user_id", userId)
+    // A Spec documents intent rather than requesting work, so it is never
+    // agent work no matter what status it carries.
+    .neq("type", "spec")
     .in("agent_provider", eligibleProviders)
     .is("active_run_id", null)
     .eq("unfinished_blockers.type", "blocks")
@@ -106,6 +109,7 @@ export async function claimNextQueuedIssue(
     })
     .eq("id", id)
     .or(eligibleIssueFilter(now))
+    .neq("type", "spec")
     .in("agent_provider", eligibleProviders)
     .is("active_run_id", null)
     .select("id")

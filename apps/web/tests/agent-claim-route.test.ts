@@ -19,6 +19,7 @@ type FakeIssue = {
     | "in-progress"
     | "completed"
     | "cancelled"
+  type: "feature" | "bug" | "spec"
   priority: IssuePriority
   updated_at: string
   usage_limit_reset_at: string | null
@@ -132,6 +133,7 @@ class FakeIssuesQuery {
     agentProviders?: string[]
     activeWorkerIds?: string[]
     activeRunIdIsNull?: boolean
+    excludedType?: string
   } = {}
   private updateValues: Partial<FakeIssue> | null = null
   private limitCount: number | null = null
@@ -161,6 +163,13 @@ class FakeIssuesQuery {
       this.filters.id = String(value)
     } else if (column === "projects.user_id") {
       this.filters.userId = String(value)
+    }
+    return this
+  }
+
+  neq(column: string, value: unknown) {
+    if (column === "type") {
+      this.filters.excludedType = String(value)
     }
     return this
   }
@@ -255,6 +264,9 @@ class FakeIssuesQuery {
         return false
       }
       if (this.filters.activeRunIdIsNull && issue.active_run_id !== null) {
+        return false
+      }
+      if (this.filters.excludedType === issue.type) {
         return false
       }
       if (
@@ -367,6 +379,7 @@ function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue
   return {
     id,
     status: "todo",
+    type: "feature",
     priority: "medium",
     updated_at: "2026-07-01T00:00:00.000Z",
     usage_limit_reset_at: null,
@@ -505,6 +518,40 @@ test("claim does not expose associated pull request URLs", async () => {
 
   assert.equal("prUrl" in (claimed ?? {}), false)
   assert.equal(claimed?.branchName, "acme-1-implement-the-task")
+})
+
+test("claim skips spec issues and takes the next agent issue instead", async () => {
+  const supabase = new FakeSupabase([], [
+    issue({
+      id: "spec-urgent",
+      type: "spec",
+      priority: "urgent",
+      updated_at: "2026-07-01T00:00:00.000Z",
+    }),
+    issue({
+      id: "feature-low",
+      priority: "low",
+      updated_at: "2026-07-02T00:00:00.000Z",
+    }),
+  ])
+
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+
+  assert.equal(claimed?.id, "feature-low")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "spec-urgent")?.active_worker_id,
+    null
+  )
+})
+
+test("claim leaves a spec issue in todo when it is the only eligible issue", async () => {
+  const supabase = new FakeSupabase([], [issue({ id: "spec", type: "spec" })])
+
+  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+
+  assert.equal(claimed, null)
+  assert.equal(supabase.issues[0]?.status, "todo")
+  assert.deepEqual(supabase.inserts, [])
 })
 
 test("claim picks urgent before older lower-priority todo issues", async () => {

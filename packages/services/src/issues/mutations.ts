@@ -4,7 +4,10 @@ import type {
   IssueType,
   UpdateIssueValues,
 } from "@gentic/validators/issues"
-import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
+import {
+  hasAttachedIssuePullRequest,
+  isSpecIssueType,
+} from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
 import { ensureLabelsAssignable } from "../labels"
@@ -16,7 +19,10 @@ import {
   ensureProjectOwned,
 } from "./ownership"
 import { getIssue } from "./queries"
-import { ISSUE_WITH_PROJECT_SELECT } from "./shared"
+import {
+  ISSUE_WITH_PROJECT_SELECT,
+  SPEC_CONVERSION_BLOCKED_MESSAGE,
+} from "./shared"
 
 export async function createIssue(
   supabase: Supabase,
@@ -35,6 +41,11 @@ export async function createIssue(
     })
   )
 
+  // Creating straight into `todo` means "hand it to an agent now", which is
+  // done by inserting the draft and letting `start_issue_from_draft` open the
+  // run. A Spec never runs, so it is simply created in the status it asked for.
+  const startsRun = input.status === "todo" && !isSpecIssueType(input.type)
+
   const result = await supabase
     .from("issues")
     .insert({
@@ -42,7 +53,7 @@ export async function createIssue(
       number,
       title: input.title ?? null,
       body: input.body ?? null,
-      status: input.status === "todo" ? "draft" : input.status,
+      status: startsRun ? "draft" : input.status,
       priority: input.priority,
       create_pr_automatically: input.create_pr_automatically,
       agent_provider: input.agent_provider,
@@ -74,7 +85,7 @@ export async function createIssue(
     }
   }
 
-  if (input.status !== "todo") {
+  if (!startsRun) {
     return issue
   }
 
@@ -148,7 +159,7 @@ export async function updateIssue(
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select(
-      "agent_provider, issue_model, priority, issue_pull_requests(id), projects!inner(user_id)"
+      "agent_provider, issue_model, priority, type, active_run_id, issue_pull_requests(id), projects!inner(user_id)"
     )
     .eq("id", id)
     .eq("projects.user_id", userId)
@@ -159,6 +170,13 @@ export async function updateIssue(
   }
   if (!current) {
     throw new ServiceError("not_found", "Issue not found")
+  }
+  if (
+    isSpecIssueType(input.type) &&
+    !isSpecIssueType(current.type) &&
+    current.active_run_id !== null
+  ) {
+    throw new ServiceError("validation", SPEC_CONVERSION_BLOCKED_MESSAGE)
   }
 
   const hasAttachedPullRequest = hasAttachedIssuePullRequest(current)
@@ -210,6 +228,10 @@ export async function updateIssueType(
 ) {
   await ensureIssueOwned(supabase, userId, id)
 
+  if (isSpecIssueType(type)) {
+    await ensureIssueRunIsFinished(supabase, id)
+  }
+
   const result = await supabase
     .from("issues")
     .update({
@@ -221,6 +243,24 @@ export async function updateIssueType(
     .single()
 
   return unwrap(result)
+}
+
+// Ownership is already established by the caller; this only asks whether a
+// worker still holds the issue, which is what makes converting it to a Spec
+// unsafe.
+async function ensureIssueRunIsFinished(supabase: Supabase, id: string) {
+  const { data, error } = await supabase
+    .from("issues")
+    .select("active_run_id")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (data?.active_run_id) {
+    throw new ServiceError("validation", SPEC_CONVERSION_BLOCKED_MESSAGE)
+  }
 }
 
 export async function updateIssueTitle(

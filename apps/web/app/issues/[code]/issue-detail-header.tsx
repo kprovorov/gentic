@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
+import { isSpecIssueType } from "@gentic/validators/issues"
 import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
@@ -284,7 +285,9 @@ export function IssueDetailHeader({
               "…" opens everything the rail would otherwise hold. */}
           <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
             <IssueTypeMenu issue={issue} />
-            <AgentProviderBadge provider={issue.agent_provider} />
+            {isSpecIssueType(issue.type) ? null : (
+              <AgentProviderBadge provider={issue.agent_provider} />
+            )}
             {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
             <PullRequestPills pullRequests={pullRequests} />
             <IssuePriorityMenu issue={issue} showLabel />

@@ -732,7 +732,7 @@ export function registerGenticMcpTools(
           .optional()
           .default("feature")
           .describe(
-            "Issue type: feature, bug, feedback, or idea. Defaults to feature."
+            "Issue type: feature, bug, feedback, idea, or spec. Defaults to feature. A spec documents intent instead of requesting work: no agent ever runs it and it has no conversation."
           ),
         create_pr_automatically: z
           .boolean()
@@ -818,7 +818,7 @@ export function registerGenticMcpTools(
           `Issue priority. ${priorityValuesDescription}`
         ),
         type: issueTypeSchema.describe(
-          "Issue type: feature, bug, feedback, or idea."
+          "Issue type: feature, bug, feedback, idea, or spec. A spec documents intent instead of requesting work: no agent ever runs it and it has no conversation."
         ),
         create_pr_automatically: z
           .boolean()
@@ -879,7 +879,7 @@ export function registerGenticMcpTools(
     {
       title: "Update Issue Status",
       description:
-        "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message that points the agent at the issue by its code. Other status changes only update the workflow status.",
+        "Update the workflow status for an issue owned by the authenticated account. Use the issue id from list_issues, create_issue, or get_issue. Important transition: moving an issue from draft to todo starts a background coding-agent run and creates the kickoff user message that points the agent at the issue by its code — except for a spec issue, which is never handed to an agent, so every status on a spec is just a workflow marker. Other status changes only update the workflow status.",
       inputSchema: {
         id: issueIdInputSchema.id,
         status: issueStatusSchema.describe(

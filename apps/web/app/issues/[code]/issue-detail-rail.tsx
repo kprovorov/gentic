@@ -697,6 +697,7 @@ export function IssueDetailRail({
   issueCode,
   status,
   priority,
+  isSpec,
   hasUnpublishedAgentChanges,
   automaticPrPublishingInProgress,
   pullRequests,
@@ -709,6 +710,9 @@ export function IssueDetailRail({
   issueCode: string | null
   status: IssueStatus
   priority: IssuePriority
+  // A Spec is never handed to an agent, so it has no pull requests to show or
+  // publish — that whole section is dropped rather than left empty.
+  isSpec: boolean
   hasUnpublishedAgentChanges: boolean
   automaticPrPublishingInProgress: boolean
   pullRequests: IssuePullRequest[]
@@ -748,14 +752,16 @@ export function IssueDetailRail({
         <IssueDetailLabels issueId={issueId} labels={labels} />
       </RailSection>
 
-      <RailSection title="Pull requests">
-        <IssueDetailPullRequests
-          issueId={issueId}
-          pullRequests={pullRequests}
-          issueStatus={status}
-          showCreatePr={showCreatePr}
-        />
-      </RailSection>
+      {isSpec ? null : (
+        <RailSection title="Pull requests">
+          <IssueDetailPullRequests
+            issueId={issueId}
+            pullRequests={pullRequests}
+            issueStatus={status}
+            showCreatePr={showCreatePr}
+          />
+        </RailSection>
+      )}
 
       {/* Files attached to the issue itself: they are not part of any chat
           turn, so they stay here across agent and conversation resets. */}

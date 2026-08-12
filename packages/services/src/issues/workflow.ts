@@ -1,5 +1,8 @@
 import type { AutomaticPrRequestStatus } from "@gentic/validators/agent"
-import { hasAttachedIssuePullRequest } from "@gentic/validators/issues"
+import {
+  hasAttachedIssuePullRequest,
+  isSpecIssueType,
+} from "@gentic/validators/issues"
 import type {
   AgentProvider,
   IssueModel,
@@ -19,6 +22,7 @@ import { getIssue } from "./queries"
 import {
   getIssueCode,
   ISSUE_WITH_PROJECT_SELECT,
+  SPEC_HAS_NO_AGENT_MESSAGE,
   type UserChatMessage,
 } from "./shared"
 
@@ -31,7 +35,7 @@ export async function resetIssueAgent(
 ): Promise<UserChatMessage> {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider,projects!inner(user_id)")
+    .select("agent_provider,type,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -41,6 +45,9 @@ export async function resetIssueAgent(
   }
   if (!current) {
     throw new ServiceError("not_found", "Issue not found")
+  }
+  if (isSpecIssueType(current.type)) {
+    throw new ServiceError("validation", SPEC_HAS_NO_AGENT_MESSAGE)
   }
 
   unwrap(
@@ -76,7 +83,7 @@ export async function updateIssueStatus(
 ) {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("status,body,projects!inner(user_id)")
+    .select("status,type,body,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -89,8 +96,13 @@ export async function updateIssueStatus(
   }
 
   // Starting a draft is a durable DB transition so body consumption and
-  // message creation stay atomic with the status change.
-  const startsRun = current.status === "draft" && status === "todo"
+  // message creation stay atomic with the status change. A Spec is not agent
+  // work, so the same transition is a plain status change for it — its
+  // statuses track human progress and never open a run.
+  const startsRun =
+    current.status === "draft" &&
+    status === "todo" &&
+    !isSpecIssueType(current.type)
 
   if (startsRun) {
     unwrap(await supabase.rpc("start_issue_from_draft", { p_issue_id: id }))
@@ -115,7 +127,7 @@ export async function bulkUpdateIssueStatus(
   const uniqueIds = Array.from(new Set(issueIds))
   const { data: issues, error: fetchError } = await supabase
     .from("issues")
-    .select("id,status,projects!inner(user_id)")
+    .select("id,status,type,projects!inner(user_id)")
     .in("id", uniqueIds)
     .eq("projects.user_id", userId)
 
@@ -126,10 +138,15 @@ export async function bulkUpdateIssueStatus(
     throw new ServiceError("not_found", "Issue not found")
   }
 
+  // Specs in the selection move to `todo` like the rest, but as a plain status
+  // change: only agent work goes through the run-opening RPC.
   const draftIds =
     status === "todo"
       ? issues
-          .filter((issue) => issue.status === "draft")
+          .filter(
+            (issue) =>
+              issue.status === "draft" && !isSpecIssueType(issue.type)
+          )
           .map((issue) => issue.id)
       : []
   const draftIdSet = new Set(draftIds)

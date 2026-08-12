@@ -113,15 +113,30 @@ export function isIssueModelForAgent(
 // "issue" is a placeholder used before the background classifier (see
 // apps/web/app/issues/type.ts) determines the real type — it is not a type
 // callers should pick deliberately.
+//
+// "spec" is the one type that is not agent work: it documents intent instead of
+// requesting it, so no worker ever claims it and it carries no agent
+// conversation (see `isSpecIssueType`). The classifier never produces it — a
+// Spec is always a deliberate choice.
 export const issueTypeSchema = z.enum([
   "issue",
   "feature",
   "bug",
   "feedback",
   "idea",
+  "spec",
 ])
 
 export type IssueType = z.infer<typeof issueTypeSchema>
+
+/**
+ * A Spec is documentation, not a task: workers skip it when claiming, the
+ * draft → todo transition never opens an agent run for it, and its detail page
+ * has no chat. Every other type is agent work.
+ */
+export function isSpecIssueType(type: string | null | undefined): boolean {
+  return type === "spec"
+}
 
 export const createIssueSchema = z.object({
   project_id: z.string().uuid(),
