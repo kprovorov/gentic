@@ -217,7 +217,7 @@ function AttachmentRow({
           <img
             src={attachment.thumbnailUrl}
             alt=""
-            className="size-12 shrink-0 rounded-md border object-cover"
+            className="size-12 shrink-0 rounded-md border bg-muted object-contain"
             loading="lazy"
           />
         ) : (

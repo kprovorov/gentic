@@ -97,7 +97,11 @@ async function signAttachment(
             transform: {
               width: ATTACHMENT_THUMBNAIL_SIZE,
               height: ATTACHMENT_THUMBNAIL_SIZE,
-              resize: "cover",
+              // "contain" fits the whole image inside the box instead of
+              // cropping it to a square: the chip letterboxes the result, and a
+              // square crop of a tall screenshot — the most common attachment
+              // here — is a blank slice of its middle that previews nothing.
+              resize: "contain",
             },
           }
         )
