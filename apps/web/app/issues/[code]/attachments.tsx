@@ -3,18 +3,12 @@
 import type React from "react"
 import { useRef } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  IconDownload,
-  IconPaperclip,
-  IconTrash,
-  IconUpload,
-} from "@tabler/icons-react"
+import { IconDownload, IconPaperclip, IconUpload } from "@tabler/icons-react"
 
 import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 
 import {
-  deleteAttachment,
   finishAttachmentUploads,
   startAttachmentUploads,
 } from "@/app/issues/actions"
@@ -81,11 +75,12 @@ export function AttachmentPreviews({
 // section answers "what has been attached here?" without scrolling the
 // transcript.
 //
-// Only the issue's own files are managed here. Uploading writes no message and
-// does not requeue or wake the agent, and those files survive an agent or
-// conversation reset. Chat files are listed read-only: they were delivered as
-// part of one prompt turn, and deleting one from here would quietly hollow out
-// a message the transcript still shows as sent.
+// The panel only ever adds files. Uploading writes no message and does not
+// requeue or wake the agent, and those files survive an agent or conversation
+// reset. Nothing here can be deleted: once an issue is submitted its files are
+// part of what the agent was handed, so removing one would quietly hollow out
+// a request — or a message the transcript still shows as sent. Files are
+// dropped before submission instead, from the composer that picked them.
 export function Attachments({
   issueId,
   attachments,
@@ -151,16 +146,11 @@ export function Attachments({
       ) : (
         <ul className="grid gap-2">
           {attachments.map((attachment) => (
-            <AttachmentRow
-              key={attachment.id}
-              issueId={issueId}
-              attachment={attachment}
-            />
+            <AttachmentRow key={attachment.id} attachment={attachment} />
           ))}
           {messageAttachments.map((attachment) => (
             <AttachmentRow
               key={attachment.id}
-              issueId={issueId}
               attachment={attachment}
               sentInChat
             />
@@ -195,38 +185,12 @@ export function Attachments({
 }
 
 function AttachmentRow({
-  issueId,
   attachment,
   sentInChat = false,
 }: {
-  issueId: string
   attachment: Attachment
   sentInChat?: boolean
 }) {
-  const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: deleteAttachment,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.issue(issueId),
-      })
-    },
-  })
-
-  function handleDelete() {
-    if (mutation.isPending) {
-      return
-    }
-    if (!window.confirm(`Delete "${attachment.fileName}"?`)) {
-      return
-    }
-
-    const formData = new FormData()
-    formData.set("id", attachment.id)
-    formData.set("issue_id", issueId)
-    mutation.mutate(formData)
-  }
-
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
       <div className="flex min-w-0 items-center gap-2">
@@ -252,33 +216,19 @@ function AttachmentRow({
           </p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {attachment.url ? (
-          <Button asChild variant="ghost" size="icon-sm">
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              download={attachment.fileName}
-              aria-label={`Download ${attachment.fileName}`}
-            >
-              <IconDownload />
-            </a>
-          </Button>
-        ) : null}
-        {sentInChat ? null : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Delete ${attachment.fileName}`}
-            onClick={handleDelete}
-            disabled={mutation.isPending}
+      {attachment.url ? (
+        <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
+          <a
+            href={attachment.url}
+            target="_blank"
+            rel="noreferrer"
+            download={attachment.fileName}
+            aria-label={`Download ${attachment.fileName}`}
           >
-            <IconTrash />
-          </Button>
-        )}
-      </div>
+            <IconDownload />
+          </a>
+        </Button>
+      ) : null}
     </li>
   )
 }

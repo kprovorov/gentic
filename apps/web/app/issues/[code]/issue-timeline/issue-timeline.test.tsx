@@ -15,7 +15,6 @@ vi.mock("streamdown", () => ({
 // server actions (and transitively `server-only`); stub it out since this
 // suite only exercises the read-only `AttachmentPreviews` list.
 vi.mock("@/app/issues/actions", () => ({
-  deleteAttachment: vi.fn(),
   startAttachmentUploads: vi.fn(),
   finishAttachmentUploads: vi.fn(),
 }))
