@@ -19,8 +19,12 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     labels,
     archivedLabelIds,
   } = data
+  // Full viewport height at every breakpoint so the composer pins to the
+  // bottom of the screen instead of the page scrolling past it on mobile.
+  // `dvh` (not `svh`) keeps that flush as mobile browser chrome and the
+  // on-screen keyboard resize the viewport.
   return (
-    <div className="flex min-w-0 flex-col bg-background xl:h-[calc(100svh-3.5rem)] xl:overflow-hidden">
+    <div className="flex h-[calc(100dvh-3.5rem)] min-w-0 flex-col overflow-hidden bg-background">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={[
@@ -47,7 +51,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         attachments={attachments}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col border-t xl:min-h-0 xl:flex-row">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col border-t xl:flex-row">
         <IssueDetailTimelinePanel
           issueId={issue.id}
           issueCreatedAt={issue.created_at}
