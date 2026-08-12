@@ -13,7 +13,6 @@ const addIssueLabelsMock = vi.fn()
 const removeIssueLabelsMock = vi.fn()
 const startAttachmentUploadsMock = vi.fn()
 const finishAttachmentUploadsMock = vi.fn()
-const deleteAttachmentMock = vi.fn()
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
 
@@ -32,7 +31,6 @@ vi.mock("@/app/issues/actions", () => ({
     startAttachmentUploadsMock(formData),
   finishAttachmentUploads: (formData: FormData) =>
     finishAttachmentUploadsMock(formData),
-  deleteAttachment: (formData: FormData) => deleteAttachmentMock(formData),
 }))
 
 // The real field fetches the label catalog over the network for its search
@@ -478,7 +476,7 @@ describe("IssueDetailRail issue attachments", () => {
     expect(screen.getByText("spec.md")).toBeVisible()
   })
 
-  it("lists the files sent through the chat as read-only", () => {
+  it("lists every file for download only, with no way to delete one", () => {
     renderRail(createQueryClient(), {
       attachments: [
         {
@@ -502,15 +500,13 @@ describe("IssueDetailRail issue attachments", () => {
 
     expect(screen.getByText("screenshot.png")).toBeVisible()
     expect(screen.getByText(/Sent in chat/)).toBeVisible()
-    // Downloadable from here, but only the issue's own file can be deleted:
-    // the chat file is still part of a message the transcript shows as sent.
     expect(
       screen.getByRole("link", { name: "Download screenshot.png" })
     ).toBeVisible()
-    expect(screen.getByRole("button", { name: "Delete spec.md" })).toBeVisible()
-    expect(
-      screen.queryByRole("button", { name: "Delete screenshot.png" })
-    ).toBeNull()
+    expect(screen.getByRole("link", { name: "Download spec.md" })).toBeVisible()
+    // The issue is already submitted, so neither its own file nor the chat
+    // file can be pulled out from under the run that was handed them.
+    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull()
   })
 
   it("uploads to the issue without sending a chat message", async () => {

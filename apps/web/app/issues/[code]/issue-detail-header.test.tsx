@@ -17,7 +17,6 @@ vi.mock("@/app/issues/actions", () => ({
   removeIssueLabels: vi.fn(),
   startAttachmentUploads: vi.fn(),
   finishAttachmentUploads: vi.fn(),
-  deleteAttachment: vi.fn(),
 }))
 
 // The real field fetches the label catalog over the network for its search
