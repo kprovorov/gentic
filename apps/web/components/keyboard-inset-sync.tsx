@@ -25,9 +25,6 @@ const SCROLL_SLACK_PX = 1
 // leaves the page taller than the visible area — exactly the slack that lets
 // the whole issue page (composer included) be panned away. Layouts that must
 // stay inside the visual viewport subtract this variable.
-//
-// Both halves therefore measure the same thing the CSS does: the gap between
-// the layout viewport `dvh` resolves against and the visible one.
 export function KeyboardInsetSync() {
   useEffect(() => {
     const viewport = window.visualViewport
@@ -58,18 +55,18 @@ export function KeyboardInsetSync() {
     }
 
     const update = () => {
-      // Measure against the root's client height — the layout viewport, and so
-      // exactly what `100dvh` resolves to — rather than `window.innerHeight`.
-      // A browser that shrinks the layout viewport for the keyboard has
-      // already taken the space out of `dvh`, and subtracting it a second time
-      // would strand the composer a whole keyboard above the keyboard.
+      // `window.innerHeight`, not the root's client height: iOS shrinks the
+      // root's box to the visible area once the keyboard is up while `dvh`
+      // keeps its full-screen value, so measuring against it reports no
+      // keyboard at all and drops the composer behind one. `innerHeight` is
+      // the height `dvh` agrees with.
       //
       // Pinch zoom shrinks the visual viewport too; only a viewport still at
       // page scale is reporting keyboard height.
       const covered =
         viewport.scale > MAX_PAGE_SCALE
           ? 0
-          : root.clientHeight - viewport.height
+          : window.innerHeight - viewport.height
 
       root.style.setProperty(
         "--keyboard-inset",
