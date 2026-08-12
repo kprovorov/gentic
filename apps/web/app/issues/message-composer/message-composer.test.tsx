@@ -17,8 +17,7 @@ function renderComposer(
     agentProvider: "claude_code",
     issueModel: null,
     hasMessages: false,
-    onAgentProviderChange: vi.fn(),
-    onIssueModelChange: vi.fn(),
+    onAgentModelChange: vi.fn(),
     ...overrides,
   }
   render(<MessageComposer {...props} />)
@@ -54,19 +53,19 @@ describe("MessageComposer", () => {
     expect(props.onSubmit).toHaveBeenCalledTimes(1)
   })
 
-  it("shows the active agent provider in the picker trigger", () => {
+  it("shows the active agent's default label in the picker trigger", () => {
     renderComposer({ agentProvider: "codex" })
 
     expect(
-      screen.getByRole("button", { name: "Choose agent" })
-    ).toHaveTextContent("Codex")
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toHaveTextContent("Codex default")
   })
 
   it("shows the active model in the picker trigger", () => {
     renderComposer({ issueModel: "claude-sonnet-5" })
 
     expect(
-      screen.getByRole("button", { name: "Choose model" })
+      screen.getByRole("button", { name: "Choose agent and model" })
     ).toHaveTextContent("Claude Sonnet 5")
   })
 

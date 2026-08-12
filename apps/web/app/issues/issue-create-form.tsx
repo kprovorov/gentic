@@ -1,19 +1,29 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
-import { useFormStatus } from "react-dom"
+import { useQuery } from "@tanstack/react-query"
 import {
   IconCheck,
   IconChevronDown,
   IconDeviceFloppy,
+  IconDots,
   IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
 
-import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import { fetchSettingsLabelsData } from "@/app/client-queries"
+import {
+  abandonIssueCreation,
+  finishIssueCreation,
+  startIssueCreation,
+} from "@/app/issues/actions"
 import type { ProjectOption } from "@/app/queries"
+import { queryKeys, queryStaleTimes } from "@/app/query-keys"
+import { BrandIcon } from "@/components/agent-provider-icon"
+import { useSupabaseClient } from "@gentic/supabase/client"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -21,6 +31,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@gentic/ui/popover"
+import { cn } from "@gentic/ui/utils"
 import {
   agentProviderSchema,
   defaultIssuePriority,
@@ -30,14 +42,26 @@ import {
   type IssuePriority,
 } from "@gentic/validators/issues"
 
+import { AttachmentPromptField } from "./attachment-prompt-field"
+import {
+  appendAttachmentDescriptors,
+  appendAttachmentIds,
+  uploadAttachmentFiles,
+} from "./attachment-uploads"
 import { AutomaticPrPreferenceField } from "./automatic-pr-preference-field"
-import { IssueLabelsField } from "./issue-labels-field"
+import {
+  interactiveIssueBadgeClassName,
+  issueBadgeClassName,
+} from "./issue-badge-styles"
+import { IssueLabelChip } from "./issue-label-chip"
+import { IssueLabelsPicker } from "./issue-labels-field"
 import {
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
+  priorityIconStyles,
 } from "./issue-priority-meta"
-import { MessageComposer } from "./message-composer/message-composer"
+import { AgentModelPicker } from "./message-composer/agent-model-picker"
 
 const ISSUE_CREATE_DRAFT_STORAGE_KEY = "gentic:issue-create-draft:v1"
 
@@ -56,6 +80,91 @@ function storeIssueDraft(body: string) {
     } else {
       window.localStorage.removeItem(ISSUE_CREATE_DRAFT_STORAGE_KEY)
     }
+  } catch {
+    return
+  }
+}
+
+const ISSUE_CREATE_FILES_DB_NAME = "gentic-issue-draft"
+const ISSUE_CREATE_FILES_STORE_NAME = "files"
+const ISSUE_CREATE_FILES_KEY = "issue-create-draft-files:v1"
+
+type StoredIssueDraftFile = {
+  name: string
+  type: string
+  lastModified: number
+  buffer: ArrayBuffer
+}
+
+function openIssueDraftFilesDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(ISSUE_CREATE_FILES_DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(ISSUE_CREATE_FILES_STORE_NAME)
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function loadStoredIssueDraftFiles(): Promise<File[]> {
+  if (typeof window === "undefined" || !window.indexedDB) {
+    return []
+  }
+
+  try {
+    const db = await openIssueDraftFilesDb()
+    const stored = await new Promise<StoredIssueDraftFile[]>(
+      (resolve, reject) => {
+        const request = db
+          .transaction(ISSUE_CREATE_FILES_STORE_NAME, "readonly")
+          .objectStore(ISSUE_CREATE_FILES_STORE_NAME)
+          .get(ISSUE_CREATE_FILES_KEY)
+        request.onsuccess = () =>
+          resolve((request.result as StoredIssueDraftFile[] | undefined) ?? [])
+        request.onerror = () => reject(request.error)
+      }
+    )
+    db.close()
+    return stored.map(
+      (file) =>
+        new File([file.buffer], file.name, {
+          type: file.type,
+          lastModified: file.lastModified,
+        })
+    )
+  } catch {
+    return []
+  }
+}
+
+async function storeIssueDraftFiles(files: File[]) {
+  if (typeof window === "undefined" || !window.indexedDB) {
+    return
+  }
+
+  try {
+    const stored: StoredIssueDraftFile[] = await Promise.all(
+      files.map(async (file) => ({
+        name: file.name,
+        type: file.type,
+        lastModified: file.lastModified,
+        buffer: await file.arrayBuffer(),
+      }))
+    )
+    const db = await openIssueDraftFilesDb()
+    await new Promise<void>((resolve, reject) => {
+      const store = db
+        .transaction(ISSUE_CREATE_FILES_STORE_NAME, "readwrite")
+        .objectStore(ISSUE_CREATE_FILES_STORE_NAME)
+      const request =
+        stored.length > 0
+          ? store.put(stored, ISSUE_CREATE_FILES_KEY)
+          : store.delete(ISSUE_CREATE_FILES_KEY)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
   } catch {
     return
   }
@@ -97,9 +206,7 @@ function loadStoredIssueSettings(): IssueCreateSettings {
       settings.priority = priority.data
     }
 
-    const agentProvider = agentProviderSchema.safeParse(
-      candidate.agentProvider
-    )
+    const agentProvider = agentProviderSchema.safeParse(candidate.agentProvider)
     if (agentProvider.success) {
       settings.agentProvider = agentProvider.data
     }
@@ -130,13 +237,24 @@ function storeIssueSettings(settings: IssueCreateSettings) {
   }
 }
 
+// The composer's controls wear the same badges the issue will wear once it
+// exists, so the meta row reads as a preview of the list row.
+const metaControlClassName = cn(
+  issueBadgeClassName,
+  interactiveIssueBadgeClassName
+)
+
 export function IssueCreateForm({
   projects,
   defaultAgentProvider = "claude_code",
+  fillHeight = false,
   className,
 }: {
   projects: ProjectOption[]
   defaultAgentProvider?: AgentProvider
+  // Stretch the body field to consume the container's height instead of sizing
+  // to its content. Used by the New Issue dialog's expanded state.
+  fillHeight?: boolean
   className?: string
 }) {
   const [body, setBody] = useState("")
@@ -150,7 +268,28 @@ export function IssueCreateForm({
   const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
   const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
+  const [submitError, setSubmitError] = useState("")
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const projectTriggerRef = useRef<HTMLButtonElement>(null)
+  // Which submit button was pressed. Both are `type="submit"` so the browser
+  // still enforces the textarea's `required` before `handleSubmit` runs, which
+  // leaves no room for the action to be an argument.
+  const intentRef = useRef<PendingAction>("draft")
+  const router = useRouter()
+  const supabase = useSupabaseClient()
+  // Shares the picker's query key, so the chips resolve from the same cache
+  // entry the overflow menu already fetches.
+  const labelsQuery = useQuery({
+    queryKey: queryKeys.settingsLabels(""),
+    queryFn: () => fetchSettingsLabelsData(),
+    staleTime: queryStaleTimes.formOptions,
+  })
+  const labelsById = new Map(
+    (labelsQuery.data?.labels ?? []).map((label) => [label.id, label])
+  )
+  const selectedLabels = labelIds
+    .map((id) => labelsById.get(id))
+    .filter((label) => label !== undefined)
   const selectedProject = projects.find((project) => project.id === projectId)
   const PriorityIcon = issuePriorityIcons[priority]
   const projectLabelId = "issue-project-label"
@@ -168,6 +307,20 @@ export function IssueCreateForm({
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadStoredIssueDraftFiles().then((storedFiles) => {
+      if (!cancelled && storedFiles.length > 0) {
+        setFiles(storedFiles)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -218,8 +371,14 @@ export function IssueCreateForm({
     storeIssueDraft(value)
   }
 
-  const clearStoredBody = () => {
+  const updateFiles = (value: File[]) => {
+    setFiles(value)
+    void storeIssueDraftFiles(value)
+  }
+
+  const clearStoredDraft = () => {
     storeIssueDraft("")
+    void storeIssueDraftFiles([])
   }
 
   const requireProject = () => {
@@ -245,204 +404,332 @@ export function IssueCreateForm({
     )
   }
 
+  const handleActionClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    action: Exclude<PendingAction, null>
+  ) => {
+    intentRef.current = action
+
+    if (!requireProject()) {
+      event.preventDefault()
+    }
+  }
+
+  // Attachments are uploaded from here rather than posted with the form: a
+  // Server Action body is capped well below the 25MB a single attachment may
+  // be, so the actions only exchange metadata and signed upload tickets while
+  // the bytes go straight to Storage.
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (pendingAction || !requireProject()) {
+      return
+    }
+
+    const action = intentRef.current
+    const status = action === "run" ? "todo" : "draft"
+    setPendingAction(action)
+    setSubmitError("")
+
+    const start = new FormData(event.currentTarget)
+    appendAttachmentDescriptors(start, files)
+
+    try {
+      const { issueId, href, uploads } = await startIssueCreation(start)
+
+      try {
+        const attachmentIds = await uploadAttachmentFiles(
+          supabase,
+          uploads,
+          files
+        )
+        const finish = new FormData()
+        finish.set("issue_id", issueId)
+        finish.set("status", status)
+        appendAttachmentIds(finish, attachmentIds)
+        await finishIssueCreation(finish)
+      } catch (error) {
+        const abandon = new FormData()
+        abandon.set("issue_id", issueId)
+        await abandonIssueCreation(abandon).catch(() => {})
+        throw error
+      }
+
+      clearStoredDraft()
+      router.push(href)
+    } catch (error) {
+      setPendingAction(null)
+      setSubmitError(getCreateErrorMessage(error))
+    }
+  }
+
   return (
-    <MessageComposer
-      formId="new-issue-form"
-      action={saveIssueDraft}
-      className={className}
-      id="issue-body"
-      name="body"
-      draft={body}
-      draftFiles={files}
-      onDraftChange={updateBody}
-      onFilesChange={setFiles}
-      rows={3}
-      placeholder="Describe what you want built, fixed, or investigated."
-      required
-      submitAriaLabel="Run issue"
-      submitDisabled={!body.trim()}
-      agentProvider={agentProvider}
-      issueModel={issueModel}
-      hasMessages={false}
-      onAgentProviderChange={(provider) => {
-        setAgentProvider(provider)
-        setIssueModel(null)
-        persistSettings({ agentProvider: provider, issueModel: null })
-      }}
-      onIssueModelChange={(model) => {
-        setIssueModel(model)
-        persistSettings({ issueModel: model })
-      }}
-      onSubmit={() => {}}
-      footerStart={
-        <div className="flex min-w-0 flex-wrap items-start gap-2">
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="sr-only" id={projectLabelId}>
-              Project
-            </label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  ref={projectTriggerRef}
-                  type="button"
-                  aria-labelledby={projectLabelId}
-                  aria-describedby={projectError ? projectErrorId : undefined}
-                  data-invalid={projectError ? true : undefined}
-                  className="flex h-8 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted data-invalid:ring-1 data-invalid:ring-destructive disabled:pointer-events-none disabled:opacity-50 sm:max-w-56"
-                >
-                  <span className="truncate">
-                    {selectedProject ? selectedProject.name : "Select project"}
-                  </span>
-                  <IconChevronDown className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-56">
-                {projects.map((project) => (
-                  <DropdownMenuItem
-                    key={project.id}
-                    onSelect={() => {
-                      setProjectId(project.id)
-                      setProjectError("")
-                      persistSettings({ projectId: project.id })
-                    }}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{project.name}</span>
-                      <span className="block truncate text-xs font-normal text-muted-foreground">
-                        {project.repo}
-                      </span>
-                    </span>
-                    {project.id === projectId ? (
-                      <IconCheck className="ml-auto size-3.5" />
-                    ) : null}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {projectError ? (
-              <p id={projectErrorId} className="text-xs text-destructive">
-                {projectError}
-              </p>
-            ) : null}
-          </div>
-
-          <label className="sr-only" id={priorityLabelId}>
-            Priority
-          </label>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-labelledby={priorityLabelId}
-                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-              >
-                <PriorityIcon className="size-3.5" />
-                <span>{issuePriorityLabels[priority]}</span>
-                <IconChevronDown className="size-3.5 opacity-70" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {issuePriorityOptions.map((option) => {
-                const OptionIcon = issuePriorityIcons[option.value]
-                const isSelected = option.value === priority
-
-                return (
-                  <DropdownMenuItem
-                    key={option.value}
-                    onSelect={() => {
-                      setPriority(option.value)
-                      persistSettings({ priority: option.value })
-                    }}
-                    className="gap-3"
-                  >
-                    <OptionIcon className="size-4" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {option.label}
-                    </span>
-                    {isSelected ? <IconCheck className="size-4" /> : null}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <IssueLabelsField
-            selectedIds={labelIds}
-            onSelectedIdsChange={setLabelIds}
-          />
-        </div>
-      }
-      belowField={
-        <AutomaticPrPreferenceField
-          key={prSettingsVersion}
-          defaultChecked={createPrAutomatically}
-          onCheckedChange={(checked) => {
-            setCreatePrAutomatically(checked)
-            persistSettings({ createPrAutomatically: checked })
-          }}
-        />
-      }
-      footerEnd={
-        <SaveDraftButton
-          onClick={(event) => {
-            if (!requireProject()) {
-              event.preventDefault()
-              return
-            }
-            clearStoredBody()
-          }}
-        />
-      }
-      submitButton={
-        <RunIssueButton
-          disabled={!body.trim()}
-          onClick={(event) => {
-            if (!requireProject()) {
-              event.preventDefault()
-              return
-            }
-            clearStoredBody()
-          }}
-        />
-      }
+    <form
+      id="new-issue-form"
+      onSubmit={handleSubmit}
+      className={cn(
+        "flex min-w-0 flex-col gap-3",
+        fillHeight && "min-h-0 flex-1",
+        className
+      )}
     >
       <input type="hidden" name="project_id" value={projectId} />
       <input type="hidden" name="priority" value={priority} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <input type="hidden" name="issue_model" value={issueModel ?? ""} />
+      <input
+        type="hidden"
+        name="create_pr_automatically"
+        value={createPrAutomatically ? "true" : "false"}
+      />
       {labelIds.map((id) => (
         <input key={id} type="hidden" name="label_id" value={id} />
       ))}
       <label className="sr-only" htmlFor="issue-body">
         Body
       </label>
-    </MessageComposer>
+
+      {/* Header row: repository selector. The expand/close window controls
+          are supplied by the dialog chrome wrapping this form, so pad the
+          right edge to leave room for them. */}
+      <div className="flex min-w-0 flex-col gap-1 pr-14">
+        <label className="sr-only" id={projectLabelId}>
+          Project
+        </label>
+        {/* Non-modal: nested in the New Issue Dialog, whose default-modal
+            DropdownMenu would disable pointer events on the trigger while
+            open, so re-clicking it to close falls through to the Dialog's
+            overlay and closes the whole dialog instead. */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              ref={projectTriggerRef}
+              type="button"
+              variant="outline"
+              size="xs"
+              aria-labelledby={projectLabelId}
+              aria-describedby={projectError ? projectErrorId : undefined}
+              aria-invalid={projectError ? true : undefined}
+              className="max-w-full self-start aria-invalid:text-destructive"
+            >
+              <BrandIcon name="github" className="size-3.5 shrink-0" />
+              <span className="min-w-0 truncate">
+                {selectedProject ? selectedProject.repo : "Select repository"}
+              </span>
+              <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-64">
+            {projects.map((project) => (
+              <DropdownMenuItem
+                key={project.id}
+                onSelect={() => {
+                  setProjectId(project.id)
+                  setProjectError("")
+                  persistSettings({ projectId: project.id })
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{project.name}</span>
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {project.repo}
+                  </span>
+                </span>
+                {project.id === projectId ? (
+                  <IconCheck className="ml-auto size-3.5" />
+                ) : null}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {projectError ? (
+          <p id={projectErrorId} className="text-xs text-destructive">
+            {projectError}
+          </p>
+        ) : null}
+      </div>
+
+      <AttachmentPromptField
+        variant="bare"
+        id="issue-body"
+        name="body"
+        value={body}
+        onChange={updateBody}
+        files={files}
+        onFilesChange={updateFiles}
+        rows={3}
+        placeholder="Describe your task…"
+        required
+        className={cn(fillHeight && "flex min-h-0 flex-1 flex-col")}
+        textareaClassName={cn(
+          "resize-none",
+          fillHeight ? "min-h-0 flex-1" : "min-h-20"
+        )}
+        metaRow={
+          <>
+            <AgentModelPicker
+              agentProvider={agentProvider}
+              issueModel={issueModel}
+              hasMessages={false}
+              onAgentModelChange={(provider, model) => {
+                setAgentProvider(provider)
+                setIssueModel(model)
+                persistSettings({ agentProvider: provider, issueModel: model })
+              }}
+              className={metaControlClassName}
+            />
+
+            <label className="sr-only" id={priorityLabelId}>
+              Priority
+            </label>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-labelledby={priorityLabelId}
+                  className={metaControlClassName}
+                >
+                  <PriorityIcon
+                    className={cn(
+                      "size-3.5 shrink-0",
+                      priorityIconStyles[priority]
+                    )}
+                  />
+                  <span className="whitespace-nowrap">
+                    {issuePriorityLabels[priority]}
+                  </span>
+                  <IconChevronDown className="size-3.5 shrink-0 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                {issuePriorityOptions.map((option) => {
+                  const OptionIcon = issuePriorityIcons[option.value]
+                  const isSelected = option.value === priority
+
+                  return (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onSelect={() => {
+                        setPriority(option.value)
+                        persistSettings({ priority: option.value })
+                      }}
+                      className="gap-3"
+                    >
+                      <OptionIcon
+                        className={cn(
+                          "size-4",
+                          priorityIconStyles[option.value]
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {option.label}
+                      </span>
+                      {isSelected ? <IconCheck className="size-4" /> : null}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More options"
+                  className={cn(
+                    metaControlClassName,
+                    "size-6 justify-center px-0"
+                  )}
+                >
+                  <IconDots className="size-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 p-0">
+                <IssueLabelsPicker
+                  selectedIds={labelIds}
+                  onSelectedIdsChange={setLabelIds}
+                />
+                <div className="border-t border-foreground/10 p-3">
+                  <AutomaticPrPreferenceField
+                    key={prSettingsVersion}
+                    defaultChecked={createPrAutomatically}
+                    renderHiddenInput={false}
+                    onCheckedChange={(checked) => {
+                      setCreatePrAutomatically(checked)
+                      persistSettings({ createPrAutomatically: checked })
+                    }}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {selectedLabels.map((label) => (
+              <IssueLabelChip
+                key={label.id}
+                label={label}
+                className="text-xs"
+                onRemove={() =>
+                  setLabelIds(labelIds.filter((id) => id !== label.id))
+                }
+              />
+            ))}
+          </>
+        }
+        footerEnd={
+          <div className="ml-auto flex items-center gap-1">
+            <SaveDraftButton
+              pendingAction={pendingAction}
+              onClick={(event) => handleActionClick(event, "draft")}
+            />
+            <RunIssueButton
+              disabled={!body.trim()}
+              pendingAction={pendingAction}
+              onClick={(event) => handleActionClick(event, "run")}
+            />
+          </div>
+        }
+      />
+
+      {submitError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {submitError}
+        </p>
+      ) : null}
+    </form>
   )
 }
 
+function getCreateErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Could not create this issue. Please try again."
+}
+
+type PendingAction = "draft" | "run" | null
+
 function SaveDraftButton({
   onClick,
+  pendingAction,
 }: {
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  pendingAction: PendingAction
 }) {
-  const { pending } = useFormStatus()
-
   return (
     <Button
       type="submit"
-      formAction={saveIssueDraft}
       variant="ghost"
       size="sm"
-      disabled={pending}
-      className="rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+      disabled={pendingAction !== null}
+      className="text-muted-foreground hover:text-foreground"
       onClick={onClick}
     >
-      {pending ? (
+      Save Draft
+      {pendingAction === "draft" ? (
         <IconLoader2 className="animate-spin" />
       ) : (
         <IconDeviceFloppy />
       )}
-      Save draft
     </Button>
   )
 }
@@ -450,23 +737,26 @@ function SaveDraftButton({
 function RunIssueButton({
   disabled,
   onClick,
+  pendingAction,
 }: {
   disabled: boolean
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  pendingAction: PendingAction
 }) {
-  const { pending } = useFormStatus()
-
   return (
     <Button
       type="submit"
-      formAction={runIssue}
-      size="icon"
-      aria-label="Run issue"
-      disabled={disabled || pending}
-      className="shrink-0"
+      size="sm"
+      disabled={disabled || pendingAction !== null}
+      className="shrink-0 px-3.5"
       onClick={onClick}
     >
-      {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />}
+      Run Agent
+      {pendingAction === "run" ? (
+        <IconLoader2 className="animate-spin" />
+      ) : (
+        <IconSend />
+      )}
     </Button>
   )
 }

@@ -48,6 +48,7 @@ import type {
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
+import { IssueLabelChip } from "../issue-label-chip"
 import { Attachments, type Attachment } from "./attachments"
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
 import {
@@ -72,23 +73,13 @@ function IssueDetailPullRequests({
   issueId,
   pullRequests,
   issueStatus,
-  hasUnpublishedAgentChanges,
-  automaticPrPublishingInProgress,
+  showCreatePr,
 }: {
   issueId: string
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
-  hasUnpublishedAgentChanges: boolean
-  automaticPrPublishingInProgress: boolean
+  showCreatePr: boolean
 }) {
-  const hasAttachedPullRequest = pullRequests.length > 0
-  const showCreatePr = canShowManualCreatePrAction({
-    status: issueStatus,
-    hasUnpublishedAgentChanges,
-    hasAttachedPullRequest,
-    automaticPublishingInProgress: automaticPrPublishingInProgress,
-  })
-
   if (pullRequests.length === 0) {
     return (
       <div className="grid gap-2">
@@ -607,19 +598,6 @@ function IssueDetailRelations({
   )
 }
 
-function LabelChip({ label }: { label: LabelSnapshot }) {
-  return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-background px-2 text-[12.5px] font-medium ring-1 ring-border">
-      <span
-        aria-hidden
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: label.color }}
-      />
-      {label.name}
-    </span>
-  )
-}
-
 function IssueDetailLabels({
   issueId,
   labels,
@@ -678,7 +656,7 @@ function IssueDetailLabels({
       {displayedLabels.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {displayedLabels.map((label) => (
-            <LabelChip key={label.id} label={label} />
+            <IssueLabelChip key={label.id} label={label} />
           ))}
         </div>
       ) : (
@@ -692,19 +670,17 @@ function IssueDetailLabels({
   )
 }
 
-function RailSection({
+export function RailSection({
   title,
   action,
-  className,
   children,
 }: {
   title: string
   action?: React.ReactNode
-  className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("px-[18px] py-4", className)}>
+    <div className="px-[18px] py-4">
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
           {title}
@@ -741,6 +717,12 @@ export function IssueDetailRail({
   labels: LabelSnapshot[]
   attachments: Attachment[]
 }) {
+  const showCreatePr = canShowManualCreatePrAction({
+    status,
+    hasUnpublishedAgentChanges,
+    hasAttachedPullRequest: pullRequests.length > 0,
+    automaticPublishingInProgress: automaticPrPublishingInProgress,
+  })
   const queryClient = useQueryClient()
   const addRelationMutation = useMutation({
     mutationFn: addIssueRelation,
@@ -755,7 +737,7 @@ export function IssueDetailRail({
 
   return (
     <div className="min-w-0 divide-y divide-border/70">
-      <RailSection title="Status" className="hidden xl:block">
+      <RailSection title="Status">
         <div className="grid gap-2">
           <IssueDetailStatus issueId={issueId} status={status} />
           <IssueDetailPriority issueId={issueId} priority={priority} />
@@ -771,8 +753,7 @@ export function IssueDetailRail({
           issueId={issueId}
           pullRequests={pullRequests}
           issueStatus={status}
-          hasUnpublishedAgentChanges={hasUnpublishedAgentChanges}
-          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+          showCreatePr={showCreatePr}
         />
       </RailSection>
 

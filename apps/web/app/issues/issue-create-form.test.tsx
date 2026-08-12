@@ -4,7 +4,11 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { runIssue, saveIssueDraft } from "@/app/issues/actions"
+import {
+  abandonIssueCreation,
+  finishIssueCreation,
+  startIssueCreation,
+} from "@/app/issues/actions"
 import { createLabel } from "@/app/settings/actions"
 import type { SettingsLabelsData } from "@/app/queries"
 import { TooltipProvider } from "@gentic/ui/tooltip"
@@ -12,12 +16,27 @@ import { TooltipProvider } from "@gentic/ui/tooltip"
 import { IssueCreateForm } from "./issue-create-form"
 
 vi.mock("@/app/issues/actions", () => ({
-  runIssue: vi.fn(),
-  saveIssueDraft: vi.fn(),
+  startIssueCreation: vi.fn(),
+  finishIssueCreation: vi.fn(),
+  abandonIssueCreation: vi.fn(),
 }))
 
 vi.mock("@/app/settings/actions", () => ({
   createLabel: vi.fn(),
+}))
+
+const push = vi.fn()
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}))
+
+const uploadToSignedUrl = vi.fn().mockResolvedValue({ error: null })
+
+vi.mock("@gentic/supabase/client", () => ({
+  useSupabaseClient: () => ({
+    storage: { from: () => ({ uploadToSignedUrl }) },
+  }),
 }))
 
 const projects = [
@@ -83,12 +102,37 @@ function renderForm(ui: React.ReactElement) {
 }
 
 describe("IssueCreateForm", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubGlobal("ResizeObserver", TestResizeObserver)
     stubLabelsFetch(defaultLabels)
     window.localStorage.clear()
-    vi.mocked(runIssue).mockClear()
-    vi.mocked(saveIssueDraft).mockClear()
+    await new Promise<void>((resolve) => {
+      const request = window.indexedDB.deleteDatabase("gentic-issue-draft")
+      request.onsuccess = () => resolve()
+      request.onerror = () => resolve()
+    })
+    push.mockClear()
+    uploadToSignedUrl.mockClear()
+    vi.mocked(startIssueCreation).mockReset()
+    // Mint one ticket per declared attachment, the way the real action does:
+    // the form pairs tickets to files by index and refuses to upload if the
+    // two ever disagree.
+    vi.mocked(startIssueCreation).mockImplementation(async (formData) => ({
+      issueId: "22222222-2222-4222-8222-222222222222",
+      href: "/issues/GEN-1",
+      uploads: (
+        JSON.parse(String(formData.get("attachments") ?? "[]")) as Array<{
+          type: string
+        }>
+      ).map((descriptor, index) => ({
+        attachmentId: `33333333-3333-4333-8333-00000000000${index}`,
+        path: `issue/file-${index}`,
+        token: `token-${index}`,
+        contentType: descriptor.type,
+      })),
+    }))
+    vi.mocked(finishIssueCreation).mockReset()
+    vi.mocked(abandonIssueCreation).mockReset()
     vi.mocked(createLabel).mockReset()
   })
 
@@ -133,11 +177,154 @@ describe("IssueCreateForm", () => {
     })
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     expect(window.localStorage.getItem("gentic:issue-create-draft:v1")).toBe(
       null
     )
+  })
+
+  it("restores attached files from browser storage", async () => {
+    const buffer = await new File(["contents"], "notes.txt", {
+      type: "text/plain",
+    }).arrayBuffer()
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = window.indexedDB.open("gentic-issue-draft", 1)
+      request.onupgradeneeded = () => request.result.createObjectStore("files")
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const request = db
+        .transaction("files", "readwrite")
+        .objectStore("files")
+        .put(
+          [{ name: "notes.txt", type: "text/plain", lastModified: 0, buffer }],
+          "issue-create-draft-files:v1"
+        )
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    await waitFor(() => {
+      expect(screen.getByText("notes.txt")).toBeVisible()
+    })
+  })
+
+  it("stores attached files in browser storage and clears them on submit", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const file = new File(["contents"], "screenshot.png", {
+      type: "image/png",
+    })
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    await user.upload(input, file)
+
+    await waitFor(() => {
+      expect(screen.getByText("screenshot.png")).toBeVisible()
+    })
+
+    const readStoredFiles = () =>
+      new Promise<{ name: string }[]>((resolve, reject) => {
+        const request = window.indexedDB.open("gentic-issue-draft", 1)
+        request.onsuccess = () => {
+          const db = request.result
+          const getRequest = db
+            .transaction("files", "readonly")
+            .objectStore("files")
+            .get("issue-create-draft-files:v1")
+          getRequest.onsuccess = () => {
+            resolve((getRequest.result as { name: string }[] | undefined) ?? [])
+            db.close()
+          }
+          getRequest.onerror = () => reject(getRequest.error)
+        }
+        request.onerror = () => reject(request.error)
+      })
+
+    await waitFor(async () => {
+      const stored = await readStoredFiles()
+      expect(stored).toHaveLength(1)
+      expect(stored[0]?.name).toBe("screenshot.png")
+    })
+
+    await user.type(screen.getByLabelText("Body"), "Fix the layout.")
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
+
+    await waitFor(async () => {
+      const stored = await readStoredFiles()
+      expect(stored).toHaveLength(0)
+    })
+  })
+
+  it("keeps the picked file readable and re-pickable after removing it", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    const file = () =>
+      new File(["contents"], "screenshot.png", { type: "image/png" })
+
+    await user.click(screen.getByRole("button", { name: "Attach files" }))
+    await user.upload(input, file())
+
+    // The picked file must stay on the input: iOS hands back a `File` backed by
+    // a temp file that WebKit releases once the selection is cleared, so
+    // clearing it here would leave the preview and the upload with no bytes.
+    expect(await screen.findByText("screenshot.png")).toBeVisible()
+    expect(input.files).toHaveLength(1)
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove screenshot.png" })
+    )
+    expect(screen.queryByText("screenshot.png")).not.toBeInTheDocument()
+
+    // Opening the picker resets the input, so the same file counts as a new
+    // pick and fires `change` again.
+    await user.click(screen.getByRole("button", { name: "Attach files" }))
+    expect(input.files).toHaveLength(0)
+    await user.upload(input, file())
+
+    expect(await screen.findByText("screenshot.png")).toBeVisible()
+  })
+
+  it("previews attached files between the body and the option pills", async () => {
+    const user = userEvent.setup()
+
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement
+    await user.upload(
+      input,
+      new File(["contents"], "screenshot.png", { type: "image/png" })
+    )
+
+    const chip = await screen.findByText("screenshot.png")
+    expect(screen.getByText("PNG · 8 B")).toBeVisible()
+
+    const following = (from: Element, to: Element) =>
+      Boolean(
+        from.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+
+    expect(following(screen.getByLabelText("Body"), chip)).toBe(true)
+    expect(
+      following(chip, screen.getByRole("button", { name: "Priority" }))
+    ).toBe(true)
   })
 
   it("stores the selected project from the dropdown", async () => {
@@ -152,7 +339,7 @@ describe("IssueCreateForm", () => {
       "name",
       "project_id"
     )
-    expect(screen.getByText("Gentic")).toBeVisible()
+    expect(screen.getByText("openai/gentic")).toBeVisible()
   })
 
   it("defaults new issues to medium priority", () => {
@@ -178,10 +365,10 @@ describe("IssueCreateForm", () => {
 
     expect(priorityInput).toHaveAttribute("name", "priority")
     expect(form).toContainElement(
-      screen.getByRole("button", { name: "Save draft" })
+      screen.getByRole("button", { name: "Save Draft" })
     )
     expect(form).toContainElement(
-      screen.getByRole("button", { name: "Run issue" })
+      screen.getByRole("button", { name: "Run Agent" })
     )
   })
 
@@ -194,11 +381,11 @@ describe("IssueCreateForm", () => {
       screen.getByLabelText("Body"),
       "Fix the new issue form validation."
     )
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
     const projectSelect = screen.getByRole("button", { name: "Project" })
 
-    expect(projectSelect).toHaveAttribute("data-invalid", "true")
+    expect(projectSelect).toHaveAttribute("aria-invalid", "true")
     expect(projectSelect).toHaveAccessibleDescription(
       "Select a project before running this issue."
     )
@@ -212,7 +399,9 @@ describe("IssueCreateForm", () => {
       <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
     )
 
-    expect(screen.getByText("Codex")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toHaveTextContent("Codex default")
     expect(screen.getByDisplayValue("codex")).toHaveAttribute(
       "name",
       "agent_provider"
@@ -226,10 +415,14 @@ describe("IssueCreateForm", () => {
       <IssueCreateForm projects={projects} defaultAgentProvider="codex" />
     )
 
-    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
 
-    expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toHaveTextContent("GPT-5.6 Sol")
     expect(screen.getByDisplayValue("gpt-5.6-sol")).toHaveAttribute(
       "name",
       "issue_model"
@@ -241,22 +434,31 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
-    expect(
-      screen.getByRole("checkbox", { name: "Create PR automatically" })
-    ).toBeChecked()
     expect(screen.getByDisplayValue("true")).toHaveAttribute(
       "name",
       "create_pr_automatically"
     )
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    expect(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    ).toBeChecked()
+    await user.keyboard("{Escape}")
 
     await user.type(screen.getByLabelText("Body"), "Open a PR.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Run issue" }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
 
-    await waitFor(() => expect(runIssue).toHaveBeenCalled())
-    const formData = vi.mocked(runIssue).mock.calls[0][0] as FormData
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
     expect(formData.get("create_pr_automatically")).toBe("true")
+
+    // Queuing is the second phase's job, so an issue is never claimable
+    // before its attachments have finished uploading.
+    await waitFor(() => expect(finishIssueCreation).toHaveBeenCalled())
+    const finishData = vi.mocked(finishIssueCreation).mock
+      .calls[0][0] as FormData
+    expect(finishData.get("status")).toBe("todo")
   })
 
   it("submits automatic PR creation unchecked when saving a draft", async () => {
@@ -264,6 +466,7 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await user.click(
       screen.getByRole("checkbox", { name: "Create PR automatically" })
     )
@@ -271,15 +474,21 @@ describe("IssueCreateForm", () => {
       "name",
       "create_pr_automatically"
     )
+    await user.keyboard("{Escape}")
 
     await user.type(screen.getByLabelText("Body"), "Keep this as a draft.")
     await user.click(screen.getByRole("button", { name: "Project" }))
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
-    await user.click(screen.getByRole("button", { name: "Save draft" }))
+    await user.click(screen.getByRole("button", { name: "Save Draft" }))
 
-    await waitFor(() => expect(saveIssueDraft).toHaveBeenCalled())
-    const formData = vi.mocked(saveIssueDraft).mock.calls[0][0] as FormData
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
     expect(formData.get("create_pr_automatically")).toBe("false")
+
+    await waitFor(() => expect(finishIssueCreation).toHaveBeenCalled())
+    const finishData = vi.mocked(finishIssueCreation).mock
+      .calls[0][0] as FormData
+    expect(finishData.get("status")).toBe("draft")
   })
 
   it("stores the selected project, priority, agent, model, and PR preference as settings", async () => {
@@ -293,8 +502,11 @@ describe("IssueCreateForm", () => {
     await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
     await user.click(screen.getByRole("button", { name: "Priority" }))
     await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
-    await user.click(screen.getByRole("button", { name: "Choose model" }))
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
     await user.click(screen.getByRole("menuitem", { name: "GPT-5.6 Sol" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await user.click(
       screen.getByRole("checkbox", { name: "Create PR automatically" })
     )
@@ -324,17 +536,20 @@ describe("IssueCreateForm", () => {
       })
     )
 
-    renderForm(<IssueCreateForm projects={projects} />)
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByText("Gentic")).toBeVisible()
+      expect(screen.getByText("openai/gentic")).toBeVisible()
       expect(screen.getByText("Urgent")).toBeVisible()
-      expect(screen.getByText("Codex")).toBeVisible()
-      expect(screen.getByText("GPT-5.6 Sol")).toBeVisible()
       expect(
-        screen.getByRole("checkbox", { name: "Create PR automatically" })
-      ).not.toBeChecked()
+        screen.getByRole("button", { name: "Choose agent and model" })
+      ).toHaveTextContent("GPT-5.6 Sol")
     })
+
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    expect(
+      screen.getByRole("checkbox", { name: "Create PR automatically" })
+    ).not.toBeChecked()
   })
 
   it("does not restore a stored project that no longer exists", async () => {
@@ -346,7 +561,7 @@ describe("IssueCreateForm", () => {
     renderForm(<IssueCreateForm projects={projects} />)
 
     await waitFor(() => {
-      expect(screen.getByText("Select project")).toBeVisible()
+      expect(screen.getByText("Select repository")).toBeVisible()
     })
   })
 
@@ -355,6 +570,7 @@ describe("IssueCreateForm", () => {
 
     renderForm(<IssueCreateForm projects={projects} />)
 
+    await user.click(screen.getByRole("button", { name: "More options" }))
     const info = screen.getByRole("button", {
       name: "About Create PR automatically",
     })
@@ -378,7 +594,7 @@ describe("IssueCreateForm", () => {
   it("filters the label picker by search", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -392,10 +608,10 @@ describe("IssueCreateForm", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("selects and deselects a label, toggling its hidden input", async () => {
+  it("selects and deselects a label from the overflow menu, toggling its hidden input", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -406,12 +622,12 @@ describe("IssueCreateForm", () => {
       "name",
       "label_id"
     )
-    expect(screen.getByRole("button", { name: "1 label" })).toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Bug" })).toBeChecked()
 
     await user.click(screen.getByRole("checkbox", { name: "Bug" }))
 
     expect(screen.queryByDisplayValue("label-bug")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Labels" })).toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Bug" })).not.toBeChecked()
   })
 
   it("creates a label inline, auto-selects it, and shows no color chooser", async () => {
@@ -421,7 +637,7 @@ describe("IssueCreateForm", () => {
     })
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })
@@ -459,11 +675,9 @@ describe("IssueCreateForm", () => {
     stubLabelsFetch(manyLabels)
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
-      expect(
-        screen.getByRole("checkbox", { name: "Label 01" })
-      ).toBeVisible()
+      expect(screen.getByRole("checkbox", { name: "Label 01" })).toBeVisible()
     })
 
     for (let index = 1; index <= 20; index += 1) {
@@ -487,10 +701,40 @@ describe("IssueCreateForm", () => {
     expect(screen.getByText("19/20")).toBeVisible()
   })
 
+  it("shows each selected label as a chip in the meta row and removes it from there", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "More options" }))
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
+    })
+    await user.click(screen.getByRole("checkbox", { name: "Bug" }))
+    await user.click(screen.getByRole("checkbox", { name: "Feature" }))
+    await user.keyboard("{Escape}")
+
+    const removeBug = await screen.findByRole("button", {
+      name: "Remove Bug label",
+    })
+    expect(
+      screen.getByRole("button", { name: "Remove Feature label" })
+    ).toBeVisible()
+
+    await user.click(removeBug)
+
+    expect(screen.queryByDisplayValue("label-bug")).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Remove Bug label" })
+    ).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue("label-feature")).toHaveAttribute(
+      "name",
+      "label_id"
+    )
+  })
+
   it("keeps selected labels selected when the project changes", async () => {
     const { user } = renderForm(<IssueCreateForm projects={projects} />)
 
-    await user.click(screen.getByRole("button", { name: "Labels" }))
+    await user.click(screen.getByRole("button", { name: "More options" }))
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Bug" })).toBeVisible()
     })

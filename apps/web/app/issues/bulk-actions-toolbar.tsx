@@ -315,11 +315,14 @@ export function BulkActionsToolbar({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+    // Wrapping (rather than a fixed row) keeps the toolbar's min-content width
+    // down to a single button, so a narrow viewport doesn't get stretched by
+    // the whole action row — the surrounding grid sizes to its widest child.
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
       <span className="text-sm font-medium">
         {pluralize(count, "issue")} selected
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={isPending}>

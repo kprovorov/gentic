@@ -19,6 +19,7 @@ import {
   IconMinus,
   IconSparkles,
   IconTag,
+  IconTagFilled,
   IconTool,
   IconUserCircle,
 } from "@tabler/icons-react"
@@ -36,7 +37,7 @@ import {
   statusIcons,
   statusLabels,
   statusStyles,
-} from "../issue-status-meta"
+} from "../../issue-status-meta"
 import { priorityIconStyles } from "../../issues-columns"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
@@ -786,10 +787,10 @@ function LabelChip({
         muted ? "text-muted-foreground line-through" : "text-foreground"
       )}
     >
-      <span
+      <IconTagFilled
         aria-hidden
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: label.color }}
+        className="size-3.5 shrink-0"
+        style={{ color: label.color }}
       />
       {label.name}
     </span>

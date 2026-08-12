@@ -16,6 +16,7 @@ export function AutomaticPrPreferenceField({
   disabled = false,
   className,
   onCheckedChange,
+  renderHiddenInput = true,
 }: {
   // This is read only on mount. Callers showing refreshed persisted data should
   // change this component's key when the default value changes.
@@ -23,6 +24,10 @@ export function AutomaticPrPreferenceField({
   disabled?: boolean
   className?: string
   onCheckedChange?: (checked: boolean) => void
+  // Set false when the caller owns an authoritative hidden input elsewhere in
+  // the form (e.g. the New Issue composer renders this inside a popover that
+  // unmounts, so the submitted value must live outside it).
+  renderHiddenInput?: boolean
 }) {
   const [checked, setChecked] = useState(defaultChecked)
   const fieldId = useId()
@@ -31,7 +36,7 @@ export function AutomaticPrPreferenceField({
 
   return (
     <div className={cn("flex min-w-0 items-start gap-2.5", className)}>
-      {!disabled ? (
+      {renderHiddenInput && !disabled ? (
         <input
           type="hidden"
           name="create_pr_automatically"

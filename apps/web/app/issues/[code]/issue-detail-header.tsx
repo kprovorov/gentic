@@ -3,21 +3,21 @@
 import Link from "next/link"
 import { useLayoutEffect, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  IconBug,
-  IconBulb,
-  IconDotsVertical,
-  IconFileDescription,
-  IconMessage2,
-  IconPencil,
-  IconSparkles,
-  IconTrash,
-} from "@tabler/icons-react"
+import { IconDotsVertical, IconPencil, IconTrash } from "@tabler/icons-react"
 
-import type { IssueDetailData } from "@/app/queries"
+import type { IssueDetailData, IssuePullRequest } from "@/app/queries"
 import { updateIssueTitle } from "@/app/issues/actions"
+import {
+  AgentProviderBadge,
+  IssuePriorityMenu,
+  IssueStatusMenu,
+  IssueTypeMenu,
+  PullRequestPills,
+  RepoBadge,
+} from "@/app/issues/issues-columns"
 import { getIssueEditHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
+import { SiteHeaderPortal } from "@/components/site-header-portal"
 import { Button } from "@gentic/ui/button"
 import {
   DropdownMenu,
@@ -26,38 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
-import { BrandIcon } from "@/components/agent-provider-icon"
+import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
+import type { LabelSnapshot } from "@gentic/validators/realtime"
 
+import { IssueLabelChip } from "../issue-label-chip"
+import type { Attachment } from "./attachments"
 import { useIssueDelete } from "./issue-delete-button"
-import {
-  IssueDetailPriority,
-  IssueDetailStatus,
-} from "./issue-detail-status-priority"
-
-const issueTypeIcons = {
-  issue: IconFileDescription,
-  feature: IconSparkles,
-  bug: IconBug,
-  feedback: IconMessage2,
-  idea: IconBulb,
-}
-
-const issueTypeStyles: Record<IssueDetailData["issue"]["type"], string> = {
-  issue: "text-muted-foreground",
-  feature: "text-violet-700 dark:text-violet-300",
-  bug: "text-red-700 dark:text-red-300",
-  feedback: "text-sky-700 dark:text-sky-300",
-  idea: "text-amber-700 dark:text-amber-300",
-}
-
-const issueTypeBadgeStyles: Record<IssueDetailData["issue"]["type"], string> =
-  {
-    issue: "bg-muted",
-    feature: "bg-muted",
-    bug: "bg-muted",
-    feedback: "bg-muted",
-    idea: "bg-muted",
-  }
+import { IssuePropertiesDialog } from "./issue-properties-dialog"
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -179,7 +154,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
           }
         }}
         className={cn(
-          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
+          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight text-pretty break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
           !currentTitleState.draft && "text-muted-foreground italic"
         )}
       />
@@ -206,51 +181,27 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
 
 export function IssueDetailHeader({
   issue,
+  pullRequests,
+  automaticPrPublishingInProgress,
+  relations,
+  relationCandidates,
+  labels,
+  attachments,
 }: {
   issue: IssueDetailData["issue"]
+  pullRequests: IssuePullRequest[]
+  automaticPrPublishingInProgress: boolean
+  relations: IssueRelation[]
+  relationCandidates: IssueRelationIssue[]
+  labels: LabelSnapshot[]
+  attachments: Attachment[]
 }) {
-  const TypeIcon = issueTypeIcons[issue.type]
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
 
   return (
     <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl",
-            issueTypeBadgeStyles[issue.type]
-          )}
-        >
-          <TypeIcon className={cn("size-4", issueTypeStyles[issue.type])} />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          {issue.code ? (
-            <p className="font-mono text-xs font-semibold text-muted-foreground">
-              {issue.code}
-            </p>
-          ) : null}
-
-          <h1>
-            <EditableIssueTitle issue={issue} />
-          </h1>
-
-          {issue.projects ? (
-            <Link
-              href={`https://github.com/${issue.projects.repo}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <BrandIcon name="github" className="size-3.5 shrink-0" />
-              <span className="min-w-0 truncate font-mono">
-                {issue.projects.repo}
-              </span>
-            </Link>
-          ) : null}
-        </div>
-
+      <SiteHeaderPortal>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -282,18 +233,40 @@ export function IssueDetailHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </SiteHeaderPortal>
+
+      <div className="flex min-w-0 items-start gap-3">
+        <IssueStatusMenu issue={issue} />
+
+        <div className="min-w-0 flex-1">
+          {/* Headings are `text-balance` globally, which wraps the title into
+              short balanced lines; the detail title should use the full row. */}
+          <h1 className="text-pretty">
+            <EditableIssueTitle issue={issue} />
+          </h1>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 xl:hidden">
-        <IssueDetailStatus
-          issueId={issue.id}
-          status={issue.status}
-          variant="pill"
-        />
-        <IssueDetailPriority
-          issueId={issue.id}
-          priority={issue.priority}
-          variant="pill"
+      {/* Grouping the pills on a tinted panel keeps them readable as one
+          metadata block on mobile, where the rail is hidden. The trailing "+"
+          opens everything the rail would otherwise hold. */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
+        <IssueTypeMenu issue={issue} />
+        <AgentProviderBadge provider={issue.agent_provider} />
+        {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
+        <PullRequestPills pullRequests={pullRequests} />
+        <IssuePriorityMenu issue={issue} showLabel />
+        {labels.map((label) => (
+          <IssueLabelChip key={label.id} label={label} className="text-xs" />
+        ))}
+        <IssuePropertiesDialog
+          issue={issue}
+          pullRequests={pullRequests}
+          automaticPrPublishingInProgress={automaticPrPublishingInProgress}
+          relations={relations}
+          relationCandidates={relationCandidates}
+          labels={labels}
+          attachments={attachments}
         />
       </div>
     </header>

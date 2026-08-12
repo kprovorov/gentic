@@ -22,7 +22,7 @@ import {
   updateIssueAgentProviderSchema,
   updateIssuePrioritySchema,
   updateIssueSchema,
-  type IssueStatus,
+  updateIssueTypeSchema,
 } from "@gentic/validators/issues"
 
 import {
@@ -37,6 +37,13 @@ import { createServiceClient } from "@gentic/supabase/service"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
+import {
+  ATTACHMENT_DESCRIPTORS_FIELD,
+  ATTACHMENT_IDS_FIELD,
+  ATTACHMENTS_BUCKET,
+  type AttachmentDescriptor,
+  type AttachmentUploadTicket,
+} from "./attachment-uploads"
 import { formatGeneratedIssueTitle } from "./title-format"
 import {
   parseCreateIssueFormData,
@@ -45,8 +52,6 @@ import {
 import { generateIssueMetadata } from "./metadata"
 import { fallbackIssueType } from "./type-parser"
 import { getIssueHref } from "./urls"
-
-const ATTACHMENTS_BUCKET = "attachments"
 
 function sanitizeFileName(name: string): string {
   const base = name.split(/[/\\]/).pop() || "file"
@@ -69,10 +74,18 @@ async function revalidateIssuePathById(
   revalidateIssuePath(await issuesService.getIssue(supabase, userId, issueId))
 }
 
-async function createIssue(status: IssueStatus, formData: FormData) {
+/**
+ * Phase one of creating an issue: everything that does not depend on the
+ * attachment bytes having landed. The issue is always born a draft, even for
+ * "Run Agent", so a browser that dies mid-upload leaves a draft the user can
+ * finish rather than a queued issue whose files never arrived —
+ * {@link finishIssueCreation} is what promotes it.
+ */
+export async function startIssueCreation(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const fields = parseCreateIssueFormData(formData)
   validateIssueModelForAgent(fields.agent_provider, fields.issue_model)
+  const descriptors = getAttachmentDescriptors(formData)
 
   // Save the issue with no title, the placeholder "issue" type, and the
   // default priority right away rather than blocking on the AI Gateway call —
@@ -87,6 +100,8 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     createIssueSchema.parse({ ...fields, status: "draft" })
   )
 
+  let uploads: AttachmentUploadTicket[] = []
+
   try {
     // The Body lives on the issue row itself (rendered above the timeline by
     // `IssueRequestBody`) and is never copied into a chat message here: doing
@@ -95,32 +110,14 @@ async function createIssue(status: IssueStatus, formData: FormData) {
     // "no user message yet" idempotency check skip creating the Kickoff
     // Message — so the agent's first prompt was the raw Body instead of
     // `Work on Gentic issue {code}.`.
-    await uploadIssueAttachments(
+    uploads = await createAttachmentUploadTickets(
       supabase,
       created.id,
       null,
-      getAttachmentFiles(formData)
+      descriptors
     )
-
-    if (status === "todo") {
-      await issuesService.startIssueFromDraft(supabase, userId, created.id)
-    }
   } catch (error) {
-    // The issue's own attachments outlive its messages now, so deleting the
-    // issue below would leave their blobs behind without this.
-    await cleanupIssueAttachments(supabase, created.id).catch(
-      (cleanupError) => {
-        console.error(
-          `Failed to clean up attachments for issue ${created.id}:`,
-          cleanupError
-        )
-      }
-    )
-    await issuesService
-      .deleteIssue(supabase, userId, created.id)
-      .catch((cleanupError) => {
-        console.error(`Failed to clean up issue ${created.id}:`, cleanupError)
-      })
+    await discardIssue(supabase, userId, created.id)
     throw error
   }
 
@@ -161,16 +158,60 @@ async function createIssue(status: IssueStatus, formData: FormData) {
         }),
     ])
   })
+
+  return {
+    issueId: created.id,
+    href: getIssueHref(created) ?? "/issues",
+    uploads,
+  }
+}
+
+/**
+ * Phase two: the bytes are in Storage, so publish the attachments and, for
+ * "Run Agent", hand the issue to the queue. Queuing happens last so a worker
+ * can never claim an issue whose attachments are still uploading.
+ */
+export async function finishIssueCreation(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const status = issueStatusSchema.parse(getString(formData, "status"))
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+
+  await completeAttachmentUploads(supabase, issueId, getAttachmentIds(formData))
+
+  if (status === "todo") {
+    await issuesService.startIssueFromDraft(supabase, userId, issueId)
+  }
+
   revalidatePath("/issues")
-  redirect(getIssueHref(created) ?? "/issues")
 }
 
-export async function saveIssueDraft(formData: FormData) {
-  await createIssue("draft", formData)
+/**
+ * Roll back a creation whose uploads failed. The draft is only ever visible to
+ * its author for the few seconds the upload takes, so it is deleted outright
+ * rather than left behind half-formed.
+ */
+export async function abandonIssueCreation(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+
+  await discardIssue(supabase, userId, issueId)
 }
 
-export async function runIssue(formData: FormData) {
-  await createIssue("todo", formData)
+async function discardIssue(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  userId: string,
+  issueId: string
+) {
+  // The issue's own attachments outlive its messages now, so deleting the
+  // issue below would leave their blobs behind without this.
+  await cleanupIssueAttachments(supabase, issueId).catch((error) => {
+    console.error(`Failed to clean up attachments for issue ${issueId}:`, error)
+  })
+  await issuesService.deleteIssue(supabase, userId, issueId).catch((error) => {
+    console.error(`Failed to clean up issue ${issueId}:`, error)
+  })
 }
 
 export async function updateIssue(formData: FormData) {
@@ -277,6 +318,20 @@ export async function updateIssuePriority(formData: FormData) {
     id,
     priority
   )
+  revalidatePath("/issues")
+  revalidateIssuePath(issue)
+
+  return issue
+}
+
+export async function updateIssueType(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const { id, type } = updateIssueTypeSchema.parse({
+    id: getString(formData, "id"),
+    type: getString(formData, "type"),
+  })
+
+  const issue = await issuesService.updateIssueType(supabase, userId, id, type)
   revalidatePath("/issues")
   revalidateIssuePath(issue)
 
@@ -428,7 +483,12 @@ export async function bulkRemoveIssueLabels(formData: FormData) {
   revalidatePath("/issues")
 }
 
-export async function sendIssueMessage(formData: FormData) {
+/**
+ * Phase one of sending a chat message: persist the turn and reserve its
+ * attachments. The issue is deliberately *not* requeued yet — the agent must
+ * not wake up to a prompt whose files are still in flight.
+ */
+export async function startIssueMessage(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const { issue_id, content } = sendIssueMessageSchema.parse({
     issue_id: getString(formData, "issue_id"),
@@ -436,8 +496,7 @@ export async function sendIssueMessage(formData: FormData) {
   })
 
   await issuesService.ensureIssueOwned(supabase, userId, issue_id)
-  const files = getAttachmentFiles(formData)
-  validateAttachmentFiles(files)
+  const descriptors = getAttachmentDescriptors(formData)
   const message = await issuesService.createIssueUserMessage(
     supabase,
     issue_id,
@@ -445,28 +504,62 @@ export async function sendIssueMessage(formData: FormData) {
   )
 
   try {
-    const attachments = await uploadIssueAttachments(
+    const uploads = await createAttachmentUploadTickets(
       supabase,
       issue_id,
       message.id,
-      files
+      descriptors
     )
-    await issuesService.requeueIssueForUserMessage(supabase, issue_id)
 
-    await revalidateIssuePathById(supabase, userId, issue_id)
-
-    return { ...message, attachments }
+    return { ...message, uploads }
   } catch (error) {
-    await cleanupFailedMessage(supabase, issue_id, message.id).catch(
-      (cleanupError) => {
-        console.error(
-          `Failed to clean up message ${message.id} after send failure:`,
-          cleanupError
-        )
-      }
-    )
+    await discardIssueMessage(supabase, issue_id, message.id)
     throw error
   }
+}
+
+/** Phase two: publish the uploaded attachments, then wake the agent. */
+export async function finishIssueMessage(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+
+  const attachments = await completeAttachmentUploads(
+    supabase,
+    issueId,
+    getAttachmentIds(formData)
+  )
+  await issuesService.requeueIssueForUserMessage(supabase, issueId)
+
+  await revalidateIssuePathById(supabase, userId, issueId)
+
+  return { attachments }
+}
+
+/**
+ * Roll back a send whose uploads failed, so the composer's retry path starts
+ * from a clean transcript instead of a turn the agent never received.
+ */
+export async function abandonIssueMessage(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const messageId = z.string().uuid().parse(getString(formData, "message_id"))
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+
+  await discardIssueMessage(supabase, issueId, messageId)
+}
+
+async function discardIssueMessage(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  issueId: string,
+  messageId: string
+) {
+  await cleanupFailedMessage(supabase, issueId, messageId).catch((error) => {
+    console.error(
+      `Failed to clean up message ${messageId} after send failure:`,
+      error
+    )
+  })
 }
 
 export async function createManualIssuePullRequest(formData: FormData) {
@@ -503,30 +596,61 @@ export async function createManualIssuePullRequest(formData: FormData) {
 // The standalone attachment panel adds durable Issue Attachments: no chat
 // message is written and the agent is neither requeued nor woken, so parking a
 // spec next to an issue is not a way to (re)start a run.
-export async function uploadAttachments(formData: FormData) {
+export async function startAttachmentUploads(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
-  const files = getAttachmentFiles(formData)
-  validateAttachmentFiles(files)
 
-  if (files.length === 0) {
-    return
-  }
+  const uploads = await createAttachmentUploadTickets(
+    supabase,
+    issueId,
+    null,
+    getAttachmentDescriptors(formData)
+  )
 
-  await uploadIssueAttachments(supabase, issueId, null, files)
+  return { uploads }
+}
+
+export async function finishAttachmentUploads(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  await issuesService.ensureIssueOwned(supabase, userId, issueId)
+
+  await completeAttachmentUploads(supabase, issueId, getAttachmentIds(formData))
 
   await revalidateIssuePathById(supabase, userId, issueId)
 }
 
-function getAttachmentFiles(formData: FormData) {
-  return formData
-    .getAll("files")
-    .filter((value): value is File => value instanceof File && value.size > 0)
+const attachmentDescriptorsSchema = z.array(
+  z.object({
+    name: z.string().trim().min(1).max(500),
+    type: z.string().max(255).default(""),
+    size: z.number().int().nonnegative(),
+  })
+)
+
+function getAttachmentDescriptors(formData: FormData): AttachmentDescriptor[] {
+  const raw = getString(formData, ATTACHMENT_DESCRIPTORS_FIELD)
+
+  if (!raw) {
+    return []
+  }
+
+  const descriptors = attachmentDescriptorsSchema.parse(JSON.parse(raw))
+
+  // Sizes are what the browser *claims*; the authoritative ceiling is the
+  // bucket's own 50MB `file_size_limit`, which Storage enforces on the upload
+  // the signed ticket authorizes. This check is what turns an over-budget
+  // batch into the same readable message the user got before.
+  validateAttachmentBatch(descriptors)
+
+  return descriptors.filter((descriptor) => descriptor.size > 0)
 }
 
-function validateAttachmentFiles(files: File[]) {
-  validateAttachmentBatch(files)
+function getAttachmentIds(formData: FormData) {
+  return z
+    .array(z.string().uuid())
+    .parse(formData.getAll(ATTACHMENT_IDS_FIELD).map(String))
 }
 
 function getIssueModel(formData: FormData) {
@@ -543,15 +667,84 @@ function validateIssueModelForAgent(
 }
 
 /**
- * Uploads a batch of files for one owner: a message id makes them Message
- * Attachments delivered with that prompt turn, `null` makes them durable Issue
- * Attachments owned by the issue itself.
+ * Reserve one `attachments` row per declared file and mint a signed ticket the
+ * browser uses to PUT the bytes into Storage directly.
+ *
+ * A message id makes these Message Attachments delivered with that prompt
+ * turn, `null` makes them durable Issue Attachments owned by the issue itself.
+ *
+ * The rows land with `upload_completed_at` null, which every read path already
+ * treats as "not here yet" (`selectIssueAttachments`, `groupMessageAttachments`,
+ * `listIssueAttachments`) and which `delete_old_orphaned_attachments` reclaims
+ * a day later — so a browser that never finishes uploading leaves nothing
+ * visible behind.
  */
-async function uploadIssueAttachments(
+async function createAttachmentUploadTickets(
   supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
   issueId: string,
   messageId: string | null,
-  files: File[]
+  descriptors: AttachmentDescriptor[]
+): Promise<AttachmentUploadTicket[]> {
+  const owner = attachmentOwnerColumns(attachmentOwnerForMessage(messageId))
+  const reservedPaths: string[] = []
+  const attachmentIds: string[] = []
+  const tickets: AttachmentUploadTicket[] = []
+
+  for (const descriptor of descriptors) {
+    const storagePath = `${issueId}/${randomUUID()}-${sanitizeFileName(descriptor.name)}`
+
+    const { data, error: insertError } = await supabase
+      .from("attachments")
+      .insert({
+        issue_id: issueId,
+        ...owner,
+        file_name: descriptor.name,
+        content_type: descriptor.type || null,
+        size_bytes: descriptor.size,
+        storage_path: storagePath,
+      })
+      .select("id")
+      .single<{ id: string }>()
+
+    if (insertError) {
+      await cleanupUploadedAttachments(supabase, reservedPaths, attachmentIds)
+      throw new Error(insertError.message)
+    }
+
+    attachmentIds.push(data.id)
+    reservedPaths.push(storagePath)
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .createSignedUploadUrl(storagePath)
+
+    if (signError || !signed) {
+      await cleanupUploadedAttachments(supabase, reservedPaths, attachmentIds)
+      throw new Error(
+        signError?.message ?? "Could not sign attachment upload URL"
+      )
+    }
+
+    tickets.push({
+      attachmentId: data.id,
+      path: signed.path,
+      token: signed.token,
+      contentType: descriptor.type || "application/octet-stream",
+    })
+  }
+
+  return tickets
+}
+
+/**
+ * Publish attachments whose bytes have landed. Ids are matched against the
+ * issue and against rows that are still pending, so a caller can only ever
+ * complete uploads it just reserved for that issue.
+ */
+async function completeAttachmentUploads(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  issueId: string,
+  attachmentIds: string[]
 ): Promise<
   Array<{
     id: string
@@ -561,74 +754,33 @@ async function uploadIssueAttachments(
     thumbnailUrl: null
   }>
 > {
-  validateAttachmentFiles(files)
-  const owner = attachmentOwnerColumns(attachmentOwnerForMessage(messageId))
-  const uploadedPaths: string[] = []
-  const attachmentIds: string[] = []
-  const attachments: Array<{
-    id: string
-    fileName: string
-    sizeBytes: number | null
-    url: null
-    thumbnailUrl: null
-  }> = []
-
-  for (const file of files) {
-    const storagePath = `${issueId}/${randomUUID()}-${sanitizeFileName(file.name)}`
-
-    const { data, error: insertError } = await supabase
-      .from("attachments")
-      .insert({
-        issue_id: issueId,
-        ...owner,
-        file_name: file.name,
-        content_type: file.type || null,
-        size_bytes: file.size,
-        storage_path: storagePath,
-      })
-      .select("id")
-      .single<{ id: string }>()
-
-    if (insertError) {
-      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
-      throw new Error(insertError.message)
-    }
-
-    attachmentIds.push(data.id)
-    uploadedPaths.push(storagePath)
-
-    const { error: uploadError } = await supabase.storage
-      .from(ATTACHMENTS_BUCKET)
-      .upload(storagePath, file, {
-        contentType: file.type || "application/octet-stream",
-      })
-
-    if (uploadError) {
-      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
-      throw new Error(uploadError.message)
-    }
-
-    const { error: updateError } = await supabase
-      .from("attachments")
-      .update({ upload_completed_at: new Date().toISOString() })
-      .eq("id", data.id)
-      .eq("issue_id", issueId)
-
-    if (updateError) {
-      await cleanupUploadedAttachments(supabase, uploadedPaths, attachmentIds)
-      throw new Error(updateError.message)
-    }
-
-    attachments.push({
-      id: data.id,
-      fileName: file.name,
-      sizeBytes: file.size,
-      url: null,
-      thumbnailUrl: null,
-    })
+  if (attachmentIds.length === 0) {
+    return []
   }
 
-  return attachments
+  const { data, error } = await supabase
+    .from("attachments")
+    .update({ upload_completed_at: new Date().toISOString() })
+    .eq("issue_id", issueId)
+    .is("upload_completed_at", null)
+    .is("deleted_at", null)
+    .in("id", attachmentIds)
+    .select("id,file_name,size_bytes")
+    .returns<
+      Array<{ id: string; file_name: string; size_bytes: number | null }>
+    >()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []).map((attachment) => ({
+    id: attachment.id,
+    fileName: attachment.file_name,
+    sizeBytes: attachment.size_bytes,
+    url: null,
+    thumbnailUrl: null,
+  }))
 }
 
 async function cleanupUploadedAttachments(

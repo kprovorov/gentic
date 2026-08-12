@@ -11,9 +11,9 @@ import {
   issuePriorityLabels,
   issuePriorityOptions,
   issuePriorityStyles,
+  priorityIconStyles,
 } from "@/app/issues/issue-priority-meta"
 import {
-  priorityIconStyles,
   statusIconStyles,
   statusIcons,
   statusLabels,

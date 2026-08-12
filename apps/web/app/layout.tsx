@@ -40,6 +40,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#ffffff",
+  // Shrink the layout viewport (and therefore `dvh`) when the on-screen
+  // keyboard opens, so bottom-pinned UI like the issue message composer stays
+  // above the keyboard instead of behind it.
+  interactiveWidget: "resizes-content",
 }
 
 const outfitHeading = Outfit({ subsets: ["latin"], variable: "--font-heading" })
