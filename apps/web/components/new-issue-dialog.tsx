@@ -23,10 +23,13 @@ import {
 import { cn } from "@gentic/ui/utils"
 
 import { useNewIssueDialog } from "./new-issue-dialog-provider"
+import { useExpandAnimation } from "./use-expand-animation"
 
 export function NewIssueDialog() {
   const { open, setOpen } = useNewIssueDialog()
   const [expanded, setExpanded] = useState(false)
+  const { contentRef, captureHeight } =
+    useExpandAnimation<HTMLDivElement>(expanded)
   const { data } = useQuery({
     queryKey: queryKeys.newIssue,
     queryFn: fetchNewIssueData,
@@ -45,6 +48,7 @@ export function NewIssueDialog() {
       }}
     >
       <DialogContent
+        ref={contentRef}
         showCloseButton={false}
         className={cn("max-w-2xl gap-0 p-4", expanded && "h-[85svh]")}
       >
@@ -61,7 +65,10 @@ export function NewIssueDialog() {
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
             aria-expanded={expanded}
-            onClick={() => setExpanded((current) => !current)}
+            onClick={() => {
+              captureHeight()
+              setExpanded((current) => !current)
+            }}
           >
             {expanded ? <IconArrowsDiagonalMinimize2 /> : <IconArrowsDiagonal />}
             <span className="sr-only">
