@@ -199,6 +199,7 @@ export function IssueDetailHeader({
   relationCandidates,
   labels,
   attachments,
+  messageAttachments,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
@@ -206,7 +207,11 @@ export function IssueDetailHeader({
   relations: IssueRelation[]
   relationCandidates: IssueRelationIssue[]
   labels: LabelSnapshot[]
+  // The request below shows only what was attached to the issue itself; the
+  // properties dialog carries the chat files too, since it stands in for the
+  // rail's Files section below xl.
   attachments: Attachment[]
+  messageAttachments: Attachment[]
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
@@ -319,6 +324,7 @@ export function IssueDetailHeader({
                 relationCandidates={relationCandidates}
                 labels={labels}
                 attachments={attachments}
+                messageAttachments={messageAttachments}
               />
             </div>
 

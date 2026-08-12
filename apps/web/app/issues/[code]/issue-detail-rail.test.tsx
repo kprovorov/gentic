@@ -150,6 +150,7 @@ function renderRail(
         relationCandidates={[]}
         labels={[]}
         attachments={[]}
+        messageAttachments={[]}
         {...props}
       />
     </QueryClientProvider>
@@ -475,6 +476,41 @@ describe("IssueDetailRail issue attachments", () => {
 
     expect(screen.getByText("Files")).toBeVisible()
     expect(screen.getByText("spec.md")).toBeVisible()
+  })
+
+  it("lists the files sent through the chat as read-only", () => {
+    renderRail(createQueryClient(), {
+      attachments: [
+        {
+          id: "attachment-1",
+          fileName: "spec.md",
+          sizeBytes: 2048,
+          url: "https://signed.test/spec.md",
+          thumbnailUrl: null,
+        },
+      ],
+      messageAttachments: [
+        {
+          id: "attachment-2",
+          fileName: "screenshot.png",
+          sizeBytes: 4096,
+          url: "https://signed.test/screenshot.png",
+          thumbnailUrl: null,
+        },
+      ],
+    })
+
+    expect(screen.getByText("screenshot.png")).toBeVisible()
+    expect(screen.getByText(/Sent in chat/)).toBeVisible()
+    // Downloadable from here, but only the issue's own file can be deleted:
+    // the chat file is still part of a message the transcript shows as sent.
+    expect(
+      screen.getByRole("link", { name: "Download screenshot.png" })
+    ).toBeVisible()
+    expect(screen.getByRole("button", { name: "Delete spec.md" })).toBeVisible()
+    expect(
+      screen.queryByRole("button", { name: "Delete screenshot.png" })
+    ).toBeNull()
   })
 
   it("uploads to the issue without sending a chat message", async () => {

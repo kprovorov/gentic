@@ -41,6 +41,7 @@ export function IssuePropertiesDialog({
   relationCandidates,
   labels,
   attachments,
+  messageAttachments,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
@@ -49,6 +50,7 @@ export function IssuePropertiesDialog({
   relationCandidates: IssueRelationIssue[]
   labels: LabelSnapshot[]
   attachments: Attachment[]
+  messageAttachments: Attachment[]
 }) {
   const isSpec = isSpecIssueType(issue.type)
 
@@ -100,6 +102,7 @@ export function IssuePropertiesDialog({
             relationCandidates={relationCandidates}
             labels={labels}
             attachments={attachments}
+            messageAttachments={messageAttachments}
           />
         </div>
       </DialogContent>

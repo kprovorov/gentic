@@ -42,13 +42,27 @@ export type SignableAttachment = {
  * thumbnail and its download link, and it renders as an anonymous file icon
  * that looks like a missing-preview bug rather than a permissions one.
  * Ownership is enforced once, on the read, instead of twice.
+ *
+ * Signatures are memoized by attachment id for the life of the signer, because
+ * one file can surface more than once in a single render — a file sent with a
+ * chat message is listed both inline with that message and in the issue's Files
+ * section — and each signature is a Storage round trip. The pending promise is
+ * what gets cached, so callers that sign the same row concurrently still share
+ * one request.
  */
 export function createAttachmentSigner(
   supabase: Supabase = createServiceClient()
 ) {
   const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
+  const signed = new Map<string, Promise<Attachment>>()
 
-  return (attachment: SignableAttachment) => signAttachment(storage, attachment)
+  return (attachment: SignableAttachment) => {
+    const pending =
+      signed.get(attachment.id) ?? signAttachment(storage, attachment)
+    signed.set(attachment.id, pending)
+
+    return pending
+  }
 }
 
 type AttachmentStorage = ReturnType<Supabase["storage"]["from"]>

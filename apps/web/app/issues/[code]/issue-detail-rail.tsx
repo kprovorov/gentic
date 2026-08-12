@@ -705,6 +705,7 @@ export function IssueDetailRail({
   relationCandidates,
   labels,
   attachments,
+  messageAttachments,
 }: {
   issueId: string
   issueCode: string | null
@@ -720,6 +721,7 @@ export function IssueDetailRail({
   relationCandidates: IssueRelationIssue[]
   labels: LabelSnapshot[]
   attachments: Attachment[]
+  messageAttachments: Attachment[]
 }) {
   const showCreatePr = canShowManualCreatePrAction({
     status,
@@ -764,10 +766,15 @@ export function IssueDetailRail({
         </RailSection>
       )}
 
-      {/* Files attached to the issue itself: they are not part of any chat
-          turn, so they stay here across agent and conversation resets. */}
+      {/* Every file the issue holds: the ones attached to the issue itself,
+          which stay across agent and conversation resets, followed by the ones
+          sent through the chat composer. */}
       <RailSection title="Files">
-        <Attachments issueId={issueId} attachments={attachments} />
+        <Attachments
+          issueId={issueId}
+          attachments={attachments}
+          messageAttachments={messageAttachments}
+        />
       </RailSection>
 
       <RailSection

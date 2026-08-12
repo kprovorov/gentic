@@ -13,6 +13,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     issue,
     messages,
     attachments,
+    messageAttachments,
     pullRequests,
     automaticPrPublishingInProgress,
     relations,
@@ -54,6 +55,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         relationCandidates={relationCandidates}
         labels={labels}
         attachments={attachments}
+        messageAttachments={messageAttachments}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col border-t xl:flex-row">
@@ -94,6 +96,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             relationCandidates={relationCandidates}
             labels={labels}
             attachments={attachments}
+            messageAttachments={messageAttachments}
           />
         </aside>
       </div>

@@ -74,6 +74,26 @@ export function selectIssueAttachments<T extends AttachmentOwnershipRow>(
 }
 
 /**
+ * The Message Attachments a file listing should show: files uploaded through
+ * the chat composer that are still around. Stricter than
+ * {@link groupMessageAttachments} in two ways, because a file listing is what
+ * the issue still holds rather than a record of what was delivered: deleted
+ * rows are dropped, and so is a row orphaned by a reset (`message_id` nulled),
+ * which is on its way out and leaves the listing along with its message.
+ */
+export function selectMessageAttachments<T extends AttachmentOwnershipRow>(
+  attachments: T[]
+): T[] {
+  return attachments.filter(
+    (attachment) =>
+      attachment.kind === MESSAGE_ATTACHMENT_KIND &&
+      attachment.message_id !== null &&
+      attachment.deleted_at === null &&
+      attachment.upload_completed_at !== null
+  )
+}
+
+/**
  * Message Attachments keyed by the message they were sent with. Deleted rows
  * are kept so the transcript can still show what was delivered at the time;
  * uploads that never completed are dropped because they were never delivered.

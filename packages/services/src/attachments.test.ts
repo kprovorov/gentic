@@ -12,6 +12,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   rollbackMessageAttachmentUpload,
   selectIssueAttachments,
+  selectMessageAttachments,
   validateAttachmentBatch,
 } from "./attachments"
 import type { Supabase } from "./types"
@@ -77,6 +78,38 @@ test("selectIssueAttachments survives a conversation reset", () => {
   assert.deepEqual(
     selectIssueAttachments(afterReset).map((row) => row.id),
     ["issue-file"]
+  )
+})
+
+test("selectMessageAttachments keeps only chat uploads that still exist", () => {
+  const chatFile = attachment({
+    id: "chat-file",
+    kind: "message",
+    message_id: "message-1",
+  })
+
+  assert.deepEqual(
+    selectMessageAttachments([
+      attachment({ id: "issue-file" }),
+      chatFile,
+      // Unlike the transcript, a file listing shows what is still there: a
+      // deleted upload has no bytes left to download, and one orphaned by a
+      // reset is on its way out.
+      attachment({
+        id: "removed",
+        kind: "message",
+        message_id: "message-1",
+        deleted_at: "2026-08-05T12:30:00.000Z",
+      }),
+      attachment({ id: "orphaned-chat-file", kind: "message" }),
+      attachment({
+        id: "half-uploaded",
+        kind: "message",
+        message_id: "message-2",
+        upload_completed_at: null,
+      }),
+    ]),
+    [chatFile]
   )
 })
 

@@ -165,6 +165,25 @@ test("reports the Storage error when an attachment cannot be signed", async () =
   )
 })
 
+// A file sent with a chat message is rendered twice on the issue page — inline
+// with its message and in the Files section — and both go through the same
+// per-request signer.
+test("signs a repeated attachment once, even concurrently", async () => {
+  const { supabase, calls } = createSupabase()
+  const signAttachment = createAttachmentSigner(supabase as never)
+
+  const [first, second] = await Promise.all([
+    signAttachment(attachment()),
+    signAttachment(attachment()),
+  ])
+  const third = await signAttachment(attachment())
+
+  assert.deepEqual(first, second)
+  assert.deepEqual(first, third)
+  // One download URL and one thumbnail, not three of each.
+  assert.equal(calls.length, 2)
+})
+
 test("keeps a deleted attachment's metadata but signs no URLs for it", async () => {
   const { supabase, calls } = createSupabase()
 
