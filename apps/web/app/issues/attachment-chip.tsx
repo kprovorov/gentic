@@ -58,25 +58,28 @@ export function AttachmentChip({
         className
       )}
     >
-      {thumbnailUrl ? (
-        // Supabase signs this URL with Image Transformation options; pending
-        // composer files pass a local object URL.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={thumbnailUrl}
-          alt=""
-          className="size-[34px] shrink-0 rounded-[9px] object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-muted-foreground">
-          {isImageFileName(fileName) ? (
-            <IconPhoto className="size-4" />
-          ) : (
-            <IconFileText className="size-4" />
-          )}
-        </span>
-      )}
+      {/* The preview always sits in the same tinted tile as the file icon it
+          replaces, and the image is letterboxed inside it rather than cropped
+          to fill it: a square crop of a phone screenshot is a blank slice of
+          its middle, and with nothing marking the tile's edges that slice reads
+          as broken chrome instead of a picture. */}
+      <span className="flex size-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[9px] bg-muted text-muted-foreground">
+        {thumbnailUrl ? (
+          // Supabase signs this URL with Image Transformation options; pending
+          // composer files pass a local object URL.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnailUrl}
+            alt=""
+            className="size-full object-contain"
+            loading="lazy"
+          />
+        ) : isImageFileName(fileName) ? (
+          <IconPhoto className="size-4" />
+        ) : (
+          <IconFileText className="size-4" />
+        )}
+      </span>
       <span className="grid min-w-0 pr-0.5 leading-[1.35]">
         <span className="min-w-0 truncate font-medium">{fileName}</span>
         {meta ? (

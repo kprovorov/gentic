@@ -6,7 +6,7 @@ import {
   type SignableAttachment,
 } from "./attachment-signing"
 
-type SignCall = { path: string; transformed: boolean }
+type SignCall = { path: string; transformed: boolean; transform: unknown }
 
 function attachment(
   overrides: Partial<SignableAttachment> = {}
@@ -42,7 +42,7 @@ function createSupabase({
             options?: { transform?: unknown }
           ) {
             const transformed = Boolean(options?.transform)
-            calls.push({ path, transformed })
+            calls.push({ path, transformed, transform: options?.transform })
 
             if (signingError) {
               return Promise.resolve({
@@ -89,6 +89,21 @@ test("serves the resized URL as the thumbnail when Storage can transform", async
   })
 })
 
+// The chip letterboxes the thumbnail, which only shows the whole image if the
+// bytes it gets were not already cropped square on the way out of Storage.
+test("asks Storage to fit the whole image inside the thumbnail box", async () => {
+  const { supabase, calls } = createSupabase()
+
+  await createAttachmentSigner(supabase as never)(attachment())
+
+  const thumbnail = calls.find((call) => call.transformed)
+  assert.deepEqual(thumbnail?.transform, {
+    width: 96,
+    height: 96,
+    resize: "contain",
+  })
+})
+
 test("falls back to the full-size URL when transformations are unavailable", async () => {
   const { supabase } = createSupabase({ transformsEnabled: false })
 
@@ -121,7 +136,11 @@ test("never asks for a thumbnail of a non-image", async () => {
 
   assert.equal(signed.thumbnailUrl, null)
   assert.deepEqual(calls, [
-    { path: "issue-1/screenshot.png", transformed: false },
+    {
+      path: "issue-1/screenshot.png",
+      transformed: false,
+      transform: undefined,
+    },
   ])
 })
 
