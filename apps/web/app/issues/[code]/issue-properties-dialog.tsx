@@ -1,6 +1,6 @@
 "use client"
 
-import { IconPlus } from "@tabler/icons-react"
+import { IconDots } from "@tabler/icons-react"
 
 import {
   AgentProviderBadge,
@@ -30,7 +30,7 @@ import { IssueDetailRail, RailSection } from "./issue-detail-rail"
 /**
  * Below xl the rail has no column to live in, so everything it holds — plus the
  * type/agent/repo pills the header only has room to summarise — is reachable
- * from this dialog, opened by the "+" that trails the header's pill row.
+ * from this dialog, opened by the "…" that trails the header's pill row.
  */
 export function IssuePropertiesDialog({
   issue,
@@ -61,7 +61,7 @@ export function IssuePropertiesDialog({
             "w-6 justify-center px-0"
           )}
         >
-          <IconPlus className="size-3.5 shrink-0" />
+          <IconDots className="size-4 shrink-0" />
         </button>
       </DialogTrigger>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:p-0">
