@@ -1,85 +1,59 @@
 "use client"
 
 import type React from "react"
-
-import { IconLoader2, IconSend } from "@tabler/icons-react"
+import { useEffect, useRef, useState } from "react"
+import { IconLoader2, IconPaperclip, IconSend } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 import type { AgentProvider } from "@gentic/validators/issues"
 
 import type { SlashCommand } from "../[code]/issue-chat/slash-commands"
-import { AttachmentPromptField } from "../attachment-prompt-field"
+import {
+  PendingAttachmentChip,
+  useAttachmentSelection,
+} from "../attachment-selection"
 import { AgentModelPicker } from "./agent-model-picker"
 
-// Reusable across an existing issue's chat and a "new issue" composer:
-// callers own all state (draft/files/agent) and pass callbacks in, so this
-// component never assumes an issue with history already exists.
+// Two shapes, one DOM tree: at rest the composer is a single pill row — attach,
+// the draft truncated to one line, send — so the timeline keeps the vertical
+// space, and it opens into a box (textarea on its own line, attach + model
+// picker + send underneath) while it is in use. The shapes differ only in
+// Tailwind classes, never in structure, so the textarea keeps its focus and
+// selection across the switch.
 export function MessageComposer({
-  formRef,
-  action,
-  encType,
-  formId,
   className,
-  fieldClassName,
-  textareaClassName,
-  id,
-  name,
-  required,
-  rows = 2,
   draft,
   draftFiles,
   disabled,
-  placeholder = "Message the agent…",
-  submitDisabled,
-  submitAriaLabel,
+  placeholder = "Follow up…",
   invalidSlashCommand = false,
   slashCommands = [],
   selectedSlashCommandIndex = 0,
-  children,
   onDraftChange,
   onFilesChange,
   onKeyDown,
   onSelectSlashCommand,
   onSubmit,
-  onInvalidCapture,
   agentProvider,
   issueModel,
   hasMessages,
   onAgentModelChange,
   pickerDisabled,
-  footerStart,
-  footerEnd,
-  belowField,
-  submitButton,
 }: {
-  formRef?: React.Ref<HTMLFormElement>
-  action?: React.ComponentProps<"form">["action"]
-  encType?: React.ComponentProps<"form">["encType"]
-  formId?: string
   className?: string
-  fieldClassName?: string
-  textareaClassName?: string
-  id?: string
-  name?: string
-  required?: boolean
-  rows?: number
   draft: string
   draftFiles: File[]
   disabled?: boolean
   placeholder?: string
-  submitDisabled?: boolean
-  submitAriaLabel?: string
   invalidSlashCommand?: boolean
   slashCommands?: SlashCommand[]
   selectedSlashCommandIndex?: number
-  children?: React.ReactNode
   onDraftChange: (value: string) => void
   onFilesChange: (files: File[]) => void
   onKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
   onSelectSlashCommand?: (command: SlashCommand) => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
-  onInvalidCapture?: React.FormEventHandler<HTMLFormElement>
   agentProvider: AgentProvider
   issueModel: string | null
   hasMessages: boolean
@@ -89,83 +63,195 @@ export function MessageComposer({
     info: { requiresReset: boolean }
   ) => void
   pickerDisabled?: boolean
-  footerStart?: React.ReactNode
-  footerEnd?: React.ReactNode
-  belowField?: React.ReactNode
-  submitButton?: React.ReactNode
 }) {
-  const isSubmitDisabled =
-    submitDisabled ?? (disabled || !draft.trim() || invalidSlashCommand)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sentRef = useRef(false)
+  const [isFocusWithin, setIsFocusWithin] = useState(false)
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const {
+    isDragging,
+    removeFile,
+    openFilePicker,
+    fileInputProps,
+    dropTargetProps,
+  } = useAttachmentSelection({ files: draftFiles, onFilesChange })
+
+  // The model menu opens in a portal, and sending disables — and so blurs —
+  // the textarea; neither should snap the composer shut under the user.
+  const isOpen =
+    isFocusWithin ||
+    isModelMenuOpen ||
+    isDragging ||
+    disabled ||
+    draftFiles.length > 0
+
+  const isSubmitDisabled = disabled || !draft.trim() || invalidSlashCommand
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    sentRef.current = !isSubmitDisabled
+    onSubmit(event)
+  }
+
+  // Sending takes focus off the disabled textarea, so hand it back once the
+  // message is on its way: the composer stays open for the follow-up instead
+  // of collapsing after every send.
+  useEffect(() => {
+    if (disabled || !sentRef.current) {
+      return
+    }
+
+    sentRef.current = false
+    textareaRef.current?.focus()
+  }, [disabled])
+
+  // Grow the open composer with the draft, up to the max height its own class
+  // caps it at. The collapsed row is always one line, so it keeps the height
+  // its class gives it.
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+
+    if (!isOpen) {
+      textarea.style.height = ""
+      return
+    }
+
+    textarea.style.height = "auto"
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [draft, isOpen])
 
   return (
     <form
-      ref={formRef}
-      action={action}
-      encType={encType}
-      id={formId}
-      onSubmit={onSubmit}
-      onInvalidCapture={onInvalidCapture}
-      className={cn("flex min-w-0 items-start gap-2.5", className)}
+      onSubmit={handleSubmit}
+      onFocus={() => setIsFocusWithin(true)}
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget
+        if (
+          !(nextTarget instanceof Node) ||
+          !event.currentTarget.contains(nextTarget)
+        ) {
+          setIsFocusWithin(false)
+        }
+      }}
+      className={cn("relative min-w-0", className)}
     >
-      {children}
-      <div className="min-w-0 flex-1">
-        <div className="relative min-w-0">
-          {slashCommands.length > 0 ? (
-            <SlashCommandMenu
-              commands={slashCommands}
-              selectedIndex={selectedSlashCommandIndex}
-              onSelect={(command) => onSelectSlashCommand?.(command)}
-            />
-          ) : null}
-          <AttachmentPromptField
-            id={id}
-            name={name}
+      {slashCommands.length > 0 ? (
+        <SlashCommandMenu
+          commands={slashCommands}
+          selectedIndex={selectedSlashCommandIndex}
+          onSelect={(command) => onSelectSlashCommand?.(command)}
+        />
+      ) : null}
+
+      <div
+        className={cn(
+          "flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
+          isOpen ? "rounded-[22px]" : "rounded-full",
+          (isFocusWithin || isDragging) && "border-ring ring-3 ring-ring/30"
+        )}
+        {...dropTargetProps}
+      >
+        <input {...fileInputProps} />
+
+        <div
+          className={cn(
+            "relative min-w-0",
+            isOpen ? "order-1 w-full px-2.5 pt-1" : "order-2 flex-1 px-1"
+          )}
+        >
+          <textarea
+            ref={textareaRef}
             value={draft}
-            onChange={onDraftChange}
-            files={draftFiles}
-            onFilesChange={onFilesChange}
+            onChange={(event) => onDraftChange(event.target.value)}
             onKeyDown={onKeyDown}
-            rows={rows}
+            rows={1}
             placeholder={placeholder}
-            required={required}
             disabled={disabled}
-            className={cn("min-w-0", fieldClassName)}
-            textareaClassName={cn("min-h-16 resize-none", textareaClassName)}
-            footerStart={
-              <>
-                <AgentModelPicker
-                  agentProvider={agentProvider}
-                  issueModel={issueModel}
-                  hasMessages={hasMessages}
-                  disabled={disabled || pickerDisabled}
-                  onAgentModelChange={onAgentModelChange}
-                />
-                {footerStart}
-              </>
-            }
-            footerEnd={footerEnd}
+            aria-label="Message the agent"
+            className={cn(
+              "w-full resize-none bg-transparent py-1 text-base leading-6 outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
+              isOpen ? "max-h-56 min-h-12" : "h-8 overflow-hidden",
+              // The one-line draft below carries the ellipsis a textarea can't.
+              !isOpen && draft && "text-transparent"
+            )}
           />
+          {!isOpen && draft ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 truncate py-1 text-base leading-6 md:text-sm"
+            >
+              {draft}
+            </span>
+          ) : null}
         </div>
-        {belowField ? <div className="mt-2">{belowField}</div> : null}
-      </div>
-      {submitButton ?? (
+
+        {draftFiles.length > 0 ? (
+          <ul className="order-2 flex w-full min-w-0 flex-wrap gap-2 px-1.5 pb-1">
+            {draftFiles.map((file, index) => (
+              <li
+                key={`${file.name}-${file.size}-${file.lastModified}`}
+                className="flex max-w-full min-w-0"
+              >
+                <PendingAttachmentChip
+                  file={file}
+                  disabled={disabled}
+                  onRemove={() => removeFile(index)}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {/* Attach and send sit on both rows, so a click that also moved focus
+            would reshape the composer mid-click and land the mouseup somewhere
+            else; keeping focus put makes the button stay under the pointer. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          disabled={disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => openFilePicker()}
+          aria-label="Attach files"
+          className={cn(
+            "rounded-full text-muted-foreground hover:bg-muted hover:text-foreground",
+            isOpen ? "order-3" : "order-1"
+          )}
+        >
+          <IconPaperclip />
+        </Button>
+
+        {isOpen ? (
+          <AgentModelPicker
+            agentProvider={agentProvider}
+            issueModel={issueModel}
+            hasMessages={hasMessages}
+            disabled={disabled || pickerDisabled}
+            onAgentModelChange={onAgentModelChange}
+            open={isModelMenuOpen}
+            onOpenChange={setIsModelMenuOpen}
+            className="order-4"
+          />
+        ) : null}
+
+        <span
+          aria-hidden="true"
+          className={cn("min-w-0 flex-1", isOpen ? "order-5" : "hidden")}
+        />
+
         <Button
           type="submit"
-          size="icon"
-          aria-label={
-            submitAriaLabel ??
-            (disabled ? "Sending message" : "Send message to agent")
-          }
+          size="icon-sm"
+          aria-label={disabled ? "Sending message" : "Send message to agent"}
           disabled={isSubmitDisabled}
-          className="shrink-0"
+          onMouseDown={(event) => event.preventDefault()}
+          className={cn("rounded-full", isOpen ? "order-6" : "order-3")}
         >
-          {disabled ? (
-            <IconLoader2 className="animate-spin" />
-          ) : (
-            <IconSend />
-          )}
+          {disabled ? <IconLoader2 className="animate-spin" /> : <IconSend />}
         </Button>
-      )}
+      </div>
     </form>
   )
 }
