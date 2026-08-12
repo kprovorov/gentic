@@ -51,6 +51,10 @@ function apiWithAttachments(
     async fetchWorkerControl() {
       return { worker: { banned: false }, runs: [] }
     },
+    async claimSkillInstall() {
+      return null
+    },
+    async reportSkillInstall() {},
   }
 }
 

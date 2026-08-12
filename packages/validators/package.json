@@ -10,6 +10,7 @@
     "./labels": "./src/labels.ts",
     "./projects": "./src/projects.ts",
     "./realtime": "./src/realtime.ts",
+    "./skills": "./src/skills.ts",
     "./workers": "./src/workers.ts"
   },
   "scripts": {

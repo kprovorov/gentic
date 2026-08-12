@@ -20,6 +20,11 @@ import type {
   WorkerControlResponse,
   WorkerHeartbeatTelemetry,
 } from "@gentic/validators/workers"
+import type {
+  ReportWorkerSkillInstallResultInput,
+  WorkerSkillInstallCommand,
+} from "@gentic/validators/skills"
+import { createSkillInstallRunner } from "../skill-installs.js"
 import {
   CONTROL_INTERVAL_MS,
   applyReloadedConfig,
@@ -494,6 +499,57 @@ test("worker control ban aborts active sessions without recording failures", asy
   }, { now: () => clock.now() })
 })
 
+test("a skill install runs alongside issue work without interrupting it", async () => {
+  const clock = new FakeClock()
+  await withHarness(async ({ config, issue, api, deps }) => {
+    config.MAX_CONCURRENT_ISSUES = 1
+    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+    api.claims.push(issue)
+    api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+    api.pendingSkillInstalls.push({
+      id: "55555555-5555-4555-8555-555555555555",
+      source: "anthropics/skills",
+      skill: "pdf",
+      expires_at: new Date(clock.nowMs + 10 * 60_000).toISOString(),
+    })
+    let sessionsRun = 0
+    api.controlResponse = () => ({
+      worker: { banned: clock.elapsedMs >= 3 * CONTROL_INTERVAL_MS },
+      runs: [
+        {
+          issue_id: issue.id,
+          active_run_id: issue.activeRunId,
+          status: "in-progress",
+        },
+      ],
+    })
+    deps.runAgentSession = async (input) => {
+      sessionsRun += 1
+      await input.onSessionId("session-1")
+    }
+    const workerDeps = loopDeps(deps, clock, api)
+    workerDeps.createSkillInstallRunner = (api_) =>
+      createSkillInstallRunner(api_, {
+        run: async () => ({
+          status: "installed",
+          error_summary: null,
+          output: null,
+        }),
+      })
+
+    await runWorkerLoop(api, config, workerDeps)
+
+    assert.equal(sessionsRun, 1)
+    assert.equal(api.sessionAborted, false)
+    assert.deepEqual(api.skillInstallResults, [
+      {
+        installId: "55555555-5555-4555-8555-555555555555",
+        result: { status: "installed", error_summary: null, output: null },
+      },
+    ])
+  }, { now: () => clock.now() })
+})
+
 test("worker control invalidates active runs and cancels their sessions", async () => {
   const clock = new FakeClock()
   await withHarness(async ({ config, issue, api, deps }) => {
@@ -928,6 +984,12 @@ class FakeApi implements AgentApi {
   readonly heartbeats: WorkerHeartbeatTelemetry[] = []
   readonly controlChecks: string[] = []
   readonly claims: ClaimedIssue[] = []
+  readonly pendingSkillInstalls: WorkerSkillInstallCommand[] = []
+  readonly skillInstallResults: {
+    installId: string
+    result: ReportWorkerSkillInstallResultInput
+  }[] = []
+  skillInstallClaims = 0
   finishResults: boolean[] = [true]
   finishStatusOverride: FinishRunResult["status"] | null = null
   onFinishAttempt: ((attempt: number) => void) | null = null
@@ -1108,6 +1170,18 @@ class FakeApi implements AgentApi {
     this.controlChecks.push(this.now().toISOString())
     return this.controlResponse()
   }
+
+  async claimSkillInstall(): Promise<WorkerSkillInstallCommand | null> {
+    this.skillInstallClaims += 1
+    return this.pendingSkillInstalls.shift() ?? null
+  }
+
+  async reportSkillInstall(
+    installId: string,
+    result: ReportWorkerSkillInstallResultInput
+  ): Promise<void> {
+    this.skillInstallResults.push({ installId, result })
+  }
 }
 
 class FakeClock {
@@ -1153,6 +1227,7 @@ function loopDeps(
     loadConfig: () => {
       throw new Error("unexpected config reload")
     },
+    createSkillInstallRunner,
     async getToolStatuses(): Promise<ToolStatuses> {
       api.providerCheckCalls += 1
       if (api.failNextProviderCheck) {

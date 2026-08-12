@@ -25,6 +25,7 @@ import {
   runAgentSession,
   throwIfAborted,
 } from "./session.js"
+import { createSkillInstallRunner } from "./skill-installs.js"
 import { getToolStatuses, type ToolStatuses } from "./tools.js"
 import { describeAgentError, getUsageLimitResetAt } from "./usage-limits.js"
 import type {
@@ -56,6 +57,7 @@ export interface WorkerLoopDeps extends ProcessIssueDeps {
   now: () => Date
   getToolStatuses: () => Promise<ToolStatuses>
   loadConfig: () => Config
+  createSkillInstallRunner: typeof createSkillInstallRunner
 }
 
 const defaultProcessIssueDeps: ProcessIssueDeps = {
@@ -77,6 +79,7 @@ const defaultWorkerLoopDeps: WorkerLoopDeps = {
   now: () => new Date(),
   getToolStatuses,
   loadConfig,
+  createSkillInstallRunner,
 }
 
 const RESTART_ONLY_CONFIG_KEYS = [
@@ -157,6 +160,7 @@ export async function runWorkerLoop(
   )
 
   const telemetry = createTelemetrySource(config, deps)
+  const skillInstalls = deps.createSkillInstallRunner(api)
   let nextHeartbeatAt = 0
   let nextControlAt = 0
 
@@ -206,6 +210,9 @@ export async function runWorkerLoop(
       if (!running) {
         break
       }
+      // Starts the install in the background: skill installation shares the
+      // control tick but never a run slot, so issue claiming continues.
+      await skillInstalls.poll()
     }
 
     if (!running) {
@@ -291,6 +298,10 @@ export async function runWorkerLoop(
     logInfo(`waiting for ${activeRuns.size} active issue run(s) to finish`)
     await Promise.all(activeRuns.keys())
   }
+
+  // An accepted install is attempted once and never retried, so let it report
+  // its result rather than abandoning it half-finished on shutdown.
+  await skillInstalls.drain()
 
   process.off("SIGINT", stop)
   process.off("SIGTERM", stop)

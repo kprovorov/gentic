@@ -70,6 +70,47 @@ The card refreshes automatically every 15 seconds, so status changes (a worker g
   Gentic only stores whether a provider is enabled, installed, authenticated, and its version. Any local model lists or provider metadata a worker reports are discarded before they reach the database — they never leave the worker process.
 </Note>
 
+## Install a skill on workers
+
+Click **Install skill** on the **Connected workers** card to install one [skills.sh](https://skills.sh) skill on the workers you choose. This is a one-time remote command, not a skill manager: Gentic keeps no inventory of what is installed, and never syncs, updates, or removes skills afterwards.
+
+<Steps>
+  <Step title="Paste a canonical skill URL">
+    The dialog accepts exactly one skill page URL:
+
+    ```
+    https://skills.sh/{owner}/{repo}/{skill}
+    ```
+
+    Repository pages, pack (`/p/...`) and topic (`/t/...`) URLs, the leaderboard, and non-skills.sh URLs are rejected — each of them names either no skill or several.
+  </Step>
+  <Step title="Review the security audits">
+    Gentic loads the current skills.sh audits for that skill and shows every partner's result. A **failed** audit blocks installation outright. A warning, a missing audit, an audit older than 30 days, or an audit lookup that fails requires you to tick the risk checkbox before the **Install** button becomes available.
+  </Step>
+  <Step title="Pick the workers">
+    Every eligible worker is selected by default. Ineligible workers stay in the list, disabled, with the reason: **Offline**, **Banned**, **Setup incomplete**, or **Installing another skill** — only one install may be in flight per worker.
+  </Step>
+  <Step title="Watch the results">
+    Each selected worker moves through **Waiting** → **Installing** → **Installed**, **Failed**, or **Timed out**. Failures show a short summary with the CLI output available behind **Show output**, with credentials and machine paths stripped out.
+  </Step>
+</Steps>
+
+Each targeted worker runs the official skills CLI once, globally, for both agents:
+
+```bash
+DISABLE_TELEMETRY=1 npx -y skills@latest add owner/repo \
+  --skill skill --global --agent claude-code --agent codex --yes
+```
+
+Node.js and `npx` are assumed to be present — a missing executable is reported as an ordinary install failure. Downloading, repeated-install behaviour, and the on-disk layout are entirely the CLI's business.
+
+A few consequences worth knowing:
+
+- **Installs never interrupt work.** A worker installs a skill while it keeps running and claiming issues.
+- **Commands expire after 10 minutes.** A worker that is selected and then disconnects still runs the command if it reconnects inside that window; after that the result is **Timed out**.
+- **There is no retry and no cancel.** Once a worker accepts a command it is attempted exactly once, and closing the dialog hides the results without stopping anything.
+- **Results are transient.** Closing the dialog loses them, and reopening it shows no history — Gentic stores no record of past installations.
+
 ## Rename a worker
 
 Click the pencil icon next to a worker's name, edit it inline, and press **Save**. Names must be unique (case-insensitively) within your workspace and up to 80 characters; a duplicate name is rejected before the request is sent.
