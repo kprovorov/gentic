@@ -217,7 +217,10 @@ export function IssueDetailHeader({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <header className="flex min-w-0 flex-none flex-col gap-3 px-6 py-4">
+      {/* The gap that separates the details from the title row lives inside the
+          collapsible instead of on this column: a flex gap would survive the
+          zero-height frame of the animation and make the header jump. */}
+      <header className="flex min-w-0 flex-none flex-col px-6 py-4">
         <SiteHeaderPortal>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -272,46 +275,58 @@ export function IssueDetailHeader({
               aria-label={open ? "Hide issue details" : "Show issue details"}
               className="shrink-0 text-muted-foreground"
             >
+              {/* Matches the collapse animation's duration so the arrow and the
+                  panel settle together. */}
               <IconChevronDown
-                className={cn("transition-transform", open && "rotate-180")}
+                className={cn(
+                  "transition-transform duration-200",
+                  open && "rotate-180"
+                )}
               />
             </Button>
           </CollapsibleTrigger>
         </div>
 
-        <CollapsibleContent className="flex min-w-0 flex-col gap-3">
-          {/* The pills stand in for the rail on mobile, where it's hidden. The
-              trailing "…" opens everything the rail would otherwise hold. */}
-          <div className="flex flex-wrap items-center gap-1.5 xl:hidden">
-            <IssueTypeMenu issue={issue} />
-            {isSpecIssueType(issue.type) ? null : (
-              <AgentProviderBadge provider={issue.agent_provider} />
-            )}
-            {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
-            <PullRequestPills pullRequests={pullRequests} />
-            <IssuePriorityMenu issue={issue} showLabel />
-            {labels.map((label) => (
-              <IssueLabelChip
-                key={label.id}
-                label={label}
-                className="text-xs"
+        {/* Radix publishes the measured height as a CSS variable, so the two
+            keyframes slide between it and zero; padding stays on the inner
+            column so the collapsed frame is truly empty. */}
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+          <div className="flex min-w-0 flex-col gap-3 pt-3">
+            {/* The pills stand in for the rail on mobile, where it's hidden. The
+                trailing "…" opens everything the rail would otherwise hold. */}
+            <div className="flex flex-wrap items-center gap-1.5 xl:hidden">
+              <IssueTypeMenu issue={issue} />
+              {isSpecIssueType(issue.type) ? null : (
+                <AgentProviderBadge provider={issue.agent_provider} />
+              )}
+              {issue.projects ? <RepoBadge repo={issue.projects.repo} /> : null}
+              <PullRequestPills pullRequests={pullRequests} />
+              <IssuePriorityMenu issue={issue} showLabel />
+              {labels.map((label) => (
+                <IssueLabelChip
+                  key={label.id}
+                  label={label}
+                  className="text-xs"
+                />
+              ))}
+              <IssuePropertiesDialog
+                issue={issue}
+                pullRequests={pullRequests}
+                automaticPrPublishingInProgress={
+                  automaticPrPublishingInProgress
+                }
+                relations={relations}
+                relationCandidates={relationCandidates}
+                labels={labels}
+                attachments={attachments}
               />
-            ))}
-            <IssuePropertiesDialog
-              issue={issue}
-              pullRequests={pullRequests}
-              automaticPrPublishingInProgress={automaticPrPublishingInProgress}
-              relations={relations}
-              relationCandidates={relationCandidates}
-              labels={labels}
-              attachments={attachments}
-            />
-          </div>
+            </div>
 
-          {/* Capped so a long request can't eat the timeline and push the
-              composer off the bottom of a viewport-height column. */}
-          <div className="max-h-[38dvh] min-w-0 overflow-y-auto">
-            <IssueRequestBody body={issue.body} attachments={attachments} />
+            {/* Capped so a long request can't eat the timeline and push the
+                composer off the bottom of a viewport-height column. */}
+            <div className="max-h-[38dvh] min-w-0 overflow-y-auto">
+              <IssueRequestBody body={issue.body} attachments={attachments} />
+            </div>
           </div>
         </CollapsibleContent>
       </header>
