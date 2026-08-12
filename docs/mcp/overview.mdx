@@ -14,7 +14,7 @@ Point your MCP client at the following URL:
 https://app.gentic.chat/mcp
 ```
 
-This single endpoint supports every Gentic tool, covering account inspection, project management, the full issue lifecycle, and account-scoped Label organization.
+This single endpoint supports every Gentic tool, covering account inspection, project management, the full issue lifecycle, blocking relations between issues, and account-scoped Label organization.
 
 <Note>
   The MCP server uses **OAuth 2.0** for authentication. The first time your client connects, it will redirect you to app.gentic.chat so you can authorize access with your Gentic account. No API keys or manual token setup is required.
@@ -67,6 +67,9 @@ Once connected, your AI assistant can:
   </Card>
   <Card title="Organize with Labels" icon="tag">
     Create account-scoped Labels, assign them across projects, and filter issues by Label or find unlabeled work.
+  </Card>
+  <Card title="Sequence work with relations" icon="link">
+    Declare that one issue blocks another so the worker runs a chain of issues in the right order.
   </Card>
 </CardGroup>
 
