@@ -5,11 +5,11 @@ import {
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
-  IconClock,
   IconDownload,
   IconEye,
   IconFlask,
   IconGitMerge,
+  IconLoader2,
   IconMessage2,
   IconMessageQuestion,
   IconPencil,
@@ -17,8 +17,11 @@ import {
   IconRocket,
   IconShieldCheck,
   IconThumbUp,
+  type IconProps,
 } from "@tabler/icons-react"
+import type { ComponentType } from "react"
 
+import { cn } from "@gentic/ui/utils"
 import { issueStatusSchema, type IssueStatus } from "@gentic/validators/issues"
 
 // The single source of truth for how a status is presented, so the issues
@@ -86,12 +89,28 @@ export const statusIconStyles: Record<IssueStatus, string> = {
   cancelled: "text-muted-foreground",
 }
 
-export const statusIcons: Record<IssueStatus, typeof IconClock> = {
+// Broader than a Tabler icon so a status can supply its own wrapper, like the
+// spinning in-progress icon below.
+type StatusIcon = ComponentType<IconProps>
+
+// In progress is the one status where a run is actively working, so its icon
+// spins instead of sitting still. Callers render it like any other status icon,
+// which keeps the animation wherever the icon shows up.
+function IconInProgress({ className, ...props }: IconProps) {
+  return (
+    <IconLoader2
+      className={cn("animate-spin motion-reduce:animate-none", className)}
+      {...props}
+    />
+  )
+}
+
+export const statusIcons: Record<IssueStatus, StatusIcon> = {
   draft: IconPencil,
   todo: IconCircleDashed,
   queued: IconDownload,
   held: IconPlayerPause,
-  "in-progress": IconClock,
+  "in-progress": IconInProgress,
   "waiting-for-input": IconMessageQuestion,
   testing: IconFlask,
   "tests-failed": IconAlertTriangle,
