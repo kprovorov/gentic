@@ -40,6 +40,8 @@ export function AgentModelPicker({
   hasMessages,
   disabled,
   onAgentModelChange,
+  open,
+  onOpenChange,
   className,
 }: {
   agentProvider: AgentProvider
@@ -51,6 +53,10 @@ export function AgentModelPicker({
     issueModel: IssueModel,
     info: { requiresReset: boolean }
   ) => void
+  // Controlled by the chat composer, which has to know the menu is open: it
+  // lives in a portal, so opening it takes focus out of the composer.
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   className?: string
 }) {
   const selectedOption = agentModelOptions[agentProvider].find(
@@ -93,7 +99,7 @@ export function AgentModelPicker({
     // whose default-modal DropdownMenu would disable pointer events on the
     // trigger while open, so a second click meant to close it falls through
     // to the Dialog's overlay and closes the whole dialog instead.
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"

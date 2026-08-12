@@ -24,6 +24,10 @@ function renderComposer(
   return props
 }
 
+function promptField() {
+  return screen.getByRole("textbox", { name: "Message the agent" })
+}
+
 describe("MessageComposer", () => {
   it("disables send until there is a non-empty draft", () => {
     renderComposer({ draft: "  " })
@@ -37,7 +41,7 @@ describe("MessageComposer", () => {
     const user = userEvent.setup()
     const props = renderComposer()
 
-    await user.type(screen.getByPlaceholderText(/Message the agent/), "h")
+    await user.type(promptField(), "h")
 
     expect(props.onDraftChange).toHaveBeenCalledWith("h")
   })
@@ -53,16 +57,77 @@ describe("MessageComposer", () => {
     expect(props.onSubmit).toHaveBeenCalledTimes(1)
   })
 
-  it("shows the active agent's default label in the picker trigger", () => {
+  it("keeps the attach and send buttons in the collapsed row", () => {
+    renderComposer()
+
+    expect(screen.getByRole("button", { name: "Attach files" })).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "Send message to agent" })
+    ).toBeVisible()
+  })
+
+  it("reveals the model picker only once the composer has focus", async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    expect(
+      screen.queryByRole("button", { name: "Choose agent and model" })
+    ).toBeNull()
+
+    await user.click(promptField())
+
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toBeVisible()
+  })
+
+  it("collapses back to the truncated one-line draft when focus leaves", async () => {
+    const user = userEvent.setup()
+    renderComposer({ draft: "Confirmed: unmanaged path collision" })
+
+    await user.click(promptField())
+    await user.click(document.body)
+
+    expect(
+      screen.queryByRole("button", { name: "Choose agent and model" })
+    ).toBeNull()
+    expect(
+      screen.getByText("Confirmed: unmanaged path collision", {
+        selector: "span",
+      })
+    ).toHaveClass("truncate")
+  })
+
+  it("stays expanded while a file is attached", async () => {
+    const user = userEvent.setup()
+    renderComposer({
+      draftFiles: [new File(["diff"], "patch.txt", { type: "text/plain" })],
+    })
+
+    await user.click(document.body)
+
+    expect(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    ).toBeVisible()
+    expect(screen.getByText("patch.txt")).toBeVisible()
+  })
+
+  it("shows the active agent's default label in the picker trigger", async () => {
+    const user = userEvent.setup()
     renderComposer({ agentProvider: "codex" })
+
+    await user.click(promptField())
 
     expect(
       screen.getByRole("button", { name: "Choose agent and model" })
     ).toHaveTextContent("Codex default")
   })
 
-  it("shows the active model in the picker trigger", () => {
+  it("shows the active model in the picker trigger", async () => {
+    const user = userEvent.setup()
     renderComposer({ issueModel: "claude-sonnet-5" })
+
+    await user.click(promptField())
 
     expect(
       screen.getByRole("button", { name: "Choose agent and model" })
