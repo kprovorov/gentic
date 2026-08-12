@@ -76,15 +76,24 @@ export function AttachmentPreviews({
   )
 }
 
-// Durable Issue Attachments: files owned by the issue rather than by one chat
-// turn. Uploading here writes no message and does not requeue or wake the
-// agent, and the files survive an agent or conversation reset.
+// Every file the issue holds, whichever way it arrived: the durable Issue
+// Attachments it owns, then the files sent through the chat composer, so this
+// section answers "what has been attached here?" without scrolling the
+// transcript.
+//
+// Only the issue's own files are managed here. Uploading writes no message and
+// does not requeue or wake the agent, and those files survive an agent or
+// conversation reset. Chat files are listed read-only: they were delivered as
+// part of one prompt turn, and deleting one from here would quietly hollow out
+// a message the transcript still shows as sent.
 export function Attachments({
   issueId,
   attachments,
+  messageAttachments,
 }: {
   issueId: string
   attachments: Attachment[]
+  messageAttachments: Attachment[]
 }) {
   const queryClient = useQueryClient()
   const supabase = useSupabaseClient()
@@ -134,7 +143,7 @@ export function Attachments({
 
   return (
     <div className="grid gap-4">
-      {attachments.length === 0 ? (
+      {attachments.length === 0 && messageAttachments.length === 0 ? (
         <p className="text-[12.5px] text-muted-foreground">
           No files attached. Files added here stay with the issue and are not
           sent to the agent as a message.
@@ -146,6 +155,14 @@ export function Attachments({
               key={attachment.id}
               issueId={issueId}
               attachment={attachment}
+            />
+          ))}
+          {messageAttachments.map((attachment) => (
+            <AttachmentRow
+              key={attachment.id}
+              issueId={issueId}
+              attachment={attachment}
+              sentInChat
             />
           ))}
         </ul>
@@ -180,9 +197,11 @@ export function Attachments({
 function AttachmentRow({
   issueId,
   attachment,
+  sentInChat = false,
 }: {
   issueId: string
   attachment: Attachment
+  sentInChat?: boolean
 }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -229,6 +248,7 @@ function AttachmentRow({
           <p className="truncate">{attachment.fileName}</p>
           <p className="text-xs text-muted-foreground">
             {formatAttachmentSize(attachment.sizeBytes)}
+            {sentInChat ? " · Sent in chat" : null}
           </p>
         </div>
       </div>
@@ -240,20 +260,24 @@ function AttachmentRow({
               target="_blank"
               rel="noreferrer"
               download={attachment.fileName}
+              aria-label={`Download ${attachment.fileName}`}
             >
               <IconDownload />
             </a>
           </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleDelete}
-          disabled={mutation.isPending}
-        >
-          <IconTrash />
-        </Button>
+        {sentInChat ? null : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Delete ${attachment.fileName}`}
+            onClick={handleDelete}
+            disabled={mutation.isPending}
+          >
+            <IconTrash />
+          </Button>
+        )}
       </div>
     </li>
   )

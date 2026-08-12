@@ -23,6 +23,8 @@ Gentic keeps issue files and chat files apart, because they are useful for diffe
   </Card>
 </CardGroup>
 
+The **Files** card lists both, so everything attached to an issue is in one place: the issue's own files first, then the chat files, marked **Sent in chat**.
+
 <Note>
   Files attached before this split stay message attachments; they are not reclassified.
 </Note>
@@ -68,13 +70,15 @@ Drag files onto the composer or click the paperclip button — or, in the **File
 
 ### Confirm the files are listed
 
-Issue files appear in the issue's **Files** card with the correct name and size; message files appear inline with the message you sent them with.
+Every file appears in the issue's **Files** card with the correct name and size; message files additionally appear inline with the message you sent them with.
 
 </Steps>
 
 ## How to delete an attachment
 
 Open the issue and find the file in the **Files** card. Click the delete button next to the file name and confirm. Gentic removes the file from storage and from the issue. Deleting it does not remove content already delivered to an agent session; use **Retry with...** if you need a fresh session built from the remaining files.
+
+Only the issue's own files can be deleted this way. A file **Sent in chat** belongs to the message it was sent with, so the Files card lists it for download only.
 
 ## Good use cases for attachments
 

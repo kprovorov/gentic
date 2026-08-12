@@ -3,6 +3,7 @@ import "server-only"
 import {
   groupMessageAttachments,
   selectIssueAttachments,
+  selectMessageAttachments,
 } from "@gentic/services/attachments"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
@@ -109,7 +110,11 @@ export type NewIssueData = {
 export type IssueDetailData = {
   issue: IssueDetail
   messages: ChatMessage[]
+  // Durable files the issue owns, shown under its request. `messageAttachments`
+  // are the still-live files sent through the chat composer; the Files section
+  // lists both, everything else only ever wants one of them.
   attachments: Attachment[]
+  messageAttachments: Attachment[]
   pullRequests: IssuePullRequest[]
   automaticPrPublishingInProgress: boolean
   relations: issuesService.IssueRelation[]
@@ -479,10 +484,17 @@ async function getIssueDetailDataForIssue(
     (attachmentRows ?? []) satisfies AttachmentRow[]
   )
   // Every row below came back through the Clerk-scoped client above, so RLS
-  // has already proven the user owns them — see `createAttachmentSigner`.
+  // has already proven the user owns them — see `createAttachmentSigner`. The
+  // signer memoizes, so the chat files listed both inline and in the Files
+  // section are only signed once.
   const signAttachment = createAttachmentSigner()
   const attachments: Attachment[] = await Promise.all(
     selectIssueAttachments(
+      (attachmentRows ?? []) satisfies AttachmentRow[]
+    ).map(signAttachment)
+  )
+  const messageAttachments: Attachment[] = await Promise.all(
+    selectMessageAttachments(
       (attachmentRows ?? []) satisfies AttachmentRow[]
     ).map(signAttachment)
   )
@@ -502,6 +514,7 @@ async function getIssueDetailDataForIssue(
     issue: parsedIssue,
     messages: messagesWithAttachments,
     attachments,
+    messageAttachments,
     pullRequests: attachPullRequestStates(pullRequests),
     automaticPrPublishingInProgress: (automaticPrRequestRows ?? []).length > 0,
     relations,

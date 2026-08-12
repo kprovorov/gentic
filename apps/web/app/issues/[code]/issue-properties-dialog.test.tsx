@@ -84,6 +84,7 @@ function renderDialog(
         relationCandidates={[]}
         labels={[]}
         attachments={[]}
+        messageAttachments={[]}
         {...props}
       />
     </QueryClientProvider>
