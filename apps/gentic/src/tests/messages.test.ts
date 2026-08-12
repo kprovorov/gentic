@@ -494,6 +494,10 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     async fetchWorkerControl() {
       return { worker: { banned: false }, runs: [] }
     },
+    async claimSkillInstall() {
+      return null
+    },
+    async reportSkillInstall() {},
   }
   return api
 }

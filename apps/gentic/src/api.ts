@@ -21,6 +21,11 @@ import {
 } from "@gentic/validators/agent"
 import type { IssueStatus } from "@gentic/validators/issues"
 import {
+  claimWorkerSkillInstallResponseSchema,
+  type ReportWorkerSkillInstallResultInput,
+  type WorkerSkillInstallCommand,
+} from "@gentic/validators/skills"
+import {
   workerControlResponseSchema,
   type WorkerControlResponse,
   type WorkerHeartbeatTelemetry,
@@ -85,6 +90,12 @@ export interface AgentApi {
   sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void>
   markOffline(): Promise<void>
   fetchWorkerControl(): Promise<WorkerControlResponse>
+  /** Accepts this worker's pending skill install, if it has one. */
+  claimSkillInstall(): Promise<WorkerSkillInstallCommand | null>
+  reportSkillInstall(
+    installId: string,
+    result: ReportWorkerSkillInstallResultInput
+  ): Promise<void>
 }
 
 export function createAgentApi(input: {
@@ -245,6 +256,21 @@ export function createAgentApi(input: {
     },
     async fetchWorkerControl() {
       return request("/agent/worker/control", workerControlResponseSchema)
+    },
+    async claimSkillInstall() {
+      const data = await request(
+        "/agent/worker/skill-installs",
+        claimWorkerSkillInstallResponseSchema,
+        { method: "POST", body: {} }
+      )
+      return data.command
+    },
+    async reportSkillInstall(installId, result) {
+      await request(
+        `/agent/worker/skill-installs/${encodeURIComponent(installId)}`,
+        okResponseSchema,
+        { method: "PATCH", body: result }
+      )
     },
   }
 }

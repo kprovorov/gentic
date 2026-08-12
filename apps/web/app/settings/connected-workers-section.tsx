@@ -10,6 +10,7 @@ import {
   IconDotsVertical,
   IconPencil,
   IconPlayerPlay,
+  IconPackageImport,
   IconPlugConnected,
   IconRefresh,
   IconServer,
@@ -17,6 +18,7 @@ import {
 } from "@tabler/icons-react"
 
 import type { SettingsWorker, SettingsWorkersData } from "@/app/queries"
+import { InstallSkillDialog } from "@/app/settings/install-skill-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,6 +87,7 @@ export function ConnectedWorkersSection({
   onRefresh,
 }: ConnectedWorkersSectionProps) {
   const [connectOpen, setConnectOpen] = React.useState(false)
+  const [installSkillOpen, setInstallSkillOpen] = React.useState(false)
   const [enrollmentCode, setEnrollmentCode] =
     React.useState<EnrollmentCode | null>(null)
   const [connectState, setConnectState] = React.useState<MutationState>({
@@ -132,10 +135,20 @@ export function ConnectedWorkersSection({
               Manage local worker processes that can claim and run tasks.
             </CardDescription>
           </div>
-          <Button type="button" onClick={openConnectDialog}>
-            <IconPlugConnected />
-            Connect worker
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInstallSkillOpen(true)}
+            >
+              <IconPackageImport />
+              Install skill
+            </Button>
+            <Button type="button" onClick={openConnectDialog}>
+              <IconPlugConnected />
+              Connect worker
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -186,6 +199,11 @@ export function ConnectedWorkersSection({
         enrollmentCode={enrollmentCode}
         state={connectState}
         onRegenerate={generateEnrollmentCode}
+      />
+
+      <InstallSkillDialog
+        open={installSkillOpen}
+        onOpenChange={setInstallSkillOpen}
       />
     </Card>
   )

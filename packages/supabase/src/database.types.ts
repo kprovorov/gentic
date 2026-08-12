@@ -637,6 +637,65 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_skill_installs: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          error_summary: string | null
+          expires_at: string
+          finished_at: string | null
+          id: string
+          output: string | null
+          skill: string
+          source: string
+          status: string
+          updated_at: string
+          url: string
+          user_id: string
+          worker_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          expires_at: string
+          finished_at?: string | null
+          id?: string
+          output?: string | null
+          skill: string
+          source: string
+          status?: string
+          updated_at?: string
+          url: string
+          user_id: string
+          worker_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          expires_at?: string
+          finished_at?: string | null
+          id?: string
+          output?: string | null
+          skill?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_skill_installs_worker_owner"
+            columns: ["worker_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       workers: {
         Row: {
           arch: string | null
