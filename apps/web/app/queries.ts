@@ -33,6 +33,7 @@ import {
   type ProjectOption,
 } from "./query-contracts"
 import type { Attachment } from "./issues/[code]/attachments"
+import { createAttachmentSigner } from "./issues/attachment-signing"
 import type { ChatMessage } from "./issues/[code]/issue-chat-state"
 import {
   listSettingsWorkersData,
@@ -43,10 +44,6 @@ import {
   fetchInstallationRepositories,
   type GithubPullRequestState,
 } from "@/lib/github-app"
-
-const ATTACHMENTS_BUCKET = "attachments"
-const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 3600
-const ATTACHMENT_THUMBNAIL_SIZE = 96
 
 type AttachmentRow = {
   id: string
@@ -481,10 +478,13 @@ async function getIssueDetailDataForIssue(
   const attachmentRowsByMessageId = groupMessageAttachments(
     (attachmentRows ?? []) satisfies AttachmentRow[]
   )
+  // Every row below came back through the Clerk-scoped client above, so RLS
+  // has already proven the user owns them — see `createAttachmentSigner`.
+  const signAttachment = createAttachmentSigner()
   const attachments: Attachment[] = await Promise.all(
     selectIssueAttachments(
       (attachmentRows ?? []) satisfies AttachmentRow[]
-    ).map((attachment) => signAttachment(supabase, attachment))
+    ).map(signAttachment)
   )
   const messagesWithAttachments = await Promise.all(
     z
@@ -493,9 +493,7 @@ async function getIssueDetailDataForIssue(
       .map(async (message) => ({
         ...message,
         attachments: await Promise.all(
-          (attachmentRowsByMessageId.get(message.id) ?? []).map((attachment) =>
-            signAttachment(supabase, attachment)
-          )
+          (attachmentRowsByMessageId.get(message.id) ?? []).map(signAttachment)
         ),
       }))
   )
@@ -535,49 +533,4 @@ function collectEventLabelIds(events: IssueEvent[]): string[] {
     }
   }
   return Array.from(ids)
-}
-
-async function signAttachment(
-  supabase: AuthenticatedContext["supabase"],
-  attachment: AttachmentRow
-): Promise<Attachment> {
-  if (attachment.deleted_at) {
-    return {
-      id: attachment.id,
-      fileName: attachment.file_name,
-      sizeBytes: attachment.size_bytes,
-      url: null,
-      thumbnailUrl: null,
-    }
-  }
-
-  const isImage = attachment.content_type?.startsWith("image/") ?? false
-  const storage = supabase.storage.from(ATTACHMENTS_BUCKET)
-  const [{ data: signed }, { data: thumbnail }] = await Promise.all([
-    storage.createSignedUrl(
-      attachment.storage_path,
-      ATTACHMENT_SIGNED_URL_TTL_SECONDS
-    ),
-    isImage
-      ? storage.createSignedUrl(
-          attachment.storage_path,
-          ATTACHMENT_SIGNED_URL_TTL_SECONDS,
-          {
-            transform: {
-              width: ATTACHMENT_THUMBNAIL_SIZE,
-              height: ATTACHMENT_THUMBNAIL_SIZE,
-              resize: "cover",
-            },
-          }
-        )
-      : Promise.resolve({ data: null }),
-  ])
-
-  return {
-    id: attachment.id,
-    fileName: attachment.file_name,
-    sizeBytes: attachment.size_bytes,
-    url: signed?.signedUrl ?? null,
-    thumbnailUrl: thumbnail?.signedUrl ?? null,
-  }
 }
