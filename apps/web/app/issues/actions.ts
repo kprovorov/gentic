@@ -103,15 +103,13 @@ export async function startIssueCreation(formData: FormData) {
   let uploads: AttachmentUploadTicket[] = []
 
   try {
-    await issuesService.createIssueUserMessage(
-      supabase,
-      created.id,
-      fields.body
-    )
-
-    // Files picked in the creation form belong to the issue, not to the
-    // message that carries its body: they stay available across agent and
-    // conversation resets, which wipe that message.
+    // The Body lives on the issue row itself (rendered above the timeline by
+    // `IssueRequestBody`) and is never copied into a chat message here: doing
+    // so used to seed the transcript, but it also left a `role: 'user'`
+    // message behind before `startIssueFromDraft` ran, which made that RPC's
+    // "no user message yet" idempotency check skip creating the Kickoff
+    // Message — so the agent's first prompt was the raw Body instead of
+    // `Work on Gentic issue {code}.`.
     uploads = await createAttachmentUploadTickets(
       supabase,
       created.id,
