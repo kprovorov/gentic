@@ -23,14 +23,15 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     archivedLabelIds,
   } = data
   const isSpec = isSpecIssueType(issue.type)
-  // Full viewport height at every breakpoint so the composer pins to the
-  // bottom of the screen instead of the page scrolling past it on mobile.
-  // `dvh` (not `svh`) keeps that flush as mobile browser chrome resizes the
-  // viewport; `--keyboard-inset` (see `KeyboardInsetSync`) covers the browsers
-  // where `dvh` ignores the on-screen keyboard, so the timeline is the only
-  // thing that scrolls and the composer stays pinned above the keyboard.
+  // Exactly one *visible* viewport tall at every breakpoint, so the composer
+  // pins to the bottom of the screen instead of the page scrolling past it on
+  // mobile. `--visual-viewport-height` (see `VisualViewportSync`) is the only
+  // measure that shrinks for the on-screen keyboard everywhere — `dvh` doesn't
+  // on iOS — so the timeline is the one thing that scrolls and the composer
+  // stays above the keyboard. `dvh` covers the first paint, before the
+  // variable lands.
   return (
-    <div className="flex h-[calc(100dvh-3.5rem-var(--keyboard-inset,0px))] min-w-0 flex-col overflow-hidden bg-background">
+    <div className="flex h-[calc(var(--visual-viewport-height,100dvh)-3.5rem)] min-w-0 flex-col overflow-hidden bg-background">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={[

@@ -5,7 +5,7 @@ import { ClerkProvider, Show } from "@clerk/nextjs"
 import "./globals.css"
 import { Providers } from "./providers"
 import { AppSidebar } from "@/components/app-sidebar"
-import { KeyboardInsetSync } from "@/components/keyboard-inset-sync"
+import { VisualViewportSync } from "@/components/visual-viewport-sync"
 import { NewIssueDialog } from "@/components/new-issue-dialog"
 import { NewIssueDialogProvider } from "@/components/new-issue-dialog-provider"
 import { PublicHeader } from "@/components/public-header"
@@ -80,12 +80,13 @@ export default function RootLayout({
               <Providers>
                 <Show when="signed-in">
                   <NewIssueDialogProvider>
-                    <KeyboardInsetSync />
-                    {/* Shrinking the shell by the keyboard inset keeps the
-                        document no taller than the visible area on browsers
-                        that leave the layout viewport full-height, so a page
-                        that already fits can't be panned around. */}
-                    <SidebarProvider className="min-h-[calc(100svh-var(--keyboard-inset,0px))]">
+                    <VisualViewportSync />
+                    {/* Holding the shell to the visible height keeps the
+                        document no taller than what the user can see on
+                        browsers that leave the layout viewport full-height
+                        behind the keyboard, so a page that already fits can't
+                        be panned around. */}
+                    <SidebarProvider className="min-h-[var(--visual-viewport-height,100svh)]">
                       <AppSidebar variant="inset" />
                       <SidebarInset>
                         <SiteHeader />
