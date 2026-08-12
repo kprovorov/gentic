@@ -1,10 +1,10 @@
 ---
-title: "Gentic MCP Tools Reference: Projects, Issues, and Labels"
+title: "Gentic MCP Tools Reference: Projects, Issues, Relations, and Labels"
 sidebarTitle: "Tools"
-description: "Reference for the Gentic MCP tools: create and manage projects and issues, organize work with account-scoped Labels, and trigger AI coding agent runs from any MCP-compatible client."
+description: "Reference for the Gentic MCP tools: create and manage projects and issues, sequence work with blocking issue relations, organize work with account-scoped Labels, and trigger AI coding agent runs from any MCP-compatible client."
 ---
 
-Gentic's MCP server exposes tools your AI assistant can call once you have connected and authorized via OAuth 2.0. This reference groups them into four categories — Account, Projects, Issues, and Labels — covering project management, the full issue lifecycle, and account-scoped Label organization. Issue relations have their own tools, documented in the [Issue Relations guide](/guides/issue-relations). Attachments, messages, retries, and GitHub integration settings remain web-app workflows. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
+Gentic's MCP server exposes tools your AI assistant can call once you have connected and authorized via OAuth 2.0. This reference groups them into five categories — Account, Projects, Issues, Issue Relations, and Labels — covering project management, the full issue lifecycle, blocking dependencies between issues, and account-scoped Label organization. For the concepts behind blocking relations, see the [Issue Relations guide](/guides/issue-relations). Uploading attachments, sending messages, retrying runs, and GitHub integration settings remain web-app workflows. All tools require an active, authorized MCP session; unauthenticated calls are rejected automatically.
 
 ---
 
@@ -382,6 +382,137 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 <Expandable title="Output fields">
   <ResponseField name="issue" type="object">
     The updated issue object, reflecting the new status.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Issue Relations
+
+Relations declare a **blocking dependency** between two issues you own: one issue
+must reach `completed` or `cancelled` before the other becomes eligible for a
+worker. Enforcement happens when a worker polls for work — a blocked issue can
+sit in `todo` indefinitely and is simply skipped. See the
+[Issue Relations guide](/guides/issue-relations) for the workflow behind them.
+
+All four tools identify issues by their **`id` (uuid)**, not their Issue Code.
+Every relation is of type `blocks`; the `direction` argument on
+[`add_issue_relation`](#add_issue_relation) is what decides which end blocks which.
+
+### `list_issue_relations`
+
+Lists every blocking relation involving one issue — both the issues it blocks and the issues blocking it — newest first.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID, from `list_issues`, `create_issue`, or `get_issue`.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="relations" type="array">
+    Blocking relations involving the issue, newest first. Each relation carries
+    `id` (the relation ID, needed for
+    [`delete_issue_relation`](#delete_issue_relation)), `source_issue_id`,
+    `target_issue_id`, `type` (always `blocks`), and `created_at`, plus embedded
+    `source_issue` and `target_issue` objects with `id`, `number`, `title`,
+    `status`, and their project `key`.
+  </ResponseField>
+</Expandable>
+
+<Note>
+  The relation always reads **source blocks target**. To know which side the
+  issue you queried is on, compare its ID against `source_issue_id` and
+  `target_issue_id`.
+</Note>
+
+---
+
+### `list_issue_relation_candidates`
+
+Lists the other issues in your account that could be related to a given issue, newest first. Use it to resolve a title into the `related_issue_id` that `add_issue_relation` needs.
+
+<ParamField body="id" type="string (uuid)" required>
+  The issue ID the candidates would be related to. This issue is excluded from
+  the results.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issues" type="array">
+    Other issues owned by the authenticated account, newest first, each with
+    `id`, `number`, `title`, `status`, and their project `key`. Candidates span
+    every project and every status, and issues already related to this one are
+    **not** filtered out — check `list_issue_relations` first to avoid a
+    duplicate.
+  </ResponseField>
+</Expandable>
+
+---
+
+### `add_issue_relation`
+
+Creates a blocking relation between two issues you own.
+
+<ParamField body="issue_id" type="string (uuid)" required>
+  The issue the relation is being added from, from `list_issues`,
+  `create_issue`, or `get_issue`.
+</ParamField>
+
+<ParamField body="related_issue_id" type="string (uuid)" required>
+  The other issue to relate to `issue_id`, from `list_issues` or
+  [`list_issue_relation_candidates`](#list_issue_relation_candidates). Must be a
+  different issue — relating an issue to itself is rejected.
+</ParamField>
+
+<ParamField body="direction" type="enum" required>
+  Which way the dependency runs.
+
+  Accepted values: `blocking`, `blocked_by`
+
+  - `blocking` — `issue_id` blocks `related_issue_id`, so `related_issue_id` waits.
+  - `blocked_by` — `issue_id` is blocked by `related_issue_id`, so `issue_id` waits.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="issue_id" type="string (uuid)">
+    The issue ID passed as `issue_id`.
+  </ResponseField>
+  <ResponseField name="related_issue_id" type="string (uuid)">
+    The issue ID passed as `related_issue_id`.
+  </ResponseField>
+  <ResponseField name="added" type="boolean">
+    Always `true` when the relation was created.
+  </ResponseField>
+</Expandable>
+
+<Note>
+  Relations are **not** idempotent. Re-adding a pair that already exists in the
+  same direction is rejected as a duplicate rather than silently succeeding, so
+  a blind retry after a timeout can surface an error even though the first call
+  landed.
+</Note>
+
+---
+
+### `delete_issue_relation`
+
+Removes a blocking relation. The blocked issue becomes eligible for a worker on its next poll.
+
+<ParamField body="id" type="string (uuid)" required>
+  The relation ID, from the `relations` array returned by
+  [`list_issue_relations`](#list_issue_relations). This is the relation's own
+  ID, not an issue ID.
+</ParamField>
+
+<ParamField body="issue_id" type="string (uuid)" required>
+  An issue ID on either end of the relation, used to look it up. The relation is
+  rejected as not found if it does not touch this issue.
+</ParamField>
+
+<Expandable title="Output fields">
+  <ResponseField name="id" type="string (uuid)">
+    The ID of the deleted relation.
+  </ResponseField>
+  <ResponseField name="deleted" type="boolean">
+    Always `true` when the deletion completed successfully.
   </ResponseField>
 </Expandable>
 

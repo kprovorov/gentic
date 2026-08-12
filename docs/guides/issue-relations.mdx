@@ -60,6 +60,14 @@ Click **Add** to save. The relation appears in the **Relations** card immediatel
 
 Open either issue in the relation and scroll to the **Relations** section. Click the remove (×) icon next to the relation you want to delete. The relation is removed immediately and the blocked issue becomes eligible for the worker on its next poll.
 
+## Manage relations from an AI assistant
+
+Relations are not web-app-only. If you have connected the [MCP server](/mcp/overview), your assistant can read and edit them directly with four tools: `list_issue_relations`, `list_issue_relation_candidates`, `add_issue_relation`, and `delete_issue_relation`. This is the fastest way to wire up a chain of issues you just created in bulk:
+
+> "Create the four notifications issues, then make each one blocked by the previous one."
+
+See the [Tools reference](/mcp/tools#issue-relations) for parameters and return shapes.
+
 ## Example: sequencing a multi-step feature
 
 Imagine you are building a new notifications system. You might create the following issues and link them in sequence:
