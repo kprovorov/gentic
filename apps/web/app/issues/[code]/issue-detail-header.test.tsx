@@ -100,7 +100,7 @@ describe("IssueDetailHeader", () => {
     renderHeader()
 
     expect(screen.getByText(issue.title as string)).toBeVisible()
-    expect(screen.getByText("Request")).toBeVisible()
+    expect(screen.getByRole("region", { name: "Request" })).toBeVisible()
     expect(screen.getByText(issue.body as string)).toBeVisible()
     expect(
       screen.getByRole("button", { name: "Open issue properties" })
@@ -113,7 +113,9 @@ describe("IssueDetailHeader", () => {
 
     await user.click(screen.getByRole("button", { name: "Hide issue details" }))
 
-    expect(screen.queryByText("Request")).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("region", { name: "Request" })
+    ).not.toBeInTheDocument()
     expect(screen.queryByText(issue.body as string)).not.toBeInTheDocument()
     expect(
       screen.queryByRole("button", { name: "Open issue properties" })

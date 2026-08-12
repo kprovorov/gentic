@@ -3,8 +3,10 @@
 import { AttachmentPreviews, type Attachment } from "./attachments"
 
 // The issue body is the request that kicked off the conversation, not a chat
-// turn, so it renders as a static card inside the detail header's collapsible
-// section rather than as the timeline's first item.
+// turn, so it renders as static text inside the detail header's collapsible
+// section rather than as the timeline's first item. It stays unstyled — no
+// heading, no tint — so the header reads as one block and the chat bubbles
+// below own the visual weight.
 export function IssueRequestBody({
   body,
   attachments,
@@ -14,19 +16,14 @@ export function IssueRequestBody({
 }) {
   return (
     <section aria-label="Request" className="min-w-0">
-      <p className="text-[11px] font-semibold tracking-[.08em] text-muted-foreground uppercase">
-        Request
+      <p className="text-sm leading-6 whitespace-pre-wrap">
+        {body || "No body provided."}
       </p>
-      <div className="mt-2 min-w-0 rounded-[20px] bg-muted/40 p-4">
-        <p className="text-sm leading-6 whitespace-pre-wrap">
-          {body || "No body provided."}
-        </p>
-        {attachments.length > 0 ? (
-          <div className="mt-3.5 border-t pt-3">
-            <AttachmentPreviews attachments={attachments} />
-          </div>
-        ) : null}
-      </div>
+      {attachments.length > 0 ? (
+        <div className="mt-3.5 border-t pt-3">
+          <AttachmentPreviews attachments={attachments} />
+        </div>
+      ) : null}
     </section>
   )
 }
