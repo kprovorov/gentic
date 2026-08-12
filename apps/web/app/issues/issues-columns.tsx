@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type { ComponentType, ReactNode } from "react"
 import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
@@ -18,6 +18,7 @@ import {
   IconSparkles,
   IconTrendingDown,
   IconTrendingUp,
+  type IconProps,
 } from "@tabler/icons-react"
 
 import type { HomeIssue } from "@/app/queries"
@@ -280,7 +281,9 @@ function SortableHeader({
   )
 }
 
-type IssueFieldIcon = typeof IconCheck
+// A plain component type rather than `typeof IconCheck`, so a field can pass a
+// wrapper around a Tabler icon (the animated in-progress status icon does).
+type IssueFieldIcon = ComponentType<IconProps>
 
 /**
  * The option list shared by the status, priority, and type dropdown menus: an
