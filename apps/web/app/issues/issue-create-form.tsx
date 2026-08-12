@@ -510,7 +510,7 @@ export function IssueCreateForm({
               aria-labelledby={projectLabelId}
               aria-describedby={projectError ? projectErrorId : undefined}
               aria-invalid={projectError ? true : undefined}
-              className="max-w-full self-start aria-invalid:text-destructive"
+              className="max-w-full self-start text-muted-foreground aria-invalid:text-destructive"
             >
               <BrandIcon name="github" className="size-3.5 shrink-0" />
               <span className="min-w-0 truncate">
