@@ -55,14 +55,12 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         <IssueDetailTimelinePanel
           issueId={issue.id}
           issueCreatedAt={issue.created_at}
-          issueBody={issue.body}
           agentProvider={issue.agent_provider}
           issueModel={issue.issue_model}
           initialMessages={messages}
           initialStatus={issue.status}
           initialUsageLimitResetAt={issue.usage_limit_reset_at}
           initialPullRequests={pullRequests}
-          attachments={attachments}
           events={events}
           archivedLabelIds={archivedLabelIds}
         />

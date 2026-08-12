@@ -19,9 +19,7 @@ import type { IssueEventContract } from "@gentic/validators/realtime"
 
 import { MessageComposer } from "../message-composer/message-composer"
 import { useIssueAgentProvider } from "../message-composer/use-issue-agent-provider"
-import type { Attachment } from "./attachments"
 import type { ChatMessage } from "./issue-chat-state"
-import { IssueRequestBody } from "./issue-request-body"
 import { useIssueChatState } from "./issue-chat/use-issue-chat-state"
 import type { RealtimeConnectionStatus } from "./issue-chat/types"
 import { buildIssueTimeline } from "./issue-timeline/build-timeline"
@@ -33,27 +31,23 @@ import { IssueTimeline } from "./issue-timeline/issue-timeline"
 export function IssueDetailTimelinePanel({
   issueId,
   issueCreatedAt,
-  issueBody,
   agentProvider,
   issueModel,
   initialMessages,
   initialStatus,
   initialUsageLimitResetAt,
   initialPullRequests,
-  attachments,
   events,
   archivedLabelIds,
 }: {
   issueId: string
   issueCreatedAt: string
-  issueBody: string | null
   agentProvider: AgentProvider
   issueModel: string | null
   initialMessages: ChatMessage[]
   initialStatus: IssueStatus
   initialUsageLimitResetAt: string | null
   initialPullRequests: IssuePullRequest[]
-  attachments: Attachment[]
   events: IssueEventContract[]
   archivedLabelIds: string[]
 }) {
@@ -91,12 +85,6 @@ export function IssueDetailTimelinePanel({
         aria-atomic="true"
       >
         {chat.liveMessage}
-      </div>
-
-      {/* Capped so a long request can't eat the timeline and push the
-          composer off the bottom of a viewport-height column. */}
-      <div className="max-h-[40%] flex-none overflow-y-auto border-b">
-        <IssueRequestBody body={issueBody} attachments={attachments} />
       </div>
 
       <MessageScrollerProvider autoScroll>

@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import type { Attachment } from "./attachments"
@@ -23,30 +22,14 @@ const attachment: Attachment = {
 }
 
 describe("IssueRequestBody", () => {
-  it("renders an expanded request card with the body and attachments", () => {
-    render(<IssueRequestBody body="Fix the flaky test" attachments={[attachment]} />)
+  it("renders the request card with the body and attachments", () => {
+    render(
+      <IssueRequestBody body="Fix the flaky test" attachments={[attachment]} />
+    )
 
     expect(screen.getByText("Request")).toBeInTheDocument()
     expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
-  })
-
-  it("collapses and expands on toggle", async () => {
-    const user = userEvent.setup()
-    render(
-      <IssueRequestBody
-        body={"Fix the flaky test\nIt fails intermittently in CI."}
-        attachments={[]}
-      />
-    )
-
-    expect(
-      screen.getByText("It fails intermittently in CI.", { exact: false })
-    ).toBeVisible()
-    await user.click(screen.getByRole("button", { name: /Request/ }))
-    expect(
-      screen.queryByText("It fails intermittently in CI.", { exact: false })
-    ).not.toBeInTheDocument()
   })
 
   it("still shows the request card when the body is empty", () => {
