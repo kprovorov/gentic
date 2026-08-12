@@ -64,7 +64,6 @@ export function NewIssueDialog() {
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
-            aria-expanded={expanded}
             onClick={() => {
               captureHeight()
               setExpanded((current) => !current)
