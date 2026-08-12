@@ -93,13 +93,14 @@ test("the detail view owns the viewport height so the composer pins to the botto
   const timelinePanel = readRouteFile("issue-detail-timeline-panel.tsx")
 
   // The view is exactly one *visible* viewport tall at every breakpoint —
-  // `dvh` for mobile browser chrome, minus `--keyboard-inset` for the browsers
-  // whose `dvh` ignores the on-screen keyboard — and the panel fills it rather
-  // than guessing its own height. Otherwise the page scrolls and the composer
-  // floats above the bottom of the screen, or behind the keyboard, on mobile.
+  // `--visual-viewport-height`, which unlike `dvh` shrinks for the on-screen
+  // keyboard on every browser, with `dvh` covering the first paint — and the
+  // panel fills it rather than guessing its own height. Otherwise the page
+  // scrolls and the composer floats above the bottom of the screen, or behind
+  // the keyboard, on mobile.
   assert.match(
     detailView,
-    /h-\[calc\(100dvh-3\.5rem-var\(--keyboard-inset,0px\)\)\]/
+    /h-\[calc\(var\(--visual-viewport-height,100dvh\)-3\.5rem\)\]/
   )
   assert.match(detailView, /overflow-hidden/)
   assert.doesNotMatch(timelinePanel, /100[sdl]vh/)

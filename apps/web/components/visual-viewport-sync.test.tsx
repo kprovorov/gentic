@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render } from "@testing-library/react"
 import { act } from "react"
 
-import { KeyboardInsetSync } from "./keyboard-inset-sync"
+import { VisualViewportSync } from "./visual-viewport-sync"
 
 class FakeVisualViewport extends EventTarget {
   height: number
@@ -23,8 +23,9 @@ class FakeVisualViewport extends EventTarget {
   }
 
   // iOS pans the page to reveal the focused field; the visual viewport reports
-  // that as a scroll of its own.
-  panTo(scrollTop: number) {
+  // that as a scroll of its own, sometimes without a resize.
+  panTo(scrollTop: number, { height = this.height } = {}) {
+    this.height = height
     setDocument({ scrollTop })
     act(() => {
       this.dispatchEvent(new Event("scroll"))
@@ -58,19 +59,10 @@ function setDocument({
   }
 }
 
-// `layoutHeight` is the height `dvh` and `window.innerHeight` agree on — the
-// screen, keyboard or no keyboard, unless the browser resizes the layout
-// viewport for one.
 function setupViewport(
   options: { height: number; scale?: number } | null,
   { layoutHeight = 800 }: { layoutHeight?: number } = {}
 ) {
-  Object.defineProperty(window, "innerHeight", {
-    configurable: true,
-    writable: true,
-    value: layoutHeight,
-  })
-
   Object.defineProperty(window, "scrollTo", {
     configurable: true,
     writable: true,
@@ -94,8 +86,10 @@ function setupViewport(
   return viewport
 }
 
-function keyboardInset() {
-  return document.documentElement.style.getPropertyValue("--keyboard-inset")
+function visualViewportHeight() {
+  return document.documentElement.style.getPropertyValue(
+    "--visual-viewport-height"
+  )
 }
 
 function scrolledTo() {
@@ -104,80 +98,69 @@ function scrolledTo() {
 
 afterEach(() => {
   cleanup()
-  document.documentElement.style.removeProperty("--keyboard-inset")
+  document.documentElement.style.removeProperty("--visual-viewport-height")
   for (const property of ["scrollTop", "scrollHeight", "clientHeight"]) {
     Reflect.deleteProperty(document.documentElement, property)
   }
 })
 
-describe("KeyboardInsetSync", () => {
-  it("publishes the height the keyboard covers", () => {
+describe("VisualViewportSync", () => {
+  it("publishes the visible height", () => {
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
-    expect(keyboardInset()).toBe("0px")
+
+    render(<VisualViewportSync />)
+
+    expect(visualViewportHeight()).toBe("800px")
 
     viewport!.resizeTo({ height: 460 })
 
-    expect(keyboardInset()).toBe("340px")
+    expect(visualViewportHeight()).toBe("460px")
   })
 
-  it("resets to zero once the keyboard closes", () => {
-    const viewport = setupViewport({ height: 460 })
-    render(<KeyboardInsetSync />)
-    expect(keyboardInset()).toBe("340px")
-
-    viewport!.resizeTo({ height: 800 })
-
-    expect(keyboardInset()).toBe("0px")
-  })
-
-  it("ignores gaps too small to be a keyboard", () => {
-    // Mobile browser chrome animating in and out moves the visual viewport a
-    // few pixels; resizing the layout for that would just look like a twitch.
-    setupViewport({ height: 790 })
-    render(<KeyboardInsetSync />)
-
-    expect(keyboardInset()).toBe("0px")
-  })
-
-  it("ignores a viewport shrunk by pinch zoom", () => {
-    setupViewport({ height: 400, scale: 2 })
-    render(<KeyboardInsetSync />)
-
-    expect(keyboardInset()).toBe("0px")
-  })
-
-  it("charges nothing for a keyboard the layout viewport already gave up", () => {
-    // A browser that honours `interactiveWidget: resizes-content` shrinks the
-    // layout viewport itself, and `innerHeight` shrinks with it, so `dvh` has
-    // already lost the covered space and there is nothing left to subtract.
-    setupViewport({ height: 460 }, { layoutHeight: 460 })
-
-    render(<KeyboardInsetSync />)
-
-    expect(keyboardInset()).toBe("0px")
-  })
-
-  it("still reports a keyboard iOS has already taken out of the root's box", () => {
-    // iOS shrinks the root element to the visible area while `dvh` keeps its
-    // full-screen value, so the composer needs the inset precisely when the
-    // root's own height says the keyboard isn't there.
+  it("publishes the visible height a keyboard left behind, whatever the rest of the page reports", () => {
+    // The bug this exists for: on iOS every other height — `dvh`,
+    // `window.innerHeight`, the root's `clientHeight` — keeps (or loses) the
+    // keyboard's space on its own schedule, so a layout built by subtracting
+    // one from another ends up full-screen and hides the composer behind the
+    // keyboard. This number comes from the keyboard's own side of the API.
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
 
-    setDocument({ clientHeight: 460, scrollHeight: 460 })
+    setDocument({ clientHeight: 460 })
     viewport!.resizeTo({ height: 460 })
 
-    expect(keyboardInset()).toBe("340px")
+    expect(visualViewportHeight()).toBe("460px")
+  })
+
+  it("follows a keyboard that only reports itself as a scroll", () => {
+    const viewport = setupViewport({ height: 800 })
+    render(<VisualViewportSync />)
+
+    viewport!.panTo(0, { height: 460 })
+
+    expect(visualViewportHeight()).toBe("460px")
+  })
+
+  it("hands a pinch-zoomed page back to `dvh`", () => {
+    // Zoomed in, the visual viewport is a window onto the page rather than the
+    // room the page has; sizing the shell to it would shrink the app to the
+    // magnifying glass.
+    const viewport = setupViewport({ height: 800 })
+    render(<VisualViewportSync />)
+    expect(visualViewportHeight()).toBe("800px")
+
+    viewport!.resizeTo({ height: 400, scale: 2 })
+
+    expect(visualViewportHeight()).toBe("")
   })
 
   it("clears the variable on unmount", () => {
     setupViewport({ height: 460 })
-    const view = render(<KeyboardInsetSync />)
+    const view = render(<VisualViewportSync />)
 
     view.unmount()
 
-    expect(keyboardInset()).toBe("")
+    expect(visualViewportHeight()).toBe("")
   })
 
   it("pulls the page back to the top when the keyboard scrolls it away", () => {
@@ -185,7 +168,7 @@ describe("KeyboardInsetSync", () => {
     // composer by scrolling the document only slides the whole thing — composer
     // included — off the top of the screen.
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
 
     viewport!.resizeTo({ height: 460 })
     viewport!.panTo(340)
@@ -195,7 +178,7 @@ describe("KeyboardInsetSync", () => {
 
   it("pulls the page back to the top as the keyboard opens", () => {
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
     setDocument({ scrollTop: 340 })
 
     viewport!.resizeTo({ height: 460 })
@@ -205,7 +188,7 @@ describe("KeyboardInsetSync", () => {
 
   it("pulls the page back to the top when the pan reaches the document", () => {
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
     viewport!.resizeTo({ height: 460 })
 
     setDocument({ scrollTop: 340 })
@@ -220,7 +203,7 @@ describe("KeyboardInsetSync", () => {
     // Here the browser scrolled to reveal a field on a long page; yanking it
     // back to the top would hide what the user is typing in.
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
     setDocument({ scrollTop: 340, scrollHeight: 4000 })
 
     viewport!.resizeTo({ height: 460 })
@@ -230,7 +213,7 @@ describe("KeyboardInsetSync", () => {
 
   it("leaves a pinch-zoomed page where the user panned it", () => {
     const viewport = setupViewport({ height: 800 })
-    render(<KeyboardInsetSync />)
+    render(<VisualViewportSync />)
 
     viewport!.resizeTo({ height: 400, scale: 2 })
     viewport!.panTo(120)
@@ -241,7 +224,7 @@ describe("KeyboardInsetSync", () => {
   it("does nothing without the Visual Viewport API", () => {
     setupViewport(null)
 
-    expect(() => render(<KeyboardInsetSync />)).not.toThrow()
-    expect(keyboardInset()).toBe("")
+    expect(() => render(<VisualViewportSync />)).not.toThrow()
+    expect(visualViewportHeight()).toBe("")
   })
 })
