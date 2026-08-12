@@ -37,6 +37,11 @@ import { createServiceClient } from "@gentic/supabase/service"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString } from "../_lib/form-data"
+import type { Attachment } from "./[code]/attachments"
+import {
+  createAttachmentSigner,
+  type SignableAttachment,
+} from "./attachment-signing"
 import {
   ATTACHMENT_DESCRIPTORS_FIELD,
   ATTACHMENT_IDS_FIELD,
@@ -745,15 +750,7 @@ async function completeAttachmentUploads(
   supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
   issueId: string,
   attachmentIds: string[]
-): Promise<
-  Array<{
-    id: string
-    fileName: string
-    sizeBytes: number | null
-    url: null
-    thumbnailUrl: null
-  }>
-> {
+): Promise<Attachment[]> {
   if (attachmentIds.length === 0) {
     return []
   }
@@ -765,22 +762,19 @@ async function completeAttachmentUploads(
     .is("upload_completed_at", null)
     .is("deleted_at", null)
     .in("id", attachmentIds)
-    .select("id,file_name,size_bytes")
-    .returns<
-      Array<{ id: string; file_name: string; size_bytes: number | null }>
-    >()
+    .select("id,file_name,content_type,size_bytes,storage_path,deleted_at")
+    .returns<SignableAttachment[]>()
 
   if (error) {
     throw new Error(error.message)
   }
 
-  return (data ?? []).map((attachment) => ({
-    id: attachment.id,
-    fileName: attachment.file_name,
-    sizeBytes: attachment.size_bytes,
-    url: null,
-    thumbnailUrl: null,
-  }))
+  // Signed here rather than left null: the composer swaps its optimistic
+  // bubble for this response, so anything missing a thumbnail would drop the
+  // just-sent image back to a file icon until the next refetch lands. The
+  // update above is RLS-scoped to the issue every caller has already
+  // ownership-checked, so these rows are the caller's to sign.
+  return Promise.all((data ?? []).map(createAttachmentSigner()))
 }
 
 async function cleanupUploadedAttachments(
