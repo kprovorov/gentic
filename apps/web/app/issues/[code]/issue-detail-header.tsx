@@ -23,6 +23,7 @@ import {
 import { getIssueEditHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import { SiteHeaderPortal } from "@/components/site-header-portal"
+import { useKeyboardOpen } from "@/components/use-keyboard-open"
 import { Button } from "@gentic/ui/button"
 import {
   Collapsible,
@@ -219,6 +220,21 @@ export function IssueDetailHeader({
   // metadata pills and the request that kicked it off — collapses together so
   // the timeline can take the whole screen when the details aren't needed.
   const [open, setOpen] = useState(true)
+  const isKeyboardOpen = useKeyboardOpen()
+  const [keyboardWasOpen, setKeyboardWasOpen] = useState(isKeyboardOpen)
+
+  // What is left of a phone screen under a keyboard cannot hold the details,
+  // the timeline and the composer at once, and this header doesn't shrink — so
+  // an expanded one pushes the composer clean off the bottom just as the user
+  // goes to type in it. Fold it away when the keyboard arrives. Only on the
+  // way in: reopening it from here is the user's call, keyboard or not.
+  if (isKeyboardOpen !== keyboardWasOpen) {
+    setKeyboardWasOpen(isKeyboardOpen)
+
+    if (isKeyboardOpen) {
+      setOpen(false)
+    }
+  }
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
@@ -329,8 +345,10 @@ export function IssueDetailHeader({
             </div>
 
             {/* Capped so a long request can't eat the timeline and push the
-                composer off the bottom of a viewport-height column. */}
-            <div className="max-h-[38dvh] min-w-0 overflow-y-auto">
+                composer off the bottom of a viewport-height column. The cap
+                tracks the *visible* height, so it keeps meaning what it says
+                when a keyboard is covering a third of the screen. */}
+            <div className="max-h-[calc(var(--visual-viewport-height,100dvh)*0.38)] min-w-0 overflow-y-auto">
               <IssueRequestBody body={issue.body} attachments={attachments} />
             </div>
           </div>
