@@ -281,7 +281,7 @@ export function IssueDetailHeader({
         <CollapsibleContent className="flex min-w-0 flex-col gap-3">
           {/* Grouping the pills on a tinted panel keeps them readable as one
               metadata block on mobile, where the rail is hidden. The trailing
-              "+" opens everything the rail would otherwise hold. */}
+              "…" opens everything the rail would otherwise hold. */}
           <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/50 p-1.5 xl:hidden">
             <IssueTypeMenu issue={issue} />
             <AgentProviderBadge provider={issue.agent_provider} />

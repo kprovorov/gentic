@@ -95,7 +95,7 @@ afterEach(() => {
 })
 
 describe("IssuePropertiesDialog", () => {
-  it("keeps the rail's contents behind the pill row's plus button", async () => {
+  it("keeps the rail's contents behind the pill row's ellipsis button", async () => {
     const user = userEvent.setup()
     renderDialog()
 
