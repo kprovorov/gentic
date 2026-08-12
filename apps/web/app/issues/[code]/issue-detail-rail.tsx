@@ -742,10 +742,11 @@ export function IssueDetailRail({
   return (
     <div className="min-w-0 divide-y divide-border/70">
       <RailSection title="Status">
-        <div className="grid gap-2">
-          <IssueDetailStatus issueId={issueId} status={status} />
-          <IssueDetailPriority issueId={issueId} priority={priority} />
-        </div>
+        <IssueDetailStatus issueId={issueId} status={status} />
+      </RailSection>
+
+      <RailSection title="Priority">
+        <IssueDetailPriority issueId={issueId} priority={priority} />
       </RailSection>
 
       <RailSection title="Labels">

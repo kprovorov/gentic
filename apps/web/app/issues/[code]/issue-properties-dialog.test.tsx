@@ -111,6 +111,7 @@ describe("IssuePropertiesDialog", () => {
     for (const section of [
       "Details",
       "Status",
+      "Priority",
       "Labels",
       "Pull requests",
       "Files",
