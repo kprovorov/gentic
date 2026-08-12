@@ -21,10 +21,12 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
   } = data
   // Full viewport height at every breakpoint so the composer pins to the
   // bottom of the screen instead of the page scrolling past it on mobile.
-  // `dvh` (not `svh`) keeps that flush as mobile browser chrome and the
-  // on-screen keyboard resize the viewport.
+  // `dvh` (not `svh`) keeps that flush as mobile browser chrome resizes the
+  // viewport; `--keyboard-inset` (see `KeyboardInsetSync`) covers the browsers
+  // where `dvh` ignores the on-screen keyboard, so the timeline is the only
+  // thing that scrolls and the composer stays pinned above the keyboard.
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] min-w-0 flex-col overflow-hidden bg-background">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--keyboard-inset,0px))] min-w-0 flex-col overflow-hidden bg-background">
       <RealtimeRefresh
         channelName={`issue-${issue.id}-detail`}
         tables={[
