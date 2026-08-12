@@ -1,10 +1,12 @@
 import type { IssueDetailData } from "@/app/queries"
 import { RealtimeRefresh } from "@/components/realtime-refresh"
+import { isSpecIssueType } from "@gentic/validators/issues"
 
 import { IssueDetailHeader } from "./issue-detail-header"
 import { IssueDetailRail } from "./issue-detail-rail"
 import { IssueDetailTimelinePanel } from "./issue-detail-timeline-panel"
 import { IssueSlugUrlSync } from "./issue-slug-url-sync"
+import { IssueSpecPanel } from "./issue-spec-panel"
 
 export function IssueDetailView({ data }: { data: IssueDetailData }) {
   const {
@@ -19,6 +21,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     labels,
     archivedLabelIds,
   } = data
+  const isSpec = isSpecIssueType(issue.type)
   // Full viewport height at every breakpoint so the composer pins to the
   // bottom of the screen instead of the page scrolling past it on mobile.
   // `dvh` (not `svh`) keeps that flush as mobile browser chrome and the
@@ -52,18 +55,26 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col border-t xl:flex-row">
-        <IssueDetailTimelinePanel
-          issueId={issue.id}
-          issueCreatedAt={issue.created_at}
-          agentProvider={issue.agent_provider}
-          issueModel={issue.issue_model}
-          initialMessages={messages}
-          initialStatus={issue.status}
-          initialUsageLimitResetAt={issue.usage_limit_reset_at}
-          initialPullRequests={pullRequests}
-          events={events}
-          archivedLabelIds={archivedLabelIds}
-        />
+        {isSpec ? (
+          <IssueSpecPanel
+            issueCreatedAt={issue.created_at}
+            events={events}
+            archivedLabelIds={archivedLabelIds}
+          />
+        ) : (
+          <IssueDetailTimelinePanel
+            issueId={issue.id}
+            issueCreatedAt={issue.created_at}
+            agentProvider={issue.agent_provider}
+            issueModel={issue.issue_model}
+            initialMessages={messages}
+            initialStatus={issue.status}
+            initialUsageLimitResetAt={issue.usage_limit_reset_at}
+            initialPullRequests={pullRequests}
+            events={events}
+            archivedLabelIds={archivedLabelIds}
+          />
+        )}
 
         {/* Below xl the rail's contents move into the header's properties
             dialog rather than stacking underneath the chat. */}
@@ -73,6 +84,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             issueCode={issue.code}
             status={issue.status}
             priority={issue.priority}
+            isSpec={isSpec}
             hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
             automaticPrPublishingInProgress={automaticPrPublishingInProgress}
             pullRequests={pullRequests}

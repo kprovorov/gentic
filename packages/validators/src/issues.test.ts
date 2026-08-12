@@ -11,6 +11,8 @@ import {
   issuePriorityOrder,
   issuePrioritySchema,
   issuePriorityStyles,
+  issueTypeSchema,
+  isSpecIssueType,
   mutateIssueLabelsSchema,
   updateIssuePrioritySchema,
   updateIssueSchema,
@@ -230,4 +232,24 @@ test("mutateIssueLabelsSchema rejects more than 20 unique label_ids", () => {
   assert.throws(() =>
     mutateIssueLabelsSchema.parse({ issue_ids: [issueId], label_ids: labelIds })
   )
+})
+
+test("issueTypeSchema accepts spec alongside the agent-work types", () => {
+  assert.deepEqual(issueTypeSchema.options, [
+    "issue",
+    "feature",
+    "bug",
+    "feedback",
+    "idea",
+    "spec",
+  ])
+})
+
+test("isSpecIssueType singles out spec from every other type", () => {
+  assert.deepEqual(
+    issueTypeSchema.options.filter((type) => isSpecIssueType(type)),
+    ["spec"]
+  )
+  assert.equal(isSpecIssueType(null), false)
+  assert.equal(isSpecIssueType(undefined), false)
 })

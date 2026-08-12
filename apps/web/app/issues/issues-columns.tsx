@@ -11,6 +11,7 @@ import {
   IconBulb,
   IconCheck,
   IconFileDescription,
+  IconFileText,
   IconLock,
   IconMessage2,
   IconMinus,
@@ -82,6 +83,7 @@ export const issueTypeLabels: Record<IssueType, string> = {
   bug: "Bug",
   feedback: "Feedback",
   idea: "Idea",
+  spec: "Spec",
 }
 
 export const issueTypeIcons = {
@@ -90,6 +92,7 @@ export const issueTypeIcons = {
   bug: IconBug,
   feedback: IconMessage2,
   idea: IconBulb,
+  spec: IconFileText,
 }
 
 export const issueTypeStyles: Record<IssueType, string> = {
@@ -98,6 +101,7 @@ export const issueTypeStyles: Record<IssueType, string> = {
   bug: "bg-muted text-muted-foreground",
   feedback: "bg-muted text-muted-foreground",
   idea: "bg-muted text-muted-foreground",
+  spec: "bg-muted text-muted-foreground",
 }
 
 export const issueTypeIconStyles: Record<IssueType, string> = {
@@ -106,6 +110,7 @@ export const issueTypeIconStyles: Record<IssueType, string> = {
   bug: "text-red-600 dark:text-red-300",
   feedback: "text-sky-600 dark:text-sky-300",
   idea: "text-amber-600 dark:text-amber-300",
+  spec: "text-indigo-600 dark:text-indigo-300",
 }
 
 export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {

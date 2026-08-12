@@ -84,6 +84,22 @@ export function getIssueCode(projectKey: string, issueNumber: number) {
 }
 
 /**
+ * Rejection message for every agent-facing operation asked of a Spec. The
+ * matching SQL functions raise their own version of it, so this is what a
+ * caller sees when the service layer catches the case first.
+ */
+export const SPEC_HAS_NO_AGENT_MESSAGE =
+  "Spec issues have no coding agent or conversation"
+
+/**
+ * Rejection message for turning an issue that is mid-run into a Spec: a Spec
+ * has no chat, so the running agent would keep streaming into a transcript
+ * nobody can see.
+ */
+export const SPEC_CONVERSION_BLOCKED_MESSAGE =
+  "Finish or reset the agent run before making this issue a Spec"
+
+/**
  * The fixed Kickoff Message that opens a fresh Coding Agent conversation. It
  * names the Issue Code and nothing else — no title, Body excerpt, or hidden
  * instruction — because the agent reads the Body itself through the Gentic MCP

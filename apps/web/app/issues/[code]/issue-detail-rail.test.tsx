@@ -142,6 +142,7 @@ function renderRail(
         issueCode="GEN-1"
         status="todo"
         priority="medium"
+        isSpec={false}
         hasUnpublishedAgentChanges={false}
         automaticPrPublishingInProgress={false}
         pullRequests={[]}

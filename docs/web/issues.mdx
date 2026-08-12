@@ -37,8 +37,8 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   Gentic generates a short title in the background after creating the issue. You can edit it later. Edited titles accept up to 160 characters.
 </ParamField>
 
-<ParamField body="type" type="feature | bug | feedback | idea">
-  Gentic classifies the issue in the background after creation. You can change the result on the edit page.
+<ParamField body="type" type="feature | bug | feedback | idea | spec">
+  Gentic classifies the issue in the background after creation. You can change the result on the edit page. The classifier only ever picks `feature` or `bug`; the rest — including `spec` — are yours to choose.
 
   | Value | When to use |
   |---|---|
@@ -46,6 +46,7 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   | `bug` | Defects and regressions to fix |
   | `feedback` | Changes driven by user or team feedback |
   | `idea` | Exploratory or speculative work |
+  | `spec` | Written intent an agent should never pick up — see [Spec issues](#spec-issues) |
 </ParamField>
 
 <ParamField body="agent" type="Claude Code | Codex">
@@ -93,6 +94,19 @@ An issue can accumulate multiple pull requests over its lifetime. When you [re-q
 Automatic publishing runs once at most for each active run. The publishing request appears in the transcript with Gentic attribution. It reuses an existing branch or pull request, avoids empty commits, and requires a ready-for-review pull request with a Conventional Commit title plus **Summary** and **Test plan** sections. The first Gentic-requested branch follows `issue-key-issue-slug`; later pull requests can use any branch name.
 
 If a finished, idle run has unpublished changes and no pull request, the issue sidebar shows **Create PR**. This manual action appears with your attribution. It is unavailable during an active run, while automatic publishing is pending, and after a pull request is attached.
+
+## Spec Issues
+
+A **Spec** is an issue that records intent instead of asking for it to be built — a written requirement, a design decision, a brief that other issues implement. Set the type to **Spec** from the type menu on the issue detail page or the edit page.
+
+A Spec differs from every other type in two ways:
+
+- **No agent runs it.** Workers skip Spec issues when claiming work, so a Spec left in **Todo** is never picked up. Its statuses are a marker of your own progress; moving one from **Draft** to **Todo** does not queue anything.
+- **It has no conversation.** The detail page shows the body and the issue's history with no chat composer, because there is no agent session to send to.
+
+Everything else — labels, priority, relations, files, and the body — works exactly as it does for other issues, so a Spec can block the issues that implement it.
+
+Changing a Spec back to another type restores its agent behaviour. You cannot convert an issue into a Spec while an agent run is active on it; finish or retry the run first.
 
 ## Edit an Issue
 

@@ -249,7 +249,9 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
 <ParamField body="type" type="enum">
   Categorizes the nature of the issue. Defaults to `feature`.
 
-  Accepted values: `feature`, `bug`, `feedback`, `idea`
+  Accepted values: `feature`, `bug`, `feedback`, `idea`, `spec`
+
+  A `spec` issue records intent instead of requesting work: no worker ever claims it and it has no agent conversation. See [Spec issues](/web/issues#spec-issues).
 </ParamField>
 
 <ParamField body="create_pr_automatically" type="boolean">
@@ -297,7 +299,9 @@ Updates the title, body, agent provider, issue model, type, and priority for an 
 <ParamField body="type" type="enum" required>
   Updated issue type.
 
-  Accepted values: `feature`, `bug`, `feedback`, `idea`
+  Accepted values: `feature`, `bug`, `feedback`, `idea`, `spec`
+
+  Switching an issue to `spec` is rejected while an agent run is active on it, because a spec has no conversation for the run to report into.
 </ParamField>
 
 <ParamField body="priority" type="enum" required>
@@ -377,6 +381,8 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 
 <Note>
   Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message `Work on Gentic issue {Issue Code}.` (the agent reads the body itself via `get_issue`), and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+
+  A [`spec`](/web/issues#spec-issues) issue is the exception: it is never claimed, so `draft` → `todo` on a spec sets the status and nothing else.
 </Note>
 
 <Expandable title="Output fields">

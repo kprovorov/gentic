@@ -1,3 +1,5 @@
+import { isSpecIssueType } from "@gentic/validators/issues"
+
 import { ServiceError, unwrap } from "../errors"
 import type { Supabase } from "../types"
 import { ensureIssueOwned } from "./ownership"
@@ -5,6 +7,7 @@ import {
   formatPublishingRequest,
   generateFirstPublishBranchName,
 } from "./publish"
+import { SPEC_HAS_NO_AGENT_MESSAGE } from "./shared"
 
 export const GENTIC_AUTHORED_USER_MESSAGE = {
   role: "user",
@@ -25,6 +28,7 @@ export async function sendIssueMessage(
   content: string
 ) {
   await ensureIssueOwned(supabase, userId, issueId)
+  await ensureIssueIsNotSpec(supabase, issueId)
 
   return unwrap(
     await supabase
@@ -34,6 +38,25 @@ export async function sendIssueMessage(
       })
       .single<{ id: string; created_at: string }>()
   )
+}
+
+// A Spec has no agent conversation, so nothing may be added to its transcript.
+// `send_issue_user_message` refuses too; checking here turns the raw SQL error
+// into the ordinary validation error callers already handle. Ownership is
+// established by the caller.
+async function ensureIssueIsNotSpec(supabase: Supabase, issueId: string) {
+  const { data, error } = await supabase
+    .from("issues")
+    .select("type")
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (isSpecIssueType(data?.type)) {
+    throw new ServiceError("validation", SPEC_HAS_NO_AGENT_MESSAGE)
+  }
 }
 
 export async function createIssueUserMessage(
