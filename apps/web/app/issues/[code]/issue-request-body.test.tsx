@@ -22,20 +22,20 @@ const attachment: Attachment = {
 }
 
 describe("IssueRequestBody", () => {
-  it("renders the request card with the body and attachments", () => {
+  it("renders the request with the body and attachments", () => {
     render(
       <IssueRequestBody body="Fix the flaky test" attachments={[attachment]} />
     )
 
-    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "Request" })).toBeInTheDocument()
     expect(screen.getByText("Fix the flaky test")).toBeInTheDocument()
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
 
-  it("still shows the request card when the body is empty", () => {
+  it("still shows the request when the body is empty", () => {
     render(<IssueRequestBody body={null} attachments={[attachment]} />)
 
-    expect(screen.getByText("Request")).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "Request" })).toBeInTheDocument()
     expect(screen.getByText("No body provided.")).toBeInTheDocument()
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
