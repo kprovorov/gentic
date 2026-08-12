@@ -53,8 +53,13 @@ export function AttachmentChip({
   return (
     <span
       className={cn(
-        "flex max-w-full items-center gap-2.5 rounded-2xl bg-background p-1.5 text-xs ring-1 ring-border",
-        invalid && "text-destructive ring-destructive",
+        // The outline is a border, not a ring: a ring paints *outside* the
+        // border box, and a chip is routinely the last thing inside a scroll
+        // container (the request body, a chat bubble), where its bottom edge
+        // sits flush against the clip rect and the ring's bottom line gets
+        // shaved off — the chip renders with three sides and no floor.
+        "flex max-w-full items-center gap-2.5 rounded-2xl border border-border bg-background p-1.5 text-xs",
+        invalid && "border-destructive text-destructive",
         className
       )}
     >

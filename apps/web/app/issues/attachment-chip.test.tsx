@@ -4,6 +4,30 @@ import { describe, expect, it } from "vitest"
 import { AttachmentChip } from "./attachment-chip"
 
 describe("AttachmentChip", () => {
+  // jsdom has no layout, so nothing here can catch the clipping itself; the
+  // guard is that the outline stays inside the chip's own box. A ring paints
+  // outside it, and the chip renders flush against the bottom of a scroll
+  // container (the request body, a chat bubble), which shaves that line off.
+  it("draws its outline as a border rather than an outset ring", () => {
+    const { container } = render(
+      <AttachmentChip fileName="spec.pdf" sizeBytes={4096} />
+    )
+
+    const chip = container.firstElementChild
+    expect(chip?.className).toContain("border")
+    expect(chip?.className).not.toContain("ring-1")
+  })
+
+  it("keeps the destructive palette on the border for an invalid file", () => {
+    const { container } = render(
+      <AttachmentChip fileName="huge.zip" sizeBytes={26_214_400} invalid />
+    )
+
+    const chip = container.firstElementChild
+    expect(chip?.className).toContain("border-destructive")
+    expect(chip?.className).not.toContain("ring-destructive")
+  })
+
   it("letterboxes the thumbnail inside the tinted preview tile", () => {
     const { container } = render(
       <AttachmentChip
