@@ -148,6 +148,37 @@ describe("MessageComposer", () => {
     ).toBeNull()
   })
 
+  it("keeps focus in the draft when the model menu is opened by pointer", async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    await user.click(promptField())
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
+
+    expect(
+      await screen.findByRole("menu", { name: "Choose agent and model" })
+    ).toBeVisible()
+    // Taking focus here is what closes the on-screen keyboard on a phone.
+    expect(promptField()).toHaveFocus()
+  })
+
+  it("spends Escape on the model menu before the composer itself", async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    await user.click(promptField())
+    await user.click(
+      screen.getByRole("button", { name: "Choose agent and model" })
+    )
+    await user.keyboard("{Escape}")
+
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(promptField()).toHaveFocus()
+    expect(backdrop()).not.toHaveClass("opacity-0")
+  })
+
   it("leaves Escape to the owner when it handles the key itself", async () => {
     const user = userEvent.setup()
     renderComposer({
