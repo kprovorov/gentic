@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 import { IconLoader2, IconPaperclip, IconSend } from "@tabler/icons-react"
 
 import { Button } from "@gentic/ui/button"
@@ -21,8 +22,8 @@ import { AgentModelPicker } from "./agent-model-picker"
 // picker + send underneath) while it is in use. The shapes differ only in
 // Tailwind classes, never in structure, so the textarea keeps its focus and
 // selection across the switch — which is also why the modal treatment below
-// tints the page around the composer where it stands instead of moving it into
-// a portal.
+// raises the composer where it stands rather than moving it into a portal, and
+// sends only its backdrop up to the body.
 export function MessageComposer({
   className,
   draft,
@@ -152,18 +153,7 @@ export function MessageComposer({
       }}
       className={cn("relative min-w-0", isRaised && "z-50", className)}
     >
-      {/* Tinted, never blurred: the timeline stays legible behind the raised
-          composer. The form's own z-index lifts it over the app shell, so the
-          backdrop only has to outrank the composer's siblings, and it takes
-          the click that dismisses it rather than passing it to the page. */}
-      <div
-        aria-hidden="true"
-        data-slot="message-composer-backdrop"
-        className={cn(
-          "fixed inset-0 z-0 bg-black/35 transition-opacity duration-100",
-          !isRaised && "pointer-events-none opacity-0"
-        )}
-      />
+      <ComposerBackdrop raised={Boolean(isRaised)} />
 
       {slashCommands.length > 0 ? (
         <SlashCommandMenu
@@ -175,7 +165,7 @@ export function MessageComposer({
 
       <div
         className={cn(
-          "relative z-10 flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
+          "relative flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
           isOpen ? "rounded-[22px]" : "rounded-full",
           // Over the backdrop the composer has to carry its own surface; the
           // translucent resting fill would just show the tint through.
@@ -284,6 +274,46 @@ export function MessageComposer({
         </Button>
       </div>
     </form>
+  )
+}
+
+// `body` is there from the first client render and never swapped, so the store
+// never has to publish a change — it only keeps the server rendering nothing.
+const subscribeToBody = () => () => {}
+const getBody = () => document.body
+const getServerBody = () => null
+
+// The tint covers the whole window, global header included, so it has to be a
+// child of nothing: rendered in place it inherits whatever the app shell does
+// to its descendants, and a `fixed` element only fills the window while no
+// ancestor has claimed it — an ancestor with a transform, a filter, or
+// containment silently becomes the box it fills instead. From `body` there is
+// no ancestor left to claim it. `z-40` ties the sticky header and wins on DOM
+// order; the composer's own `z-50` keeps it above.
+function ComposerBackdrop({ raised }: { raised: boolean }) {
+  const container = useSyncExternalStore(
+    subscribeToBody,
+    getBody,
+    getServerBody
+  )
+
+  if (!container) {
+    return null
+  }
+
+  return createPortal(
+    <div
+      aria-hidden="true"
+      data-slot="message-composer-backdrop"
+      className={cn(
+        "fixed inset-0 z-40 bg-black/35 transition-opacity duration-100",
+        // Tinted, never blurred: the timeline stays legible behind the raised
+        // composer, and the backdrop takes the click that dismisses it rather
+        // than passing it through to the page.
+        !raised && "pointer-events-none opacity-0"
+      )}
+    />,
+    container
   )
 }
 

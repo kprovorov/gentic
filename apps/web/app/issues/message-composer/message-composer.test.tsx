@@ -124,6 +124,15 @@ describe("MessageComposer", () => {
     expect(backdrop()).toHaveClass("opacity-0")
   })
 
+  it("hangs the tint off the body so no ancestor can bound it", () => {
+    renderComposer()
+
+    // Rendered in place it would fill whichever ancestor happened to claim it
+    // — the app shell rather than the window — leaving the global header
+    // untinted.
+    expect(backdrop().parentElement).toBe(document.body)
+  })
+
   it("leaves the page untinted for a composer parked open by an attachment", async () => {
     const user = userEvent.setup()
     renderComposer({
