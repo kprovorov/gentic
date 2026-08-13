@@ -95,12 +95,14 @@ export function MessageComposer({
   }
 
   // Escape dismisses the raised composer the way it would any modal — unless
-  // the owner already spent it on something nearer, such as closing the slash
-  // command menu, which it signals by preventing the default.
+  // it is spent on something nearer first: the slash command menu, which
+  // signals that by preventing the default, or the model menu, which keeps
+  // focus here while it is open and so would otherwise be closed by the same
+  // keypress that collapses the whole composer.
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     onKeyDown?.(event)
 
-    if (event.key === "Escape" && !event.defaultPrevented) {
+    if (event.key === "Escape" && !event.defaultPrevented && !isModelMenuOpen) {
       event.currentTarget.blur()
     }
   }
