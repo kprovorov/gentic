@@ -513,8 +513,17 @@ test("a skill install runs alongside issue work without interrupting it", async 
       expires_at: new Date(clock.nowMs + 10 * 60_000).toISOString(),
     })
     let sessionsRun = 0
+    // The ban is only here to end the loop, so hold it until the session has
+    // actually run. The worker starts `processIssue` without awaiting it, and
+    // that path clears the attachments directory off the real filesystem
+    // before it reaches the session — while the loop itself races ahead on a
+    // clock that only moves when it sleeps. On a loaded machine that `rm`
+    // outlives three control polls, and a ban keyed on elapsed time alone
+    // cancels the run before the session it is meant to leave undisturbed.
     api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 3 * CONTROL_INTERVAL_MS },
+      worker: {
+        banned: sessionsRun > 0 && clock.elapsedMs >= 3 * CONTROL_INTERVAL_MS,
+      },
       runs: [
         {
           issue_id: issue.id,
