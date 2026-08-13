@@ -28,6 +28,17 @@ function promptField() {
   return screen.getByRole("textbox", { name: "Message the agent" })
 }
 
+// The backdrop is decorative, so it carries no role to query it by.
+function backdrop() {
+  const element = document.querySelector(
+    '[data-slot="message-composer-backdrop"]'
+  )
+  if (!element) {
+    throw new Error("composer backdrop not rendered")
+  }
+  return element
+}
+
 describe("MessageComposer", () => {
   it("disables send until there is a non-empty draft", () => {
     renderComposer({ draft: "  " })
@@ -96,6 +107,57 @@ describe("MessageComposer", () => {
         selector: "span",
       })
     ).toHaveClass("truncate")
+  })
+
+  it("tints the page behind the composer while it has focus", async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    expect(backdrop()).toHaveClass("opacity-0")
+
+    await user.click(promptField())
+
+    expect(backdrop()).not.toHaveClass("opacity-0")
+
+    await user.click(document.body)
+
+    expect(backdrop()).toHaveClass("opacity-0")
+  })
+
+  it("leaves the page untinted for a composer parked open by an attachment", async () => {
+    const user = userEvent.setup()
+    renderComposer({
+      draftFiles: [new File(["diff"], "patch.txt", { type: "text/plain" })],
+    })
+
+    await user.click(document.body)
+
+    expect(backdrop()).toHaveClass("opacity-0")
+  })
+
+  it("closes the raised composer on Escape", async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    await user.click(promptField())
+    await user.keyboard("{Escape}")
+
+    expect(backdrop()).toHaveClass("opacity-0")
+    expect(
+      screen.queryByRole("button", { name: "Choose agent and model" })
+    ).toBeNull()
+  })
+
+  it("leaves Escape to the owner when it handles the key itself", async () => {
+    const user = userEvent.setup()
+    renderComposer({
+      onKeyDown: (event) => event.preventDefault(),
+    })
+
+    await user.click(promptField())
+    await user.keyboard("{Escape}")
+
+    expect(backdrop()).not.toHaveClass("opacity-0")
   })
 
   it("stays expanded while a file is attached", async () => {
