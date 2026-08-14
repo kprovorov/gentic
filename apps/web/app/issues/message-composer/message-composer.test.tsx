@@ -28,17 +28,6 @@ function promptField() {
   return screen.getByRole("textbox", { name: "Message the agent" })
 }
 
-// The backdrop is decorative, so it carries no role to query it by.
-function backdrop() {
-  const element = document.querySelector(
-    '[data-slot="message-composer-backdrop"]'
-  )
-  if (!element) {
-    throw new Error("composer backdrop not rendered")
-  }
-  return element
-}
-
 describe("MessageComposer", () => {
   it("disables send until there is a non-empty draft", () => {
     renderComposer({ draft: "  " })
@@ -107,88 +96,6 @@ describe("MessageComposer", () => {
         selector: "span",
       })
     ).toHaveClass("truncate")
-  })
-
-  it("tints the page behind the composer while it has focus", async () => {
-    const user = userEvent.setup()
-    renderComposer()
-
-    expect(backdrop()).toHaveClass("opacity-0")
-
-    await user.click(promptField())
-
-    expect(backdrop()).not.toHaveClass("opacity-0")
-
-    await user.click(document.body)
-
-    expect(backdrop()).toHaveClass("opacity-0")
-  })
-
-  it("leaves the page untinted for a composer parked open by an attachment", async () => {
-    const user = userEvent.setup()
-    renderComposer({
-      draftFiles: [new File(["diff"], "patch.txt", { type: "text/plain" })],
-    })
-
-    await user.click(document.body)
-
-    expect(backdrop()).toHaveClass("opacity-0")
-  })
-
-  it("closes the raised composer on Escape", async () => {
-    const user = userEvent.setup()
-    renderComposer()
-
-    await user.click(promptField())
-    await user.keyboard("{Escape}")
-
-    expect(backdrop()).toHaveClass("opacity-0")
-    expect(
-      screen.queryByRole("button", { name: "Choose agent and model" })
-    ).toBeNull()
-  })
-
-  it("keeps focus in the draft when the model menu is opened by pointer", async () => {
-    const user = userEvent.setup()
-    renderComposer()
-
-    await user.click(promptField())
-    await user.click(
-      screen.getByRole("button", { name: "Choose agent and model" })
-    )
-
-    expect(
-      await screen.findByRole("menu", { name: "Choose agent and model" })
-    ).toBeVisible()
-    // Taking focus here is what closes the on-screen keyboard on a phone.
-    expect(promptField()).toHaveFocus()
-  })
-
-  it("spends Escape on the model menu before the composer itself", async () => {
-    const user = userEvent.setup()
-    renderComposer()
-
-    await user.click(promptField())
-    await user.click(
-      screen.getByRole("button", { name: "Choose agent and model" })
-    )
-    await user.keyboard("{Escape}")
-
-    expect(screen.queryByRole("menu")).toBeNull()
-    expect(promptField()).toHaveFocus()
-    expect(backdrop()).not.toHaveClass("opacity-0")
-  })
-
-  it("leaves Escape to the owner when it handles the key itself", async () => {
-    const user = userEvent.setup()
-    renderComposer({
-      onKeyDown: (event) => event.preventDefault(),
-    })
-
-    await user.click(promptField())
-    await user.keyboard("{Escape}")
-
-    expect(backdrop()).not.toHaveClass("opacity-0")
   })
 
   it("stays expanded while a file is attached", async () => {

@@ -20,9 +20,7 @@ import { AgentModelPicker } from "./agent-model-picker"
 // space, and it opens into a box (textarea on its own line, attach + model
 // picker + send underneath) while it is in use. The shapes differ only in
 // Tailwind classes, never in structure, so the textarea keeps its focus and
-// selection across the switch — which is also why the modal treatment below
-// tints the page around the composer where it stands instead of moving it into
-// a portal.
+// selection across the switch.
 export function MessageComposer({
   className,
   draft,
@@ -78,33 +76,20 @@ export function MessageComposer({
     dropTargetProps,
   } = useAttachmentSelection({ files: draftFiles, onFilesChange })
 
-  // In use, so the composer takes over the screen: it opens and the page behind
-  // it goes dim. The model menu opens in a portal, and sending disables — and
-  // so blurs — the textarea; neither should drop the composer back down under
-  // the user.
-  const isRaised = isFocusWithin || isModelMenuOpen || isDragging || disabled
-  // A parked attachment holds the open shape without the dimming, because the
-  // user may well have left it there to go read the timeline.
-  const isOpen = isRaised || draftFiles.length > 0
+  // The model menu opens in a portal, and sending disables — and so blurs —
+  // the textarea; neither should snap the composer shut under the user.
+  const isOpen =
+    isFocusWithin ||
+    isModelMenuOpen ||
+    isDragging ||
+    disabled ||
+    draftFiles.length > 0
 
   const isSubmitDisabled = disabled || !draft.trim() || invalidSlashCommand
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     sentRef.current = !isSubmitDisabled
     onSubmit(event)
-  }
-
-  // Escape dismisses the raised composer the way it would any modal — unless
-  // it is spent on something nearer first: the slash command menu, which
-  // signals that by preventing the default, or the model menu, which keeps
-  // focus here while it is open and so would otherwise be closed by the same
-  // keypress that collapses the whole composer.
-  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    onKeyDown?.(event)
-
-    if (event.key === "Escape" && !event.defaultPrevented && !isModelMenuOpen) {
-      event.currentTarget.blur()
-    }
   }
 
   // Sending takes focus off the disabled textarea, so hand it back once the
@@ -150,21 +135,8 @@ export function MessageComposer({
           setIsFocusWithin(false)
         }
       }}
-      className={cn("relative min-w-0", isRaised && "z-50", className)}
+      className={cn("relative min-w-0", className)}
     >
-      {/* Tinted, never blurred: the timeline stays legible behind the raised
-          composer. The form's own z-index lifts it over the app shell, so the
-          backdrop only has to outrank the composer's siblings, and it takes
-          the click that dismisses it rather than passing it to the page. */}
-      <div
-        aria-hidden="true"
-        data-slot="message-composer-backdrop"
-        className={cn(
-          "fixed inset-0 z-0 bg-black/35 transition-opacity duration-100",
-          !isRaised && "pointer-events-none opacity-0"
-        )}
-      />
-
       {slashCommands.length > 0 ? (
         <SlashCommandMenu
           commands={slashCommands}
@@ -175,11 +147,8 @@ export function MessageComposer({
 
       <div
         className={cn(
-          "relative z-10 flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
+          "flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
           isOpen ? "rounded-[22px]" : "rounded-full",
-          // Over the backdrop the composer has to carry its own surface; the
-          // translucent resting fill would just show the tint through.
-          isRaised && "bg-popover shadow-2xl",
           (isFocusWithin || isDragging) && "border-ring ring-3 ring-ring/30"
         )}
         {...dropTargetProps}
@@ -196,7 +165,7 @@ export function MessageComposer({
             ref={textareaRef}
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
-            onKeyDown={handleKeyDown}
+            onKeyDown={onKeyDown}
             rows={1}
             placeholder={placeholder}
             disabled={disabled}
