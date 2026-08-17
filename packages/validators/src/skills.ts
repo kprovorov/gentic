@@ -295,7 +295,7 @@ const redactionPatterns: Array<[RegExp, string]> = [
  * server before persisting, so neither side has to be trusted alone.
  */
 export function sanitizeSkillInstallOutput(value: string): string {
-  // eslint-disable-next-line no-control-regex -- strips ANSI colour codes
+  // Strips ANSI colour codes.
   let output = value.replace(/\u001B\[[0-9;]*[A-Za-z]/g, "")
 
   for (const [pattern, replacement] of redactionPatterns) {
