@@ -838,7 +838,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
         ) : (
           <section className="grid gap-4">
             <div className="flex items-center gap-2">
-              <div className="relative min-w-0 max-w-sm flex-1">
+              <div className="relative max-w-sm min-w-0 flex-1">
                 <IconSearch className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={globalFilter}
@@ -1114,9 +1114,7 @@ export function IssuesView({ initialData }: { initialData: IssuesData }) {
                       </DropdownMenuItem>
                     ) : null}
                     {availableProjects.length === 0 ? (
-                      <DropdownMenuItem disabled>
-                        No projects
-                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled>No projects</DropdownMenuItem>
                     ) : (
                       availableProjects.map((project) => (
                         <DropdownMenuCheckboxItem

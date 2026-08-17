@@ -16,11 +16,7 @@ import {
 // destructive resetIssueAgent path once a conversation exists. Kept separate
 // from MessageComposer itself, which stays issue-agnostic (see
 // MessageComposer's prop contract).
-export function useIssueAgentProvider({
-  issueId,
-}: {
-  issueId: string
-}) {
+export function useIssueAgentProvider({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
 
   const resetMutation = useMutation({

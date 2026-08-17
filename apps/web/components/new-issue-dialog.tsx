@@ -69,7 +69,11 @@ export function NewIssueDialog() {
               setExpanded((current) => !current)
             }}
           >
-            {expanded ? <IconArrowsDiagonalMinimize2 /> : <IconArrowsDiagonal />}
+            {expanded ? (
+              <IconArrowsDiagonalMinimize2 />
+            ) : (
+              <IconArrowsDiagonal />
+            )}
             <span className="sr-only">
               {expanded ? "Collapse composer" : "Expand composer"}
             </span>

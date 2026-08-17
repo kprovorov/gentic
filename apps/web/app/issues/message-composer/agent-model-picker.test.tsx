@@ -74,9 +74,7 @@ describe("AgentModelPicker", () => {
       />
     )
 
-    await user.click(
-      screen.getByRole("menuitem", { name: /Claude Sonnet 5/ })
-    )
+    await user.click(screen.getByRole("menuitem", { name: /Claude Sonnet 5/ }))
 
     expect(confirmSpy).not.toHaveBeenCalled()
     expect(onAgentModelChange).not.toHaveBeenCalled()
@@ -143,9 +141,7 @@ describe("AgentModelPicker", () => {
       />
     )
 
-    await user.click(
-      screen.getByRole("menuitem", { name: /Claude Sonnet 5/ })
-    )
+    await user.click(screen.getByRole("menuitem", { name: /Claude Sonnet 5/ }))
 
     expect(confirmSpy).toHaveBeenCalledWith(
       "Switch model? This resets the conversation and starts a fresh run."

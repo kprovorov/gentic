@@ -2,10 +2,7 @@ import type { QueryKey } from "@tanstack/react-query"
 
 export type RealtimeRefreshMode = "invalidate-query" | "refresh-route"
 export type RealtimeSubscribeStatus =
-  | "SUBSCRIBED"
-  | "TIMED_OUT"
-  | "CLOSED"
-  | "CHANNEL_ERROR"
+  "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR"
 
 export const realtimeFallbackRefreshMs = 10_000
 const routeRefreshDeferredPathnames = new Set(["/issues/new"])

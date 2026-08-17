@@ -17,10 +17,7 @@ export function mergeMessage(list: ChatMessage[], incoming: ChatMessage) {
   return next
 }
 
-export function mergeMessages(
-  list: ChatMessage[],
-  incoming: ChatMessage[]
-) {
+export function mergeMessages(list: ChatMessage[], incoming: ChatMessage[]) {
   return incoming.reduce(mergeMessage, list)
 }
 

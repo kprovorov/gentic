@@ -41,10 +41,7 @@ import { Button } from "@gentic/ui/button"
 import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
-import type {
-  IssueRelation,
-  IssueRelationIssue,
-} from "@gentic/services/issues"
+import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
@@ -86,9 +83,7 @@ function IssueDetailPullRequests({
         <p className="text-[12.5px] text-muted-foreground">
           No pull requests yet.
         </p>
-        {showCreatePr ? (
-          <ManualCreatePrButton issueId={issueId} />
-        ) : null}
+        {showCreatePr ? <ManualCreatePrButton issueId={issueId} /> : null}
       </div>
     )
   }
@@ -136,11 +131,7 @@ function IssueDetailPullRequests({
   )
 }
 
-function ManualCreatePrButton({
-  issueId,
-}: {
-  issueId: string
-}) {
+function ManualCreatePrButton({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
   const [optimisticRequested, setOptimisticRequested] = useState(false)
   const mutation = useMutation({
@@ -405,7 +396,7 @@ function IssueRelationDialog({
         </Button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30 duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 supports-backdrop-filter:backdrop-blur-sm" />
         <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 grid w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[1.4rem] bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:ring-foreground/10">
           <DialogPrimitive.Title className="sr-only">
             Add relation
@@ -471,7 +462,7 @@ function IssueRelationDialog({
                                 <IconCheck className="size-3.5" />
                               ) : null}
                             </span>
-                            <span className="min-w-0 flex items-baseline gap-3">
+                            <span className="flex min-w-0 items-baseline gap-3">
                               {issueCode ? (
                                 <span className="shrink-0 font-medium text-muted-foreground">
                                   {issueCode}

@@ -39,7 +39,9 @@ type FakeIssue = {
   project_key: string
   repo: string | null
   setup_script: string | null
-  blockerStatuses: Array<"todo" | "held" | "in-progress" | "completed" | "cancelled">
+  blockerStatuses: Array<
+    "todo" | "held" | "in-progress" | "completed" | "cancelled"
+  >
 }
 
 type FakeWorker = {
@@ -218,7 +220,9 @@ class FakeIssuesQuery {
   }
 
   maybeSingle() {
-    return this.updateValues ? this.updateMaybeSingle() : this.selectMaybeSingle()
+    return this.updateValues
+      ? this.updateMaybeSingle()
+      : this.selectMaybeSingle()
   }
 
   private selectMaybeSingle() {
@@ -247,7 +251,10 @@ class FakeIssuesQuery {
   private matchingIssues() {
     return this.db.issues.filter((issue) => {
       if (this.filters.id && issue.id !== this.filters.id) return false
-      if (this.filters.userId && issue.project_user_id !== this.filters.userId) {
+      if (
+        this.filters.userId &&
+        issue.project_user_id !== this.filters.userId
+      ) {
         return false
       }
       if (
@@ -374,7 +381,9 @@ function worker(overrides: Partial<FakeWorker> = {}): FakeWorker {
   }
 }
 
-function issue(overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">): FakeIssue {
+function issue(
+  overrides: Partial<FakeIssue> & Pick<FakeIssue, "id">
+): FakeIssue {
   const { id, ...rest } = overrides
   return {
     id,
@@ -418,7 +427,8 @@ function compareIssues(orders: { column: string; ascending: boolean }[]) {
     for (const order of orders) {
       let comparison = 0
       if (order.column === "priority") {
-        comparison = PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
+        comparison =
+          PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
       } else if (order.column === "updated_at") {
         comparison = left.updated_at.localeCompare(right.updated_at)
       }
@@ -481,16 +491,23 @@ test("claim keeps existing pending user messages intact", async () => {
 })
 
 test("claim includes the issue code inputs and current title the worker needs", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "coded",
-      project_key: "ACME",
-      number: 42,
-      title: "Fix the thing",
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "coded",
+        project_key: "ACME",
+        number: 42,
+        title: "Fix the thing",
+      }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.code, "ACME-42")
   assert.equal(claimed?.title, "Fix the thing")
@@ -498,48 +515,63 @@ test("claim includes the issue code inputs and current title the worker needs", 
 })
 
 test("claim does not expose associated pull request URLs", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "associated",
-      issue_pull_requests: [
-        {
-          url: "https://github.com/acme/repo/pull/41",
-          created_at: "2026-07-01T00:00:00.000Z",
-        },
-        {
-          url: "https://github.com/acme/repo/pull/42",
-          created_at: "2026-07-02T00:00:00.000Z",
-        },
-      ],
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "associated",
+        issue_pull_requests: [
+          {
+            url: "https://github.com/acme/repo/pull/41",
+            created_at: "2026-07-01T00:00:00.000Z",
+          },
+          {
+            url: "https://github.com/acme/repo/pull/42",
+            created_at: "2026-07-02T00:00:00.000Z",
+          },
+        ],
+      }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal("prUrl" in (claimed ?? {}), false)
   assert.equal(claimed?.branchName, "acme-1-implement-the-task")
 })
 
 test("claim skips spec issues and takes the next agent issue instead", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "spec-urgent",
-      type: "spec",
-      priority: "urgent",
-      updated_at: "2026-07-01T00:00:00.000Z",
-    }),
-    issue({
-      id: "feature-low",
-      priority: "low",
-      updated_at: "2026-07-02T00:00:00.000Z",
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "spec-urgent",
+        type: "spec",
+        priority: "urgent",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      }),
+      issue({
+        id: "feature-low",
+        priority: "low",
+        updated_at: "2026-07-02T00:00:00.000Z",
+      }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "feature-low")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "spec-urgent")?.active_worker_id,
+    supabase.issues.find((entry) => entry.id === "spec-urgent")
+      ?.active_worker_id,
     null
   )
 })
@@ -547,7 +579,11 @@ test("claim skips spec issues and takes the next agent issue instead", async () 
 test("claim leaves a spec issue in todo when it is the only eligible issue", async () => {
   const supabase = new FakeSupabase([], [issue({ id: "spec", type: "spec" })])
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed, null)
   assert.equal(supabase.issues[0]?.status, "todo")
@@ -555,24 +591,32 @@ test("claim leaves a spec issue in todo when it is the only eligible issue", asy
 })
 
 test("claim picks urgent before older lower-priority todo issues", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "low-old",
-      priority: "low",
-      updated_at: "2026-07-01T00:00:00.000Z",
-    }),
-    issue({
-      id: "urgent-new",
-      priority: "urgent",
-      updated_at: "2026-07-02T00:00:00.000Z",
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "low-old",
+        priority: "low",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      }),
+      issue({
+        id: "urgent-new",
+        priority: "urgent",
+        updated_at: "2026-07-02T00:00:00.000Z",
+      }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "urgent-new")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "urgent-new")?.active_worker_id,
+    supabase.issues.find((entry) => entry.id === "urgent-new")
+      ?.active_worker_id,
     workerId
   )
   assert.deepEqual(supabase.issueQueries[0]?.orders, [
@@ -628,8 +672,7 @@ test("claim routes a shared queue by the authenticated worker's provider readine
   assert.equal(codexClaim?.id, "codex-low")
   assert.equal(claudeClaim?.id, "claude-urgent")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "codex-low")
-      ?.active_worker_id,
+    supabase.issues.find((entry) => entry.id === "codex-low")?.active_worker_id,
     workerId
   )
   assert.equal(
@@ -640,20 +683,30 @@ test("claim routes a shared queue by the authenticated worker's provider readine
 })
 
 test("claim derives capacity from active issue assignments", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "already-running",
-      status: "in-progress",
-      active_worker_id: workerId,
-      active_run_id: "already-running-run",
-    }),
-    issue({ id: "queued-work" }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "already-running",
+        status: "in-progress",
+        active_worker_id: workerId,
+        active_run_id: "already-running-run",
+      }),
+      issue({ id: "queued-work" }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed, null)
-  assert.equal(supabase.issues.find((entry) => entry.id === "queued-work")?.status, "todo")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "queued-work")?.status,
+    "todo"
+  )
 })
 
 test("unsupported workers cannot claim but update-available workers can", async () => {
@@ -694,40 +747,54 @@ test("unsupported workers cannot claim but update-available workers can", async 
 })
 
 test("claim breaks equal-priority ties FIFO by oldest eligible issue", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "newer",
-      priority: "high",
-      updated_at: "2026-07-02T00:00:00.000Z",
-    }),
-    issue({
-      id: "older",
-      priority: "high",
-      updated_at: "2026-07-01T00:00:00.000Z",
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "newer",
+        priority: "high",
+        updated_at: "2026-07-02T00:00:00.000Z",
+      }),
+      issue({
+        id: "older",
+        priority: "high",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "older")
 })
 
 test("claim preserves blocker checks before applying priority", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "blocked-urgent",
-      priority: "urgent",
-      blockerStatuses: ["in-progress"],
-    }),
-    issue({
-      id: "completed-blocker-high",
-      priority: "high",
-      blockerStatuses: ["completed"],
-    }),
-    issue({ id: "unblocked-low", priority: "low" }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "blocked-urgent",
+        priority: "urgent",
+        blockerStatuses: ["in-progress"],
+      }),
+      issue({
+        id: "completed-blocker-high",
+        priority: "high",
+        blockerStatuses: ["completed"],
+      }),
+      issue({ id: "unblocked-low", priority: "low" }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "completed-blocker-high")
   assert.equal(
@@ -737,23 +804,30 @@ test("claim preserves blocker checks before applying priority", async () => {
 })
 
 test("claim includes reset-ready held issues by priority but skips future holds", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "future-held",
-      status: "held",
-      priority: "urgent",
-      usage_limit_reset_at: "2999-01-01T00:00:00.000Z",
-    }),
-    issue({
-      id: "ready-held",
-      status: "held",
-      priority: "high",
-      usage_limit_reset_at: "2026-01-01T00:00:00.000Z",
-    }),
-    issue({ id: "todo-low", priority: "low" }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "future-held",
+        status: "held",
+        priority: "urgent",
+        usage_limit_reset_at: "2999-01-01T00:00:00.000Z",
+      }),
+      issue({
+        id: "ready-held",
+        status: "held",
+        priority: "high",
+        usage_limit_reset_at: "2026-01-01T00:00:00.000Z",
+      }),
+      issue({ id: "todo-low", priority: "low" }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "ready-held")
   assert.equal(supabase.inserts.length, 0)
@@ -763,24 +837,31 @@ test("claim includes reset-ready held issues by priority but skips future holds"
 })
 
 test("claim does not start drafts or preempt active runs", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({ id: "draft-urgent", status: "draft", priority: "urgent" }),
-    issue({
-      id: "queued-urgent",
-      status: "queued",
-      priority: "urgent",
-      active_run_id: "active-queued",
-    }),
-    issue({
-      id: "in-progress-high",
-      status: "in-progress",
-      priority: "high",
-      active_run_id: "active-progress",
-    }),
-    issue({ id: "todo-low", status: "todo", priority: "low" }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({ id: "draft-urgent", status: "draft", priority: "urgent" }),
+      issue({
+        id: "queued-urgent",
+        status: "queued",
+        priority: "urgent",
+        active_run_id: "active-queued",
+      }),
+      issue({
+        id: "in-progress-high",
+        status: "in-progress",
+        priority: "high",
+        active_run_id: "active-progress",
+      }),
+      issue({ id: "todo-low", status: "todo", priority: "low" }),
+    ]
+  )
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed?.id, "todo-low")
   assert.equal(
@@ -788,7 +869,8 @@ test("claim does not start drafts or preempt active runs", async () => {
     "draft"
   )
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "queued-urgent")?.active_run_id,
+    supabase.issues.find((entry) => entry.id === "queued-urgent")
+      ?.active_run_id,
     "active-queued"
   )
   assert.equal(
@@ -804,26 +886,37 @@ test("claim returns null when another worker wins the conditional update", async
     supabase.issues[0]!.status = "queued"
   }
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed, null)
   assert.equal(supabase.issues[0]?.active_run_id, null)
 })
 
 test("claim returns null when a held issue becomes reset-ineligible before update", async () => {
-  const supabase = new FakeSupabase([], [
-    issue({
-      id: "delayed-held",
-      status: "held",
-      priority: "urgent",
-      usage_limit_reset_at: "2026-01-01T00:00:00.000Z",
-    }),
-  ])
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "delayed-held",
+        status: "held",
+        priority: "urgent",
+        usage_limit_reset_at: "2026-01-01T00:00:00.000Z",
+      }),
+    ]
+  )
   supabase.beforeIssueUpdate = () => {
     supabase.issues[0]!.usage_limit_reset_at = "2999-01-01T00:00:00.000Z"
   }
 
-  const claimed = await claimNextQueuedIssue(supabase as never, "user-1", workerId)
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    workerId
+  )
 
   assert.equal(claimed, null)
   assert.equal(supabase.issues[0]?.status, "held")

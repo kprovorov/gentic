@@ -648,17 +648,17 @@ test("download_attachment returns a fresh signed URL and forwards ownership acro
 })
 
 test("download_attachment output schema advertises a signed URL and no byte payload", () => {
-  const outputSchema =
-    registerTools().get("download_attachment")?.config.outputSchema
+  const outputSchema = registerTools().get("download_attachment")?.config
+    .outputSchema
   assert.ok(outputSchema)
   assert.match(outputSchema.url.description ?? "", /signed url/i)
   assert.equal(outputSchema.bytes, undefined)
   assert.equal(outputSchema.data, undefined)
 
   assert.equal(
-    (
-      outputSchema.url.safeParse as (value: unknown) => { success: boolean }
-    )("https://storage.example/signed?token=abc").success,
+    (outputSchema.url.safeParse as (value: unknown) => { success: boolean })(
+      "https://storage.example/signed?token=abc"
+    ).success,
     true
   )
   // Bytes are not a valid URL, so an attempt to smuggle them in fails the

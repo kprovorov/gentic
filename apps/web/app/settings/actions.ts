@@ -2,10 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { agentProviderSchema } from "@gentic/validators/issues"
-import {
-  createLabelSchema,
-  updateLabelSchema,
-} from "@gentic/validators/labels"
+import { createLabelSchema, updateLabelSchema } from "@gentic/validators/labels"
 import { idSchema, projectSchema } from "@gentic/validators/projects"
 
 import * as labelsService from "@gentic/services/labels"
@@ -46,7 +43,9 @@ export async function createProject(formData: FormData) {
   if (
     !repositories.some((repository) => repository.full_name === project.repo)
   ) {
-    throw new Error("Choose a repository from the connected GitHub installation.")
+    throw new Error(
+      "Choose a repository from the connected GitHub installation."
+    )
   }
 
   await projectsService.createProject(supabase, userId, project)

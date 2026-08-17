@@ -130,7 +130,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
   const [acceptRisk, setAcceptRisk] = React.useState(false)
   const [submit, setSubmit] = React.useState<SubmitState>({ status: "idle" })
   const [installs, setInstalls] = React.useState<WorkerSkillInstall[] | null>(
-    null,
+    null
   )
 
   const dispatched = installs !== null
@@ -150,7 +150,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
     const load = async () => {
       try {
         const data = await getJson<{ workers: InstallTarget[] }>(
-          "/api/app/skills/install-targets",
+          "/api/app/skills/install-targets"
         )
         if (cancelled) return
         setTargets(data.workers)
@@ -161,15 +161,15 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
               new Set(
                 data.workers
                   .filter(
-                    (worker) => worker.eligible && current.has(worker.worker_id),
+                    (worker) => worker.eligible && current.has(worker.worker_id)
                   )
-                  .map((worker) => worker.worker_id),
+                  .map((worker) => worker.worker_id)
               )
             : new Set(
                 data.workers
                   .filter((worker) => worker.eligible)
-                  .map((worker) => worker.worker_id),
-              ),
+                  .map((worker) => worker.worker_id)
+              )
         )
       } catch {
         if (!cancelled) setTargets([])
@@ -190,9 +190,10 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const data = await getJson<{ skill: SkillIdentity; gate: SkillAuditGate }>(
-          `/api/app/skills/audit?url=${encodeURIComponent(trimmedUrl)}`,
-        )
+        const data = await getJson<{
+          skill: SkillIdentity
+          gate: SkillAuditGate
+        }>(`/api/app/skills/audit?url=${encodeURIComponent(trimmedUrl)}`)
         if (!cancelled) {
           setAudit({
             status: "ready",
@@ -222,7 +223,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
   const pendingIds = (installs ?? [])
     .filter(
       (install) =>
-        install.status === "waiting" || install.status === "installing",
+        install.status === "waiting" || install.status === "installing"
     )
     .map((install) => install.id)
   const pendingKey = pendingIds.join(",")
@@ -234,14 +235,14 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
     const timer = setInterval(async () => {
       try {
         const data = await getJson<{ installs: WorkerSkillInstall[] }>(
-          `/api/app/skills/installs?ids=${encodeURIComponent(pendingKey)}`,
+          `/api/app/skills/installs?ids=${encodeURIComponent(pendingKey)}`
         )
         if (cancelled) return
         setInstalls((current) =>
           (current ?? []).map(
             (install) =>
-              data.installs.find((next) => next.id === install.id) ?? install,
-          ),
+              data.installs.find((next) => next.id === install.id) ?? install
+          )
         )
       } catch {
         // Leave the last known states in place; the next tick retries.
@@ -274,7 +275,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
           url: auditState.skill.url,
           worker_ids: selectedIds,
           accept_risk: acceptRisk,
-        },
+        }
       )
       setSubmit({ status: "idle" })
       setInstalls(data.installs)
@@ -300,9 +301,9 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
       <DialogHeader>
         <DialogTitle>Install skill</DialogTitle>
         <DialogDescription>
-          Installs one skill from skills.sh on the workers you select, for
-          both Claude Code and Codex. Results are shown here while the dialog
-          stays open and are not kept afterwards.
+          Installs one skill from skills.sh on the workers you select, for both
+          Claude Code and Codex. Results are shown here while the dialog stays
+          open and are not kept afterwards.
         </DialogDescription>
       </DialogHeader>
 
@@ -340,10 +341,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
         {gate ? <AuditPanel gate={gate} /> : null}
 
         {dispatched ? (
-          <InstallResults
-            installs={installs ?? []}
-            targets={targets ?? []}
-          />
+          <InstallResults installs={installs ?? []} targets={targets ?? []} />
         ) : (
           <WorkerPicker
             targets={targets}
@@ -435,7 +433,10 @@ function AuditPanel({ gate }: { gate: SkillAuditGate }) {
       {gate.audits.length > 0 ? (
         <ul className="grid gap-1.5">
           {gate.audits.map((audit) => (
-            <AuditRow key={`${audit.provider}-${audit.slug ?? ""}`} audit={audit} />
+            <AuditRow
+              key={`${audit.provider}-${audit.slug ?? ""}`}
+              audit={audit}
+            />
           ))}
         </ul>
       ) : null}
@@ -534,7 +535,7 @@ function InstallResults({
   targets: InstallTarget[]
 }) {
   const names = new Map(
-    targets.map((target) => [target.worker_id, target.display_name]),
+    targets.map((target) => [target.worker_id, target.display_name])
   )
 
   return (
@@ -619,7 +620,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new ApiError(
       body?.error?.message ?? "Request failed.",
-      body?.gate ?? null,
+      body?.gate ?? null
     )
   }
 

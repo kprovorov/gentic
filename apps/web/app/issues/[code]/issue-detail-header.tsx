@@ -167,7 +167,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
           }
         }}
         className={cn(
-          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight text-pretty break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
+          "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-lg leading-tight font-semibold tracking-tight text-pretty break-words shadow-none ring-0 outline-none focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-70",
           !currentTitleState.draft && "text-muted-foreground italic"
         )}
       />
@@ -183,7 +183,7 @@ function EditableIssueTitle({ issue }: { issue: IssueDetailData["issue"] }) {
         setIsEditing(true)
       }}
       className={cn(
-        "block w-full cursor-text border-0 bg-transparent p-0 text-left text-lg leading-tight font-semibold tracking-tight break-words shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-default disabled:opacity-70",
+        "block w-full cursor-text border-0 bg-transparent p-0 text-left text-lg leading-tight font-semibold tracking-tight break-words shadow-none ring-0 outline-none focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-default disabled:opacity-70",
         !displayTitle && "text-muted-foreground italic"
       )}
     >

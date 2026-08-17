@@ -20,5 +20,8 @@ test("generated titles normalize model punctuation and whitespace", () => {
 })
 
 test("generated title formatter keeps a bounded single long word", () => {
-  assert.equal(formatGeneratedIssueTitle("a".repeat(80)).length, MAX_TITLE_LENGTH)
+  assert.equal(
+    formatGeneratedIssueTitle("a".repeat(80)).length,
+    MAX_TITLE_LENGTH
+  )
 })

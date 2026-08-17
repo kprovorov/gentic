@@ -94,21 +94,21 @@ export function ConnectedWorkersSection({
     status: "idle",
   })
   const [hiddenDeletedWorkerIds, setHiddenDeletedWorkerIds] = React.useState(
-    () => new Set<string>(),
+    () => new Set<string>()
   )
   const workers =
     data?.workers.filter((worker) => !hiddenDeletedWorkerIds.has(worker.id)) ??
     []
   const summary = data?.summary ?? { online: 0, offline: 0, banned: 0 }
   const setupIncomplete = workers.filter(
-    (worker) => worker.primaryState === "setup-incomplete",
+    (worker) => worker.primaryState === "setup-incomplete"
   ).length
 
   async function generateEnrollmentCode() {
     setConnectState({ status: "pending" })
     try {
       const nextCode = await postJson<EnrollmentCode>(
-        "/api/app/workers/enrollment-code",
+        "/api/app/workers/enrollment-code"
       )
       setEnrollmentCode(nextCode)
       setConnectState({ status: "idle" })
@@ -212,7 +212,7 @@ export function ConnectedWorkersSection({
 function SummaryCount({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border bg-muted/30 px-3 py-2">
-      <div className="text-lg font-medium leading-none">{value}</div>
+      <div className="text-lg leading-none font-medium">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{label}</div>
     </div>
   )
@@ -369,7 +369,7 @@ function WorkerRow({
   const duplicateName = allWorkers.some(
     (candidate) =>
       candidate.id !== worker.id &&
-      normalizeWorkerName(candidate.editableName) === normalizeWorkerName(name),
+      normalizeWorkerName(candidate.editableName) === normalizeWorkerName(name)
   )
   const canDelete = typedDeleteName === worker.editableName
 
@@ -421,7 +421,7 @@ function WorkerRow({
         onDeleted(worker.id)
       } else {
         await postJson(
-          `/api/app/workers/${encodeURIComponent(worker.id)}/${action}`,
+          `/api/app/workers/${encodeURIComponent(worker.id)}/${action}`
         )
       }
       setActionState({ status: "idle" })
@@ -751,7 +751,7 @@ async function postJson<T = unknown>(path: string): Promise<T> {
 
 async function requestJson<T = unknown>(
   path: string,
-  init: RequestInit,
+  init: RequestInit
 ): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -799,7 +799,7 @@ function formatDateTime(value: string) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-    new Date(value),
+    new Date(value)
   )
 }
 

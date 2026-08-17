@@ -51,7 +51,7 @@ function stubFetch(route: Route = {}) {
                 message: "Only skills.sh URLs can be installed.",
               },
             },
-            400,
+            400
           )
         }
         return jsonResponse({
@@ -65,7 +65,7 @@ function stubFetch(route: Route = {}) {
       }
 
       throw new Error(`Unexpected request to ${input}`)
-    }),
+    })
   )
 
   return calls
@@ -118,12 +118,10 @@ describe("InstallSkillDialog", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Only skills.sh URLs can be installed."),
+        screen.getByText("Only skills.sh URLs can be installed.")
       ).toBeVisible()
     })
-    expect(
-      screen.getByRole("button", { name: /^Install on/ }),
-    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: /^Install on/ })).toBeDisabled()
   })
 
   it("requires explicit risk acceptance when audits are not all current and passing", async () => {
@@ -132,7 +130,11 @@ describe("InstallSkillDialog", () => {
         decision: "confirm",
         reasons: ["warning"],
         audits: [
-          { provider: "Socket", status: "warn", summary: "1 alert: gptAnomaly" },
+          {
+            provider: "Socket",
+            status: "warn",
+            summary: "1 alert: gptAnomaly",
+          },
         ],
       },
     })
@@ -148,7 +150,7 @@ describe("InstallSkillDialog", () => {
     expect(installButton).toBeDisabled()
 
     await user.click(
-      screen.getByLabelText("Accept the risk and install anyway"),
+      screen.getByLabelText("Accept the risk and install anyway")
     )
     expect(installButton).toBeEnabled()
   })
@@ -166,11 +168,11 @@ describe("InstallSkillDialog", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Installation blocked by a failed audit"),
+        screen.getByText("Installation blocked by a failed audit")
       ).toBeVisible()
     })
     expect(
-      screen.queryByLabelText("Accept the risk and install anyway"),
+      screen.queryByLabelText("Accept the risk and install anyway")
     ).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^Install on/ })).toBeDisabled()
   })
@@ -211,15 +213,13 @@ describe("InstallSkillDialog", () => {
       expect(screen.getByText("Installed")).toBeVisible()
     })
     expect(screen.getByText("Failed")).toBeVisible()
-    expect(
-      screen.getByText("npx skills add exited with code 1."),
-    ).toBeVisible()
+    expect(screen.getByText("npx skills add exited with code 1.")).toBeVisible()
 
     await user.click(screen.getByRole("button", { name: "Show output" }))
     expect(screen.getByText("npm error 404 Not Found")).toBeVisible()
 
     expect(
-      calls.find((call) => call.url === "/api/app/skills/installs")?.body,
+      calls.find((call) => call.url === "/api/app/skills/installs")?.body
     ).toEqual({
       url: SKILL_URL,
       worker_ids: ["w1", "w2"],
@@ -227,7 +227,7 @@ describe("InstallSkillDialog", () => {
     })
     // Dispatched commands are not cancellable, so no cancel affordance exists.
     expect(
-      screen.queryByRole("button", { name: /cancel/i }),
+      screen.queryByRole("button", { name: /cancel/i })
     ).not.toBeInTheDocument()
   })
 
@@ -260,7 +260,7 @@ describe("InstallSkillDialog", () => {
       expect(screen.getByText("Accept the risk to continue.")).toBeVisible()
     })
     expect(
-      screen.getByLabelText("Accept the risk and install anyway"),
+      screen.getByLabelText("Accept the risk and install anyway")
     ).not.toBeChecked()
     expect(screen.getByRole("button", { name: /^Install on/ })).toBeDisabled()
   })

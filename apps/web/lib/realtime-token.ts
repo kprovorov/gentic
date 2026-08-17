@@ -18,7 +18,9 @@ export interface RealtimeToken {
  * Clerk-issued session token, so the same `realtime.messages` RLS policies
  * authorize both browser and worker connections to a private issue channel.
  */
-export async function mintRealtimeToken(userId: string): Promise<RealtimeToken> {
+export async function mintRealtimeToken(
+  userId: string
+): Promise<RealtimeToken> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   const privateKeyJwk = process.env.SUPABASE_JWT_PRIVATE_KEY

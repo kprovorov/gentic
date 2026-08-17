@@ -54,7 +54,10 @@ afterEach(() => {
 describe("createManualIssuePullRequest server action", () => {
   it("delegates to the manual first-PR service and revalidates the issue", async () => {
     const supabase = {}
-    getAuthenticatedContextMock.mockResolvedValue({ supabase, userId: "user-1" })
+    getAuthenticatedContextMock.mockResolvedValue({
+      supabase,
+      userId: "user-1",
+    })
     createManualFirstPrPublishMessageMock.mockResolvedValue({
       id: "message-1",
       created_at: "2026-07-29T12:00:00.000Z",

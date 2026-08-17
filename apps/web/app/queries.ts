@@ -142,7 +142,7 @@ async function resolveContext(context?: AuthenticatedContext) {
 // The GitHub webhook route keeps this column live on every `pull_request`
 // event, so rendering just reads it — no per-render GitHub API call.
 function attachPullRequestStates<
-  T extends { url: string; state?: string | null }
+  T extends { url: string; state?: string | null },
 >(
   pullRequests: T[]
 ): (Omit<T, "state"> & { state?: GithubPullRequestState })[] {

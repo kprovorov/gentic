@@ -1,8 +1,7 @@
 import type { AgentProvider, IssueModel } from "@gentic/validators/issues"
 
 export type AgentModelSelectionResult =
-  | { type: "noop" }
-  | { type: "apply"; requiresReset: boolean }
+  { type: "noop" } | { type: "apply"; requiresReset: boolean }
 
 /**
  * Decides what should happen when a user picks an agent+model pair in the

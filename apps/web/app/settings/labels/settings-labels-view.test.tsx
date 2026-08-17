@@ -163,9 +163,7 @@ describe("SettingsLabelsView", () => {
     )
 
     expect(screen.getByText("Archive Zero count?")).toBeInTheDocument()
-    expect(
-      screen.getByText(/isn't assigned to any issues/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/isn't assigned to any issues/)).toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Archive label" }))
 

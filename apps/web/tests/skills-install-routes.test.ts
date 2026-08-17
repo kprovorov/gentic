@@ -18,8 +18,7 @@ const skill = {
 
 const allowGate = { decision: "allow" as const, reasons: [], audits: [] }
 
-const authenticated = async () =>
-  ({ supabase: {}, userId: "user_1" }) as never
+const authenticated = async () => ({ supabase: {}, userId: "user_1" }) as never
 
 function auditRequest(url: string) {
   return new Request(
@@ -126,7 +125,10 @@ test("an ineligible worker fails the whole submission with its reason", async ()
   const route = createSkillInstallsRoute({
     getContext: authenticated,
     createInstalls: async () => {
-      throw new ServiceError("conflict", "laptop can no longer be installed to (offline).")
+      throw new ServiceError(
+        "conflict",
+        "laptop can no longer be installed to (offline)."
+      )
     },
   })
 

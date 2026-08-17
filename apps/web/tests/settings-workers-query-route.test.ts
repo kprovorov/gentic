@@ -106,10 +106,12 @@ test("settings workers query scopes rows to the owner and returns the approved s
 
   const data = await listSettingsWorkersData(db as never, "user-1")
 
-  assert.deepEqual(
-    data.workers.map((worker) => worker.id).sort(),
-    ["banned", "offline", "online", "setup"]
-  )
+  assert.deepEqual(data.workers.map((worker) => worker.id).sort(), [
+    "banned",
+    "offline",
+    "online",
+    "setup",
+  ])
   assert.deepEqual(data.summary, { online: 1, offline: 1, banned: 1 })
 
   const online = data.workers.find((worker) => worker.id === "online")
@@ -294,8 +296,16 @@ function seededDb() {
       active_worker_id: "online",
       active_run_id: "run-2",
     }),
-    issueRow({ id: "issue-3", active_worker_id: "online", status: "completed" }),
-    issueRow({ id: "issue-orphan", active_worker_id: "online", status: "todo" }),
+    issueRow({
+      id: "issue-3",
+      active_worker_id: "online",
+      status: "completed",
+    }),
+    issueRow({
+      id: "issue-orphan",
+      active_worker_id: "online",
+      status: "todo",
+    }),
     issueRow({ id: "issue-4", active_worker_id: "theirs" })
   )
 

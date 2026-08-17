@@ -28,7 +28,7 @@ export function HomeView({
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-2">
-            <p className="text-muted-foreground text-sm font-medium">Home</p>
+            <p className="text-sm font-medium text-muted-foreground">Home</p>
             <h1 className="text-3xl">Create issue</h1>
           </div>
           <div className="flex flex-wrap gap-2">

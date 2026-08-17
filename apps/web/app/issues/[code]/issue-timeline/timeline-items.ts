@@ -15,7 +15,9 @@ export type TimelineDisplayItem =
 // Groups consecutive tool-call chat messages into a single pill, mirroring
 // `groupChatMessages` in `issue-chat/transcript-items.ts`, but operating over
 // the full timeline (which interleaves other node kinds between messages).
-export function groupTimelineItems(items: TimelineItem[]): TimelineDisplayItem[] {
+export function groupTimelineItems(
+  items: TimelineItem[]
+): TimelineDisplayItem[] {
   const displayItems: TimelineDisplayItem[] = []
   let toolGroup: ChatMessage[] = []
 

@@ -168,10 +168,16 @@ test("rejects when the issue does not belong to the caller", async () => {
   ])
 
   await assert.rejects(
-    recordIssueUnpublishedChanges(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-      has_unpublished_agent_changes: true,
-    }),
+    recordIssueUnpublishedChanges(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+        has_unpublished_agent_changes: true,
+      }
+    ),
     { status: 404, message: "Issue not found" }
   )
 })
@@ -182,10 +188,16 @@ test("rejects a stale or superseded run", async () => {
   ])
 
   await assert.rejects(
-    recordIssueUnpublishedChanges(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId2,
-      has_unpublished_agent_changes: true,
-    }),
+    recordIssueUnpublishedChanges(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId2,
+        has_unpublished_agent_changes: true,
+      }
+    ),
     { status: 409, message: "Run is not active for this worker" }
   )
   assert.equal(supabase.issues[0]?.has_unpublished_agent_changes, false)
