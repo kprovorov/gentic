@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test \"app/**/*.test.ts\" \"tests/*.test.ts\" && find app components -name \"*.test.tsx\" -print | xargs env NODE_ENV=development pnpm exec vitest run",
-    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format": "prettier --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
