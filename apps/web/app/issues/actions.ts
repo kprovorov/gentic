@@ -33,10 +33,11 @@ import {
 } from "@gentic/services/attachments"
 import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
+import type { Supabase } from "@gentic/services/types"
 import { createServiceClient } from "@gentic/supabase/service"
 
 import { getAuthenticatedContext } from "../_lib/auth-context"
-import { getString } from "../_lib/form-data"
+import { getString, getUuid } from "../_lib/form-data"
 import type { Attachment } from "./[code]/attachments"
 import {
   createAttachmentSigner,
@@ -72,7 +73,7 @@ function revalidateIssuePath(issue: Parameters<typeof getIssueHref>[0]) {
 }
 
 async function revalidateIssuePathById(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   userId: string,
   issueId: string
 ) {
@@ -178,7 +179,7 @@ export async function startIssueCreation(formData: FormData) {
  */
 export async function finishIssueCreation(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
   const status = issueStatusSchema.parse(getString(formData, "status"))
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
@@ -198,14 +199,14 @@ export async function finishIssueCreation(formData: FormData) {
  */
 export async function abandonIssueCreation(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
   await discardIssue(supabase, userId, issueId)
 }
 
 async function discardIssue(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   userId: string,
   issueId: string
 ) {
@@ -271,7 +272,7 @@ export async function updateIssueTitle(formData: FormData) {
 
 export async function deleteIssue(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const id = z.string().uuid().parse(getString(formData, "id"))
+  const id = getUuid(formData, "id")
 
   await issuesService.deleteIssue(supabase, userId, id)
   revalidatePath("/issues")
@@ -280,7 +281,7 @@ export async function deleteIssue(formData: FormData) {
 
 export async function resetIssueAgent(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const id = z.string().uuid().parse(getString(formData, "id"))
+  const id = getUuid(formData, "id")
   const agentProvider = agentProviderSchema.parse(
     getString(formData, "agent_provider") || "claude_code"
   )
@@ -302,7 +303,7 @@ export async function resetIssueAgent(formData: FormData) {
 
 export async function updateIssueStatus(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const id = z.string().uuid().parse(getString(formData, "id"))
+  const id = getUuid(formData, "id")
   const status = issueStatusSchema.parse(getString(formData, "status"))
 
   await issuesService.updateIssueStatus(supabase, userId, id, status)
@@ -526,7 +527,7 @@ export async function startIssueMessage(formData: FormData) {
 /** Phase two: publish the uploaded attachments, then wake the agent. */
 export async function finishIssueMessage(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
   const attachments = await completeAttachmentUploads(
@@ -547,15 +548,15 @@ export async function finishIssueMessage(formData: FormData) {
  */
 export async function abandonIssueMessage(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
-  const messageId = z.string().uuid().parse(getString(formData, "message_id"))
+  const issueId = getUuid(formData, "issue_id")
+  const messageId = getUuid(formData, "message_id")
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
   await discardIssueMessage(supabase, issueId, messageId)
 }
 
 async function discardIssueMessage(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   issueId: string,
   messageId: string
 ) {
@@ -569,7 +570,7 @@ async function discardIssueMessage(
 
 export async function createManualIssuePullRequest(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
 
   try {
     const message = await issuesService.createManualFirstPrPublishMessage(
@@ -603,7 +604,7 @@ export async function createManualIssuePullRequest(formData: FormData) {
 // spec next to an issue is not a way to (re)start a run.
 export async function startAttachmentUploads(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
   const uploads = await createAttachmentUploadTickets(
@@ -618,7 +619,7 @@ export async function startAttachmentUploads(formData: FormData) {
 
 export async function finishAttachmentUploads(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
-  const issueId = z.string().uuid().parse(getString(formData, "issue_id"))
+  const issueId = getUuid(formData, "issue_id")
   await issuesService.ensureIssueOwned(supabase, userId, issueId)
 
   await completeAttachmentUploads(supabase, issueId, getAttachmentIds(formData))
@@ -685,7 +686,7 @@ function validateIssueModelForAgent(
  * visible behind.
  */
 async function createAttachmentUploadTickets(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   issueId: string,
   messageId: string | null,
   descriptors: AttachmentDescriptor[]
@@ -747,7 +748,7 @@ async function createAttachmentUploadTickets(
  * complete uploads it just reserved for that issue.
  */
 async function completeAttachmentUploads(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   issueId: string,
   attachmentIds: string[]
 ): Promise<Attachment[]> {
@@ -778,7 +779,7 @@ async function completeAttachmentUploads(
 }
 
 async function cleanupUploadedAttachments(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   storagePaths: string[],
   attachmentIds: string[]
 ) {
@@ -804,10 +805,7 @@ async function cleanupUploadedAttachments(
   }
 }
 
-async function cleanupIssueAttachments(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
-  issueId: string
-) {
+async function cleanupIssueAttachments(supabase: Supabase, issueId: string) {
   const { data } = await supabase
     .from("attachments")
     .select("id,storage_path")
@@ -823,7 +821,7 @@ async function cleanupIssueAttachments(
 }
 
 async function cleanupFailedMessage(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  supabase: Supabase,
   issueId: string,
   messageId: string
 ) {
