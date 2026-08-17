@@ -92,8 +92,7 @@ export function useIssueChatState({
   > | null>(null)
   const broadcastSubscribedRef = useRef(false)
   const announcedAssistantMessageRef = useRef<string | null>(null)
-  const connectionStatusRef =
-    useRef<RealtimeConnectionStatus>(connectionStatus)
+  const connectionStatusRef = useRef<RealtimeConnectionStatus>(connectionStatus)
   const localThumbnailUrlsRef = useRef(new Set<string>())
 
   useEffect(() => {
@@ -241,7 +240,9 @@ export function useIssueChatState({
           } satisfies UserMessageEvent,
         })
       }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.issue(issueId),
+      })
     },
     onError: (_error, formData, context) => {
       const content = String(formData.get("content") ?? "")
@@ -288,9 +289,7 @@ export function useIssueChatState({
     )
   const matchingSlashCommands = useMemo(
     () =>
-      slashQuery === null
-        ? []
-        : filterSlashCommands(slashCommands, slashQuery),
+      slashQuery === null ? [] : filterSlashCommands(slashCommands, slashQuery),
     [slashCommands, slashQuery]
   )
   const showSlashCommands =
@@ -411,7 +410,9 @@ export function useIssueChatState({
               return
             }
             setPullRequests((current) =>
-              current.filter((pullRequest) => pullRequest.id !== removed.data.id)
+              current.filter(
+                (pullRequest) => pullRequest.id !== removed.data.id
+              )
             )
             return
           }
@@ -471,35 +472,27 @@ export function useIssueChatState({
 
       channel = supabase
         .channel(issueRealtimeTopic(issueId), { config: { private: true } })
-        .on(
-          "broadcast",
-          { event: REALTIME_MESSAGE_EVENT },
-          ({ payload }) => {
-            const event = parseMessageEventPayload(payload)
-            if (!event.success) {
-              return
-            }
-            dispatch({
-              type:
-                event.data.status === "streaming"
-                  ? "stream_delta"
-                  : "finalization",
-              event: event.data,
-            })
+        .on("broadcast", { event: REALTIME_MESSAGE_EVENT }, ({ payload }) => {
+          const event = parseMessageEventPayload(payload)
+          if (!event.success) {
+            return
           }
-        )
-        .on(
-          "broadcast",
-          { event: REALTIME_RUN_STATE_EVENT },
-          ({ payload }) => {
-            const event = parseRunStatePayload(payload)
-            if (!event.success) {
-              return
-            }
-            setStatus(event.data.status)
-            setUsageLimitResetAt(event.data.usage_limit_reset_at)
+          dispatch({
+            type:
+              event.data.status === "streaming"
+                ? "stream_delta"
+                : "finalization",
+            event: event.data,
+          })
+        })
+        .on("broadcast", { event: REALTIME_RUN_STATE_EVENT }, ({ payload }) => {
+          const event = parseRunStatePayload(payload)
+          if (!event.success) {
+            return
           }
-        )
+          setStatus(event.data.status)
+          setUsageLimitResetAt(event.data.usage_limit_reset_at)
+        })
         .subscribe((subscribeStatus) => {
           broadcastSubscribedRef.current = subscribeStatus === "SUBSCRIBED"
           if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -601,7 +594,9 @@ export function useIssueChatState({
     setSelectedSlashCommandIndex(0)
   }
 
-  function handlePromptKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handlePromptKeyDown(
+    event: React.KeyboardEvent<HTMLTextAreaElement>
+  ) {
     if (showSlashCommands) {
       if (event.key === "ArrowDown") {
         event.preventDefault()

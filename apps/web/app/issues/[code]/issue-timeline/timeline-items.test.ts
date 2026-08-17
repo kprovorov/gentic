@@ -19,12 +19,21 @@ function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
 
 function messageItem(overrides: Partial<ChatMessage> = {}): TimelineItem {
   const msg = message(overrides)
-  return { kind: "message", key: msg.id, timestamp: msg.created_at, message: msg }
+  return {
+    kind: "message",
+    key: msg.id,
+    timestamp: msg.created_at,
+    message: msg,
+  }
 }
 
 test("passes non-message items through untouched", () => {
   const items: TimelineItem[] = [
-    { kind: "issue-created", key: "issue-created", timestamp: "2026-07-01T00:00:00.000Z" },
+    {
+      kind: "issue-created",
+      key: "issue-created",
+      timestamp: "2026-07-01T00:00:00.000Z",
+    },
     {
       kind: "status-milestone",
       key: "evt-1",
@@ -50,8 +59,16 @@ test("wraps a lone chat message in a message display item", () => {
 })
 
 test("groups adjacent tool-call messages into a single tool-group without crossing other messages", () => {
-  const toolA = messageItem({ id: "tool-a", kind: "tool", content: "Reading file" })
-  const toolB = messageItem({ id: "tool-b", kind: "tool", content: "Editing file" })
+  const toolA = messageItem({
+    id: "tool-a",
+    kind: "tool",
+    content: "Reading file",
+  })
+  const toolB = messageItem({
+    id: "tool-b",
+    kind: "tool",
+    content: "Editing file",
+  })
   const reply = messageItem({ id: "reply", kind: "text", content: "Done" })
 
   const displayItems = groupTimelineItems([toolA, toolB, reply])

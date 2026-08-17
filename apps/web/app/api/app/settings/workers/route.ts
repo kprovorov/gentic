@@ -7,10 +7,12 @@ type AuthenticatedContext = NonNullable<
   Awaited<ReturnType<typeof getOptionalAuthenticatedContext>>
 >
 
-export function createSettingsWorkersRoute(deps: {
-  getContext?: typeof getOptionalAuthenticatedContext
-  read?: (context: AuthenticatedContext) => Promise<unknown>
-} = {}) {
+export function createSettingsWorkersRoute(
+  deps: {
+    getContext?: typeof getOptionalAuthenticatedContext
+    read?: (context: AuthenticatedContext) => Promise<unknown>
+  } = {}
+) {
   return createJsonQueryHandler(
     ({ context }) => (deps.read ?? getSettingsWorkersData)(context),
     {

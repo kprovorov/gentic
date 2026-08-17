@@ -213,8 +213,7 @@ function buildTimelineRows(
       case "priority-milestone": {
         const milestonePriority = item.to ?? item.from
         const isKnownPriority =
-          milestonePriority !== null &&
-          milestonePriority in issuePriorityStyles
+          milestonePriority !== null && milestonePriority in issuePriorityStyles
         const PriorityIcon =
           isKnownPriority && item.to
             ? priorityIcons[item.to as IssuePriority]
@@ -654,9 +653,7 @@ function StatusBadge({ status }: { status: string | null }) {
         statusStyles[knownStatus]
       )}
     >
-      <StatusIcon
-        className={cn("size-3.5", statusIconStyles[knownStatus])}
-      />
+      <StatusIcon className={cn("size-3.5", statusIconStyles[knownStatus])} />
       {statusLabels[knownStatus]}
     </span>
   )
@@ -765,9 +762,7 @@ function LabelChipGroup({
         />
       ))}
       {remaining > 0 ? (
-        <span className="text-xs text-muted-foreground">
-          +{remaining} more
-        </span>
+        <span className="text-xs text-muted-foreground">+{remaining} more</span>
       ) : null}
     </>
   )

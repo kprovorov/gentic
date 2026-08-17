@@ -221,11 +221,13 @@ test("persisted final replaces streaming partial without duplicating", () => {
   })
 
   assert.deepEqual(
-    selectIssueChatMessages(state).map(({ id: messageId, content, status }) => ({
-      id: messageId,
-      content,
-      status,
-    })),
+    selectIssueChatMessages(state).map(
+      ({ id: messageId, content, status }) => ({
+        id: messageId,
+        content,
+        status,
+      })
+    ),
     [{ id, content: "persisted final", status: "complete" }]
   )
 })

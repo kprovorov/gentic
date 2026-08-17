@@ -1,10 +1,6 @@
 import { getWorkerControlState } from "@gentic/services/workers"
 
-import {
-  getAgentContextWithOptions,
-  handleAgentError,
-  json,
-} from "../../_lib"
+import { getAgentContextWithOptions, handleAgentError, json } from "../../_lib"
 
 export const runtime = "nodejs"
 

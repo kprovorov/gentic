@@ -57,11 +57,7 @@ export async function PATCH(
 
     await ensureIssueOwned(supabase, userId, id)
 
-    if (
-      body &&
-      typeof body === "object" &&
-      "finish_if_no_pending" in body
-    ) {
+    if (body && typeof body === "object" && "finish_if_no_pending" in body) {
       return json(await finishIssueRun(supabase, userId, workerId, id, body))
     }
 

@@ -122,8 +122,7 @@ class FakeWorkersQuery {
 // `created: false`, matching the DB's `on conflict do nothing` + fallback
 // `select`.
 class FakeSupabase {
-  readonly rpcCalls: Array<{ name: string; args: Record<string, unknown> }> =
-    []
+  readonly rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = []
   private readonly requests = new Map<string, RpcRequest>()
   private nextId = 1
 
@@ -163,7 +162,7 @@ class FakeSupabase {
       created = true
     }
     return {
-      single: <T,>() =>
+      single: <T>() =>
         Promise.resolve({
           data: {
             request_id: request!.requestId,
@@ -213,9 +212,15 @@ test("rejects when the issue does not belong to the caller", async () => {
   ])
 
   await assert.rejects(
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
     { status: 404, message: "Issue not found" }
   )
 })
@@ -226,9 +231,15 @@ test("rejects a stale or superseded run", async () => {
   ])
 
   await assert.rejects(
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId2,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId2,
+      }
+    ),
     { status: 409, message: "Run is not active for this worker" }
   )
   assert.deepEqual(supabase.rpcCalls, [])
@@ -240,9 +251,15 @@ test("rejects when create_pr_automatically is not opted in", async () => {
   ])
 
   await assert.rejects(
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
     { name: "ServiceError", code: "validation" }
   )
 })
@@ -253,9 +270,15 @@ test("rejects when the issue already has a pull request", async () => {
   ])
 
   await assert.rejects(
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
     { name: "ServiceError", code: "validation" }
   )
 })
@@ -284,9 +307,15 @@ test("rejects when there are no unpublished changes", async () => {
   ])
 
   await assert.rejects(
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
     { name: "ServiceError", code: "validation" }
   )
 })
@@ -361,12 +390,24 @@ test("concurrent calls for the same run only create one message", async () => {
   const supabase = new FakeSupabase([issue({ id: "issue-1" })])
 
   const [first, second] = await Promise.all([
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
-    requestIssueAutomaticPrPublish(supabase as never, "user-1", workerId, "issue-1", {
-      active_run_id: runId1,
-    }),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
+    requestIssueAutomaticPrPublish(
+      supabase as never,
+      "user-1",
+      workerId,
+      "issue-1",
+      {
+        active_run_id: runId1,
+      }
+    ),
   ])
 
   const createdCount = [first, second].filter((r) => r.created).length

@@ -219,7 +219,9 @@ describe("IssueTimeline", () => {
       />
     )
 
-    await user.click(screen.getByRole("button", { name: "Completed: Edit file" }))
+    await user.click(
+      screen.getByRole("button", { name: "Completed: Edit file" })
+    )
     expect(screen.getAllByText("Completed: Edit file")[1]).toBeVisible()
     expect(screen.queryByText("Diff: src/index.ts")).not.toBeInTheDocument()
     expect(document.querySelector("diffs-container")).not.toBeNull()

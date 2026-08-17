@@ -295,7 +295,10 @@ export function BulkActionsToolbar({
 
   // Add and remove submit the identical payload — the whole selection plus
   // the chosen label ids — so the only difference is which mutation runs.
-  function mutateLabels(mutation: typeof addLabelsMutation, labelIds: string[]) {
+  function mutateLabels(
+    mutation: typeof addLabelsMutation,
+    labelIds: string[]
+  ) {
     if (count === 0 || labelIds.length === 0 || mutation.isPending) {
       return
     }

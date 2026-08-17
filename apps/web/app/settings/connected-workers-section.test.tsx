@@ -8,7 +8,7 @@ import type { SettingsWorkersData } from "@/app/queries"
 import { ConnectedWorkersSection } from "./connected-workers-section"
 
 function renderSection(
-  props: Partial<React.ComponentProps<typeof ConnectedWorkersSection>> = {},
+  props: Partial<React.ComponentProps<typeof ConnectedWorkersSection>> = {}
 ) {
   const defaultProps: React.ComponentProps<typeof ConnectedWorkersSection> = {
     data: workersData(),
@@ -42,8 +42,8 @@ describe("ConnectedWorkersSection", () => {
     expect(screen.getAllByText("Online").length).toBeGreaterThan(0)
     expect(
       screen.getAllByText(
-        "Update available 0.13.0 - install the latest Gentic worker locally",
-      ).length,
+        "Update available 0.13.0 - install the latest Gentic worker locally"
+      ).length
     ).toBeGreaterThan(0)
     expect(screen.getByText("2/4")).toBeVisible()
     expect(screen.getByText("linux / x64")).toBeVisible()
@@ -54,7 +54,7 @@ describe("ConnectedWorkersSection", () => {
     expect(screen.getByText("2 active")).toBeVisible()
     expect(screen.queryByText("Task title")).not.toBeInTheDocument()
     expect(
-      screen.queryByRole("link", { name: /Task title/ }),
+      screen.queryByRole("link", { name: /Task title/ })
     ).not.toBeInTheDocument()
   })
 
@@ -65,13 +65,13 @@ describe("ConnectedWorkersSection", () => {
         jsonResponse({
           code: "gtce_first",
           expires_at: "2026-07-30T12:10:00.000Z",
-        }),
+        })
       )
       .mockResolvedValueOnce(
         jsonResponse({
           code: "gtce_second",
           expires_at: "2026-07-30T12:11:00.000Z",
-        }),
+        })
       )
 
     renderSection()
@@ -79,17 +79,17 @@ describe("ConnectedWorkersSection", () => {
     await user.click(screen.getByRole("button", { name: "Connect worker" }))
 
     expect(
-      await screen.findByText("gentic worker connect gtce_first"),
+      await screen.findByText("gentic worker connect gtce_first")
     ).toBeVisible()
     expect(screen.getByText(/Expires/)).toBeVisible()
 
     await user.click(screen.getByRole("button", { name: "New code" }))
 
     expect(
-      await screen.findByText("gentic worker connect gtce_second"),
+      await screen.findByText("gentic worker connect gtce_second")
     ).toBeVisible()
     expect(
-      screen.queryByText("gentic worker connect gtce_first"),
+      screen.queryByText("gentic worker connect gtce_first")
     ).not.toBeInTheDocument()
     expect(fetch).toHaveBeenCalledTimes(2)
   })
@@ -102,21 +102,19 @@ describe("ConnectedWorkersSection", () => {
       jsonResponse({
         code: "gtce_first",
         expires_at: "2026-07-30T12:10:00.000Z",
-      }),
+      })
     )
 
     renderSection()
 
     await user.click(screen.getByRole("button", { name: "Connect worker" }))
     expect(
-      await screen.findByText("gentic worker connect gtce_first"),
+      await screen.findByText("gentic worker connect gtce_first")
     ).toBeVisible()
 
     await user.click(screen.getByRole("button", { name: "Copy command" }))
 
-    expect(writeText).toHaveBeenCalledWith(
-      "gentic worker connect gtce_first",
-    )
+    expect(writeText).toHaveBeenCalledWith("gentic worker connect gtce_first")
     expect(await screen.findByRole("button", { name: "Copied" })).toBeVisible()
   })
 
@@ -141,7 +139,7 @@ describe("ConnectedWorkersSection", () => {
         isLoading={false}
         isError={false}
         onRefresh={vi.fn()}
-      />,
+      />
     )
 
     expect(screen.getByText("Build host updated")).toBeVisible()
@@ -170,7 +168,7 @@ describe("ConnectedWorkersSection", () => {
         expect.objectContaining({
           method: "PATCH",
           body: JSON.stringify({ display_name: "Edge runner" }),
-        }),
+        })
       )
     })
     expect(onRefresh).toHaveBeenCalled()
@@ -179,12 +177,12 @@ describe("ConnectedWorkersSection", () => {
     await user.clear(screen.getByLabelText("Worker name for Build host"))
     await user.type(
       screen.getByLabelText("Worker name for Build host"),
-      "Other worker",
+      "Other worker"
     )
     await user.click(screen.getByRole("button", { name: "Save" }))
 
     expect(
-      screen.getByText("A worker with this name already exists."),
+      screen.getByText("A worker with this name already exists.")
     ).toBeVisible()
   })
 
@@ -195,12 +193,12 @@ describe("ConnectedWorkersSection", () => {
     renderSection()
 
     await user.click(
-      screen.getByRole("button", { name: "Worker actions for Build host" }),
+      screen.getByRole("button", { name: "Worker actions for Build host" })
     )
     await user.click(screen.getByRole("menuitem", { name: "Ban" }))
 
     expect(
-      screen.getByText(/interrupt and requeue 2 active tasks/),
+      screen.getByText(/interrupt and requeue 2 active tasks/)
     ).toBeVisible()
 
     await user.click(screen.getByRole("button", { name: "Ban worker" }))
@@ -208,7 +206,7 @@ describe("ConnectedWorkersSection", () => {
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/app/workers/worker-1/ban",
-        expect.objectContaining({ method: "POST" }),
+        expect.objectContaining({ method: "POST" })
       )
     })
   })
@@ -220,12 +218,12 @@ describe("ConnectedWorkersSection", () => {
     renderSection()
 
     await user.click(
-      screen.getByRole("button", { name: "Worker actions for Build host" }),
+      screen.getByRole("button", { name: "Worker actions for Build host" })
     )
     await user.click(screen.getByRole("menuitem", { name: "Delete" }))
 
     expect(
-      screen.getByText(/permanently revokes the worker credential/i),
+      screen.getByText(/permanently revokes the worker credential/i)
     ).toBeVisible()
     expect(screen.getByRole("button", { name: "Delete worker" })).toBeDisabled()
 
@@ -235,7 +233,7 @@ describe("ConnectedWorkersSection", () => {
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/app/workers/worker-1",
-        expect.objectContaining({ method: "DELETE" }),
+        expect.objectContaining({ method: "DELETE" })
       )
     })
     await waitFor(() => {
@@ -250,14 +248,14 @@ describe("ConnectedWorkersSection", () => {
     renderSection({ data: workersData({ workers: [bannedWorker()] }) })
 
     await user.click(
-      screen.getByRole("button", { name: "Worker actions for Banned host" }),
+      screen.getByRole("button", { name: "Worker actions for Banned host" })
     )
     await user.click(screen.getByRole("menuitem", { name: "Unban" }))
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/app/workers/worker-banned/unban",
-        expect.objectContaining({ method: "POST" }),
+        expect.objectContaining({ method: "POST" })
       )
     })
   })
@@ -266,10 +264,10 @@ describe("ConnectedWorkersSection", () => {
     const user = userEvent.setup()
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        jsonResponse({ error: { message: "Code failed" } }, false),
+        jsonResponse({ error: { message: "Code failed" } }, false)
       )
       .mockResolvedValueOnce(
-        jsonResponse({ error: { message: "Ban failed" } }, false),
+        jsonResponse({ error: { message: "Ban failed" } }, false)
       )
 
     renderSection()
@@ -279,7 +277,7 @@ describe("ConnectedWorkersSection", () => {
 
     await user.click(screen.getByRole("button", { name: "Close" }))
     await user.click(
-      screen.getByRole("button", { name: "Worker actions for Build host" }),
+      screen.getByRole("button", { name: "Worker actions for Build host" })
     )
     await user.click(screen.getByRole("menuitem", { name: "Ban" }))
     await user.click(screen.getByRole("button", { name: "Ban worker" }))
@@ -296,7 +294,7 @@ function jsonResponse(body: unknown, ok = true) {
 }
 
 function workersData(
-  overrides: Partial<SettingsWorkersData> = {},
+  overrides: Partial<SettingsWorkersData> = {}
 ): SettingsWorkersData {
   const workers = overrides.workers ?? [
     baseWorker(),

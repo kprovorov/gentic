@@ -24,9 +24,7 @@ const navMain = [
   { title: "Settings", href: "/settings", icon: IconSettings },
 ]
 
-export function AppSidebar({
-  ...props
-}: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { setOpenMobile } = useSidebar()
 
   return (

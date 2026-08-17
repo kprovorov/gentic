@@ -7,13 +7,10 @@ import {
 } from "../app/api/app/api-query-route"
 
 test("API query route returns 401 when no authenticated context exists", async () => {
-  const handler = createJsonQueryHandler(
-    async () => ({ ok: true }),
-    {
-      getContext: async () => null,
-      isNotFoundError: () => false,
-    }
-  )
+  const handler = createJsonQueryHandler(async () => ({ ok: true }), {
+    getContext: async () => null,
+    isNotFoundError: () => false,
+  })
 
   const response = await handler(new Request("http://localhost/api/app/home"))
 

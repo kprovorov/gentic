@@ -271,9 +271,7 @@ export function SettingsLabelsView({
                       >
                         <input type="hidden" name="id" value={label.id} />
                         <div className="grid gap-2">
-                          <Label htmlFor={`label-name-${label.id}`}>
-                            Name
-                          </Label>
+                          <Label htmlFor={`label-name-${label.id}`}>Name</Label>
                           <Input
                             id={`label-name-${label.id}`}
                             name="name"
@@ -350,9 +348,9 @@ export function SettingsLabelsView({
             <AlertDialogDescription>
               {archiveAssignmentSummary(archiveDialogLabel?.assignment_count)}{" "}
               It will disappear from Settings, assignment autocomplete, and
-              filters. Past activity that referenced it stays visible in
-              issue timelines. Those assignments won&rsquo;t come back, but
-              creating a label with the same name later restores it.
+              filters. Past activity that referenced it stays visible in issue
+              timelines. Those assignments won&rsquo;t come back, but creating a
+              label with the same name later restores it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {archiveMutation.isError ? (
@@ -412,7 +410,9 @@ function ColorButton({
       style={{ backgroundColor: color }}
       onClick={onClick}
     >
-      {selected ? <IconCheck className="size-4 text-white drop-shadow" /> : null}
+      {selected ? (
+        <IconCheck className="size-4 text-white drop-shadow" />
+      ) : null}
     </button>
   )
 }

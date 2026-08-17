@@ -28,20 +28,24 @@ test("mergeMessage inserts messages in created_at order", () => {
 })
 
 test("mergeMessage preserves the optimistic client key when server data arrives", () => {
-  const merged = mergeMessage(
-    [{ ...baseMessage, clientKey: "optimistic-1" }],
-    { ...baseMessage, content: "complete", status: "complete" }
-  )
+  const merged = mergeMessage([{ ...baseMessage, clientKey: "optimistic-1" }], {
+    ...baseMessage,
+    content: "complete",
+    status: "complete",
+  })
 
   assert.equal(merged[0]?.clientKey, "optimistic-1")
   assert.equal(merged[0]?.content, "complete")
 })
 
 test("mergeMessages applies a batch through the same invariant", () => {
-  const merged = mergeMessages([], [
-    { ...baseMessage, id: "b", created_at: "2026-07-02" },
-    { ...baseMessage, id: "a", created_at: "2026-07-01" },
-  ])
+  const merged = mergeMessages(
+    [],
+    [
+      { ...baseMessage, id: "b", created_at: "2026-07-02" },
+      { ...baseMessage, id: "a", created_at: "2026-07-01" },
+    ]
+  )
 
   assert.deepEqual(
     merged.map((message) => message.id),

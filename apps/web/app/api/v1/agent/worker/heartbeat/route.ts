@@ -7,11 +7,7 @@ import {
   workerOfflineInputSchema,
 } from "@gentic/validators/workers"
 
-import {
-  getAgentContext,
-  handleAgentError,
-  json,
-} from "../../_lib"
+import { getAgentContext, handleAgentError, json } from "../../_lib"
 
 export const runtime = "nodejs"
 

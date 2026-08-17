@@ -49,8 +49,7 @@ function publicApiUrl(): string {
 }
 
 export function rateLimitKeyFromRequest(request: Request): string {
-  const vercelForwardedFor =
-    request.headers.get("x-vercel-forwarded-for") ?? ""
+  const vercelForwardedFor = request.headers.get("x-vercel-forwarded-for") ?? ""
   const forwardedFor = request.headers.get("x-forwarded-for") ?? ""
   const subject =
     firstForwardedFor(vercelForwardedFor) ??
@@ -61,16 +60,20 @@ export function rateLimitKeyFromRequest(request: Request): string {
 }
 
 function firstForwardedFor(value: string): string | null {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .find(Boolean) ?? null
+  return (
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean) ?? null
+  )
 }
 
 function rightMostForwardedFor(value: string): string | null {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .at(-1) ?? null
+  return (
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .at(-1) ?? null
+  )
 }

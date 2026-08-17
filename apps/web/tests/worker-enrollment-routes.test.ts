@@ -52,7 +52,10 @@ test("worker enrollment code route maps service validation errors", async () => 
   const handler = createWorkerEnrollmentCodeHandler({
     getContext: async () => ({ supabase: {}, userId: "user_1" }) as never,
     createCode: async () => {
-      throw new ServiceError("validation", "Worker enrollment code already exists")
+      throw new ServiceError(
+        "validation",
+        "Worker enrollment code already exists"
+      )
     },
   })
 

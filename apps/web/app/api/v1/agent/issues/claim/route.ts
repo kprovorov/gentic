@@ -194,9 +194,7 @@ function getWorkerEligibleIssueProviders(
 function isProviderReady(
   provider: Awaited<ReturnType<typeof getWorker>>["providers"]["codex"]
 ): boolean {
-  return Boolean(
-    provider?.installed && provider.authenticated === true
-  )
+  return Boolean(provider?.installed && provider.authenticated === true)
 }
 
 // Safety net for a `todo` issue that reaches a claim with no unconsumed user
