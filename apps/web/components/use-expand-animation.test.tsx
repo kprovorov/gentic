@@ -7,16 +7,23 @@ import { useExpandAnimation } from "./use-expand-animation"
 
 const COLLAPSED_HEIGHT = 320
 const EXPANDED_HEIGHT = 700
+const MID_FLIGHT_HEIGHT = 540
 
 let animate: ReturnType<typeof vi.fn>
 let cancel: ReturnType<typeof vi.fn>
 let reducedMotion = false
 
 // jsdom has no layout, so stand in for the class-driven height swap the dialog
-// gets from Tailwind: the expanded element simply measures taller.
+// gets from Tailwind: the expanded element simply measures taller. An element
+// the hook has clipped is one it is animating, and reports the height its
+// animation has reached rather than either resting shape.
 function stubLayout() {
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
     function (this: Element) {
+      if ((this as HTMLElement).style.overflow === "hidden") {
+        return { height: MID_FLIGHT_HEIGHT } as DOMRect
+      }
+
       const height = this.classList.contains("expanded")
         ? EXPANDED_HEIGHT
         : COLLAPSED_HEIGHT
@@ -27,18 +34,11 @@ function stubLayout() {
 
 function Panel() {
   const [expanded, setExpanded] = useState(false)
-  const { contentRef, captureHeight } =
-    useExpandAnimation<HTMLDivElement>(expanded)
+  const contentRef = useExpandAnimation<HTMLDivElement>(expanded)
 
   return (
     <div ref={contentRef} className={expanded ? "expanded" : ""}>
-      <button
-        type="button"
-        onClick={() => {
-          captureHeight()
-          setExpanded((current) => !current)
-        }}
-      >
+      <button type="button" onClick={() => setExpanded((current) => !current)}>
         toggle
       </button>
     </div>
@@ -51,6 +51,12 @@ function toggle() {
 
 function keyframesOf(call: number) {
   return animate.mock.calls[call]?.[0]
+}
+
+// The hook restores the element to its resting overflow from `onfinish`, which
+// jsdom never fires on its own.
+function settleAnimation(call: number) {
+  animate.mock.results[call]?.value.onfinish?.()
 }
 
 beforeEach(() => {
@@ -93,11 +99,24 @@ describe("useExpandAnimation", () => {
     render(<Panel />)
 
     await toggle()
+    settleAnimation(0)
     await toggle()
 
     expect(animate).toHaveBeenCalledTimes(2)
     expect(keyframesOf(1)).toEqual([
       { height: `${EXPANDED_HEIGHT}px` },
+      { height: `${COLLAPSED_HEIGHT}px` },
+    ])
+  })
+
+  it("starts from the height a toggle interrupted mid-animation", async () => {
+    render(<Panel />)
+
+    await toggle()
+    await toggle()
+
+    expect(keyframesOf(1)).toEqual([
+      { height: `${MID_FLIGHT_HEIGHT}px` },
       { height: `${COLLAPSED_HEIGHT}px` },
     ])
   })
@@ -120,6 +139,19 @@ describe("useExpandAnimation", () => {
     unmount()
 
     expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it("clips the panel only while the animation runs", async () => {
+    render(<Panel />)
+
+    await toggle()
+    const panel = screen.getByRole("button", { name: "toggle" })
+      .parentElement as HTMLElement
+    expect(panel.style.overflow).toBe("hidden")
+
+    settleAnimation(0)
+
+    expect(panel.style.overflow).toBe("")
   })
 
   it("snaps instead of animating when reduced motion is requested", async () => {

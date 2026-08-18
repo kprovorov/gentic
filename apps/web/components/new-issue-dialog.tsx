@@ -28,8 +28,7 @@ import { useExpandAnimation } from "./use-expand-animation"
 export function NewIssueDialog() {
   const { open, setOpen } = useNewIssueDialog()
   const [expanded, setExpanded] = useState(false)
-  const { contentRef, captureHeight } =
-    useExpandAnimation<HTMLDivElement>(expanded)
+  const contentRef = useExpandAnimation<HTMLDivElement>(expanded)
   const { data } = useQuery({
     queryKey: queryKeys.newIssue,
     queryFn: fetchNewIssueData,
@@ -64,10 +63,7 @@ export function NewIssueDialog() {
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              captureHeight()
-              setExpanded((current) => !current)
-            }}
+            onClick={() => setExpanded((current) => !current)}
           >
             {expanded ? (
               <IconArrowsDiagonalMinimize2 />
