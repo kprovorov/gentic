@@ -1,9 +1,15 @@
 import type React from "react"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { MessageComposer } from "./message-composer"
+
+const PILL_HEIGHT = 44
+const BOX_HEIGHT = 104
+
+// Only the parts of Animation the expand animation touches.
+type FakeAnimation = { cancel: () => void; onfinish?: () => void }
 
 function renderComposer(
   overrides: Partial<React.ComponentProps<typeof MessageComposer>> = {}
@@ -27,6 +33,37 @@ function renderComposer(
 function promptField() {
   return screen.getByRole("textbox", { name: "Message the agent" })
 }
+
+// jsdom has neither layout nor the Web Animations API. Give the row a height
+// per shape — Tailwind tells the two apart by their corner radius — so the
+// expand animation has something to measure.
+function stubExpandAnimation() {
+  const animate = vi.fn<(keyframes: Keyframe[]) => FakeAnimation>(() => ({
+    cancel: vi.fn(),
+  }))
+  Element.prototype.animate = animate as unknown as Element["animate"]
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: false }) as MediaQueryList)
+  )
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: Element) {
+      const height = this.classList.contains("rounded-full")
+        ? PILL_HEIGHT
+        : BOX_HEIGHT
+      return { height } as DOMRect
+    }
+  )
+  return animate
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  // @ts-expect-error putting jsdom back the way it was found: it has no Web
+  // Animations API, so there was nothing here to spy on and restore.
+  delete Element.prototype.animate
+})
 
 describe("MessageComposer", () => {
   it("disables send until there is a non-empty draft", () => {
@@ -96,6 +133,31 @@ describe("MessageComposer", () => {
         selector: "span",
       })
     ).toHaveClass("truncate")
+  })
+
+  it("animates the row between the two shapes as it opens and closes", async () => {
+    const animate = stubExpandAnimation()
+    const user = userEvent.setup()
+    renderComposer()
+
+    await user.click(promptField())
+
+    expect(animate).toHaveBeenCalledTimes(1)
+    expect(animate.mock.calls[0]?.[0]).toEqual([
+      { height: `${PILL_HEIGHT}px` },
+      { height: `${BOX_HEIGHT}px` },
+    ])
+
+    // jsdom never fires it, and the hook only reaches for the box height once
+    // the opening animation has settled on it.
+    animate.mock.results[0]?.value.onfinish?.()
+
+    await user.click(document.body)
+
+    expect(animate.mock.calls[1]?.[0]).toEqual([
+      { height: `${BOX_HEIGHT}px` },
+      { height: `${PILL_HEIGHT}px` },
+    ])
   })
 
   it("stays expanded while a file is attached", async () => {

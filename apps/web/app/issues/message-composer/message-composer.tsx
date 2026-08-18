@@ -1,9 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { IconLoader2, IconPaperclip, IconSend } from "@tabler/icons-react"
 
+import { useExpandAnimation } from "@/components/use-expand-animation"
 import { Button } from "@gentic/ui/button"
 import { cn } from "@gentic/ui/utils"
 import type { AgentProvider } from "@gentic/validators/issues"
@@ -20,7 +21,9 @@ import { AgentModelPicker } from "./agent-model-picker"
 // space, and it opens into a box (textarea on its own line, attach + model
 // picker + send underneath) while it is in use. The shapes differ only in
 // Tailwind classes, never in structure, so the textarea keeps its focus and
-// selection across the switch.
+// selection across the switch — but for the same reason the switch is a reflow
+// rather than a set of animatable property changes, so the row's height is
+// animated between the two measured shapes to carry it.
 export function MessageComposer({
   className,
   draft,
@@ -106,8 +109,9 @@ export function MessageComposer({
 
   // Grow the open composer with the draft, up to the max height its own class
   // caps it at. The collapsed row is always one line, so it keeps the height
-  // its class gives it.
-  useEffect(() => {
+  // its class gives it. Before paint, so the row below is measured at the size
+  // it will actually be painted at.
+  useLayoutEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) {
       return
@@ -121,6 +125,11 @@ export function MessageComposer({
     textarea.style.height = "auto"
     textarea.style.height = `${textarea.scrollHeight}px`
   }, [draft, isOpen])
+
+  // Declared after the resize above so it measures the settled row: layout
+  // effects run in the order they are declared, and the two shapes only differ
+  // by how they reflow, which nothing here can transition on its own.
+  const rowRef = useExpandAnimation<HTMLDivElement>(isOpen)
 
   return (
     <form
@@ -146,6 +155,7 @@ export function MessageComposer({
       ) : null}
 
       <div
+        ref={rowRef}
         className={cn(
           "flex min-w-0 flex-wrap items-center gap-1 border border-transparent bg-input/50 p-1.5 transition-[border-radius,color,box-shadow,background-color]",
           isOpen ? "rounded-[22px]" : "rounded-full",
@@ -232,7 +242,9 @@ export function MessageComposer({
             onAgentModelChange={onAgentModelChange}
             open={isModelMenuOpen}
             onOpenChange={setIsModelMenuOpen}
-            className="order-4"
+            // It has no collapsed counterpart to reshape from, so it fades in
+            // over the row's unfolding instead of appearing on the first frame.
+            className="order-4 animate-in duration-200 fade-in-0 motion-reduce:animate-none"
           />
         ) : null}
 
