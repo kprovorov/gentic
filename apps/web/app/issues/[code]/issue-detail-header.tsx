@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useLayoutEffect, useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   IconChevronDown,
@@ -46,6 +46,38 @@ import type { Attachment } from "./attachments"
 import { useIssueDelete } from "./issue-delete-button"
 import { IssuePropertiesDialog } from "./issue-properties-dialog"
 import { IssueRequestBody } from "./issue-request-body"
+
+// Whether the details are folded away is a reading preference rather than
+// something about one issue, so it is remembered across issues and reloads.
+const HEADER_EXPANDED_STORAGE_KEY = "gentic:issue-detail-header-expanded:v1"
+
+// `null` when the user has never toggled the header, which leaves the default.
+function loadStoredHeaderExpanded(): boolean | null {
+  try {
+    const stored = window.localStorage.getItem(HEADER_EXPANDED_STORAGE_KEY)
+    return stored === null ? null : stored === "true"
+  } catch {
+    return null
+  }
+}
+
+function storeHeaderExpanded(expanded: boolean) {
+  try {
+    window.localStorage.setItem(HEADER_EXPANDED_STORAGE_KEY, String(expanded))
+  } catch {
+    return
+  }
+}
+
+// Nothing outside this tab moves the preference mid-session, and the toggle
+// that does keeps its own state, so there is nothing to subscribe to.
+function subscribeToStoredHeaderExpanded() {
+  return () => {}
+}
+
+function readHeaderExpandedOnServer() {
+  return null
+}
 
 function resizeTitleTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
@@ -219,7 +251,30 @@ export function IssueDetailHeader({
   // Title and status stay pinned; everything else about the issue — the
   // metadata pills and the request that kicked it off — collapses together so
   // the timeline can take the whole screen when the details aren't needed.
-  const [open, setOpen] = useState(true)
+  //
+  // The remembered preference can't seed a `useState`: this page is server
+  // rendered, and a stored "collapsed" would contradict the expanded markup
+  // being hydrated. Read it through the store hook instead, whose whole job is
+  // that handover — hydration matches the server's `null`, then React re-runs
+  // the render with what localStorage actually holds.
+  const storedOpen = useSyncExternalStore(
+    subscribeToStoredHeaderExpanded,
+    loadStoredHeaderExpanded,
+    readHeaderExpandedOnServer
+  )
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null)
+  const open = openOverride ?? storedOpen ?? true
+
+  // Animate only what the user drives. The stored state arrives a render after
+  // mount, and a header that folds shut on arrival reads as a flicker rather
+  // than a transition.
+  const [animated, setAnimated] = useState(false)
+
+  function toggle(nextOpen: boolean) {
+    setOpenOverride(nextOpen)
+    setAnimated(true)
+  }
+
   const isKeyboardOpen = useKeyboardOpen()
   const [keyboardWasOpen, setKeyboardWasOpen] = useState(isKeyboardOpen)
 
@@ -227,17 +282,28 @@ export function IssueDetailHeader({
   // the timeline and the composer at once, and this header doesn't shrink — so
   // an expanded one pushes the composer clean off the bottom just as the user
   // goes to type in it. Fold it away when the keyboard arrives. Only on the
-  // way in: reopening it from here is the user's call, keyboard or not.
+  // way in: reopening it from here is the user's call, keyboard or not. This
+  // fold isn't stored either — it is the screen making room, not a preference,
+  // and storing it would leave every issue collapsed after the first reply.
   if (isKeyboardOpen !== keyboardWasOpen) {
     setKeyboardWasOpen(isKeyboardOpen)
 
     if (isKeyboardOpen) {
-      setOpen(false)
+      toggle(false)
     }
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} asChild>
+    <Collapsible
+      open={open}
+      // Only a deliberate toggle is worth remembering, which is exactly what
+      // Radix reports here — the keyboard fold above sets the state directly.
+      onOpenChange={(nextOpen) => {
+        toggle(nextOpen)
+        storeHeaderExpanded(nextOpen)
+      }}
+      asChild
+    >
       {/* The gap that separates the details from the title row lives inside the
           collapsible instead of on this column: a flex gap would survive the
           zero-height frame of the animation and make the header jump. */}
@@ -300,7 +366,7 @@ export function IssueDetailHeader({
                   panel settle together. */}
               <IconChevronDown
                 className={cn(
-                  "transition-transform duration-200",
+                  animated && "transition-transform duration-200",
                   open && "rotate-180"
                 )}
               />
@@ -311,7 +377,13 @@ export function IssueDetailHeader({
         {/* Radix publishes the measured height as a CSS variable, so the two
             keyframes slide between it and zero; padding stays on the inner
             column so the collapsed frame is truly empty. */}
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+        <CollapsibleContent
+          className={cn(
+            "overflow-hidden",
+            animated &&
+              "data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none"
+          )}
+        >
           <div className="flex min-w-0 flex-col gap-3 pt-3">
             {/* The pills stand in for the rail on mobile, where it's hidden. The
                 trailing "…" opens everything the rail would otherwise hold. */}

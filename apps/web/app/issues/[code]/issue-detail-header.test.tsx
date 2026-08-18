@@ -1,5 +1,7 @@
 import type React from "react"
 import { act } from "react"
+import { hydrateRoot } from "react-dom/client"
+import { renderToString } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -65,7 +67,7 @@ const issue = {
   projects: { key: "GEN", repo: "kprovorov/gentic" },
 } as unknown as React.ComponentProps<typeof IssueDetailHeader>["issue"]
 
-function renderHeader(
+function headerTree(
   props: Partial<React.ComponentProps<typeof IssueDetailHeader>> = {}
 ) {
   const queryClient = new QueryClient({
@@ -75,7 +77,7 @@ function renderHeader(
     },
   })
 
-  render(
+  return (
     <QueryClientProvider client={queryClient}>
       <IssueDetailHeader
         issue={issue}
@@ -90,6 +92,12 @@ function renderHeader(
       />
     </QueryClientProvider>
   )
+}
+
+function renderHeader(
+  props: Partial<React.ComponentProps<typeof IssueDetailHeader>> = {}
+) {
+  render(headerTree(props))
 }
 
 // A keyboard is only up because a field has focus — here the composer, which
@@ -124,8 +132,11 @@ function fakeViewport(height: number) {
   return viewport
 }
 
+const EXPANDED_STORAGE_KEY = "gentic:issue-detail-header-expanded:v1"
+
 afterEach(() => {
   vi.clearAllMocks()
+  window.localStorage.clear()
 })
 
 describe("IssueDetailHeader", () => {
@@ -172,6 +183,70 @@ describe("IssueDetailHeader", () => {
     viewport.resizeTo(460)
 
     expect(screen.queryByText(issue.body as string)).not.toBeInTheDocument()
+  })
+
+  // Whether the details are folded away is a reading preference, so it has to
+  // outlive the issue the user set it on.
+  it("opens collapsed when the details were last hidden", () => {
+    window.localStorage.setItem(EXPANDED_STORAGE_KEY, "false")
+
+    renderHeader()
+
+    expect(screen.queryByText(issue.body as string)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Show issue details" })
+    ).toBeVisible()
+  })
+
+  // The page is server rendered, so the stored preference reaches the header
+  // through a client-only store rather than the initial state — seeding the
+  // state from localStorage would make the first client render disagree with
+  // the markup being hydrated and blow the whole tree away.
+  it("restores a stored collapse without a hydration mismatch", () => {
+    const container = document.createElement("div")
+    document.body.append(container)
+    container.innerHTML = renderToString(headerTree())
+    expect(container.textContent).toContain(issue.body as string)
+
+    // React only surfaces a mismatch here — it recovers by re-rendering the
+    // whole tree on the client, so the DOM alone would look fine either way.
+    const recoverableErrors: unknown[] = []
+    window.localStorage.setItem(EXPANDED_STORAGE_KEY, "false")
+    let root!: ReturnType<typeof hydrateRoot>
+    act(() => {
+      root = hydrateRoot(container, headerTree(), {
+        onRecoverableError: (error) => recoverableErrors.push(error),
+      })
+    })
+
+    expect(recoverableErrors).toEqual([])
+    expect(container.textContent).not.toContain(issue.body as string)
+
+    act(() => root.unmount())
+    container.remove()
+  })
+
+  it("remembers each toggle of the details", async () => {
+    const user = userEvent.setup()
+    renderHeader()
+
+    await user.click(screen.getByRole("button", { name: "Hide issue details" }))
+    expect(window.localStorage.getItem(EXPANDED_STORAGE_KEY)).toBe("false")
+
+    await user.click(screen.getByRole("button", { name: "Show issue details" }))
+    expect(window.localStorage.getItem(EXPANDED_STORAGE_KEY)).toBe("true")
+  })
+
+  it("doesn't remember the fold the keyboard forced", () => {
+    // The keyboard fold is the screen making room, not a choice — storing it
+    // would leave every later issue collapsed after a single reply.
+    const viewport = fakeViewport(800)
+    renderHeader()
+
+    focusComposer()
+    viewport.resizeTo(460)
+
+    expect(window.localStorage.getItem(EXPANDED_STORAGE_KEY)).toBeNull()
   })
 
   it("lets the details back open with the keyboard still up", async () => {
