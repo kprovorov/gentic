@@ -52,6 +52,13 @@ export const homeIssueSchema = z.object({
   projects: projectOptionSchema.nullable(),
 })
 
+const projectAutomaticReviewSchema = z.object({
+  automatic_review_enabled: z.boolean(),
+  automatic_review_provider: agentProviderSchema.nullable(),
+  automatic_review_model: z.string().nullable(),
+  automatic_review_instructions: z.string().nullable(),
+})
+
 export const issueEditSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
@@ -62,8 +69,10 @@ export const issueEditSchema = z.object({
   type: issueTypeSchema,
   priority: issuePrioritySchema,
   create_pr_automatically: z.boolean(),
+  // Null inherits the Project's Automatic Review default.
+  automatic_review_enabled: z.boolean().nullable(),
   issue_pull_requests: z.array(z.object({ id: z.string() })).optional(),
-  projects: projectOptionSchema.nullable(),
+  projects: projectOptionSchema.merge(projectAutomaticReviewSchema).nullable(),
 })
 
 export const issueDetailSchema = z.object({
@@ -137,6 +146,21 @@ export type IssueDetail = {
   projects: ProjectOption | null
 }
 
+export type ProjectAutomaticReviewDefaults = {
+  enabled: boolean
+  provider: AgentProvider | null
+  model: string | null
+  instructions: string | null
+}
+
+export type IssueReviewPolicySnapshot = {
+  enabled: boolean
+  reviewer_provider: AgentProvider
+  reviewer_model: string | null
+  reviewer_instructions: string | null
+  created_at: string
+}
+
 export type IssueEdit = Pick<
   IssueDetail,
   | "id"
@@ -152,6 +176,31 @@ export type IssueEdit = Pick<
   | "projects"
 > & {
   has_attached_pull_request: boolean
+  // Null inherits the Project's Automatic Review default.
+  automatic_review_enabled: boolean | null
+  project_automatic_review: ProjectAutomaticReviewDefaults | null
+  // The frozen policy, present only once a pull request has been associated.
+  automatic_review_policy: IssueReviewPolicySnapshot | null
+}
+
+const issueReviewPolicyRowSchema = z.object({
+  enabled: z.boolean(),
+  reviewer_provider: agentProviderSchema,
+  reviewer_model: z.string().nullable(),
+  reviewer_instructions: z.string().nullable(),
+  created_at: z.string(),
+})
+
+export function toIssueReviewPolicySnapshot(
+  policy: {
+    enabled: boolean
+    reviewer_provider: string
+    reviewer_model: string | null
+    reviewer_instructions: string | null
+    created_at: string
+  } | null
+): IssueReviewPolicySnapshot | null {
+  return policy ? issueReviewPolicyRowSchema.parse(policy) : null
 }
 
 export type IssueDetailRow = z.infer<typeof issueDetailSchema>
@@ -248,7 +297,10 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
   }
 }
 
-export function toIssueEdit(issue: IssueEditRow): IssueEdit {
+export function toIssueEdit(
+  issue: IssueEditRow,
+  automaticReviewPolicy: IssueReviewPolicySnapshot | null = null
+): IssueEdit {
   return {
     id: issue.id,
     code: getDisplayIssueCode(issue),
@@ -260,7 +312,17 @@ export function toIssueEdit(issue: IssueEditRow): IssueEdit {
     type: issue.type,
     priority: issue.priority,
     create_pr_automatically: issue.create_pr_automatically,
+    automatic_review_enabled: issue.automatic_review_enabled,
     has_attached_pull_request: hasAttachedIssuePullRequest(issue),
     projects: toProjectOption(issue.projects),
+    project_automatic_review: issue.projects
+      ? {
+          enabled: issue.projects.automatic_review_enabled,
+          provider: issue.projects.automatic_review_provider,
+          model: issue.projects.automatic_review_model,
+          instructions: issue.projects.automatic_review_instructions,
+        }
+      : null,
+    automatic_review_policy: automaticReviewPolicy,
   }
 }

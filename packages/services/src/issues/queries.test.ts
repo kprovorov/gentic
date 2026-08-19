@@ -2,19 +2,21 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { ServiceError } from "../errors"
-import { listIssues } from "./queries"
+import { getIssueReviewPolicy, listIssues } from "./queries"
 
 type Row = Record<string, unknown>
-type TableName = "issues" | "labels"
+type TableName = "issues" | "labels" | "issue_review_policies"
 
 class FakeDb {
   issues: Row[] = []
   labels: Row[] = []
+  issue_review_policies: Row[] = []
 }
 
 class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
   private readonly eqFilters: Array<[string, unknown]> = []
   private readonly inFilters: Array<[string, unknown[]]> = []
+  private wantsSingle = false
 
   constructor(
     private readonly table: TableName,
@@ -43,6 +45,11 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this
   }
 
+  maybeSingle() {
+    this.wantsSingle = true
+    return this
+  }
+
   then<TResult1 = { data: unknown; error: null }, TResult2 = never>(
     onfulfilled?:
       | ((value: {
@@ -52,8 +59,9 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
       | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ) {
+    const matched = this.db[this.table].filter((row) => this.matches(row))
     return Promise.resolve({
-      data: this.db[this.table].filter((row) => this.matches(row)),
+      data: this.wantsSingle ? (matched[0] ?? null) : matched,
       error: null,
     }).then(onfulfilled, onrejected)
   }
@@ -185,4 +193,55 @@ test("listIssues clearly rejects missing, archived, and cross-account Label IDs"
         /missing, archived, or not owned/.test(error.message)
     )
   }
+})
+
+test("getIssueReviewPolicy returns null before a policy is snapshotted", async () => {
+  const db = new FakeDb()
+  db.issues.push({ id: "issue-no-pr", projects: { user_id: "user-1" } })
+
+  const policy = await getIssueReviewPolicy(
+    new FakeSupabase(db) as never,
+    "user-1",
+    "issue-no-pr"
+  )
+
+  assert.equal(policy, null)
+})
+
+test("getIssueReviewPolicy returns the frozen snapshot once one exists", async () => {
+  const db = new FakeDb()
+  db.issues.push({ id: "issue-with-pr", projects: { user_id: "user-1" } })
+  db.issue_review_policies.push({
+    issue_id: "issue-with-pr",
+    enabled: true,
+    reviewer_provider: "claude_code",
+    reviewer_model: "claude-opus-5",
+    reviewer_instructions: null,
+    created_at: "2026-08-19T00:00:00Z",
+  })
+
+  const policy = await getIssueReviewPolicy(
+    new FakeSupabase(db) as never,
+    "user-1",
+    "issue-with-pr"
+  )
+
+  assert.deepEqual(policy, {
+    issue_id: "issue-with-pr",
+    enabled: true,
+    reviewer_provider: "claude_code",
+    reviewer_model: "claude-opus-5",
+    reviewer_instructions: null,
+    created_at: "2026-08-19T00:00:00Z",
+  })
+})
+
+test("getIssueReviewPolicy rejects an issue owned by another account", async () => {
+  const db = new FakeDb()
+  db.issues.push({ id: "issue-foreign", projects: { user_id: "user-2" } })
+
+  await assert.rejects(
+    getIssueReviewPolicy(new FakeSupabase(db) as never, "user-1", "issue-foreign"),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
 })

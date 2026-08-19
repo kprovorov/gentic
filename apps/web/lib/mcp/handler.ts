@@ -201,6 +201,47 @@ const projectIdInputSchema = {
     .describe("The project id, from list_projects or get_project."),
 }
 
+const automaticReviewInputSchema = {
+  automatic_review_enabled: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether Automatic Code Review is enabled for this project. Defaults to false, and stays false unless explicitly set."
+    ),
+  automatic_review_provider: agentProviderSchema
+    .nullable()
+    .optional()
+    .describe(
+      'Reviewer provider override. Omit or pass null for "Same as Issue" (follows whatever provider the Issue itself uses).'
+    ),
+  automatic_review_model: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .nullable()
+    .optional()
+    .describe(
+      'Reviewer model override. Omit or pass null for "Same as Issue".'
+    ),
+  automatic_review_instructions: z
+    .string()
+    .trim()
+    .max(10000)
+    .nullable()
+    .optional()
+    .describe(
+      "Additive reviewer instructions, appended to the repository's own review instructions rather than replacing them."
+    ),
+}
+
+type AutomaticReviewInput = {
+  automatic_review_enabled?: boolean
+  automatic_review_provider?: "claude_code" | "codex" | null
+  automatic_review_model?: string | null
+  automatic_review_instructions?: string | null
+}
+
 const issueIdInputSchema = {
   id: z
     .string()
@@ -495,13 +536,18 @@ export function registerGenticMcpTools(
           .describe(
             "Optional shell setup script run by the background agent after cloning this project."
           ),
+        ...automaticReviewInputSchema,
       },
       outputSchema: projectOutputSchema,
     },
     deps.tool(
       async (
         { supabase, userId },
-        input: { name: string; repo: string; setup_script?: string | null }
+        input: {
+          name: string
+          repo: string
+          setup_script?: string | null
+        } & AutomaticReviewInput
       ) => {
         const project = await deps.projectsService.createProject(
           supabase,
@@ -509,6 +555,9 @@ export function registerGenticMcpTools(
           projectSchema.parse({
             ...input,
             setup_script: input.setup_script ?? null,
+            auto_respond_to_reviews: true,
+            automatic_review_instructions:
+              input.automatic_review_instructions ?? null,
           })
         )
         return { project }
@@ -542,6 +591,7 @@ export function registerGenticMcpTools(
           .describe(
             "Updated optional shell setup script run by the background agent after cloning this project."
           ),
+        ...automaticReviewInputSchema,
       },
       outputSchema: projectOutputSchema,
     },
@@ -553,14 +603,40 @@ export function registerGenticMcpTools(
           name: string
           repo: string
           setup_script: string | null
-        }
+        } & AutomaticReviewInput
       ) => {
         const { id, ...values } = input
+        // Fields this tool doesn't require every call (auto-respond, every
+        // Automatic Review setting) fall back to the project's current value
+        // rather than silently resetting when a caller omits them.
+        const current = await deps.projectsService.getProject(
+          supabase,
+          userId,
+          id
+        )
         const project = await deps.projectsService.updateProject(
           supabase,
           userId,
           id,
-          projectSchema.parse(values)
+          projectSchema.parse({
+            ...values,
+            auto_respond_to_reviews: current.auto_respond_to_reviews,
+            automatic_review_enabled:
+              values.automatic_review_enabled ??
+              current.automatic_review_enabled,
+            automatic_review_provider:
+              values.automatic_review_provider === undefined
+                ? current.automatic_review_provider
+                : values.automatic_review_provider,
+            automatic_review_model:
+              values.automatic_review_model === undefined
+                ? current.automatic_review_model
+                : values.automatic_review_model,
+            automatic_review_instructions:
+              values.automatic_review_instructions === undefined
+                ? current.automatic_review_instructions
+                : values.automatic_review_instructions,
+          })
         )
         return { project }
       }
@@ -826,6 +902,13 @@ export function registerGenticMcpTools(
           .describe(
             "Whether Gentic automatically opens a pull request when the agent finishes. Omit to leave unchanged."
           ),
+        automatic_review_enabled: z
+          .boolean()
+          .nullable()
+          .optional()
+          .describe(
+            "Overrides the Project's Automatic Review default for this issue. Omit to leave unchanged, or pass null to inherit the Project default. Only mutable before this issue's first pull request is associated; rejected afterward."
+          ),
       },
       outputSchema: issueOutputSchema,
     },
@@ -841,6 +924,7 @@ export function registerGenticMcpTools(
           priority: z.infer<typeof issuePrioritySchema>
           type: z.infer<typeof issueTypeSchema>
           create_pr_automatically?: boolean
+          automatic_review_enabled?: boolean | null
         }
       ) => {
         const { id, ...values } = input

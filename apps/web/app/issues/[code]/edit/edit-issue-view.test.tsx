@@ -29,6 +29,14 @@ const baseIssue: IssueEdit = {
   priority: "medium",
   create_pr_automatically: true,
   has_attached_pull_request: false,
+  automatic_review_enabled: null,
+  project_automatic_review: {
+    enabled: false,
+    provider: null,
+    model: null,
+    instructions: null,
+  },
+  automatic_review_policy: null,
   projects: {
     id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
     name: "Gentic",
@@ -114,6 +122,47 @@ describe("EditIssueView", () => {
     )
     expect(
       document.querySelector("input[name='create_pr_automatically']")
+    ).not.toBeInTheDocument()
+  })
+
+  it("submits an explicit automatic review override while no PR is attached", async () => {
+    const user = userEvent.setup()
+
+    renderView()
+
+    await user.selectOptions(
+      screen.getByLabelText("Automatic Code Review"),
+      "Enabled"
+    )
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() => expect(updateIssue).toHaveBeenCalled())
+    const formData = vi.mocked(updateIssue).mock.calls[0][0] as FormData
+    expect(formData.get("automatic_review_enabled")).toBe("true")
+  })
+
+  it("shows the frozen automatic review policy once a PR is attached", () => {
+    renderView({
+      ...baseIssue,
+      has_attached_pull_request: true,
+      automatic_review_enabled: true,
+      automatic_review_policy: {
+        enabled: true,
+        reviewer_provider: "claude_code",
+        reviewer_model: "claude-opus-5",
+        reviewer_instructions: null,
+        created_at: "2026-08-19T00:00:00.000Z",
+      },
+    })
+
+    expect(
+      screen.queryByLabelText("Automatic Code Review")
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Snapshotted when the first pull request/)
+    ).toHaveTextContent("Enabled")
+    expect(
+      document.querySelector("input[name='automatic_review_enabled']")
     ).not.toBeInTheDocument()
   })
 })

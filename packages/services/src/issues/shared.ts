@@ -2,12 +2,15 @@ import type { Tables } from "@gentic/supabase/types"
 import type { ChatMessageContract } from "@gentic/validators/realtime"
 
 const ISSUE_SELECT =
-  "id,project_id,number,title,body,status,type,priority,agent_provider,issue_model,session_id,active_run_id,active_worker_id,run_started_at,run_finished_at,run_error,usage_limit_reset_at,create_pr_automatically,has_unpublished_agent_changes,created_at,updated_at"
+  "id,project_id,number,title,body,status,type,priority,agent_provider,issue_model,session_id,active_run_id,active_worker_id,run_started_at,run_finished_at,run_error,usage_limit_reset_at,create_pr_automatically,automatic_review_enabled,has_unpublished_agent_changes,created_at,updated_at"
 
-export const ISSUE_WITH_PROJECT_SELECT = `${ISSUE_SELECT}, projects!inner(id,name,repo,user_id,key)`
+const PROJECT_JOIN_COLUMNS =
+  "id,name,repo,user_id,key,automatic_review_enabled,automatic_review_provider,automatic_review_model,automatic_review_instructions"
+
+export const ISSUE_WITH_PROJECT_SELECT = `${ISSUE_SELECT}, projects!inner(${PROJECT_JOIN_COLUMNS})`
 
 export const ISSUE_WITH_PROJECT_AND_LABELS_SELECT =
-  `${ISSUE_SELECT}, projects!inner(id,name,repo,user_id,key), issue_labels(labels!inner(id,name,color,state))`
+  `${ISSUE_SELECT}, projects!inner(${PROJECT_JOIN_COLUMNS}), issue_labels(labels!inner(id,name,color,state))`
 
 export type AssignedIssueLabel = {
   id: string
@@ -98,6 +101,16 @@ export const SPEC_HAS_NO_AGENT_MESSAGE =
  */
 export const SPEC_CONVERSION_BLOCKED_MESSAGE =
   "Finish or reset the agent run before making this issue a Spec"
+
+/**
+ * Rejection message when a caller tries to change an Issue's Automatic Review
+ * override after its policy has already been snapshotted (i.e. a pull request
+ * has been associated). The matching DB trigger,
+ * `enforce_issue_review_override_immutable`, raises its own version if this
+ * app-level check is ever bypassed.
+ */
+export const AUTOMATIC_REVIEW_OVERRIDE_LOCKED_MESSAGE =
+  "Automatic Review override cannot change after a pull request is associated"
 
 /**
  * The fixed Kickoff Message that opens a fresh Coding Agent conversation. It

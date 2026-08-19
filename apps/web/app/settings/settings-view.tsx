@@ -22,6 +22,7 @@ import {
   updateDefaultAgent,
   updateProject,
 } from "@/app/settings/actions"
+import { AutomaticReviewFields } from "@/app/settings/automatic-review-fields"
 import { ConnectedWorkersSection } from "@/app/settings/connected-workers-section"
 import {
   agentProviderLabels,
@@ -416,6 +417,7 @@ export function SettingsView({
                     Auto-respond to review feedback
                   </Label>
                 </div>
+                <AutomaticReviewFields />
                 <Button
                   type="submit"
                   className="mt-2"
@@ -498,6 +500,19 @@ export function SettingsView({
                           Auto-respond to review feedback
                         </Label>
                       </div>
+                      <AutomaticReviewFields
+                        // Remount when the persisted defaults change so the
+                        // internal (controlled) state doesn't go stale after
+                        // a refetch — see AutomaticPrPreferenceField for the
+                        // same convention.
+                        key={`${project.id}-${project.automatic_review_enabled}-${project.automatic_review_provider}-${project.automatic_review_model}-${project.automatic_review_instructions}`}
+                        defaultEnabled={project.automatic_review_enabled}
+                        defaultProvider={project.automatic_review_provider}
+                        defaultModel={project.automatic_review_model}
+                        defaultInstructions={
+                          project.automatic_review_instructions
+                        }
+                      />
                       <div className="flex gap-2">
                         <Button
                           type="submit"

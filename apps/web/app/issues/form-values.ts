@@ -8,6 +8,12 @@ const explicitBooleanSchema = z
   .enum(["true", "false"])
   .transform((value) => value === "true")
 
+// The Automatic Review override is tri-state: "" inherits the Project
+// default (`null`), "true"/"false" is an explicit override.
+const automaticReviewOverrideSchema = z
+  .enum(["", "true", "false"])
+  .transform((value) => (value === "" ? null : value === "true"))
+
 export const createIssueFormSchema = createIssueSchema
   .omit({ title: true, status: true, type: true })
   .extend({
@@ -17,6 +23,7 @@ export const createIssueFormSchema = createIssueSchema
 
 export const updateIssueFormSchema = updateIssueSchema.extend({
   create_pr_automatically: explicitBooleanSchema.optional(),
+  automatic_review_enabled: automaticReviewOverrideSchema.optional(),
 })
 
 export function parseCreateIssueFormData(formData: FormData) {
@@ -42,5 +49,11 @@ export function parseUpdateIssueFormData(formData: FormData) {
     priority: getString(formData, "priority") || undefined,
     create_pr_automatically:
       getString(formData, "create_pr_automatically") || undefined,
+    // "" is a meaningful value here (inherit the Project default), so unlike
+    // the fields above this can't collapse a missing field to "" || undefined
+    // — a locked form omits the field entirely, which `has` distinguishes.
+    automatic_review_enabled: formData.has("automatic_review_enabled")
+      ? getString(formData, "automatic_review_enabled")
+      : undefined,
   })
 }
