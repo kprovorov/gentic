@@ -320,11 +320,47 @@ export type Database = {
           },
         ]
       }
+      issue_review_policies: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          issue_id: string
+          reviewer_instructions: string | null
+          reviewer_model: string | null
+          reviewer_provider: string
+        }
+        Insert: {
+          created_at?: string
+          enabled: boolean
+          issue_id: string
+          reviewer_instructions?: string | null
+          reviewer_model?: string | null
+          reviewer_provider: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          issue_id?: string
+          reviewer_instructions?: string | null
+          reviewer_model?: string | null
+          reviewer_provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_review_policies_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issues: {
         Row: {
           active_run_id: string | null
           active_worker_id: string | null
           agent_provider: string
+          automatic_review_enabled: boolean | null
           body: string | null
           create_pr_automatically: boolean
           created_at: string
@@ -348,6 +384,7 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          automatic_review_enabled?: boolean | null
           body?: string | null
           create_pr_automatically?: boolean
           created_at?: string
@@ -371,6 +408,7 @@ export type Database = {
           active_run_id?: string | null
           active_worker_id?: string | null
           agent_provider?: string
+          automatic_review_enabled?: boolean | null
           body?: string | null
           create_pr_automatically?: boolean
           created_at?: string
@@ -532,6 +570,10 @@ export type Database = {
       projects: {
         Row: {
           auto_respond_to_reviews: boolean
+          automatic_review_enabled: boolean
+          automatic_review_instructions: string | null
+          automatic_review_model: string | null
+          automatic_review_provider: string | null
           created_at: string
           id: string
           key: string
@@ -544,6 +586,10 @@ export type Database = {
         }
         Insert: {
           auto_respond_to_reviews?: boolean
+          automatic_review_enabled?: boolean
+          automatic_review_instructions?: string | null
+          automatic_review_model?: string | null
+          automatic_review_provider?: string | null
           created_at?: string
           id?: string
           key: string
@@ -556,6 +602,10 @@ export type Database = {
         }
         Update: {
           auto_respond_to_reviews?: boolean
+          automatic_review_enabled?: boolean
+          automatic_review_instructions?: string | null
+          automatic_review_model?: string | null
+          automatic_review_provider?: string | null
           created_at?: string
           id?: string
           key?: string
@@ -567,6 +617,193 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      review_attempts: {
+        Row: {
+          attempt_number: number
+          created_at: string
+          github_review_id: number | null
+          id: string
+          published_at: string | null
+          review_cycle_id: string
+          review_run_id: string
+          summary: string | null
+          verdict: string
+        }
+        Insert: {
+          attempt_number: number
+          created_at?: string
+          github_review_id?: number | null
+          id?: string
+          published_at?: string | null
+          review_cycle_id: string
+          review_run_id: string
+          summary?: string | null
+          verdict: string
+        }
+        Update: {
+          attempt_number?: number
+          created_at?: string
+          github_review_id?: number | null
+          id?: string
+          published_at?: string | null
+          review_cycle_id?: string
+          review_run_id?: string
+          summary?: string | null
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_attempts_review_cycle_id_fkey"
+            columns: ["review_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "review_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_attempts_review_run_id_fkey"
+            columns: ["review_run_id"]
+            isOneToOne: true
+            referencedRelation: "review_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_cycles: {
+        Row: {
+          created_at: string
+          head_sha: string
+          id: string
+          issue_id: string
+          pull_request_id: string
+          state: string
+          superseded_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          head_sha: string
+          id?: string
+          issue_id: string
+          pull_request_id: string
+          state?: string
+          superseded_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          head_sha?: string
+          id?: string
+          issue_id?: string
+          pull_request_id?: string
+          state?: string
+          superseded_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_cycles_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_cycles_pull_request_id_fkey"
+            columns: ["pull_request_id"]
+            isOneToOne: false
+            referencedRelation: "issue_pull_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_findings: {
+        Row: {
+          body: string | null
+          created_at: string
+          file_path: string | null
+          github_comment_id: number | null
+          head_sha: string
+          id: string
+          line: number | null
+          review_attempt_id: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          file_path?: string | null
+          github_comment_id?: number | null
+          head_sha: string
+          id?: string
+          line?: number | null
+          review_attempt_id: string
+          severity?: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          file_path?: string | null
+          github_comment_id?: number | null
+          head_sha?: string
+          id?: string
+          line?: number | null
+          review_attempt_id?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_findings_review_attempt_id_fkey"
+            columns: ["review_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "review_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          review_cycle_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          review_cycle_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          review_cycle_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_runs_review_cycle_id_fkey"
+            columns: ["review_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "review_cycles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_settings: {
         Row: {
