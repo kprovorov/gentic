@@ -1,10 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const resetIssueAgentMock = vi.fn()
 const updateIssueAgentProviderMock = vi.fn()
+const toastErrorMock = vi.fn()
+
+vi.mock("sonner", () => ({
+  toast: { error: (message: string) => toastErrorMock(message) },
+}))
 
 vi.mock("@/app/issues/actions", () => ({
   resetIssueAgent: (formData: FormData) => resetIssueAgentMock(formData),
@@ -20,7 +25,10 @@ vi.mock("@/app/query-keys", () => ({
   },
 }))
 
-import { useIssueAgentProvider } from "./use-issue-agent-provider"
+import {
+  AGENT_SWITCH_ERROR_MESSAGE,
+  useIssueAgentProvider,
+} from "./use-issue-agent-provider"
 
 function TestHarness({ issueId }: { issueId: string }) {
   const { onAgentModelChange } = useIssueAgentProvider({ issueId })
@@ -146,5 +154,19 @@ describe("useIssueAgentProvider", () => {
     const formData = resetIssueAgentMock.mock.calls[0][0] as FormData
     expect(formData.get("agent_provider")).toBe("codex")
     expect(formData.get("issue_model")).toBe("gpt-5.6-sol")
+  })
+
+  // The picker keeps showing the old agent either way, so a rejected switch is
+  // invisible unless it says something.
+  it("says so when the reset behind a switch is rejected", async () => {
+    const user = userEvent.setup()
+    resetIssueAgentMock.mockRejectedValue(new Error("Issue not found"))
+    renderHarness()
+
+    await user.click(screen.getByRole("button", { name: "set-with-reset" }))
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(AGENT_SWITCH_ERROR_MESSAGE)
+    )
   })
 })
