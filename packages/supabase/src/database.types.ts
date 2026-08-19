@@ -207,6 +207,66 @@ export type Database = {
           },
         ]
       }
+      issue_implementation_owners: {
+        Row: {
+          agent_provider: string
+          created_at: string
+          established_at: string
+          generation: number
+          id: string
+          issue_id: string
+          issue_model: string | null
+          origin: string
+          session_id: string | null
+          superseded_at: string | null
+          updated_at: string
+          worker_id: string | null
+        }
+        Insert: {
+          agent_provider: string
+          created_at?: string
+          established_at?: string
+          generation: number
+          id?: string
+          issue_id: string
+          issue_model?: string | null
+          origin: string
+          session_id?: string | null
+          superseded_at?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Update: {
+          agent_provider?: string
+          created_at?: string
+          established_at?: string
+          generation?: number
+          id?: string
+          issue_id?: string
+          issue_model?: string | null
+          origin?: string
+          session_id?: string | null
+          superseded_at?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_implementation_owners_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_implementation_owners_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_labels: {
         Row: {
           created_at: string
@@ -991,6 +1051,29 @@ export type Database = {
           created_at: string
           id: string
         }[]
+      }
+      start_fresh_implementation: {
+        Args: { p_issue_id: string; p_now?: string; p_user_id: string }
+        Returns: {
+          agent_provider: string
+          created_at: string
+          established_at: string
+          generation: number
+          id: string
+          issue_id: string
+          issue_model: string | null
+          origin: string
+          session_id: string | null
+          superseded_at: string | null
+          updated_at: string
+          worker_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "issue_implementation_owners"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       start_issue_from_draft: {
         Args: { p_issue_id: string }

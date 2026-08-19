@@ -33,6 +33,18 @@ export {
   updateIssueTitle,
   updateIssueType,
 } from "./issues/mutations"
+export {
+  IMPLEMENTATION_OWNER_UNAVAILABLE_REASONS,
+  type FixHandoffRejectionReason,
+  type FixHandoffTarget,
+  type FixHandoffValidation,
+  type ImplementationOwner,
+  type ImplementationOwnerOrigin,
+  type ImplementationOwnerUnavailableReason,
+  resolveImplementationOwner,
+  startFreshImplementation,
+  validateFixHandoff,
+} from "./issues/implementation-owner"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { addIssueLabels, removeIssueLabels } from "./issues/labels"
 export { slugifyIssueTitle } from "./issues/slug"
