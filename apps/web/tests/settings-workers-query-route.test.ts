@@ -5,11 +5,12 @@ import { createJsonQueryHandler } from "../app/api/app/api-query-route"
 import { listSettingsWorkersData } from "../app/settings/workers-read-model"
 
 type Row = Record<string, unknown>
-type TableName = "workers" | "issues"
+type TableName = "workers" | "issues" | "review_runs"
 
 class FakeSupabase {
   workers: Row[] = []
   issues: Row[] = []
+  review_runs: Row[] = []
 
   from(table: TableName) {
     return new FakeQuery(table, this)

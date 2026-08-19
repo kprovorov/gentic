@@ -27,6 +27,7 @@ type TableName =
   | "workers"
   | "issues"
   | "messages"
+  | "review_runs"
   | "worker_enrollment_codes"
   | "worker_enrollment_exchange_failures"
 
@@ -61,6 +62,7 @@ class FakeDb {
   workers: Row[] = []
   issues: Row[] = []
   messages: Row[] = []
+  review_runs: Row[] = []
   worker_enrollment_codes: Row[] = []
   worker_enrollment_exchange_failures: Row[] = []
 }
@@ -95,7 +97,8 @@ class FakeSupabase {
       (row) =>
         row.code_hash === args.p_code_hash &&
         row.consumed_at === null &&
-        new Date(String(row.expires_at)).getTime() > new Date(nowValue).getTime()
+        new Date(String(row.expires_at)).getTime() >
+          new Date(nowValue).getTime()
     )
 
     if (!code) {
@@ -153,9 +156,7 @@ class FakeSupabase {
         failed_count: 1,
         window_started_at: nowValue,
         locked_until:
-          maxFailures <= 1
-            ? new Date(nowMs + windowMs).toISOString()
-            : null,
+          maxFailures <= 1 ? new Date(nowMs + windowMs).toISOString() : null,
         updated_at: nowValue,
       }
       this.db.worker_enrollment_exchange_failures.push(row)
@@ -163,11 +164,8 @@ class FakeSupabase {
     }
 
     const windowExpired =
-      nowMs - new Date(String(existing.window_started_at)).getTime() >=
-      windowMs
-    const failedCount = windowExpired
-      ? 1
-      : Number(existing.failed_count) + 1
+      nowMs - new Date(String(existing.window_started_at)).getTime() >= windowMs
+    const failedCount = windowExpired ? 1 : Number(existing.failed_count) + 1
 
     existing.failed_count = failedCount
     existing.window_started_at = windowExpired
@@ -298,9 +296,10 @@ class FakeSupabase {
   }
 }
 
-class FakeRpcQuery
-  implements PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>
-{
+class FakeRpcQuery implements PromiseLike<{
+  data: unknown
+  error: { message: string; code?: string } | null
+}> {
   constructor(
     private readonly data: Row | boolean | null,
     private readonly error: { message: string; code?: string } | null = null
@@ -318,7 +317,13 @@ class FakeRpcQuery
     return this
   }
 
-  then<TResult1 = { data: unknown; error: { message: string; code?: string } | null }, TResult2 = never>(
+  then<
+    TResult1 = {
+      data: unknown
+      error: { message: string; code?: string } | null
+    },
+    TResult2 = never,
+  >(
     onfulfilled?:
       | ((value: {
           data: unknown
@@ -506,7 +511,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
 
     return {
       data: this.wantsSingle
-        ? matched[0] ?? (this.maybe ? null : undefined)
+        ? (matched[0] ?? (this.maybe ? null : undefined))
         : matched,
       error: null,
     }
@@ -796,6 +801,34 @@ test("running task count is derived from active issue assignments", async () => 
   assert.equal(worker.running_task_count, 2)
 })
 
+test("running task count includes claimed review runs sharing the same capacity pool", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.workers.push(
+    workerRow({ id: "worker-1", configured_capacity: 4 })
+  )
+  supabase.db.issues.push({
+    id: "issue-1",
+    active_worker_id: "worker-1",
+    active_run_id: "run-1",
+    status: "in-progress",
+  })
+  supabase.db.review_runs.push(
+    { id: "review-run-1", claimed_by_worker_id: "worker-1", status: "running" },
+    // A completed review run no longer holds the worker's capacity.
+    {
+      id: "review-run-2",
+      claimed_by_worker_id: "worker-1",
+      status: "completed",
+    }
+  )
+
+  const worker = await getWorker(supabase as never, "user-1", "worker-1", {
+    now,
+  })
+
+  assert.equal(worker.running_task_count, 2)
+})
+
 test("worker control ignores orphaned assignments without an active run", async () => {
   const supabase = new FakeSupabase()
   supabase.db.issues.push(
@@ -824,6 +857,30 @@ test("worker control ignores orphaned assignments without an active run", async 
           status: "in-progress",
         },
       ],
+      review_runs: [],
+    }
+  )
+})
+
+test("worker control includes the worker's claimed running review runs", async () => {
+  const supabase = new FakeSupabase()
+  supabase.db.review_runs.push(
+    { id: "review-run-1", claimed_by_worker_id: "worker-1", status: "running" },
+    // Terminal and another worker's claim are both excluded.
+    {
+      id: "review-run-2",
+      claimed_by_worker_id: "worker-1",
+      status: "completed",
+    },
+    { id: "review-run-3", claimed_by_worker_id: "worker-2", status: "running" }
+  )
+
+  assert.deepEqual(
+    await getWorkerControlState(supabase as never, "worker-1", false),
+    {
+      worker: { banned: false },
+      runs: [],
+      review_runs: [{ review_run_id: "review-run-1", status: "running" }],
     }
   )
 })

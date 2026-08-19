@@ -89,6 +89,47 @@ export async function ensureActiveWorkerRun(
   // grace period; reconciliation clears it when the worker is truly stale.
 }
 
+export async function ensureActiveReviewRunClaim(
+  supabase: Supabase,
+  userId: string,
+  workerId: string,
+  reviewRunId: string
+): Promise<void> {
+  const reviewRunResult = await supabase
+    .from("review_runs")
+    .select(
+      "id,status,claimed_by_worker_id,review_cycles!inner(issues!inner(projects!inner(user_id)))"
+    )
+    .eq("id", reviewRunId)
+    .maybeSingle()
+
+  const { data: reviewRun, error: reviewRunError } = reviewRunResult as {
+    data: {
+      id: string
+      status: string
+      claimed_by_worker_id: string | null
+      review_cycles: { issues: { projects: { user_id: string } } }
+    } | null
+    error: { message: string } | null
+  }
+
+  if (reviewRunError) {
+    throw new Error(reviewRunError.message)
+  }
+  if (
+    !reviewRun ||
+    reviewRun.review_cycles.issues.projects.user_id !== userId
+  ) {
+    throw new ApiError(404, "Review run not found")
+  }
+  if (
+    reviewRun.claimed_by_worker_id !== workerId ||
+    reviewRun.status !== "running"
+  ) {
+    throw new ApiError(409, "Review run is not claimed by this worker")
+  }
+}
+
 export async function getAgentContext(request: Request): Promise<{
   userId: string
   workerId: string

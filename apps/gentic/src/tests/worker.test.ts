@@ -7,6 +7,7 @@ import { test } from "node:test"
 import type {
   AgentApi,
   ClaimedIssue,
+  ClaimedReviewRun,
   FinishRunFields,
   FinishRunResult,
   RunStateFields,
@@ -14,6 +15,7 @@ import type {
 } from "../api.js"
 import type { Config } from "../config.js"
 import type { IssueRealtimeChannel } from "../realtime.js"
+import { isSessionCancelled } from "../session.js"
 import type { PromptDelivery, PromptTurn, RunSessionInput } from "../session.js"
 import type { ToolStatuses } from "../tools.js"
 import type {
@@ -27,8 +29,10 @@ import type {
 import { createSkillInstallRunner } from "../skill-installs.js"
 import {
   CONTROL_INTERVAL_MS,
+  REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
   applyReloadedConfig,
   processIssue,
+  processReviewRun,
   runWorkerLoop,
   type ProcessIssueDeps,
   type WorkerLoopDeps,
@@ -321,60 +325,66 @@ test("concurrent issue runs isolate prompt queues and attachment directories", a
 
 test("worker loop sends heartbeat every 30s and checks control every 10s", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, api, deps }) => {
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 61_000 },
-      runs: [],
-    })
+  await withHarness(
+    async ({ config, api, deps }) => {
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.controlResponse = () => ({
+        worker: { banned: clock.elapsedMs >= 61_000 },
+        runs: [],
+      })
 
-    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
-    assert.deepEqual(
-      api.heartbeats.map((entry) => entry.last_seen_at),
-      [
+      assert.deepEqual(
+        api.heartbeats.map((entry) => entry.last_seen_at),
+        [
+          "2026-07-29T08:30:00.000Z",
+          "2026-07-29T08:30:30.000Z",
+          "2026-07-29T08:31:00.000Z",
+        ]
+      )
+      assert.deepEqual(api.controlChecks, [
         "2026-07-29T08:30:00.000Z",
+        "2026-07-29T08:30:10.000Z",
+        "2026-07-29T08:30:20.000Z",
         "2026-07-29T08:30:30.000Z",
+        "2026-07-29T08:30:40.000Z",
+        "2026-07-29T08:30:50.000Z",
         "2026-07-29T08:31:00.000Z",
-      ]
-    )
-    assert.deepEqual(api.controlChecks, [
-      "2026-07-29T08:30:00.000Z",
-      "2026-07-29T08:30:10.000Z",
-      "2026-07-29T08:30:20.000Z",
-      "2026-07-29T08:30:30.000Z",
-      "2026-07-29T08:30:40.000Z",
-      "2026-07-29T08:30:50.000Z",
-      "2026-07-29T08:31:00.000Z",
-      "2026-07-29T08:31:10.000Z",
-    ])
-    assert.equal(api.providerCheckCalls, 1)
-    assert.equal(api.offlineCalls, 0)
-  }, { now: () => clock.now() })
+        "2026-07-29T08:31:10.000Z",
+      ])
+      assert.equal(api.providerCheckCalls, 1)
+      assert.equal(api.offlineCalls, 0)
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker loop reloads config on SIGHUP without stopping", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, api, deps }) => {
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 21_000 },
-      runs: [],
-    })
-    const workerDeps = loopDeps(deps, clock, api)
-    workerDeps.loadConfig = () => ({
-      ...config,
-      POLL_INTERVAL_MS: 2000,
-      MAX_CONCURRENT_ISSUES: 5,
-    })
-    clock.onSleep = () => process.emit("SIGHUP")
+  await withHarness(
+    async ({ config, api, deps }) => {
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.controlResponse = () => ({
+        worker: { banned: clock.elapsedMs >= 21_000 },
+        runs: [],
+      })
+      const workerDeps = loopDeps(deps, clock, api)
+      workerDeps.loadConfig = () => ({
+        ...config,
+        POLL_INTERVAL_MS: 2000,
+        MAX_CONCURRENT_ISSUES: 5,
+      })
+      clock.onSleep = () => process.emit("SIGHUP")
 
-    await runWorkerLoop(api, config, workerDeps)
+      await runWorkerLoop(api, config, workerDeps)
 
-    assert.equal(config.POLL_INTERVAL_MS, 2000)
-    assert.equal(config.MAX_CONCURRENT_ISSUES, 5)
-    assert.equal(api.offlineCalls, 0)
-  }, { now: () => clock.now() })
+      assert.equal(config.POLL_INTERVAL_MS, 2000)
+      assert.equal(config.MAX_CONCURRENT_ISSUES, 5)
+      assert.equal(api.offlineCalls, 0)
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker loop marks graceful shutdown offline immediately", async () => {
@@ -392,206 +402,315 @@ test("worker loop marks graceful shutdown offline immediately", async () => {
 
 test("worker loop waits for signal-triggered offline update", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, api, deps }) => {
-    let releaseOffline = (): void => {}
-    let completed = false
-    api.offlineDelay = new Promise<void>((resolve) => {
-      releaseOffline = resolve
-    })
-    const signalSent = new Promise<void>((resolve) => {
-      clock.onSleep = () => {
-        process.emit("SIGTERM")
-        resolve()
-      }
-    })
-    api.controlResponse = () => ({ worker: { banned: false }, runs: [] })
+  await withHarness(
+    async ({ config, api, deps }) => {
+      let releaseOffline = (): void => {}
+      let completed = false
+      api.offlineDelay = new Promise<void>((resolve) => {
+        releaseOffline = resolve
+      })
+      const signalSent = new Promise<void>((resolve) => {
+        clock.onSleep = () => {
+          process.emit("SIGTERM")
+          resolve()
+        }
+      })
+      api.controlResponse = () => ({ worker: { banned: false }, runs: [] })
 
-    const run = runWorkerLoop(api, config, loopDeps(deps, clock, api)).then(
-      () => {
-        completed = true
-      }
-    )
+      const run = runWorkerLoop(api, config, loopDeps(deps, clock, api)).then(
+        () => {
+          completed = true
+        }
+      )
 
-    await signalSent
-    assert.equal(api.offlineCalls, 1)
-    assert.equal(completed, false)
+      await signalSent
+      assert.equal(api.offlineCalls, 1)
+      assert.equal(completed, false)
 
-    releaseOffline()
-    await run
-    assert.equal(completed, true)
-  }, { now: () => clock.now() })
+      releaseOffline()
+      await run
+      assert.equal(completed, true)
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker loop survives transient heartbeat and control failures", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, api, deps }) => {
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.failNextHeartbeat = true
-    api.failNextControl = true
-    api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 31_000 },
-      runs: [],
-    })
+  await withHarness(
+    async ({ config, api, deps }) => {
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.failNextHeartbeat = true
+      api.failNextControl = true
+      api.controlResponse = () => ({
+        worker: { banned: clock.elapsedMs >= 31_000 },
+        runs: [],
+      })
 
-    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
-    assert.equal(api.heartbeats.length, 1)
-    assert.equal(api.controlChecks.length, 4)
-  }, { now: () => clock.now() })
+      assert.equal(api.heartbeats.length, 1)
+      assert.equal(api.controlChecks.length, 4)
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker heartbeat survives transient provider check failures", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, api, deps }) => {
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.failNextProviderCheck = true
-    api.controlResponse = () => ({
-      worker: { banned: clock.elapsedMs >= 31_000 },
-      runs: [],
-    })
+  await withHarness(
+    async ({ config, api, deps }) => {
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.failNextProviderCheck = true
+      api.controlResponse = () => ({
+        worker: { banned: clock.elapsedMs >= 31_000 },
+        runs: [],
+      })
 
-    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
-    assert.equal(api.providerCheckCalls, 1)
-    assert.deepEqual(
-      api.heartbeats.map((entry) => entry.provider_capabilities),
-      [{ providers: {} }, { providers: {} }]
-    )
-  }, { now: () => clock.now() })
+      assert.equal(api.providerCheckCalls, 1)
+      assert.deepEqual(
+        api.heartbeats.map((entry) => entry.provider_capabilities),
+        [{ providers: {} }, { providers: {} }]
+      )
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker control ban aborts active sessions without recording failures", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, issue, api, deps }) => {
-    config.MAX_CONCURRENT_ISSUES = 1
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.claims.push(issue)
-    api.addMessage(issue.id, message("initial", "Initial prompt", 1))
-    let sessionEntered = false
-    api.controlResponse = () => ({
-      worker: {
-        banned: sessionEntered && clock.elapsedMs >= CONTROL_INTERVAL_MS,
-      },
-      runs: [
-        {
-          issue_id: issue.id,
-          active_run_id: issue.activeRunId,
-          status: "in-progress",
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue)
+      api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+      let sessionEntered = false
+      api.controlResponse = () => ({
+        worker: {
+          banned: sessionEntered && clock.elapsedMs >= CONTROL_INTERVAL_MS,
         },
-      ],
-    })
-    deps.runAgentSession = async (input) => {
-      assert.ok(input.signal)
-      await input.onSessionId("session-1")
-      sessionEntered = true
-      await waitForAbort(input.signal)
-      api.sessionAborted = true
-    }
+        runs: [
+          {
+            issue_id: issue.id,
+            active_run_id: issue.activeRunId,
+            status: "in-progress",
+          },
+        ],
+      })
+      deps.runAgentSession = async (input) => {
+        assert.ok(input.signal)
+        await input.onSessionId("session-1")
+        sessionEntered = true
+        await waitForAbort(input.signal)
+        api.sessionAborted = true
+      }
 
-    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
-    assert.equal(api.sessionAborted, true)
-    assert.equal(api.finishedStatuses.length, 0)
-    assert.equal(
-      api.runStates.some((entry) => entry.fields.status === "run-failed"),
-      false
-    )
-  }, { now: () => clock.now() })
+      assert.equal(api.sessionAborted, true)
+      assert.equal(api.finishedStatuses.length, 0)
+      assert.equal(
+        api.runStates.some((entry) => entry.fields.status === "run-failed"),
+        false
+      )
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("a skill install runs alongside issue work without interrupting it", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, issue, api, deps }) => {
-    config.MAX_CONCURRENT_ISSUES = 1
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.claims.push(issue)
-    api.addMessage(issue.id, message("initial", "Initial prompt", 1))
-    api.pendingSkillInstalls.push({
-      id: "55555555-5555-4555-8555-555555555555",
-      source: "anthropics/skills",
-      skill: "pdf",
-      expires_at: new Date(clock.nowMs + 10 * 60_000).toISOString(),
-    })
-    let sessionsRun = 0
-    // The ban is only here to end the loop, so hold it until the session has
-    // actually run. The worker starts `processIssue` without awaiting it, and
-    // that path clears the attachments directory off the real filesystem
-    // before it reaches the session — while the loop itself races ahead on a
-    // clock that only moves when it sleeps. On a loaded machine that `rm`
-    // outlives three control polls, and a ban keyed on elapsed time alone
-    // cancels the run before the session it is meant to leave undisturbed.
-    api.controlResponse = () => ({
-      worker: {
-        banned: sessionsRun > 0 && clock.elapsedMs >= 3 * CONTROL_INTERVAL_MS,
-      },
-      runs: [
-        {
-          issue_id: issue.id,
-          active_run_id: issue.activeRunId,
-          status: "in-progress",
-        },
-      ],
-    })
-    deps.runAgentSession = async (input) => {
-      sessionsRun += 1
-      await input.onSessionId("session-1")
-    }
-    const workerDeps = loopDeps(deps, clock, api)
-    workerDeps.createSkillInstallRunner = (api_) =>
-      createSkillInstallRunner(api_, {
-        run: async () => ({
-          status: "installed",
-          error_summary: null,
-          output: null,
-        }),
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue)
+      api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+      api.pendingSkillInstalls.push({
+        id: "55555555-5555-4555-8555-555555555555",
+        source: "anthropics/skills",
+        skill: "pdf",
+        expires_at: new Date(clock.nowMs + 10 * 60_000).toISOString(),
       })
+      let sessionsRun = 0
+      // The ban is only here to end the loop, so hold it until the session has
+      // actually run. The worker starts `processIssue` without awaiting it, and
+      // that path clears the attachments directory off the real filesystem
+      // before it reaches the session — while the loop itself races ahead on a
+      // clock that only moves when it sleeps. On a loaded machine that `rm`
+      // outlives three control polls, and a ban keyed on elapsed time alone
+      // cancels the run before the session it is meant to leave undisturbed.
+      api.controlResponse = () => ({
+        worker: {
+          banned: sessionsRun > 0 && clock.elapsedMs >= 3 * CONTROL_INTERVAL_MS,
+        },
+        runs: [
+          {
+            issue_id: issue.id,
+            active_run_id: issue.activeRunId,
+            status: "in-progress",
+          },
+        ],
+      })
+      deps.runAgentSession = async (input) => {
+        sessionsRun += 1
+        await input.onSessionId("session-1")
+      }
+      const workerDeps = loopDeps(deps, clock, api)
+      workerDeps.createSkillInstallRunner = (api_) =>
+        createSkillInstallRunner(api_, {
+          run: async () => ({
+            status: "installed",
+            error_summary: null,
+            output: null,
+          }),
+        })
 
-    await runWorkerLoop(api, config, workerDeps)
+      await runWorkerLoop(api, config, workerDeps)
 
-    assert.equal(sessionsRun, 1)
-    assert.equal(api.sessionAborted, false)
-    assert.deepEqual(api.skillInstallResults, [
-      {
-        installId: "55555555-5555-4555-8555-555555555555",
-        result: { status: "installed", error_summary: null, output: null },
-      },
-    ])
-  }, { now: () => clock.now() })
+      assert.equal(sessionsRun, 1)
+      assert.equal(api.sessionAborted, false)
+      assert.deepEqual(api.skillInstallResults, [
+        {
+          installId: "55555555-5555-4555-8555-555555555555",
+          result: { status: "installed", error_summary: null, output: null },
+        },
+      ])
+    },
+    { now: () => clock.now() }
+  )
 })
 
 test("worker control invalidates active runs and cancels their sessions", async () => {
   const clock = new FakeClock()
-  await withHarness(async ({ config, issue, api, deps }) => {
-    config.MAX_CONCURRENT_ISSUES = 1
-    config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-    api.claims.push(issue)
-    let sessionEntered = false
-    api.controlResponse = () => ({
-      worker: { banned: sessionEntered && clock.elapsedMs >= 20_000 },
-      runs:
-        !sessionEntered || clock.elapsedMs < CONTROL_INTERVAL_MS
-          ? [
-              {
-                issue_id: issue.id,
-                active_run_id: issue.activeRunId,
-                status: "in-progress",
-              },
-            ]
-          : [],
-    })
-    deps.runAgentSession = async (input) => {
-      assert.ok(input.signal)
-      await input.onSessionId("session-1")
-      sessionEntered = true
-      await waitForAbort(input.signal)
-      api.sessionAborted = true
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue)
+      let sessionEntered = false
+      api.controlResponse = () => ({
+        worker: { banned: sessionEntered && clock.elapsedMs >= 20_000 },
+        runs:
+          !sessionEntered || clock.elapsedMs < CONTROL_INTERVAL_MS
+            ? [
+                {
+                  issue_id: issue.id,
+                  active_run_id: issue.activeRunId,
+                  status: "in-progress",
+                },
+              ]
+            : [],
+      })
+      deps.runAgentSession = async (input) => {
+        assert.ok(input.signal)
+        await input.onSessionId("session-1")
+        sessionEntered = true
+        await waitForAbort(input.signal)
+        api.sessionAborted = true
+      }
+
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+      assert.equal(api.sessionAborted, true)
+      assert.equal(api.finishedStatuses.length, 0)
+    },
+    { now: () => clock.now() }
+  )
+})
+
+test("implementation work is claimed before a queued review job with one available slot", async () => {
+  const clock = new FakeClock()
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue)
+      api.reviewRunClaims.push(claimedReviewRun("review-1"))
+      let sessionEntered = false
+      api.controlResponse = () => ({
+        worker: {
+          banned: sessionEntered && clock.elapsedMs >= CONTROL_INTERVAL_MS,
+        },
+        runs: [
+          {
+            issue_id: issue.id,
+            active_run_id: issue.activeRunId,
+            status: "in-progress",
+          },
+        ],
+      })
+      deps.runAgentSession = async (input) => {
+        assert.ok(input.signal)
+        await input.onSessionId("session-1")
+        sessionEntered = true
+        await waitForAbort(input.signal)
+      }
+
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+      // The implementation issue filled the worker's only slot, so the
+      // queued review job was never claimed this run.
+      assert.deepEqual(api.reviewRunClaims, [claimedReviewRun("review-1")])
+      assert.deepEqual(api.reviewRunHeartbeats, [])
+    },
+    { now: () => clock.now() }
+  )
+})
+
+test("a review job is claimed once no implementation issue is available", async () => {
+  const clock = new FakeClock()
+  await withHarness(
+    async ({ config, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      // No implementation issue queued — `api.claims` stays empty.
+      api.reviewRunClaims.push(claimedReviewRun("review-1"))
+      api.controlResponse = () => ({
+        worker: { banned: api.reviewRunHeartbeats.length > 0 },
+        runs: [],
+        review_runs: [{ review_run_id: "review-1", status: "running" }],
+      })
+
+      await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+
+      assert.deepEqual(api.reviewRunHeartbeats, ["review-1"])
+      assert.deepEqual(api.failedReviewRuns, [
+        {
+          reviewRunId: "review-1",
+          error: REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
+        },
+      ])
+    },
+    { now: () => clock.now() }
+  )
+})
+
+test("processReviewRun stops without reporting an infra failure once aborted", async () => {
+  await withHarness(async ({ api }) => {
+    const controller = new AbortController()
+    let heartbeatSent = false
+    api.sendReviewRunHeartbeat = async (reviewRunId: string) => {
+      api.reviewRunHeartbeats.push(reviewRunId)
+      heartbeatSent = true
+      // Simulates the control poll aborting the claim (e.g. the PR closed)
+      // in the window between the heartbeat and the fail-run report.
+      controller.abort()
     }
 
-    await runWorkerLoop(api, config, loopDeps(deps, clock, api))
+    await assert.rejects(
+      processReviewRun(api, claimedReviewRun("review-1"), {
+        signal: controller.signal,
+      }),
+      (error: unknown) => isSessionCancelled(error)
+    )
 
-    assert.equal(api.sessionAborted, true)
-    assert.equal(api.finishedStatuses.length, 0)
-  }, { now: () => clock.now() })
+    assert.equal(heartbeatSent, true)
+    assert.deepEqual(api.failedReviewRuns, [])
+  })
 })
 
 test("processIssue cancellation reaches an active agent session", async () => {
@@ -993,6 +1112,10 @@ class FakeApi implements AgentApi {
   readonly heartbeats: WorkerHeartbeatTelemetry[] = []
   readonly controlChecks: string[] = []
   readonly claims: ClaimedIssue[] = []
+  readonly reviewRunClaims: ClaimedReviewRun[] = []
+  readonly reviewRunHeartbeats: string[] = []
+  readonly failedReviewRuns: { reviewRunId: string; error: string }[] = []
+  readonly failReviewRunResults: { retried: boolean }[] = []
   readonly pendingSkillInstalls: WorkerSkillInstallCommand[] = []
   readonly skillInstallResults: {
     installId: string
@@ -1002,7 +1125,11 @@ class FakeApi implements AgentApi {
   finishResults: boolean[] = [true]
   finishStatusOverride: FinishRunResult["status"] | null = null
   onFinishAttempt: ((attempt: number) => void) | null = null
-  controlResponse: () => WorkerControlResponse = () => ({
+  // `review_runs` defaults to `[]` in `fetchWorkerControl` below, so
+  // existing call sites that only cover implementation-issue control state
+  // don't all need updating for GEN-414's new field.
+  controlResponse: () => Omit<WorkerControlResponse, "review_runs"> &
+    Partial<Pick<WorkerControlResponse, "review_runs">> = () => ({
     worker: { banned: true },
     runs: [],
   })
@@ -1028,6 +1155,22 @@ class FakeApi implements AgentApi {
 
   async claimNextQueuedIssue(): Promise<ClaimedIssue | null> {
     return this.claims.shift() ?? null
+  }
+
+  async claimReviewRun(): Promise<ClaimedReviewRun | null> {
+    return this.reviewRunClaims.shift() ?? null
+  }
+
+  async sendReviewRunHeartbeat(reviewRunId: string): Promise<void> {
+    this.reviewRunHeartbeats.push(reviewRunId)
+  }
+
+  async failReviewRun(
+    reviewRunId: string,
+    input: { error: string }
+  ): Promise<{ retried: boolean }> {
+    this.failedReviewRuns.push({ reviewRunId, error: input.error })
+    return this.failReviewRunResults.shift() ?? { retried: false }
   }
 
   async setRunState(
@@ -1156,9 +1299,7 @@ class FakeApi implements AgentApi {
     }
   }
 
-  async sendHeartbeat(
-    telemetry: WorkerHeartbeatTelemetry
-  ): Promise<void> {
+  async sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void> {
     if (this.failNextHeartbeat) {
       this.failNextHeartbeat = false
       throw new Error("temporary heartbeat failure")
@@ -1177,7 +1318,7 @@ class FakeApi implements AgentApi {
       throw new Error("temporary control failure")
     }
     this.controlChecks.push(this.now().toISOString())
-    return this.controlResponse()
+    return { review_runs: [], ...this.controlResponse() }
   }
 
   async claimSkillInstall(): Promise<WorkerSkillInstallCommand | null> {
@@ -1310,6 +1451,16 @@ function claimedIssue(id: string): ClaimedIssue {
     branchName: `test-${id}-issue`,
     createPrAutomatically: false,
     hasUnpublishedAgentChanges: false,
+  }
+}
+
+function claimedReviewRun(id: string): ClaimedReviewRun {
+  return {
+    id,
+    reviewCycleId: `${id}-cycle`,
+    issueId: `${id}-issue`,
+    pullRequestId: `${id}-pr`,
+    headSha: "abc123",
   }
 }
 

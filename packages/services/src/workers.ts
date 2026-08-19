@@ -42,10 +42,7 @@ const CREDENTIAL_PREFIX = "gtwc_"
 const SECRET_BYTES = 32
 
 export type WorkerPrimaryState =
-  | "setup-incomplete"
-  | "online"
-  | "offline"
-  | "banned"
+  "setup-incomplete" | "online" | "offline" | "banned"
 
 export type WorkerProviderReadiness = {
   installed: boolean
@@ -138,6 +135,10 @@ export type WorkerControlState = {
     active_run_id: string | null
     status: string
   }>
+  review_runs: Array<{
+    review_run_id: string
+    status: string
+  }>
 }
 
 export type RenameWorkerInput = {
@@ -221,7 +222,9 @@ export async function createWorker(
         "Worker credential hash is invalid"
       ),
       setup_state: input.setup_state
-        ? parseWorkerValue(() => workerSetupStateSchema.parse(input.setup_state))
+        ? parseWorkerValue(() =>
+            workerSetupStateSchema.parse(input.setup_state)
+          )
         : "enrolling",
       banned_at: input.banned_at ?? null,
       last_seen_at: input.last_seen_at ?? null,
@@ -235,12 +238,11 @@ export async function createWorker(
           : parseWorkerValue(() =>
               workerCapacitySchema.parse(input.configured_capacity)
             ),
-      provider_capabilities:
-        (input.provider_capabilities
-          ? parseWorkerValue(() =>
-              workerCapabilitiesSchema.parse(input.provider_capabilities)
-            )
-          : { providers: {} }) as Json,
+      provider_capabilities: (input.provider_capabilities
+        ? parseWorkerValue(() =>
+            workerCapabilitiesSchema.parse(input.provider_capabilities)
+          )
+        : { providers: {} }) as Json,
     })
     .select(workerSelect)
     .single()
@@ -369,15 +371,12 @@ export async function authenticateWorkerCredential(
     .select("id,user_id,banned_at,credential_expires_at")
     .eq("credential_hash", hashWorkerSecret(parsed.data))
     .maybeSingle()
-    .returns<
-      | {
-          id: string
-          user_id: string
-          banned_at: string | null
-          credential_expires_at: string | null
-        }
-      | null
-    >()
+    .returns<{
+      id: string
+      user_id: string
+      banned_at: string | null
+      credential_expires_at: string | null
+    } | null>()
 
   if (error) {
     throw new ServiceError("internal", error.message)
@@ -396,7 +395,11 @@ export async function authenticateWorkerCredential(
     throw new ServiceError("forbidden", "Invalid worker credential")
   }
 
-  return { userId: data.user_id, workerId: data.id, banned: Boolean(data.banned_at) }
+  return {
+    userId: data.user_id,
+    workerId: data.id,
+    banned: Boolean(data.banned_at),
+  }
 }
 
 export async function recordWorkerHeartbeat(
@@ -414,7 +417,8 @@ export async function recordWorkerHeartbeat(
     userId,
     workerId,
     {
-      last_seen_at: telemetry.last_seen_at ?? (options.now ?? new Date()).toISOString(),
+      last_seen_at:
+        telemetry.last_seen_at ?? (options.now ?? new Date()).toISOString(),
       offline_since_at: null,
       process_started_at: telemetry.process_started_at,
       gentic_version: telemetry.gentic_version,
@@ -486,7 +490,13 @@ export async function banWorker(
     compatibilityPolicy?: WorkerCompatibilityPolicy
   } = {}
 ): Promise<WorkerDomain> {
-  return runWorkerLifecycleRpc(supabase, "ban_worker", userId, workerId, options)
+  return runWorkerLifecycleRpc(
+    supabase,
+    "ban_worker",
+    userId,
+    workerId,
+    options
+  )
 }
 
 export async function unbanWorker(
@@ -536,27 +546,41 @@ export async function getWorkerControlState(
   workerId: string,
   banned: boolean
 ): Promise<WorkerControlState> {
-  const rows = unwrap(
-    await supabase
-      .from("issues")
-      .select("id,active_run_id,status")
-      .eq("active_worker_id", workerId)
-      .not("active_run_id", "is", null)
-      .not("status", "in", "(completed,cancelled)")
-      .returns<
-        Array<{
-          id: string
-          active_run_id: string | null
-          status: string
-        }>
-      >()
-  )
+  const [rows, reviewRunRows] = await Promise.all([
+    unwrap(
+      await supabase
+        .from("issues")
+        .select("id,active_run_id,status")
+        .eq("active_worker_id", workerId)
+        .not("active_run_id", "is", null)
+        .not("status", "in", "(completed,cancelled)")
+        .returns<
+          Array<{
+            id: string
+            active_run_id: string | null
+            status: string
+          }>
+        >()
+    ),
+    unwrap(
+      await supabase
+        .from("review_runs")
+        .select("id,status")
+        .eq("claimed_by_worker_id", workerId)
+        .eq("status", "running")
+        .returns<Array<{ id: string; status: string }>>()
+    ),
+  ])
 
   return {
     worker: { banned },
     runs: rows.map((row) => ({
       issue_id: row.id,
       active_run_id: row.active_run_id,
+      status: row.status,
+    })),
+    review_runs: reviewRunRows.map((row) => ({
+      review_run_id: row.id,
       status: row.status,
     })),
   }
@@ -731,7 +755,9 @@ async function clearEnrollmentExchangeFailures(
   }
 }
 
-function parseOptionalPlatform(value: string | null | undefined): string | null {
+function parseOptionalPlatform(
+  value: string | null | undefined
+): string | null {
   return value === null || value === undefined
     ? null
     : parseWorkerValue(() => workerPlatformSchema.parse(value))
@@ -784,22 +810,44 @@ async function listRunningTaskCounts(
     return counts
   }
 
-  const rows = unwrap(
-    await supabase
-      .from("issues")
-      .select("active_worker_id")
-      .in("active_worker_id", workerIds)
-      .not("active_worker_id", "is", null)
-      .not("active_run_id", "is", null)
-      .not("status", "in", "(completed,cancelled)")
-      .returns<Array<{ active_worker_id: string | null }>>()
-  )
+  // Implementation issues and claimed review runs share one capacity pool
+  // per worker, so both are counted into the same map — this is what makes
+  // "implementation work always wins capacity contention" (GEN-414) work:
+  // whichever job class claims first consumes the slot the other sees.
+  const [issueRows, reviewRunRows] = await Promise.all([
+    unwrap(
+      await supabase
+        .from("issues")
+        .select("active_worker_id")
+        .in("active_worker_id", workerIds)
+        .not("active_worker_id", "is", null)
+        .not("active_run_id", "is", null)
+        .not("status", "in", "(completed,cancelled)")
+        .returns<Array<{ active_worker_id: string | null }>>()
+    ),
+    unwrap(
+      await supabase
+        .from("review_runs")
+        .select("claimed_by_worker_id")
+        .in("claimed_by_worker_id", workerIds)
+        .eq("status", "running")
+        .returns<Array<{ claimed_by_worker_id: string | null }>>()
+    ),
+  ])
 
-  for (const row of rows) {
+  for (const row of issueRows) {
     if (row.active_worker_id) {
       counts.set(
         row.active_worker_id,
         (counts.get(row.active_worker_id) ?? 0) + 1
+      )
+    }
+  }
+  for (const row of reviewRunRows) {
+    if (row.claimed_by_worker_id) {
+      counts.set(
+        row.claimed_by_worker_id,
+        (counts.get(row.claimed_by_worker_id) ?? 0) + 1
       )
     }
   }
@@ -843,7 +891,10 @@ function toWorkerDomain(
   }
 }
 
-function deriveWorkerPrimaryState(row: WorkerRow, now: Date): WorkerPrimaryState {
+function deriveWorkerPrimaryState(
+  row: WorkerRow,
+  now: Date
+): WorkerPrimaryState {
   if (row.banned_at) {
     return "banned"
   }
@@ -885,9 +936,7 @@ function sanitizeProviderCapabilities(
   return sanitized
 }
 
-function isSupportedWorkerProviderKey(
-  key: string
-): key is WorkerProviderKey {
+function isSupportedWorkerProviderKey(key: string): key is WorkerProviderKey {
   return key in supportedWorkerProviderKeys
 }
 
@@ -979,7 +1028,10 @@ function throwWorkerLifecycleRpcError(error: {
   throw new ServiceError("internal", error.message)
 }
 
-function throwWorkerWriteError(error: { message: string; code?: string }): never {
+function throwWorkerWriteError(error: {
+  message: string
+  code?: string
+}): never {
   if (
     error.code === "23505" ||
     error.message.toLowerCase().includes("workers_user_normalized_name_unique")
@@ -1000,7 +1052,10 @@ function throwWorkerEnrollmentWriteError(error: {
       .toLowerCase()
       .includes("worker_enrollment_codes_one_active_per_user")
   ) {
-    throw new ServiceError("validation", "Worker enrollment code already exists")
+    throw new ServiceError(
+      "validation",
+      "Worker enrollment code already exists"
+    )
   }
 
   throw new ServiceError("internal", error.message)

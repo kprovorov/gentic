@@ -826,10 +826,12 @@ export type Database = {
       }
       review_runs: {
         Row: {
+          claimed_by_worker_id: string | null
           created_at: string
           error: string | null
           finished_at: string | null
           head_sha: string
+          heartbeat_at: string | null
           id: string
           review_cycle_id: string
           started_at: string | null
@@ -837,10 +839,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          claimed_by_worker_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
           head_sha: string
+          heartbeat_at?: string | null
           id?: string
           review_cycle_id: string
           started_at?: string | null
@@ -848,10 +852,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          claimed_by_worker_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
           head_sha?: string
+          heartbeat_at?: string | null
           id?: string
           review_cycle_id?: string
           started_at?: string | null
@@ -859,6 +865,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "review_runs_claimed_by_worker_id_fkey"
+            columns: ["claimed_by_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "review_runs_review_cycle_id_fkey"
             columns: ["review_cycle_id"]
@@ -1130,6 +1143,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_review_run: {
+        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+        Returns: {
+          head_sha: string
+          issue_id: string
+          pull_request_id: string
+          review_cycle_id: string
+          review_run_id: string
+        }[]
+      }
       complete_review_attempt: {
         Args: {
           p_findings?: Json
@@ -1261,6 +1284,10 @@ export type Database = {
           status_changed: boolean
         }[]
       }
+      reconcile_offline_review_runs: {
+        Args: { p_now?: string }
+        Returns: number
+      }
       reconcile_offline_worker_runs: {
         Args: { p_now?: string }
         Returns: number
@@ -1321,6 +1348,10 @@ export type Database = {
         }[]
       }
       requeue_worker_active_issues: {
+        Args: { p_now: string; p_worker_id: string }
+        Returns: number
+      }
+      requeue_worker_active_review_runs: {
         Args: { p_now: string; p_worker_id: string }
         Returns: number
       }

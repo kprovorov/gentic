@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(35);
+SELECT plan(40);
 
 INSERT INTO public.workers (
   id,
@@ -179,6 +179,24 @@ INSERT INTO public.messages (
   '2026-07-29T19:56:00Z'
 );
 
+-- A review job (GEN-414) claimed by the same worker must also be released
+-- on ban — `reconcile_offline_review_runs` deliberately excludes banned
+-- workers, so `ban_worker` is the only thing that ever frees this claim.
+UPDATE public.projects
+   SET automatic_review_enabled = true
+ WHERE id = '10000000-0000-4000-8000-100000000001';
+
+INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
+  ('20000000-0000-4000-8000-100000000003', '10000000-0000-4000-8000-100000000001', 'Review job task', 'Body', 'ready-for-review', 3, 'claude_code');
+
+INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
+  ('20000000-0000-4000-8000-100000000103', '20000000-0000-4000-8000-100000000003', 'https://github.com/gentic/alpha/pull/3', 'open', 'sha-ban', 'success');
+
+SELECT public.evaluate_review_eligibility('https://github.com/gentic/alpha/pull/3');
+
+CREATE TEMP TABLE ban_review_claim AS
+SELECT * FROM public.claim_review_run('00000000-0000-4000-8000-100000000001', 'user_alpha');
+
 SELECT is(
   (
     SELECT banned_at
@@ -190,6 +208,24 @@ SELECT is(
   ),
   '2026-07-29 20:04:00+00'::timestamptz,
   'ban marks the worker banned'
+);
+
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT review_run_id FROM ban_review_claim)),
+  'failed',
+  'ban releases the worker''s claimed review run'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.review_attempts WHERE review_cycle_id = (SELECT review_cycle_id FROM ban_review_claim)),
+  0,
+  'ban releasing a review run never consumes a Review Attempt'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.review_runs WHERE review_cycle_id = (SELECT review_cycle_id FROM ban_review_claim) AND status = 'pending'),
+  1,
+  'ban releasing a review run automatically retries it'
 );
 
 SELECT is(
@@ -385,6 +421,17 @@ UPDATE public.issues
        run_error = 'offline failed'
  WHERE id = '20000000-0000-4000-8000-100000000002';
 
+INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
+  ('20000000-0000-4000-8000-100000000004', '10000000-0000-4000-8000-100000000001', 'Review job task for delete', 'Body', 'ready-for-review', 4, 'claude_code');
+
+INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
+  ('20000000-0000-4000-8000-100000000104', '20000000-0000-4000-8000-100000000004', 'https://github.com/gentic/alpha/pull/4', 'open', 'sha-delete', 'success');
+
+SELECT public.evaluate_review_eligibility('https://github.com/gentic/alpha/pull/4');
+
+CREATE TEMP TABLE delete_review_claim AS
+SELECT * FROM public.claim_review_run('00000000-0000-4000-8000-100000000002', 'user_alpha');
+
 SELECT ok(
   public.delete_worker(
     'user_alpha',
@@ -392,6 +439,18 @@ SELECT ok(
     '2026-07-29T20:07:00Z'
   ),
   'offline delete succeeds'
+);
+
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT review_run_id FROM delete_review_claim)),
+  'failed',
+  'delete releases the worker''s claimed review run'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.review_runs WHERE review_cycle_id = (SELECT review_cycle_id FROM delete_review_claim) AND status = 'pending'),
+  1,
+  'delete releasing a review run automatically retries it'
 );
 
 SELECT is(

@@ -16,6 +16,13 @@ function apiWithAttachments(
     async claimNextQueuedIssue() {
       return null
     },
+    async claimReviewRun() {
+      return null
+    },
+    async sendReviewRunHeartbeat() {},
+    async failReviewRun() {
+      return { retried: false }
+    },
     async setRunState() {},
     async finishRun() {
       return { finished: true, status: "waiting-for-input" }
@@ -49,7 +56,7 @@ function apiWithAttachments(
     async sendHeartbeat() {},
     async markOffline() {},
     async fetchWorkerControl() {
-      return { worker: { banned: false }, runs: [] }
+      return { worker: { banned: false }, runs: [], review_runs: [] }
     },
     async claimSkillInstall() {
       return null
