@@ -112,13 +112,17 @@ Changing a Spec back to another type restores its agent behaviour. You cannot co
 
 Open the issue detail page and click **Edit**. You can update the **Title**, **Body**, **Agent**, **Type**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
 
-## Retry an Agent
+## Reset an Issue
 
-Retrying an agent clears the current agent session and re-queues the issue as if it were starting fresh. Open the issue and click **Retry with Claude Code**, or use the adjacent dropdown to retry with Codex.
+Resetting clears the agent session and re-queues the issue as if it were starting fresh, on the agent and model it is already set to. Open the issue, click the **⋮** menu beside the title, choose **Reset**, and confirm.
+
+Reset is offered on any issue that has left **Draft**. A draft has nothing to reset — move it to **Todo** to start it. A [Spec](#spec-issues) never shows the action, because no agent runs it.
 
 <Warning>
-  Retrying is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message — `Work on Gentic issue {Issue Code}.` — that the agent uses to read the current body. It does not delete pull requests from GitHub.
+  Resetting is irreversible: Gentic deletes the stored conversation and pull-request links for the issue, then creates a fresh kickoff message — `Work on Gentic issue {Issue Code}.` — that the agent uses to read the current body. It does not delete pull requests from GitHub.
 </Warning>
+
+Switching the agent or model from the composer's picker takes the same path once a conversation exists, and asks for the same confirmation.
 
 ## Delete an Issue
 
