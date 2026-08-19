@@ -7,6 +7,7 @@ import {
   IconChevronDown,
   IconDotsVertical,
   IconPencil,
+  IconRefresh,
   IconTrash,
 } from "@tabler/icons-react"
 
@@ -46,6 +47,8 @@ import type { Attachment } from "./attachments"
 import { useIssueDelete } from "./issue-delete-button"
 import { IssuePropertiesDialog } from "./issue-properties-dialog"
 import { IssueRequestBody } from "./issue-request-body"
+import { canResetIssue } from "./issue-reset-visibility"
+import { useIssueReset } from "./use-issue-reset"
 
 // Whether the details are folded away is a reading preference rather than
 // something about one issue, so it is remembered across issues and reloads.
@@ -248,6 +251,11 @@ export function IssueDetailHeader({
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
+  const { isPending: isResetPending, handleReset } = useIssueReset({
+    issueId: issue.id,
+    agentProvider: issue.agent_provider,
+    issueModel: issue.issue_model,
+  })
   // Title and status stay pinned; everything else about the issue — the
   // metadata pills and the request that kicked it off — collapses together so
   // the timeline can take the whole screen when the details aren't needed.
@@ -327,6 +335,18 @@ export function IssueDetailHeader({
                   Edit
                 </Link>
               </DropdownMenuItem>
+              {canResetIssue(issue) ? (
+                <DropdownMenuItem
+                  disabled={isResetPending}
+                  // Unlike Delete this lets the menu close: the reset leaves
+                  // the user on the issue, and a menu still hanging open over
+                  // the freshly cleared transcript reads as a stuck click.
+                  onSelect={handleReset}
+                >
+                  <IconRefresh />
+                  Reset
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem
                 variant="destructive"
                 disabled={isPending}

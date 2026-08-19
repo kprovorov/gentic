@@ -3,15 +3,16 @@ import { act } from "react"
 import { hydrateRoot } from "react-dom/client"
 import { renderToString } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/app/issues/actions", () => ({
   addIssueRelation: vi.fn(),
   createManualIssuePullRequest: vi.fn(),
   deleteIssue: vi.fn(),
   deleteIssueRelation: vi.fn(),
+  resetIssueAgent: vi.fn(),
   updateIssuePriority: vi.fn(),
   updateIssueStatus: vi.fn(),
   updateIssueTitle: vi.fn(),
@@ -32,8 +33,9 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }))
 
-// Radix menus need pointer APIs jsdom lacks; this suite only cares that the
-// header's controls render.
+// Radix menus need pointer APIs jsdom lacks, so the menu renders flat here.
+// The items still have to act on a click: the actions hanging off them are
+// what the tests below exercise.
 vi.mock("@gentic/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -44,12 +46,28 @@ vi.mock("@gentic/ui/dropdown-menu", () => ({
   DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  DropdownMenuItem: ({ children }: { children: React.ReactNode }) => (
-    <button type="button" role="menuitem">
+  DropdownMenuItem: ({
+    children,
+    disabled,
+    onSelect,
+  }: {
+    children: React.ReactNode
+    disabled?: boolean
+    onSelect?: (event: Event) => void
+  }) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => onSelect?.(new Event("select"))}
+    >
       {children}
     </button>
   ),
 }))
+
+import { resetIssueAgent } from "@/app/issues/actions"
+import { registerSiteHeaderActionsSlot } from "@/components/site-header-actions-slot"
 
 import { IssueDetailHeader } from "./issue-detail-header"
 
@@ -63,6 +81,7 @@ const issue = {
   priority: "medium",
   type: "bug",
   agent_provider: "claude_code",
+  issue_model: "claude-opus-5",
   has_unpublished_agent_changes: false,
   projects: { key: "GEN", repo: "kprovorov/gentic" },
 } as unknown as React.ComponentProps<typeof IssueDetailHeader>["issue"]
@@ -134,7 +153,17 @@ function fakeViewport(height: number) {
 
 const EXPANDED_STORAGE_KEY = "gentic:issue-detail-header-expanded:v1"
 
+// The header's action menu is portalled into the site header rather than
+// rendered in place, so without a registered slot it renders nowhere at all.
+beforeEach(() => {
+  const slot = document.createElement("div")
+  document.body.append(slot)
+  registerSiteHeaderActionsSlot(slot)
+})
+
 afterEach(() => {
+  registerSiteHeaderActionsSlot(null)
+  vi.restoreAllMocks()
   vi.clearAllMocks()
   window.localStorage.clear()
 })
@@ -247,6 +276,49 @@ describe("IssueDetailHeader", () => {
     viewport.resizeTo(460)
 
     expect(window.localStorage.getItem(EXPANDED_STORAGE_KEY)).toBeNull()
+  })
+
+  it("resets the issue on the agent and model it is already set to", async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true)
+    renderHeader()
+
+    await user.click(screen.getByRole("menuitem", { name: "Reset" }))
+
+    expect(confirm).toHaveBeenCalledOnce()
+    await waitFor(() => expect(resetIssueAgent).toHaveBeenCalledOnce())
+    const formData = vi.mocked(resetIssueAgent).mock.calls[0][0]
+    expect(formData.get("id")).toBe(issue.id)
+    expect(formData.get("agent_provider")).toBe("claude_code")
+    expect(formData.get("issue_model")).toBe("claude-opus-5")
+  })
+
+  // The reset deletes the conversation and the pull-request links, so a
+  // dismissed confirmation has to leave the issue untouched.
+  it("leaves the issue alone when the reset confirmation is dismissed", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(false)
+    renderHeader()
+
+    await user.click(screen.getByRole("menuitem", { name: "Reset" }))
+
+    expect(resetIssueAgent).not.toHaveBeenCalled()
+  })
+
+  it("offers no reset before the issue has left draft", () => {
+    renderHeader({ issue: { ...issue, status: "draft" } })
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Reset" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("offers no reset on a Spec, which never runs an agent", () => {
+    renderHeader({ issue: { ...issue, type: "spec" } })
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Reset" })
+    ).not.toBeInTheDocument()
   })
 
   it("lets the details back open with the keyboard still up", async () => {
