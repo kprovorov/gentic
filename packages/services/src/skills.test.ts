@@ -16,7 +16,7 @@ import {
 } from "./skills"
 
 type Row = Record<string, unknown>
-type TableName = "workers" | "issues" | "worker_skill_installs"
+type TableName = "workers" | "issues" | "review_runs" | "worker_skill_installs"
 
 const NOW = new Date("2026-08-12T12:00:00.000Z")
 const SKILL_URL = "https://skills.sh/anthropics/skills/pdf"
@@ -28,6 +28,7 @@ const OTHER_ACCOUNT_WORKER = "44444444-4444-4444-8444-444444444444"
 class FakeSupabase {
   workers: Row[] = []
   issues: Row[] = []
+  review_runs: Row[] = []
   worker_skill_installs: Row[] = []
   private nextId = 0
 
@@ -121,8 +122,7 @@ class FakeQuery implements PromiseLike<QueryResult> {
 
   then<TResult1 = QueryResult, TResult2 = never>(
     onfulfilled?:
-      | ((value: QueryResult) => TResult1 | PromiseLike<TResult1>)
-      | null,
+      ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ) {
     return this.execute().then(onfulfilled, onrejected)
@@ -279,53 +279,54 @@ test("audits that all pass and are current need no risk acceptance", () => {
 })
 
 test("a failing audit blocks, and warnings, staleness, gaps and outages ask for confirmation", () => {
-  const cases: Array<[Parameters<typeof evaluateSkillAudits>[0], string, string[]]> =
+  const cases: Array<
+    [Parameters<typeof evaluateSkillAudits>[0], string, string[]]
+  > = [
     [
-      [
-        {
-          outcome: "audited",
-          audits: [
-            { provider: "Snyk", status: "fail", auditedAt: NOW.toISOString() },
-            { provider: "Socket", status: "pass", auditedAt: NOW.toISOString() },
-          ],
-        },
-        "block",
-        ["failed"],
-      ],
-      [
-        {
-          outcome: "audited",
-          audits: [
-            { provider: "Socket", status: "warn", auditedAt: NOW.toISOString() },
-          ],
-        },
-        "confirm",
-        ["warning"],
-      ],
-      [
-        {
-          outcome: "audited",
-          audits: [
-            {
-              provider: "Socket",
-              status: "pass",
-              auditedAt: new Date(
-                NOW.getTime() - 31 * 24 * 60 * 60_000
-              ).toISOString(),
-            },
-          ],
-        },
-        "confirm",
-        ["stale"],
-      ],
-      [
-        { outcome: "audited", audits: [{ provider: "Socket", status: "pass" }] },
-        "confirm",
-        ["stale"],
-      ],
-      [{ outcome: "missing" }, "confirm", ["missing"]],
-      [{ outcome: "unavailable" }, "confirm", ["unavailable"]],
-    ]
+      {
+        outcome: "audited",
+        audits: [
+          { provider: "Snyk", status: "fail", auditedAt: NOW.toISOString() },
+          { provider: "Socket", status: "pass", auditedAt: NOW.toISOString() },
+        ],
+      },
+      "block",
+      ["failed"],
+    ],
+    [
+      {
+        outcome: "audited",
+        audits: [
+          { provider: "Socket", status: "warn", auditedAt: NOW.toISOString() },
+        ],
+      },
+      "confirm",
+      ["warning"],
+    ],
+    [
+      {
+        outcome: "audited",
+        audits: [
+          {
+            provider: "Socket",
+            status: "pass",
+            auditedAt: new Date(
+              NOW.getTime() - 31 * 24 * 60 * 60_000
+            ).toISOString(),
+          },
+        ],
+      },
+      "confirm",
+      ["stale"],
+    ],
+    [
+      { outcome: "audited", audits: [{ provider: "Socket", status: "pass" }] },
+      "confirm",
+      ["stale"],
+    ],
+    [{ outcome: "missing" }, "confirm", ["missing"]],
+    [{ outcome: "unavailable" }, "confirm", ["unavailable"]],
+  ]
 
   for (const [lookup, decision, reasons] of cases) {
     const gate = evaluateSkillAudits(lookup, { now: NOW })

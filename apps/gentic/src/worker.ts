@@ -4,7 +4,12 @@ import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
 import packageJson from "../package.json" with { type: "json" }
-import { createAgentApi, type AgentApi, type ClaimedIssue } from "./api.js"
+import {
+  createAgentApi,
+  type AgentApi,
+  type ClaimedIssue,
+  type ClaimedReviewRun,
+} from "./api.js"
 import { buildAttachmentBlocks } from "./attachments.js"
 import { loadConfig, type Config } from "./config.js"
 import {
@@ -126,9 +131,18 @@ export async function runWorkerLoop(
     Promise<void>,
     { issueId: string; activeRunId: string; controller: AbortController }
   >()
+  // Tracked separately from `activeRuns` because review jobs are a distinct
+  // process launch from implementation issues (GEN-414), but both maps count
+  // against the same `MAX_CONCURRENT_ISSUES` capacity and are drained
+  // together on shutdown.
+  const activeReviewRuns = new Map<
+    Promise<void>,
+    { reviewRunId: string; controller: AbortController }
+  >()
   const stop = (): void => {
     running = false
     abortActiveRuns(activeRuns)
+    abortActiveRuns(activeReviewRuns)
     if (!stoppedByControl && !offlineMarked) {
       offlineMarked = true
       offlinePending = api.markOffline().catch((error) => {
@@ -148,7 +162,10 @@ export async function runWorkerLoop(
         )
       }
     } catch (error) {
-      logError("failed to reload worker config; keeping current config:", describe(error))
+      logError(
+        "failed to reload worker config; keeping current config:",
+        describe(error)
+      )
     }
   }
   process.on("SIGINT", stop)
@@ -185,6 +202,7 @@ export async function runWorkerLoop(
       stoppedByControl = true
       running = false
       abortActiveRuns(activeRuns)
+      abortActiveRuns(activeReviewRuns)
       return
     }
 
@@ -193,6 +211,21 @@ export async function runWorkerLoop(
     )
     for (const run of activeRuns.values()) {
       if (validRuns.get(run.issueId) !== run.activeRunId) {
+        run.controller.abort()
+      }
+    }
+
+    // A review run leaving `running` server-side (PR closed/draft, new head
+    // SHA, human changes-requested, or a completed/failed verdict) is how a
+    // cancellation reaches a worker holding the claim — every relevant
+    // GitHub webhook already drives that transition (GEN-413).
+    const validReviewRunIds = new Set(
+      control.review_runs
+        .filter((run) => run.status === "running")
+        .map((run) => run.review_run_id)
+    )
+    for (const run of activeReviewRuns.values()) {
+      if (!validReviewRunIds.has(run.reviewRunId)) {
         run.controller.abort()
       }
     }
@@ -219,11 +252,14 @@ export async function runWorkerLoop(
       break
     }
 
-    if (activeRuns.size >= config.MAX_CONCURRENT_ISSUES) {
+    if (
+      activeRuns.size + activeReviewRuns.size >=
+      config.MAX_CONCURRENT_ISSUES
+    ) {
       // Wake promptly when a run frees a slot, but periodically re-check the
       // stop flag when every slot remains occupied.
       await Promise.race([
-        Promise.race(activeRuns.keys()),
+        Promise.race([...activeRuns.keys(), ...activeReviewRuns.keys()]),
         sleepUntilNextTick(
           deps,
           config.POLL_INTERVAL_MS,
@@ -247,7 +283,49 @@ export async function runWorkerLoop(
       logError("failed to poll for queued issues:", describe(error))
     }
 
-    if (!issue) {
+    if (issue) {
+      const controller = new AbortController()
+      const run = processIssue(api, config, issue, deps, {
+        signal: controller.signal,
+      })
+        .catch((error) => {
+          if (isSessionCancelled(error)) {
+            logInfo(`issue ${issue.id} cancelled by worker control`)
+            return
+          }
+          // processIssue records ordinary failures itself. This protects the
+          // pool from an unexpected failure in its cleanup path.
+          logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
+        })
+        .finally(() => {
+          activeRuns.delete(run)
+        })
+      activeRuns.set(run, {
+        issueId: issue.id,
+        activeRunId: issue.activeRunId,
+        controller,
+      })
+      logInfo(
+        `issue ${issue.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      )
+      continue
+    }
+
+    // Implementation work always wins capacity contention (GEN-414): a
+    // review job is only claimed once no implementation issue was available
+    // for this worker, re-evaluated on every poll tick rather than just once
+    // at cold start.
+    let reviewRun: ClaimedReviewRun | null = null
+    if (!running) {
+      break
+    }
+    try {
+      reviewRun = await api.claimReviewRun()
+    } catch (error) {
+      logError("failed to poll for review runs:", describe(error))
+    }
+
+    if (!reviewRun) {
       await sleepUntilNextTick(
         deps,
         config.POLL_INTERVAL_MS,
@@ -257,29 +335,29 @@ export async function runWorkerLoop(
       continue
     }
 
-    const controller = new AbortController()
-    const run = processIssue(api, config, issue, deps, {
-      signal: controller.signal,
+    const reviewController = new AbortController()
+    const reviewRunPromise = processReviewRun(api, reviewRun, {
+      signal: reviewController.signal,
     })
       .catch((error) => {
         if (isSessionCancelled(error)) {
-          logInfo(`issue ${issue.id} cancelled by worker control`)
+          logInfo(`review run ${reviewRun.id} cancelled by worker control`)
           return
         }
-        // processIssue records ordinary failures itself. This protects the
-        // pool from an unexpected failure in its cleanup path.
-        logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
+        logError(
+          `review run ${reviewRun.id} ended unexpectedly:`,
+          describe(error)
+        )
       })
       .finally(() => {
-        activeRuns.delete(run)
+        activeReviewRuns.delete(reviewRunPromise)
       })
-    activeRuns.set(run, {
-      issueId: issue.id,
-      activeRunId: issue.activeRunId,
-      controller,
+    activeReviewRuns.set(reviewRunPromise, {
+      reviewRunId: reviewRun.id,
+      controller: reviewController,
     })
     logInfo(
-      `issue ${issue.id} started (${activeRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      `review run ${reviewRun.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
     )
   }
 
@@ -293,10 +371,13 @@ export async function runWorkerLoop(
     await offlinePending
   }
 
-  if (activeRuns.size > 0) {
+  if (activeRuns.size > 0 || activeReviewRuns.size > 0) {
     abortActiveRuns(activeRuns)
-    logInfo(`waiting for ${activeRuns.size} active issue run(s) to finish`)
-    await Promise.all(activeRuns.keys())
+    abortActiveRuns(activeReviewRuns)
+    logInfo(
+      `waiting for ${activeRuns.size} active issue run(s) and ${activeReviewRuns.size} active review run(s) to finish`
+    )
+    await Promise.all([...activeRuns.keys(), ...activeReviewRuns.keys()])
   }
 
   // An accepted install is attempted once and never retried, so let it report
@@ -427,15 +508,9 @@ export async function processIssue(
       resumeSessionId: issue.sessionId,
       onSessionId: (sessionId) => {
         currentSessionId = sessionId
-        return deps.setRunState(
-          api,
-          channel,
-          issue.id,
-          issue.activeRunId,
-          {
-            session_id: sessionId,
-          }
-        )
+        return deps.setRunState(api, channel, issue.id, issue.activeRunId, {
+          session_id: sessionId,
+        })
       },
       onPromptProcessed: promptSource.onPromptProcessed,
       nextPrompt: promptSource.nextPrompt,
@@ -556,13 +631,46 @@ export async function processIssue(
 }
 
 function abortActiveRuns(
-  activeRuns: Map<
-    Promise<void>,
-    { issueId: string; activeRunId: string; controller: AbortController }
-  >
+  activeRuns: Map<Promise<void>, { controller: AbortController }>
 ): void {
   for (const run of activeRuns.values()) {
     run.controller.abort()
+  }
+}
+
+// Interim behavior for GEN-414: the review-job claim/lease/heartbeat/
+// cancel/reconcile/retry pipeline is fully wired end to end, but no
+// reviewer runtime exists yet (GEN-414 explicitly excludes reviewer
+// prompt/runtime details, see ADR-0005). Every claimed review run is
+// deliberately routed through the existing infra-failure path instead of
+// fabricating a verdict — non-destructive (no Review Attempt consumed), and
+// it lets the retry-then-stop recovery semantics already built for ADR-0004
+// degrade gracefully. Replace this function's body with a real reviewer
+// session once that issue lands.
+export const REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR =
+  "Automatic review runtime is not implemented yet (GEN-414 built only the claim/lease pipeline)."
+
+export async function processReviewRun(
+  api: AgentApi,
+  reviewRun: ClaimedReviewRun,
+  options: { signal?: AbortSignal } = {}
+): Promise<void> {
+  try {
+    throwIfAborted(options.signal)
+    await api.sendReviewRunHeartbeat(reviewRun.id)
+    throwIfAborted(options.signal)
+    const { retried } = await api.failReviewRun(reviewRun.id, {
+      error: REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
+    })
+    logInfo(`review run ${reviewRun.id} deferred (retried: ${retried})`)
+  } catch (error) {
+    if (options.signal?.aborted || isSessionCancelled(error)) {
+      throw error
+    }
+    logError(
+      `review run ${reviewRun.id} failed to report infra failure:`,
+      describe(error)
+    )
   }
 }
 
@@ -587,12 +695,10 @@ function createTelemetrySource(
   snapshot: () => Promise<WorkerHeartbeatTelemetry>
 } {
   const processStartedAt = deps.now().toISOString()
-  let cached:
-    | {
-        expiresAt: number
-        value: WorkerCapabilities
-      }
-    | null = null
+  let cached: {
+    expiresAt: number
+    value: WorkerCapabilities
+  } | null = null
 
   return {
     async snapshot() {

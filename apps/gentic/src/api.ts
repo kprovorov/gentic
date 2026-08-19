@@ -3,6 +3,9 @@ import {
   automaticPrPublishResponseSchema,
   claimIssueInputSchema,
   claimIssueResponseSchema,
+  claimReviewRunInputSchema,
+  claimReviewRunResponseSchema,
+  failReviewRunResponseSchema,
   finishRunResponseSchema,
   insertMessageResponseSchema,
   okResponseSchema,
@@ -12,6 +15,7 @@ import {
   type Attachment,
   type AutomaticPrPublishResponse,
   type ClaimedIssue,
+  type ClaimedReviewRun,
   type FinishRunFields,
   type InsertMessageInput,
   type RecordUnpublishedChangesInput,
@@ -37,6 +41,7 @@ export type {
   Attachment,
   AutomaticPrPublishResponse,
   ClaimedIssue,
+  ClaimedReviewRun,
   FinishRunFields,
   InsertMessageInput,
   RecordUnpublishedChangesInput,
@@ -53,6 +58,12 @@ export type FinishRunResult = {
 
 export interface AgentApi {
   claimNextQueuedIssue(): Promise<ClaimedIssue | null>
+  claimReviewRun(): Promise<ClaimedReviewRun | null>
+  sendReviewRunHeartbeat(reviewRunId: string): Promise<void>
+  failReviewRun(
+    reviewRunId: string,
+    input: { error: string }
+  ): Promise<{ retried: boolean }>
   setRunState(
     issueId: string,
     activeRunId: string,
@@ -104,6 +115,7 @@ export function createAgentApi(input: {
 }): AgentApi {
   const apiUrl = input.apiUrl.replace(/\/+$/, "")
   const claimInput = claimIssueInputSchema.parse({})
+  const claimReviewRunInput = claimReviewRunInputSchema.parse({})
 
   async function request<T>(
     path: string,
@@ -150,6 +162,28 @@ export function createAgentApi(input: {
         { method: "POST", body: claimInput }
       )
       return data.issue
+    },
+    async claimReviewRun() {
+      const data = await request(
+        "/agent/review-runs/claim",
+        claimReviewRunResponseSchema,
+        { method: "POST", body: claimReviewRunInput }
+      )
+      return data.reviewRun
+    },
+    async sendReviewRunHeartbeat(reviewRunId) {
+      await request(
+        `/agent/review-runs/${encodeURIComponent(reviewRunId)}/heartbeat`,
+        okResponseSchema,
+        { method: "PATCH", body: {} }
+      )
+    },
+    async failReviewRun(reviewRunId, reviewInput) {
+      return request(
+        `/agent/review-runs/${encodeURIComponent(reviewRunId)}/fail`,
+        failReviewRunResponseSchema,
+        { method: "PATCH", body: reviewInput }
+      )
     },
     async setRunState(issueId, activeRunId, fields) {
       await request(

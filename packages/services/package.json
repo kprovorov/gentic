@@ -10,6 +10,7 @@
     "./issues": "./src/issues.ts",
     "./labels": "./src/labels.ts",
     "./projects": "./src/projects.ts",
+    "./review-jobs": "./src/review-jobs.ts",
     "./review-lifecycle": "./src/review-lifecycle.ts",
     "./skills": "./src/skills.ts",
     "./user-settings": "./src/user-settings.ts",

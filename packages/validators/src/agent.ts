@@ -221,6 +221,73 @@ export type AutomaticPrPublishResponse = z.infer<
   typeof automaticPrPublishResponseSchema
 >
 
+export const claimReviewRunInputSchema = z.object({}).passthrough()
+
+export type ClaimReviewRunInput = z.infer<typeof claimReviewRunInputSchema>
+
+export const claimedReviewRunSchema = z
+  .object({
+    id: z.string().uuid(),
+    reviewCycleId: z.string().uuid(),
+    issueId: z.string().uuid(),
+    pullRequestId: z.string().uuid(),
+    headSha: z.string(),
+  })
+  .strict()
+
+export type ClaimedReviewRun = z.infer<typeof claimedReviewRunSchema>
+
+export const claimReviewRunResponseSchema = z.object({
+  reviewRun: claimedReviewRunSchema.nullable(),
+})
+
+export const reviewRunHeartbeatInputSchema = z.object({}).passthrough()
+
+export const failReviewRunInputSchema = z
+  .object({
+    error: z.string().min(1),
+  })
+  .strict()
+
+export type FailReviewRunInput = z.infer<typeof failReviewRunInputSchema>
+
+export const failReviewRunResponseSchema = z.object({
+  retried: z.boolean(),
+})
+
+const reviewFindingInputSchema = z
+  .object({
+    severity: z.enum(["info", "warning", "error", "blocker"]).optional(),
+    filePath: z.string().nullable().optional(),
+    line: z.number().int().positive().nullable().optional(),
+    title: z.string(),
+    body: z.string().nullable().optional(),
+    githubCommentId: z.number().nullable().optional(),
+  })
+  .strict()
+
+export const completeReviewRunInputSchema = z
+  .object({
+    verdict: z.enum(["approved", "changes_requested", "commented"]),
+    summary: z.string().nullable().optional(),
+    githubReviewId: z.number().nullable().optional(),
+    findings: z.array(reviewFindingInputSchema).optional(),
+  })
+  .strict()
+
+export type CompleteReviewRunInput = z.infer<
+  typeof completeReviewRunInputSchema
+>
+
+export const completeReviewRunResponseSchema = z.object({
+  reviewAttemptId: z.string().uuid().nullable(),
+  reviewCycleId: z.string().uuid().nullable(),
+  issueId: z.string().uuid().nullable(),
+  attemptNumber: z.number().nullable(),
+  cycleState: z.string().nullable(),
+  accepted: z.boolean(),
+})
+
 export const attachmentSchema = z.object({
   id: z.string().uuid(),
   fileName: z.string(),

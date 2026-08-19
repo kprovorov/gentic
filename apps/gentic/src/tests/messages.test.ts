@@ -240,7 +240,9 @@ test("runTurn surfaces terminal output from tool_call_update _meta", async () =>
       toolCallId: "tool-1",
       status: "failed",
       content: [{ type: "terminal", terminalId: "tool-1" }],
-      _meta: { terminal_output: { terminal_id: "tool-1", data: "1 failing test" } },
+      _meta: {
+        terminal_output: { terminal_id: "tool-1", data: "1 failing test" },
+      },
     },
   ])
 
@@ -457,6 +459,13 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     async claimNextQueuedIssue() {
       return null
     },
+    async claimReviewRun() {
+      return null
+    },
+    async sendReviewRunHeartbeat() {},
+    async failReviewRun() {
+      return { retried: false }
+    },
     async setRunState() {},
     async finishRun() {
       return { finished: true, status: "waiting-for-input" }
@@ -492,7 +501,7 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     async sendHeartbeat() {},
     async markOffline() {},
     async fetchWorkerControl() {
-      return { worker: { banned: false }, runs: [] }
+      return { worker: { banned: false }, runs: [], review_runs: [] }
     },
     async claimSkillInstall() {
       return null

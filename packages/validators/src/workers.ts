@@ -131,6 +131,14 @@ export const workerControlResponseSchema = z
         })
         .strict()
     ),
+    review_runs: z.array(
+      z
+        .object({
+          review_run_id: z.string().uuid(),
+          status: z.string(),
+        })
+        .strict()
+    ),
   })
   .strict()
 

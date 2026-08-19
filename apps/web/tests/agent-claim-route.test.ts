@@ -329,6 +329,27 @@ class FakeWorkersQuery {
   }
 }
 
+// Implementation issues and review runs share one worker capacity pool
+// (GEN-414); this fake always has zero claimed review runs, so
+// `listRunningTaskCounts`'s review-run query is a harmless no-op here.
+class FakeReviewRunsQuery {
+  select() {
+    return this
+  }
+
+  in() {
+    return this
+  }
+
+  eq() {
+    return this
+  }
+
+  returns<T>() {
+    return Promise.resolve({ data: [] as T, error: null })
+  }
+}
+
 class FakeSupabase {
   readonly inserts: Record<string, unknown>[] = []
   readonly issueQueries: FakeIssuesQuery[] = []
@@ -346,6 +367,9 @@ class FakeSupabase {
     }
     if (table === "workers") {
       return new FakeWorkersQuery(this)
+    }
+    if (table === "review_runs") {
+      return new FakeReviewRunsQuery()
     }
     assert.equal(table, "messages")
     return new FakeMessagesQuery(this)
