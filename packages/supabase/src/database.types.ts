@@ -1141,11 +1141,11 @@ export type Database = {
         }
         Returns: {
           accepted: boolean
-          attempt_number: number | null
-          cycle_state: string | null
-          issue_id: string | null
-          review_attempt_id: string | null
-          review_cycle_id: string | null
+          attempt_number: number
+          cycle_state: string
+          issue_id: string
+          review_attempt_id: string
+          review_cycle_id: string
         }[]
       }
       consume_worker_enrollment_code: {
@@ -1217,17 +1217,17 @@ export type Database = {
           eligible: boolean
           issue_id: string
           pull_request_id: string
-          review_cycle_id: string | null
-          review_run_id: string | null
+          review_cycle_id: string
+          review_run_id: string
         }[]
       }
       fail_review_run: {
         Args: { p_error: string; p_now?: string; p_review_run_id: string }
         Returns: {
           accepted: boolean
-          next_review_run_id: string | null
+          next_review_run_id: string
           retried: boolean
-          review_cycle_id: string | null
+          review_cycle_id: string
           review_run_id: string
         }[]
       }
@@ -1378,7 +1378,7 @@ export type Database = {
       supersede_active_review_cycle: {
         Args: { p_now?: string; p_pr_url: string; p_reason: string }
         Returns: {
-          review_cycle_id: string | null
+          review_cycle_id: string
           superseded: boolean
         }[]
       }
