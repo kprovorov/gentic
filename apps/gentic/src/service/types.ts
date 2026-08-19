@@ -1,5 +1,16 @@
 export type ServiceScope = "user" | "system"
 
+/**
+ * The subset of `promisify(execFile)` the service backends use. Injecting it
+ * lets the tests assert which `launchctl`/`systemctl` commands a backend runs
+ * without shelling out to a real service manager.
+ */
+export type ExecFn = (
+  file: string,
+  args: string[],
+  options?: { env?: NodeJS.ProcessEnv },
+) => Promise<{ stdout: string; stderr: string }>
+
 export interface ServiceStatus {
   state: "running" | "stopped" | "not-installed"
   pid?: number

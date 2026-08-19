@@ -61,6 +61,8 @@ gentic start --system
 gentic stop
 ```
 
+A stop is durable: the worker stays stopped across logouts and reboots until you run `gentic start` (or `gentic restart`) again. On macOS this records a launchd disable override alongside the agent's plist; on Linux it disables the systemd unit. `gentic status` reports `Boot: disabled` while a worker is stopped this way.
+
 Stop the **system-wide** service instead of the per-user one (Linux/systemd only):
 
 ```bash
@@ -188,6 +190,8 @@ gentic start --no-boot
 ```
 
 When `--no-boot` is set, `gentic status` reports `Boot: disabled`. You can re-enable boot registration at any time by running `gentic start` again without the flag.
+
+The preference sticks across a stop: `gentic restart` after a `gentic stop` restores whatever the last `gentic start` asked for, so a `--no-boot` worker is never silently promoted to starting on boot.
 
 ---
 

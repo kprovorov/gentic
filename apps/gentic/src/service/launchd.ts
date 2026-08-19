@@ -8,11 +8,19 @@ import { promisify } from "node:util"
 import { spawnInteractive } from "../installers.js"
 import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
-import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
+import type { ExecFn, ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
 
-const execFile = promisify(execFileCb)
+const execFileAsync = promisify(execFileCb)
+
+const defaultExec: ExecFn = (file, args, options) =>
+  execFileAsync(file, args, { ...options, encoding: "utf8" })
 
 const LABEL = "dev.gentic.agent"
+
+// `launchctl print-disabled <domain>` lists every label the domain knows an
+// override for. macOS 13+ renders the value as `enabled`/`disabled`; older
+// releases print `false`/`true`.
+const DISABLED_ENTRY = new RegExp(`"${LABEL.replaceAll(".", "\\.")}"\\s*=>\\s*(\\S+)`)
 
 function plistPath(): string {
   return join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`)
@@ -44,6 +52,8 @@ function escapeXml(value: string): string {
 
 export class LaunchdBackend implements ServiceBackend {
   readonly name = "launchd"
+
+  constructor(private readonly exec: ExecFn = defaultExec) {}
 
   isAvailable(): boolean {
     return process.platform === "darwin"
@@ -80,10 +90,31 @@ ${programArguments}
 
   private async isLoaded(): Promise<boolean> {
     try {
-      await execFile("launchctl", ["print", serviceTarget()])
+      await this.exec("launchctl", ["print", serviceTarget()])
       return true
     } catch {
       return false
+    }
+  }
+
+  private async isDisabled(): Promise<boolean> {
+    try {
+      const { stdout } = await this.exec("launchctl", ["print-disabled", domainTarget()])
+      const value = DISABLED_ENTRY.exec(stdout)?.[1]
+      return value === "true" || value === "disabled"
+    } catch {
+      return false
+    }
+  }
+
+  // `stop()` records a persistent disable so the worker stays down across a
+  // reboot. That override outlives the plist, so every path that loads the job
+  // has to clear it first — `bootstrap` on a disabled label fails outright.
+  private async enable(): Promise<void> {
+    try {
+      await this.exec("launchctl", ["enable", serviceTarget()])
+    } catch (error) {
+      throw new Error(`launchctl enable failed: ${describe(error)}`)
     }
   }
 
@@ -93,11 +124,13 @@ ${programArguments}
     await writeFile(plistPath(), this.plistContents(opts.enableOnBoot), "utf8")
 
     if (await this.isLoaded()) {
-      await execFile("launchctl", ["bootout", serviceTarget()]).catch(() => undefined)
+      await this.exec("launchctl", ["bootout", serviceTarget()]).catch(() => undefined)
     }
 
+    await this.enable()
+
     try {
-      await execFile("launchctl", ["bootstrap", domainTarget(), plistPath()])
+      await this.exec("launchctl", ["bootstrap", domainTarget(), plistPath()])
     } catch (error) {
       throw new Error(`launchctl bootstrap failed: ${describe(error)}`)
     }
@@ -105,7 +138,10 @@ ${programArguments}
 
   async uninstall(): Promise<void> {
     if (!existsSync(plistPath())) return
-    await execFile("launchctl", ["bootout", serviceTarget()]).catch(() => undefined)
+    await this.exec("launchctl", ["bootout", serviceTarget()]).catch(() => undefined)
+    // Clear the override too, so a later re-install doesn't inherit a disable
+    // recorded by a `gentic stop` from before the uninstall.
+    await this.exec("launchctl", ["enable", serviceTarget()]).catch(() => undefined)
     await rm(plistPath(), { force: true })
   }
 
@@ -114,24 +150,39 @@ ${programArguments}
       throw new Error("gentic service is not installed; run `gentic start` to install it")
     }
 
+    await this.enable()
+
     if (await this.isLoaded()) {
-      await execFile("launchctl", ["kickstart", serviceTarget()]).catch((error) => {
+      await this.exec("launchctl", ["kickstart", serviceTarget()]).catch((error) => {
         throw new Error(`launchctl kickstart failed: ${describe(error)}`)
       })
       return
     }
 
     try {
-      await execFile("launchctl", ["bootstrap", domainTarget(), plistPath()])
+      await this.exec("launchctl", ["bootstrap", domainTarget(), plistPath()])
     } catch (error) {
       throw new Error(`launchctl bootstrap failed: ${describe(error)}`)
     }
   }
 
   async stop(): Promise<void> {
+    if (!existsSync(plistPath())) return
+
+    // Booting the job out only unloads it for this boot session: launchd
+    // re-reads ~/Library/LaunchAgents at the next login and RunAtLoad starts
+    // the worker again. The disable override lives in launchd's own database
+    // and survives the reboot, so a stopped worker stays stopped until
+    // `gentic start` clears it.
+    try {
+      await this.exec("launchctl", ["disable", serviceTarget()])
+    } catch (error) {
+      throw new Error(`launchctl disable failed: ${describe(error)}`)
+    }
+
     if (!(await this.isLoaded())) return
     try {
-      await execFile("launchctl", ["bootout", serviceTarget()])
+      await this.exec("launchctl", ["bootout", serviceTarget()])
     } catch (error) {
       throw new Error(`launchctl bootout failed: ${describe(error)}`)
     }
@@ -140,7 +191,7 @@ ${programArguments}
   async restart(): Promise<void> {
     if (await this.isLoaded()) {
       try {
-        await execFile("launchctl", ["kickstart", "-k", serviceTarget()])
+        await this.exec("launchctl", ["kickstart", "-k", serviceTarget()])
       } catch (error) {
         throw new Error(`launchctl kickstart failed: ${describe(error)}`)
       }
@@ -154,7 +205,7 @@ ${programArguments}
       throw new Error("gentic service is not running")
     }
     try {
-      await execFile("launchctl", ["kill", "SIGHUP", serviceTarget()])
+      await this.exec("launchctl", ["kill", "SIGHUP", serviceTarget()])
     } catch (error) {
       throw new Error(`launchctl kill failed: ${describe(error)}`)
     }
@@ -164,7 +215,7 @@ ${programArguments}
     if (!existsSync(plistPath())) return { state: "not-installed" }
 
     try {
-      const { stdout } = await execFile("launchctl", ["print", serviceTarget()])
+      const { stdout } = await this.exec("launchctl", ["print", serviceTarget()])
       const pidMatch = /^\s*pid = (\d+)/m.exec(stdout)
       const stateMatch = /state = (\S+)/.exec(stdout)
       const running = stateMatch?.[1] === "running"
@@ -179,6 +230,9 @@ ${programArguments}
 
   async isEnabledOnBoot(): Promise<boolean> {
     if (!existsSync(plistPath())) return false
+    // A disable override wins over RunAtLoad: launchd refuses to load the job
+    // at login while it is set.
+    if (await this.isDisabled()) return false
     const contents = await readFile(plistPath(), "utf8")
     return /<key>RunAtLoad<\/key>\s*<true\/>/.test(contents)
   }
