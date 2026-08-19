@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { resetIssueAgent } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
@@ -13,6 +14,8 @@ import {
 
 export const RESET_ISSUE_CONFIRM_MESSAGE =
   "Reset this issue? This deletes the conversation and its pull-request links, then re-queues a fresh run."
+
+export const RESET_ISSUE_ERROR_MESSAGE = "Couldn't reset the issue"
 
 /**
  * The issue menu's **Reset** action. It runs the same destructive path the
@@ -53,6 +56,12 @@ export function useIssueReset({
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
         queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
+    },
+    // Reset writes nothing to the UI until the server answers, so a rejected
+    // call is indistinguishable from a no-op: the user confirms a destructive
+    // dialog and the page just sits there. Say so instead.
+    onError: () => {
+      toast.error(RESET_ISSUE_ERROR_MESSAGE)
     },
   })
 

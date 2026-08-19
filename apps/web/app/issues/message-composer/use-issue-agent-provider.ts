@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { resetIssueAgent, updateIssueAgentProvider } from "@/app/issues/actions"
 import { queryKeys } from "@/app/query-keys"
@@ -16,6 +17,8 @@ import {
 // destructive resetIssueAgent path once a conversation exists. Kept separate
 // from MessageComposer itself, which stays issue-agnostic (see
 // MessageComposer's prop contract).
+export const AGENT_SWITCH_ERROR_MESSAGE = "Couldn't switch the agent"
+
 export function useIssueAgentProvider({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()
 
@@ -39,6 +42,11 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
         queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
     },
+    // Nothing in the composer moves until the server answers, so a rejected
+    // switch would otherwise look like the picker simply ignoring the choice.
+    onError: () => {
+      toast.error(AGENT_SWITCH_ERROR_MESSAGE)
+    },
   })
 
   const updateMutation = useMutation({
@@ -49,6 +57,9 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
         queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
       ])
+    },
+    onError: () => {
+      toast.error(AGENT_SWITCH_ERROR_MESSAGE)
     },
   })
 

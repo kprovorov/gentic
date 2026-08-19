@@ -66,10 +66,13 @@ vi.mock("@gentic/ui/dropdown-menu", () => ({
   ),
 }))
 
+import { toast } from "sonner"
+
 import { resetIssueAgent } from "@/app/issues/actions"
 import { registerSiteHeaderActionsSlot } from "@/components/site-header-actions-slot"
 
 import { IssueDetailHeader } from "./issue-detail-header"
+import { RESET_ISSUE_ERROR_MESSAGE } from "./use-issue-reset"
 
 const issue = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -303,6 +306,21 @@ describe("IssueDetailHeader", () => {
     await user.click(screen.getByRole("menuitem", { name: "Reset" }))
 
     expect(resetIssueAgent).not.toHaveBeenCalled()
+  })
+
+  // A reset that fails changes nothing on screen, so without a message the
+  // user is left staring at a confirmed dialog that apparently did nothing.
+  it("says so when the reset is rejected", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    vi.mocked(resetIssueAgent).mockRejectedValue(new Error("Issue not found"))
+    renderHeader()
+
+    await user.click(screen.getByRole("menuitem", { name: "Reset" }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(RESET_ISSUE_ERROR_MESSAGE)
+    )
   })
 
   it("offers no reset before the issue has left draft", () => {
