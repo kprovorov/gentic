@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { createServiceClient } from "@gentic/supabase/service"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 import * as issuesService from "@gentic/services/issues"
+import * as reviewLifecycleService from "@gentic/services/review-lifecycle"
 
 import { resolveCheckSuiteStatus } from "@/lib/ci-status"
 import {
@@ -164,6 +165,9 @@ type PullRequestEventServices = {
   associatePullRequestFromWebhook: typeof githubIntegrationsService.associatePullRequestFromWebhook
   applyPullRequestDeliveryState: typeof githubIntegrationsService.applyPullRequestDeliveryState
   logIssueEvent: typeof issuesService.logIssueEvent
+  evaluateReviewEligibility: typeof reviewLifecycleService.evaluateReviewEligibility
+  supersedeActiveReviewCycle: typeof reviewLifecycleService.supersedeActiveReviewCycle
+  isKnownReviewAttempt: typeof reviewLifecycleService.isKnownReviewAttempt
 }
 
 const defaultPullRequestEventServices: PullRequestEventServices = {
@@ -172,6 +176,9 @@ const defaultPullRequestEventServices: PullRequestEventServices = {
   applyPullRequestDeliveryState:
     githubIntegrationsService.applyPullRequestDeliveryState,
   logIssueEvent: issuesService.logIssueEvent,
+  evaluateReviewEligibility: reviewLifecycleService.evaluateReviewEligibility,
+  supersedeActiveReviewCycle: reviewLifecycleService.supersedeActiveReviewCycle,
+  isKnownReviewAttempt: reviewLifecycleService.isKnownReviewAttempt,
 }
 
 export async function POST(request: Request) {
@@ -324,6 +331,21 @@ async function handlePullRequestEvent(
     await services.logIssueEvent(supabase, diagnostic.issueId, "pr_merged", {
       pr_url: payload.pull_request.html_url,
     })
+  }
+
+  // Opened, synchronize, ready_for_review, reopened, and converted_to_draft
+  // all change eligibility (a new head SHA, or the draft/open state itself),
+  // so every pull_request delivery is a chance to re-evaluate it.
+  try {
+    await services.evaluateReviewEligibility(
+      supabase,
+      payload.pull_request.html_url
+    )
+  } catch (error) {
+    console.error(
+      "[github-webhook] failed to evaluate automatic review eligibility:",
+      error
+    )
   }
 }
 
@@ -564,6 +586,15 @@ async function resolveCompletedChecksForRef(
         prUrl
       )
     }
+
+    try {
+      await reviewLifecycleService.evaluateReviewEligibility(supabase, prUrl)
+    } catch (error) {
+      console.error(
+        "[github-webhook] failed to evaluate automatic review eligibility:",
+        error
+      )
+    }
   }
 }
 
@@ -621,6 +652,15 @@ async function markPendingChecksForRef(
       ciState: "pending",
       expectedHeadSha: headSha,
     })
+
+    try {
+      await reviewLifecycleService.evaluateReviewEligibility(supabase, prUrl)
+    } catch (error) {
+      console.error(
+        "[github-webhook] failed to evaluate automatic review eligibility:",
+        error
+      )
+    }
   }
 }
 
@@ -655,6 +695,30 @@ async function handlePullRequestReviewEvent(
     payload.action === "submitted" &&
     payload.review.state === "changes_requested"
   ) {
+    // Our own automated reviewer posts its verdict as a normal GitHub review
+    // too, so this webhook echoes it back. Only a review we didn't already
+    // record ourselves is a genuine human decision that should immediately
+    // supersede an in-flight automatic run/cycle — otherwise this would
+    // incorrectly cancel the cycle `completeReviewAttempt` just recorded.
+    try {
+      const isAutomated = await services.isKnownReviewAttempt(
+        supabase,
+        payload.review.id
+      )
+      if (!isAutomated) {
+        await services.supersedeActiveReviewCycle(
+          supabase,
+          payload.pull_request.html_url,
+          "human_review"
+        )
+      }
+    } catch (error) {
+      console.error(
+        "[github-webhook] failed to supersede automatic review on human changes-requested:",
+        error
+      )
+    }
+
     await applyChangesRequestedReview(supabase, payload)
   }
 }

@@ -829,6 +829,7 @@ export type Database = {
           created_at: string
           error: string | null
           finished_at: string | null
+          head_sha: string
           id: string
           review_cycle_id: string
           started_at: string | null
@@ -839,6 +840,7 @@ export type Database = {
           created_at?: string
           error?: string | null
           finished_at?: string | null
+          head_sha: string
           id?: string
           review_cycle_id: string
           started_at?: string | null
@@ -849,6 +851,7 @@ export type Database = {
           created_at?: string
           error?: string | null
           finished_at?: string | null
+          head_sha?: string
           id?: string
           review_cycle_id?: string
           started_at?: string | null
@@ -1127,6 +1130,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_review_attempt: {
+        Args: {
+          p_findings?: Json
+          p_github_review_id?: number
+          p_now?: string
+          p_review_run_id: string
+          p_summary?: string
+          p_verdict: string
+        }
+        Returns: {
+          accepted: boolean
+          attempt_number: number
+          cycle_state: string
+          issue_id: string
+          review_attempt_id: string
+          review_cycle_id: string
+        }[]
+      }
       consume_worker_enrollment_code: {
         Args: {
           p_arch: string
@@ -1167,6 +1188,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      continue_with_human_review: {
+        Args: { p_issue_id: string; p_now?: string; p_user_id: string }
+        Returns: {
+          issue_id: string
+          review_cycle_id: string
+          status: string
+        }[]
+      }
       delete_old_orphaned_attachments: {
         Args: { older_than?: string }
         Returns: {
@@ -1180,6 +1209,27 @@ export type Database = {
       delete_worker: {
         Args: { p_now?: string; p_user_id: string; p_worker_id: string }
         Returns: boolean
+      }
+      evaluate_review_eligibility: {
+        Args: { p_now?: string; p_pr_url: string }
+        Returns: {
+          action: string
+          eligible: boolean
+          issue_id: string
+          pull_request_id: string
+          review_cycle_id: string
+          review_run_id: string
+        }[]
+      }
+      fail_review_run: {
+        Args: { p_error: string; p_now?: string; p_review_run_id: string }
+        Returns: {
+          accepted: boolean
+          next_review_run_id: string
+          retried: boolean
+          review_cycle_id: string
+          review_run_id: string
+        }[]
       }
       finish_issue_run_if_no_pending: {
         Args: {
@@ -1289,6 +1339,15 @@ export type Database = {
           id: string
         }[]
       }
+      set_issue_status_from_review: {
+        Args: {
+          p_issue_id: string
+          p_now?: string
+          p_reason?: string
+          p_status: string
+        }
+        Returns: undefined
+      }
       start_fresh_implementation: {
         Args: { p_issue_id: string; p_now?: string; p_user_id: string }
         Returns: {
@@ -1315,6 +1374,13 @@ export type Database = {
       start_issue_from_draft: {
         Args: { p_issue_id: string }
         Returns: undefined
+      }
+      supersede_active_review_cycle: {
+        Args: { p_now?: string; p_pr_url: string; p_reason: string }
+        Returns: {
+          review_cycle_id: string
+          superseded: boolean
+        }[]
       }
       unban_worker: {
         Args: { p_now?: string; p_user_id: string; p_worker_id: string }

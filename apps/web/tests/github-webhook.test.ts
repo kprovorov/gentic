@@ -66,16 +66,23 @@ function pullRequestServiceRecorder(
     outcome: "associated",
     issueId: "issue-42",
     statusChanged: true,
-  }
+  },
+  options: { isAutomatedReview?: boolean } = {}
 ) {
   const associations: Array<Record<string, unknown>> = []
   const deliveryStates: Array<Record<string, unknown>> = []
   const hydrationCalls: Array<Record<string, unknown>> = []
+  const eligibilityEvaluations: string[] = []
+  const supersessions: Array<{ prUrl: string; reason: string }> = []
+  const knownReviewAttemptChecks: number[] = []
 
   return {
     associations,
     deliveryStates,
     hydrationCalls,
+    eligibilityEvaluations,
+    supersessions,
+    knownReviewAttemptChecks,
     async stateFetcher(
       installationId: string,
       owner: string,
@@ -106,6 +113,22 @@ function pullRequestServiceRecorder(
         return null
       },
       async logIssueEvent() {},
+      async evaluateReviewEligibility(_supabase: unknown, prUrl: string) {
+        eligibilityEvaluations.push(prUrl)
+        return null
+      },
+      async supersedeActiveReviewCycle(
+        _supabase: unknown,
+        prUrl: string,
+        reason: string
+      ) {
+        supersessions.push({ prUrl, reason })
+        return { reviewCycleId: null, superseded: false }
+      },
+      async isKnownReviewAttempt(_supabase: unknown, githubReviewId: number) {
+        knownReviewAttemptChecks.push(githubReviewId)
+        return options.isAutomatedReview ?? false
+      },
     },
   }
 }
@@ -140,6 +163,25 @@ test("every signed pull-request action attempts association from the current for
   }
 })
 
+test("an associated pull-request delivery re-evaluates automatic review eligibility", async () => {
+  const recorder = pullRequestServiceRecorder()
+
+  const response = await handleGithubWebhookRequest(
+    signedPullRequest(pullRequestPayload({ action: "synchronize" })),
+    {
+      webhookSecret,
+      supabase: {} as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.eligibilityEvaluations, [
+    "https://github.com/acme/base/pull/42",
+  ])
+})
+
 test("a signed unmatched pull-request branch is a successful no-op", async () => {
   const recorder = pullRequestServiceRecorder({
     outcome: "no_match",
@@ -162,6 +204,7 @@ test("a signed unmatched pull-request branch is a successful no-op", async () =>
   assert.equal(response.status, 200)
   assert.equal(recorder.associations.length, 1)
   assert.deepEqual(recorder.deliveryStates, [])
+  assert.deepEqual(recorder.eligibilityEvaluations, [])
 })
 
 test("an existing association refreshes durable state without directly writing Issue status", async () => {
@@ -326,6 +369,90 @@ test("a review delivery persists GitHub's aggregate decision for the exact PR", 
       reviewDecision: "changes_requested",
     },
   ])
+})
+
+// `applyChangesRequestedReview` (unrelated to the supersede logic under
+// test here) looks up the Issue for the PR via a plain `.from(...)` chain.
+// Returning no match short-circuits it before it needs anything else.
+function noFeedbackIssueSupabase() {
+  const builder = {
+    select: () => builder,
+    eq: () => builder,
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+  }
+  return { from: () => builder }
+}
+
+test("a genuine human changes-requested review supersedes an in-flight automatic cycle", async () => {
+  const recorder = pullRequestServiceRecorder(
+    { outcome: "already_associated", issueId: "issue-42", statusChanged: false },
+    { isAutomatedReview: false }
+  )
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9002,
+        state: "changes_requested",
+        body: "Please fix this",
+        user: { login: "alice" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: noFeedbackIssueSupabase() as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.knownReviewAttemptChecks, [9002])
+  assert.deepEqual(recorder.supersessions, [
+    { prUrl: "https://github.com/acme/base/pull/42", reason: "human_review" },
+  ])
+})
+
+test("our own automated review echoed back through the webhook does not supersede its cycle", async () => {
+  const recorder = pullRequestServiceRecorder(
+    { outcome: "already_associated", issueId: "issue-42", statusChanged: false },
+    { isAutomatedReview: true }
+  )
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9003,
+        state: "changes_requested",
+        body: "Automated findings",
+        user: { login: "gentic-reviewer" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: noFeedbackIssueSupabase() as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.knownReviewAttemptChecks, [9003])
+  assert.deepEqual(recorder.supersessions, [])
 })
 
 test("isPullRequestIssue recognizes PR issue_comment payloads", () => {
