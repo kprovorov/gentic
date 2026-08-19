@@ -11,6 +11,7 @@ export const issueStatusSchema = z.enum([
   "testing",
   "tests-failed",
   "ready-for-review",
+  "reviewing",
   "changes-requested",
   "approved",
   "merged",
