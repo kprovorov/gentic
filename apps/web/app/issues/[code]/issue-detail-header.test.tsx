@@ -162,6 +162,19 @@ beforeEach(() => {
   const slot = document.createElement("div")
   document.body.append(slot)
   registerSiteHeaderActionsSlot(slot)
+  vi.mocked(resetIssueAgent).mockResolvedValue({
+    message: {
+      id: "33333333-3333-4333-8333-333333333333",
+      role: "user",
+      kind: "text",
+      content: "Work on GEN-1.",
+      status: "complete",
+      author_type: "gentic",
+      generated_action: null,
+      created_at: "2026-07-14T00:00:00.000Z",
+    },
+    discardedRunIds: [],
+  })
 })
 
 afterEach(() => {

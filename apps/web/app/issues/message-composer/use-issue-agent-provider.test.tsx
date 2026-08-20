@@ -108,8 +108,11 @@ describe("useIssueAgentProvider", () => {
   it("calls resetIssueAgent (the same destructive path as retry) when a reset is required", async () => {
     const user = userEvent.setup()
     resetIssueAgentMock.mockResolvedValue({
-      id: "22222222-2222-4222-8222-222222222222",
-      created_at: "2026-07-14T00:00:00.000Z",
+      message: {
+        id: "22222222-2222-4222-8222-222222222222",
+        created_at: "2026-07-14T00:00:00.000Z",
+      },
+      discardedRunIds: [],
     })
     renderHarness()
 
@@ -140,8 +143,11 @@ describe("useIssueAgentProvider", () => {
   it("resets the issue when changing model after messages exist", async () => {
     const user = userEvent.setup()
     resetIssueAgentMock.mockResolvedValue({
-      id: "22222222-2222-4222-8222-222222222222",
-      created_at: "2026-07-14T00:00:00.000Z",
+      message: {
+        id: "22222222-2222-4222-8222-222222222222",
+        created_at: "2026-07-14T00:00:00.000Z",
+      },
+      discardedRunIds: [],
     })
     renderHarness()
 

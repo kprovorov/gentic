@@ -59,6 +59,7 @@ export {
   bulkUpdateIssuePriority,
   bulkUpdateIssueStatus,
   getIssueRepo,
+  type IssueAgentReset,
   type PersistedPullRequestState,
   recordUnpublishedAgentChanges,
   requestAutomaticPrPublish,

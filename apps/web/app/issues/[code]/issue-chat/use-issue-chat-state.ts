@@ -39,6 +39,7 @@ import {
   parseMessageEventPayload,
   parseRunStatePayload,
 } from "./event-mapping"
+import { isDiscardedRunEvent, rememberDiscardedRuns } from "./discarded-runs"
 import { mergePullRequest } from "./pull-requests"
 import {
   createOptimisticAttachments,
@@ -94,6 +95,7 @@ export function useIssueChatState({
   const announcedAssistantMessageRef = useRef<string | null>(null)
   const connectionStatusRef = useRef<RealtimeConnectionStatus>(connectionStatus)
   const localThumbnailUrlsRef = useRef(new Set<string>())
+  const discardedRunIdsRef = useRef<ReadonlySet<string>>(new Set<string>())
 
   useEffect(() => {
     const visibleThumbnailUrls = new Set(
@@ -320,6 +322,10 @@ export function useIssueChatState({
         return
       }
 
+      discardedRunIdsRef.current = rememberDiscardedRuns(
+        discardedRunIdsRef.current,
+        detail.discardedRunIds
+      )
       dispatch({ type: "reset", messages: [detail.message] })
       setStatus(detail.status)
       setUsageLimitResetAt(detail.usageLimitResetAt)
@@ -475,6 +481,11 @@ export function useIssueChatState({
         .on("broadcast", { event: REALTIME_MESSAGE_EVENT }, ({ payload }) => {
           const event = parseMessageEventPayload(payload)
           if (!event.success) {
+            return
+          }
+          // The worker behind a reset run keeps streaming for a while; its
+          // events would otherwise rebuild the transcript the reset cleared.
+          if (isDiscardedRunEvent(discardedRunIdsRef.current, event.data)) {
             return
           }
           dispatch({

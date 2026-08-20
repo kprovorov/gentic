@@ -38,7 +38,7 @@ export function useIssueReset({
     // The open transcript belongs to the run that was just wiped, so clear it
     // here rather than waiting for a refetch to contradict it — the same
     // handover the composer's agent switch uses.
-    onSuccess: async (message) => {
+    onSuccess: async ({ message, discardedRunIds }) => {
       window.dispatchEvent(
         new CustomEvent<IssueRetryResetEventDetail>(ISSUE_RETRY_RESET_EVENT, {
           detail: {
@@ -47,6 +47,7 @@ export function useIssueReset({
             status: "todo",
             usageLimitResetAt: null,
             pullRequests: [],
+            discardedRunIds,
           },
         })
       )
