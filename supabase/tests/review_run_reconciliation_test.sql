@@ -64,6 +64,15 @@ CREATE TEMP TABLE claim1 AS SELECT * FROM public.claim_review_run('d0000000-0000
 CREATE TEMP TABLE claim2 AS SELECT * FROM public.claim_review_run('d0000000-0000-4000-8000-000000000032', 'recon_test_user', '2026-08-19T11:59:30Z'::timestamptz);
 CREATE TEMP TABLE claim3 AS SELECT * FROM public.claim_review_run('d0000000-0000-4000-8000-000000000033', 'recon_test_user', '2026-08-19T11:59:30Z'::timestamptz);
 CREATE TEMP TABLE claim4 AS SELECT * FROM public.claim_review_run('d0000000-0000-4000-8000-000000000034', 'recon_test_user', '2026-08-19T11:59:30Z'::timestamptz);
+-- Issue 5's run is otherwise the oldest still-pending row once 1-4 are
+-- claimed, and `claim_review_run` is a plain FIFO queue with no per-call
+-- targeting -- without outranking it, this claim would silently take issue
+-- 5's run instead of issue 6's, contradicting "issue 5 stays pending
+-- throughout" below.
+UPDATE public.issues
+   SET priority = 'urgent'
+ WHERE id = 'd0000000-0000-4000-8000-000000000016';
+
 -- Claimed while healthy and unbanned; banned only afterward, to prove the
 -- reconciler skips it because it is *currently* banned, not because a
 -- banned worker could never have claimed it in the first place.
@@ -130,6 +139,15 @@ CREATE TEMP TABLE claim4_retry AS
 SELECT * FROM public.review_runs
  WHERE review_cycle_id = (SELECT review_cycle_id FROM claim4) AND status = 'pending';
 
+-- `claim_review_run` is a plain FIFO queue (priority desc, created_at asc)
+-- with no worker affinity, and pull/5's still-pending run is older than any
+-- retry created above -- without this, the "same worker" reclaim below would
+-- nondeterministically win pull/5's run instead of its own retry. Bumping
+-- issue 4's priority is the only lever that reliably outranks it.
+UPDATE public.issues
+   SET priority = 'urgent'
+ WHERE id = 'd0000000-0000-4000-8000-000000000014';
+
 -- The automatic retry is itself claimed and then also goes stale.
 CREATE TEMP TABLE reclaim4 AS
 SELECT * FROM public.claim_review_run('d0000000-0000-4000-8000-000000000034', 'recon_test_user', '2026-08-19T12:01:00Z'::timestamptz);
@@ -144,6 +162,20 @@ UPDATE public.workers
    SET last_seen_at = '2026-08-19T12:24:00Z',
        updated_at = '2026-08-19T12:24:00Z'
  WHERE id = 'd0000000-0000-4000-8000-000000000034';
+
+-- The fresh worker, and the run it's holding, were only ever given a
+-- timestamp once back at setup time (`started_at`, since `heartbeat_at` was
+-- never set); without refreshing both, either one reads as offline/stale by
+-- this second, much later pass and the run gets wrongly reconciled
+-- alongside the two-strikes worker's run.
+UPDATE public.workers
+   SET last_seen_at = '2026-08-19T12:29:00Z',
+       updated_at = '2026-08-19T12:29:00Z'
+ WHERE id = 'd0000000-0000-4000-8000-000000000032';
+
+UPDATE public.review_runs
+   SET heartbeat_at = '2026-08-19T12:29:00Z'
+ WHERE id = (SELECT review_run_id FROM claim2);
 
 SELECT is(
   public.reconcile_offline_review_runs('2026-08-19T12:30:00Z'::timestamptz),

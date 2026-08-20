@@ -40,6 +40,9 @@ jobs:
       - name: Lint local database
         run: pnpm dlx supabase@2.109.1 db lint --local
 
+      - name: pgTAP tests
+        run: pnpm db:test
+
       - name: Lint
         run: pnpm lint
 

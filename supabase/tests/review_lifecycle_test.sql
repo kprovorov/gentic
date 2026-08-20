@@ -69,9 +69,9 @@ SELECT throws_ok(
 -- An active run is allowed on an open pull request.
 SELECT lives_ok(
   $$
-    INSERT INTO public.review_runs (id, review_cycle_id, status)
+    INSERT INTO public.review_runs (id, review_cycle_id, status, head_sha)
     VALUES ('50000000-0000-4000-8000-000000000e01',
-            '40000000-0000-4000-8000-000000000d01', 'pending')
+            '40000000-0000-4000-8000-000000000d01', 'pending', 'sha1')
   $$,
   'an active run is allowed on a non-draft pull request'
 );
@@ -83,8 +83,8 @@ INSERT INTO public.review_cycles (id, issue_id, pull_request_id, head_sha) VALUE
 
 SELECT throws_ok(
   $$
-    INSERT INTO public.review_runs (review_cycle_id, status)
-    VALUES ('40000000-0000-4000-8000-000000000d03', 'pending')
+    INSERT INTO public.review_runs (review_cycle_id, status, head_sha)
+    VALUES ('40000000-0000-4000-8000-000000000d03', 'pending', 'sha1')
   $$,
   '23514',
   null,
@@ -92,12 +92,12 @@ SELECT throws_ok(
 );
 
 -- Supporting runs for the attempt tests.
-INSERT INTO public.review_runs (id, review_cycle_id, status) VALUES
-  ('50000000-0000-4000-8000-000000000e02', '40000000-0000-4000-8000-000000000d01', 'completed'),
-  ('50000000-0000-4000-8000-000000000e03', '40000000-0000-4000-8000-000000000d01', 'completed'),
-  ('50000000-0000-4000-8000-000000000e04', '40000000-0000-4000-8000-000000000d01', 'completed'),
-  ('50000000-0000-4000-8000-000000000e05', '40000000-0000-4000-8000-000000000d01', 'completed'),
-  ('50000000-0000-4000-8000-000000000e06', '40000000-0000-4000-8000-000000000d01', 'completed');
+INSERT INTO public.review_runs (id, review_cycle_id, status, head_sha) VALUES
+  ('50000000-0000-4000-8000-000000000e02', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1'),
+  ('50000000-0000-4000-8000-000000000e03', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1'),
+  ('50000000-0000-4000-8000-000000000e04', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1'),
+  ('50000000-0000-4000-8000-000000000e05', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1'),
+  ('50000000-0000-4000-8000-000000000e06', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1');
 
 -- Three completed attempts per cycle.
 SELECT lives_ok(

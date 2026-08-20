@@ -14,7 +14,8 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "db:types": "bash scripts/generate-supabase-types.sh",
-    "db:types:check": "bash scripts/check-supabase-types.sh"
+    "db:types:check": "bash scripts/check-supabase-types.sh",
+    "db:test": "pnpm dlx supabase@2.109.1 test db"
   },
   "devDependencies": {
     "turbo": "^2.10.2"
