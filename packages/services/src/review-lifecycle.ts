@@ -62,6 +62,9 @@ export type ReviewFindingInput = {
   line?: number | null
   title: string
   body?: string | null
+  evidence: string
+  impact: string
+  requestedChange: string
   githubCommentId?: number | null
 }
 
@@ -102,6 +105,9 @@ export async function completeReviewAttempt(
         line: finding.line ?? null,
         title: finding.title,
         body: finding.body ?? null,
+        evidence: finding.evidence,
+        impact: finding.impact,
+        requested_change: finding.requestedChange,
         github_comment_id: finding.githubCommentId ?? null,
       })),
     })

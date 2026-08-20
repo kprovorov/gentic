@@ -781,11 +781,14 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          evidence: string | null
           file_path: string | null
           github_comment_id: number | null
           head_sha: string
           id: string
+          impact: string | null
           line: number | null
+          requested_change: string | null
           review_attempt_id: string
           severity: string
           title: string
@@ -793,11 +796,14 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          evidence?: string | null
           file_path?: string | null
           github_comment_id?: number | null
           head_sha: string
           id?: string
+          impact?: string | null
           line?: number | null
+          requested_change?: string | null
           review_attempt_id: string
           severity?: string
           title: string
@@ -805,11 +811,14 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          evidence?: string | null
           file_path?: string | null
           github_comment_id?: number | null
           head_sha?: string
           id?: string
+          impact?: string | null
           line?: number | null
+          requested_change?: string | null
           review_attempt_id?: string
           severity?: string
           title?: string
@@ -820,6 +829,41 @@ export type Database = {
             columns: ["review_attempt_id"]
             isOneToOne: false
             referencedRelation: "review_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_run_logs: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          review_run_id: string
+          role: string
+          seq: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          review_run_id: string
+          role: string
+          seq: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          review_run_id?: string
+          role?: string
+          seq?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_run_logs_review_run_id_fkey"
+            columns: ["review_run_id"]
+            isOneToOne: false
+            referencedRelation: "review_runs"
             referencedColumns: ["id"]
           },
         ]

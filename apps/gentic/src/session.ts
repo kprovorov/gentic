@@ -538,7 +538,7 @@ export function throwIfAborted(signal: AbortSignal | undefined): void {
   }
 }
 
-function abortable<T>(
+export function abortable<T>(
   promise: Promise<T>,
   signal: AbortSignal | undefined
 ): Promise<T> {

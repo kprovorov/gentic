@@ -23,6 +23,26 @@ export function issueRealtimeTopic(issueId: string): string {
   return `issue:${issueId}`
 }
 
+// The Review Run log sink (GEN-415) is a deliberately separate channel from
+// Issue chat above — a reviewer's execution log must never be mistaken for,
+// or mixed into, the implementation agent's transcript.
+export function reviewRunRealtimeTopic(reviewRunId: string): string {
+  return `review-run:${reviewRunId}`
+}
+
+// Broadcast payload for the Review Run log sink — deliberately a much
+// smaller shape than `messageEventSchema` above (no tool-call/event-type/
+// generated-action fields), since it mirrors the equally minimal
+// `review_run_logs` table rather than the full chat-message contract.
+export const reviewRunLogEventSchema = z.object({
+  seq: z.number().int().positive(),
+  role: z.enum(["assistant", "system"]),
+  content: z.string(),
+  ts: z.string(),
+})
+
+export type ReviewRunLogEvent = z.infer<typeof reviewRunLogEventSchema>
+
 export const messageAuthorTypeSchema = z.enum(["user", "agent", "gentic"])
 export const generatedMessageActionSchema = z.enum(["create_pr"])
 

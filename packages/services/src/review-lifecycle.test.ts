@@ -77,7 +77,17 @@ test("completeReviewAttempt sends findings in snake_case and maps the result", a
     reviewRunId: "run-1",
     verdict: "changes_requested",
     summary: "Needs work",
-    findings: [{ title: "Null deref", severity: "warning", filePath: "a.ts", line: 10 }],
+    findings: [
+      {
+        title: "Null deref",
+        severity: "warning",
+        filePath: "a.ts",
+        line: 10,
+        evidence: "line 10 dereferences `user` without a null check",
+        impact: "crashes on any request with no authenticated user",
+        requestedChange: "add a null check before dereferencing `user`",
+      },
+    ],
   })
 
   assert.deepEqual(result, {
@@ -100,6 +110,9 @@ test("completeReviewAttempt sends findings in snake_case and maps the result", a
         line: 10,
         title: "Null deref",
         body: null,
+        evidence: "line 10 dereferences `user` without a null check",
+        impact: "crashes on any request with no authenticated user",
+        requested_change: "add a null check before dereferencing `user`",
         github_comment_id: null,
       },
     ],
