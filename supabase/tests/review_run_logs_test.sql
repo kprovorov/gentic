@@ -18,8 +18,8 @@ INSERT INTO public.review_cycles (id, issue_id, pull_request_id, head_sha) VALUE
   ('40000000-0000-4000-8000-000000000d01', '20000000-0000-4000-8000-000000000b01',
    '30000000-0000-4000-8000-000000000c01', 'sha1');
 
-INSERT INTO public.review_runs (id, review_cycle_id, status) VALUES
-  ('50000000-0000-4000-8000-000000000e01', '40000000-0000-4000-8000-000000000d01', 'running');
+INSERT INTO public.review_runs (id, review_cycle_id, status, head_sha) VALUES
+  ('50000000-0000-4000-8000-000000000e01', '40000000-0000-4000-8000-000000000d01', 'running', 'sha1');
 
 SELECT lives_ok(
   $$
@@ -70,8 +70,8 @@ SELECT is(
 );
 
 -- RLS: logs are readable exactly where the owning issue is.
-INSERT INTO public.review_runs (id, review_cycle_id, status) VALUES
-  ('50000000-0000-4000-8000-000000000e02', '40000000-0000-4000-8000-000000000d01', 'running');
+INSERT INTO public.review_runs (id, review_cycle_id, status, head_sha) VALUES
+  ('50000000-0000-4000-8000-000000000e02', '40000000-0000-4000-8000-000000000d01', 'running', 'sha1');
 INSERT INTO public.review_run_logs (review_run_id, seq, role, content) VALUES
   ('50000000-0000-4000-8000-000000000e02', 1, 'assistant', 'Reviewing diff');
 

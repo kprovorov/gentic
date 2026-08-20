@@ -16,8 +16,8 @@ INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha) VALU
 INSERT INTO public.review_cycles (id, issue_id, pull_request_id, head_sha) VALUES
   ('40000000-0000-4000-8000-000000000d01', '20000000-0000-4000-8000-000000000b01',
    '30000000-0000-4000-8000-000000000c01', 'sha1');
-INSERT INTO public.review_runs (id, review_cycle_id, status) VALUES
-  ('50000000-0000-4000-8000-000000000e01', '40000000-0000-4000-8000-000000000d01', 'completed');
+INSERT INTO public.review_runs (id, review_cycle_id, status, head_sha) VALUES
+  ('50000000-0000-4000-8000-000000000e01', '40000000-0000-4000-8000-000000000d01', 'completed', 'sha1');
 INSERT INTO public.review_attempts (id, review_cycle_id, review_run_id, attempt_number, verdict) VALUES
   ('60000000-0000-4000-8000-000000000f01', '40000000-0000-4000-8000-000000000d01',
    '50000000-0000-4000-8000-000000000e01', 1, 'changes_requested');
