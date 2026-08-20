@@ -421,8 +421,12 @@ UPDATE public.issues
        run_error = 'offline failed'
  WHERE id = '20000000-0000-4000-8000-100000000002';
 
-INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
-  ('20000000-0000-4000-8000-100000000004', '10000000-0000-4000-8000-100000000001', 'Review job task for delete', 'Body', 'ready-for-review', 4, 'claude_code');
+-- `priority = 'urgent'` (default is 'medium') so `claim_review_run`'s FIFO
+-- queue (priority desc, created_at asc) hands this run to the claim below
+-- instead of the ban scenario's still-pending, unclaimed retry above, which
+-- is otherwise older and would win the tiebreak.
+INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider, priority) VALUES
+  ('20000000-0000-4000-8000-100000000004', '10000000-0000-4000-8000-100000000001', 'Review job task for delete', 'Body', 'ready-for-review', 4, 'claude_code', 'urgent');
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
   ('20000000-0000-4000-8000-100000000104', '20000000-0000-4000-8000-100000000004', 'https://github.com/gentic/alpha/pull/4', 'open', 'sha-delete', 'success');
