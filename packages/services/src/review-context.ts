@@ -203,3 +203,65 @@ async function getReviewRunContextAttachments(
     })
   )
 }
+
+export type ReviewRunPublishContext = {
+  repo: string
+  prUrl: string
+  // `review_runs.head_sha`, not `issue_pull_requests.head_sha` — the SHA
+  // this specific run's verdict was produced against, frozen at run
+  // creation. `issue_pull_requests.head_sha` can already have moved by
+  // publish time if a new push landed mid-review; comparing against it
+  // instead would let a stale verdict slip through as if it were current.
+  headSha: string
+}
+
+/**
+ * Everything GEN-416's publish step needs to place a GitHub review: which
+ * repo/pull-request to post to, and the exact commit the verdict is about
+ * (for the caller's live-head-SHA staleness guard). Deliberately separate
+ * from `getReviewRunContext` (the reviewer's own input payload), which reads
+ * `issue_pull_requests.head_sha` for a different purpose — the PR's current
+ * state, not the frozen commit a completed run's verdict is pinned to.
+ */
+export async function getReviewRunPublishContext(
+  supabase: Supabase,
+  reviewRunId: string
+): Promise<ReviewRunPublishContext> {
+  const runResult = await supabase
+    .from("review_runs")
+    .select(
+      `
+      head_sha,
+      review_cycles!inner (
+        issue_pull_requests!inner ( url ),
+        issues!inner ( projects!inner ( repo ) )
+      )
+      `
+    )
+    .eq("id", reviewRunId)
+    .maybeSingle()
+
+  const { data: run, error: runError } = runResult as {
+    data: {
+      head_sha: string
+      review_cycles: {
+        issue_pull_requests: { url: string }
+        issues: { projects: { repo: string } }
+      }
+    } | null
+    error: { message: string } | null
+  }
+
+  if (runError) {
+    throw new ServiceError("internal", runError.message)
+  }
+  if (!run) {
+    throw new ServiceError("not_found", "Review run not found")
+  }
+
+  return {
+    repo: run.review_cycles.issues.projects.repo,
+    prUrl: run.review_cycles.issue_pull_requests.url,
+    headSha: run.head_sha,
+  }
+}
