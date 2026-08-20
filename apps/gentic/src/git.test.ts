@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -14,10 +15,13 @@ import { afterEach, beforeEach, describe, test } from "node:test"
 import {
   captureRepoBaseline,
   checkoutIssueBranch,
+  cloneRepoAtSha,
+  diffAgainstBase,
   hasChangesSinceBaseline,
   hasLocalCheckout,
   hasNewCommitsSince,
   hasUncommittedChanges,
+  verifyHeadSha,
 } from "./git.js"
 
 let dir: string
@@ -101,6 +105,149 @@ test("checkoutIssueBranch resumes a canonical remote branch without a PR URL", a
     }).trim(),
     "gen-42-fix-the-thing"
   )
+})
+
+describe("exact-SHA checkout (GEN-415 isolated reviewer)", () => {
+  let remote: string
+  let source: string
+  let baseSha: string
+  let headSha: string
+
+  beforeEach(() => {
+    remote = join(dir, "remote.git")
+    source = join(dir, "source")
+    mkdirSync(source)
+    execFileSync("git", ["init", "--bare", "-q", remote])
+    // Fetching an arbitrary commit SHA (not just a branch tip) requires this
+    // on the server side — GitHub enables it account-wide already, so this
+    // mirrors production rather than working around a local-only quirk.
+    execFileSync("git", [
+      "config",
+      "--file",
+      join(remote, "config"),
+      "uploadpack.allowReachableSHA1InWant",
+      "true",
+    ])
+    execFileSync("git", ["init", "-q"], { cwd: source })
+    execFileSync("git", ["config", "user.email", "gentic-test@example.com"], {
+      cwd: source,
+    })
+    execFileSync("git", ["config", "user.name", "Gentic Test"], {
+      cwd: source,
+    })
+    writeFileSync(join(source, "README.md"), "base\n")
+    execFileSync("git", ["add", "README.md"], { cwd: source })
+    execFileSync("git", ["commit", "-q", "-m", "base commit"], { cwd: source })
+    execFileSync("git", ["branch", "-M", "main"], { cwd: source })
+    execFileSync("git", ["remote", "add", "origin", remote], { cwd: source })
+    execFileSync("git", ["push", "-q", "-u", "origin", "main"], {
+      cwd: source,
+    })
+    baseSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: source,
+      encoding: "utf8",
+    }).trim()
+
+    writeFileSync(join(source, "README.md"), "head\n")
+    execFileSync("git", ["commit", "-q", "-am", "head commit"], {
+      cwd: source,
+    })
+    execFileSync("git", ["push", "-q", "origin", "main"], { cwd: source })
+    headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: source,
+      encoding: "utf8",
+    }).trim()
+  })
+
+  test("cloneRepoAtSha checks out exactly the requested commit, detached", async () => {
+    const checkout = join(dir, "checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: headSha,
+      dir: checkout,
+    })
+
+    assert.equal(
+      execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: checkout,
+        encoding: "utf8",
+      }).trim(),
+      headSha
+    )
+    assert.equal(
+      execFileSync("git", ["branch", "--show-current"], {
+        cwd: checkout,
+        encoding: "utf8",
+      }).trim(),
+      "",
+      "HEAD is detached, not on a branch"
+    )
+    assert.equal(
+      readFileSync(join(checkout, "README.md"), "utf8"),
+      "head\n"
+    )
+  })
+
+  test("cloneRepoAtSha pins to an older SHA, not the branch tip", async () => {
+    const checkout = join(dir, "checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: baseSha,
+      dir: checkout,
+    })
+
+    assert.equal(
+      execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: checkout,
+        encoding: "utf8",
+      }).trim(),
+      baseSha
+    )
+    assert.equal(readFileSync(join(checkout, "README.md"), "utf8"), "base\n")
+  })
+
+  test("verifyHeadSha resolves for a matching checkout", async () => {
+    const checkout = join(dir, "checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: headSha,
+      dir: checkout,
+    })
+
+    await assert.doesNotReject(verifyHeadSha(checkout, headSha))
+  })
+
+  test("verifyHeadSha throws on a mismatched SHA", async () => {
+    const checkout = join(dir, "checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: headSha,
+      dir: checkout,
+    })
+
+    await assert.rejects(
+      verifyHeadSha(checkout, baseSha),
+      /does not match the requested review SHA/
+    )
+  })
+
+  test("diffAgainstBase returns the diff between the base and head commits", async () => {
+    const checkout = join(dir, "checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: headSha,
+      dir: checkout,
+    })
+
+    const diff = await diffAgainstBase({ dir: checkout, baseSha, headSha })
+    assert.match(diff, /-base/)
+    assert.match(diff, /\+head/)
+  })
 })
 
 describe("repo baseline helpers", () => {

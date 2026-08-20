@@ -39,7 +39,7 @@ export function resolveCheckSuiteStatus(
   return checkSuitesFailed(suites) ? "tests-failed" : "ready-for-review"
 }
 
-function parsePullNumber(prUrl: string): number | null {
+export function parsePullNumber(prUrl: string): number | null {
   const match = prUrl.match(/\/pull\/(\d+)/)
   return match ? Number(match[1]) : null
 }

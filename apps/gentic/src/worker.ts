@@ -16,15 +16,23 @@ import {
   captureRepoBaseline,
   checkoutIssueBranch,
   cloneRepo,
+  cloneRepoAtSha,
+  diffAgainstBase,
   hasChangesSinceBaseline,
   hasLocalCheckout,
   type RepoBaseline,
   runSetupScript,
+  verifyHeadSha,
 } from "./git.js"
 import { logError, logInfo } from "./log.js"
 import { setRunState } from "./messages.js"
 import { createPendingMessagePromptSource } from "./pending-messages.js"
 import { connectIssueChannel, type IssueRealtimeChannel } from "./realtime.js"
+import {
+  connectReviewRunChannel,
+  type ReviewRunRealtimeChannel,
+} from "./review-run-realtime.js"
+import { runReviewerSession } from "./review-session.js"
 import {
   isSessionCancelled,
   runAgentSession,
@@ -57,7 +65,15 @@ export interface ProcessIssueDeps {
   runAgentSession: typeof runAgentSession
 }
 
-export interface WorkerLoopDeps extends ProcessIssueDeps {
+export interface ProcessReviewRunDeps {
+  connectReviewRunChannel: typeof connectReviewRunChannel
+  cloneRepoAtSha: typeof cloneRepoAtSha
+  verifyHeadSha: typeof verifyHeadSha
+  diffAgainstBase: typeof diffAgainstBase
+  runReviewerSession: typeof runReviewerSession
+}
+
+export interface WorkerLoopDeps extends ProcessIssueDeps, ProcessReviewRunDeps {
   sleep: (ms: number) => Promise<void>
   now: () => Date
   getToolStatuses: () => Promise<ToolStatuses>
@@ -78,8 +94,17 @@ const defaultProcessIssueDeps: ProcessIssueDeps = {
   runAgentSession,
 }
 
+const defaultProcessReviewRunDeps: ProcessReviewRunDeps = {
+  connectReviewRunChannel,
+  cloneRepoAtSha,
+  verifyHeadSha,
+  diffAgainstBase,
+  runReviewerSession,
+}
+
 const defaultWorkerLoopDeps: WorkerLoopDeps = {
   ...defaultProcessIssueDeps,
+  ...defaultProcessReviewRunDeps,
   sleep,
   now: () => new Date(),
   getToolStatuses,
@@ -336,7 +361,7 @@ export async function runWorkerLoop(
     }
 
     const reviewController = new AbortController()
-    const reviewRunPromise = processReviewRun(api, reviewRun, {
+    const reviewRunPromise = processReviewRun(api, config, reviewRun, deps, {
       signal: reviewController.signal,
     })
       .catch((error) => {
@@ -638,39 +663,160 @@ function abortActiveRuns(
   }
 }
 
-// Interim behavior for GEN-414: the review-job claim/lease/heartbeat/
-// cancel/reconcile/retry pipeline is fully wired end to end, but no
-// reviewer runtime exists yet (GEN-414 explicitly excludes reviewer
-// prompt/runtime details, see ADR-0005). Every claimed review run is
-// deliberately routed through the existing infra-failure path instead of
-// fabricating a verdict — non-destructive (no Review Attempt consumed), and
-// it lets the retry-then-stop recovery semantics already built for ADR-0004
-// degrade gracefully. Replace this function's body with a real reviewer
-// session once that issue lands.
-export const REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR =
-  "Automatic review runtime is not implemented yet (GEN-414 built only the claim/lease pipeline)."
-
+// The isolated reviewer runtime (GEN-415), built on top of the claim/lease/
+// heartbeat/cancel/reconcile/retry pipeline GEN-414 already wired end to
+// end. `failReviewRun` is the target of every failure path here — checkout
+// verification, session errors, and an invalid/missing structured verdict
+// alike — never a fabricated verdict; only a validated
+// `ReviewerStructuredOutput` ever reaches `completeReviewRun`.
 export async function processReviewRun(
   api: AgentApi,
+  config: Config,
   reviewRun: ClaimedReviewRun,
+  deps: ProcessReviewRunDeps = defaultProcessReviewRunDeps,
   options: { signal?: AbortSignal } = {}
 ): Promise<void> {
+  const dir = join(config.WORKDIR, `review-${reviewRun.id}`)
+  // Sibling of the disposable checkout, not inside it — same reason
+  // `processIssue`'s attachmentsDir is: a downloaded attachment must never
+  // end up counted as part of "what changed" in the checkout the reviewer
+  // inspects.
+  const attachmentsDir = join(
+    config.WORKDIR,
+    `review-${reviewRun.id}-attachments`
+  )
+
+  let channel: ReviewRunRealtimeChannel | null = null
+  let seq = 0
+  // The reconciler judges a live run stale using `coalesce(review_runs.
+  // heartbeat_at, review_runs.started_at)` (ADR-0005) — a genuinely
+  // long-running reviewer session needs heartbeats throughout its run, not
+  // just once at the start, to stay ahead of that window.
+  const heartbeatTimer = setInterval(() => {
+    api.sendReviewRunHeartbeat(reviewRun.id).catch((error) => {
+      logError(
+        `review run ${reviewRun.id} heartbeat failed:`,
+        describe(error)
+      )
+    })
+  }, HEARTBEAT_INTERVAL_MS)
+
   try {
     throwIfAborted(options.signal)
     await api.sendReviewRunHeartbeat(reviewRun.id)
+
+    channel = await deps
+      .connectReviewRunChannel(api, reviewRun.id)
+      .catch((error) => {
+        logError(
+          `review run ${reviewRun.id} realtime unavailable; continuing with durable logs only:`,
+          describe(error)
+        )
+        return createNoopReviewRunChannel()
+      })
+
+    const appendLog = async (entry: {
+      role: "assistant" | "system"
+      content: string
+    }): Promise<void> => {
+      seq += 1
+      const logEntry = { seq, ...entry }
+      await api.appendReviewRunLog(reviewRun.id, logEntry).catch((error) => {
+        logError(
+          `review run ${reviewRun.id} failed to persist log line:`,
+          describe(error)
+        )
+      })
+      await channel?.publishLog(logEntry).catch((error) => {
+        logError(
+          `review run ${reviewRun.id} failed to broadcast log line:`,
+          describe(error)
+        )
+      })
+    }
+
     throwIfAborted(options.signal)
-    const { retried } = await api.failReviewRun(reviewRun.id, {
-      error: REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
+    const context = await api.fetchReviewRunContext(reviewRun.id)
+
+    throwIfAborted(options.signal)
+    await deps.cloneRepoAtSha({
+      remoteBase: config.GIT_REMOTE_BASE,
+      repo: context.repo,
+      sha: reviewRun.headSha,
+      dir,
     })
-    logInfo(`review run ${reviewRun.id} deferred (retried: ${retried})`)
+    // Proves checked-out HEAD equals the requested SHA before review begins
+    // — the acceptance criterion GEN-415 is built around. A mismatch throws
+    // and is reported as an infra failure below, never silently reviewed.
+    await deps.verifyHeadSha(dir, reviewRun.headSha)
+
+    throwIfAborted(options.signal)
+    const diff = context.pullRequest.baseSha
+      ? await deps.diffAgainstBase({
+          dir,
+          baseSha: context.pullRequest.baseSha,
+          headSha: reviewRun.headSha,
+        })
+      : ""
+
+    throwIfAborted(options.signal)
+    const output = await deps.runReviewerSession({
+      reviewerProvider: context.reviewerProvider,
+      reviewerModel: context.reviewerModel,
+      cwd: dir,
+      attachmentsDir,
+      context,
+      diff,
+      appendLog,
+      signal: options.signal,
+    })
+
+    throwIfAborted(options.signal)
+    await api.completeReviewRun(reviewRun.id, {
+      verdict: output.verdict,
+      summary: output.summary ?? null,
+      findings: output.findings.map((finding) => ({
+        severity: "blocker",
+        filePath: finding.filePath ?? null,
+        line: finding.line ?? null,
+        title: finding.defect,
+        evidence: finding.evidence,
+        impact: finding.impact,
+        requestedChange: finding.requestedChange,
+      })),
+    })
+    logInfo(
+      `review run ${reviewRun.id} completed with verdict: ${output.verdict}`
+    )
   } catch (error) {
     if (options.signal?.aborted || isSessionCancelled(error)) {
       throw error
     }
-    logError(
-      `review run ${reviewRun.id} failed to report infra failure:`,
-      describe(error)
+    const message = describe(error)
+    logError(`review run ${reviewRun.id} failed:`, message)
+    await api.failReviewRun(reviewRun.id, { error: message }).catch(
+      (failError) => {
+        logError(
+          `review run ${reviewRun.id} failed to report infra failure:`,
+          describe(failError)
+        )
+      }
     )
+  } finally {
+    clearInterval(heartbeatTimer)
+    if (channel) {
+      await channel.close().catch((closeError) => {
+        logError(
+          "failed to close review run realtime channel:",
+          describe(closeError)
+        )
+      })
+    }
+    // Discards every workspace change and artifact unconditionally, on both
+    // success and failure — the disposable checkout must never outlive the
+    // run it was created for.
+    await rm(dir, { recursive: true, force: true })
+    await rm(attachmentsDir, { recursive: true, force: true })
   }
 }
 
@@ -823,6 +969,13 @@ function createNoopIssueChannel(): IssueRealtimeChannel {
   return {
     async publishMessage() {},
     async publishRunState() {},
+    async close() {},
+  }
+}
+
+function createNoopReviewRunChannel(): ReviewRunRealtimeChannel {
+  return {
+    async publishLog() {},
     async close() {},
   }
 }

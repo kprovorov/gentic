@@ -88,7 +88,23 @@ export async function buildAttachmentBlocks(
       : Promise.resolve<Attachment[]>([]),
     api.fetchAttachments(issueId, runId, messageId),
   ])
-  const attachments = [...issueAttachments, ...messageAttachments]
+  return attachmentsToContentBlocks(
+    [...issueAttachments, ...messageAttachments],
+    attachmentsDir
+  )
+}
+
+/**
+ * The download/convert half of {@link buildAttachmentBlocks}, split out so a
+ * caller that already has `Attachment[]` metadata (signed URL included) can
+ * skip the `AgentApi.fetchAttachments` round trip entirely — used by the
+ * isolated reviewer (GEN-415), whose context payload already carries the
+ * issue's attachments with their signed URLs.
+ */
+export async function attachmentsToContentBlocks(
+  attachments: Attachment[],
+  attachmentsDir: string
+): Promise<ContentBlock[]> {
   if (attachments.length === 0) {
     return []
   }

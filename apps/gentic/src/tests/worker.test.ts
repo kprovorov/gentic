@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -8,13 +9,21 @@ import type {
   AgentApi,
   ClaimedIssue,
   ClaimedReviewRun,
+  CompleteReviewRunInput,
+  CompleteReviewRunResponse,
   FinishRunFields,
   FinishRunResult,
+  RealtimeTokenResponse,
+  ReviewRunContext,
+  ReviewRunLogInput,
   RunStateFields,
   UserMessage,
 } from "../api.js"
 import type { Config } from "../config.js"
 import type { IssueRealtimeChannel } from "../realtime.js"
+import type { ReviewRunRealtimeChannel } from "../review-run-realtime.js"
+import { ReviewerOutputInvalidError } from "../review-session.js"
+import type { ReviewerStructuredOutput } from "@gentic/validators/agent"
 import { isSessionCancelled } from "../session.js"
 import type { PromptDelivery, PromptTurn, RunSessionInput } from "../session.js"
 import type { ToolStatuses } from "../tools.js"
@@ -29,12 +38,12 @@ import type {
 import { createSkillInstallRunner } from "../skill-installs.js"
 import {
   CONTROL_INTERVAL_MS,
-  REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
   applyReloadedConfig,
   processIssue,
   processReviewRun,
   runWorkerLoop,
   type ProcessIssueDeps,
+  type ProcessReviewRunDeps,
   type WorkerLoopDeps,
 } from "../worker.js"
 
@@ -669,8 +678,15 @@ test("a review job is claimed once no implementation issue is available", async 
       config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
       // No implementation issue queued — `api.claims` stays empty.
       api.reviewRunClaims.push(claimedReviewRun("review-1"))
+      // Banning on the heartbeat alone would race the review run's own
+      // (now genuinely async — real fs calls in the fakes below) work to
+      // completion: a control poll landing between the heartbeat and
+      // `completeReviewRun` would abort the run before it finished.
+      // `completedReviewRuns.length` only ever becomes true once
+      // `processReviewRun` has actually finished, so waiting for it keeps
+      // this deterministic.
       api.controlResponse = () => ({
-        worker: { banned: api.reviewRunHeartbeats.length > 0 },
+        worker: { banned: api.completedReviewRuns.length > 0 },
         runs: [],
         review_runs: [{ review_run_id: "review-1", status: "running" }],
       })
@@ -678,19 +694,151 @@ test("a review job is claimed once no implementation issue is available", async 
       await runWorkerLoop(api, config, loopDeps(deps, clock, api))
 
       assert.deepEqual(api.reviewRunHeartbeats, ["review-1"])
-      assert.deepEqual(api.failedReviewRuns, [
-        {
-          reviewRunId: "review-1",
-          error: REVIEW_RUNTIME_NOT_IMPLEMENTED_ERROR,
-        },
-      ])
+      assert.equal(api.completedReviewRuns.length, 1)
+      assert.equal(api.completedReviewRuns[0]?.reviewRunId, "review-1")
+      assert.deepEqual(api.failedReviewRuns, [])
     },
     { now: () => clock.now() }
   )
 })
 
+test("processReviewRun completes a review, mapping findings to the general-purpose finding shape", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    api.reviewerSessionOutput = {
+      verdict: "changes_requested",
+      summary: "One blocking issue.",
+      findings: [
+        {
+          defect: "Unbounded recursion",
+          evidence: "foo() calls itself with no base case",
+          impact: "stack overflow on any nonempty input",
+          requestedChange: "add a base case",
+          filePath: "src/foo.ts",
+          line: 12,
+        },
+      ],
+    }
+
+    await processReviewRun(api, config, claimedReviewRun("review-1"), deps)
+
+    assert.equal(api.completedReviewRuns.length, 1)
+    assert.deepEqual(api.completedReviewRuns[0], {
+      reviewRunId: "review-1",
+      input: {
+        verdict: "changes_requested",
+        summary: "One blocking issue.",
+        findings: [
+          {
+            severity: "blocker",
+            filePath: "src/foo.ts",
+            line: 12,
+            title: "Unbounded recursion",
+            evidence: "foo() calls itself with no base case",
+            impact: "stack overflow on any nonempty input",
+            requestedChange: "add a base case",
+          },
+        ],
+      },
+    })
+    assert.deepEqual(api.failedReviewRuns, [])
+  })
+})
+
+test("processReviewRun proves the exact-SHA checkout before reviewing and fails the run on a mismatch", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    api.reviewVerifyError = new Error(
+      "Checked-out HEAD (wrong-sha) does not match the requested review SHA (sha1)"
+    )
+
+    await processReviewRun(api, config, claimedReviewRun("review-1"), deps)
+
+    assert.equal(api.reviewCloneCalls, 1)
+    assert.equal(api.reviewVerifyCalls, 1)
+    // Never reaches the reviewer session or a completion call once the SHA
+    // check fails.
+    assert.equal(api.reviewDiffCalls, 0)
+    assert.deepEqual(api.completedReviewRuns, [])
+    assert.equal(api.failedReviewRuns.length, 1)
+    assert.equal(api.failedReviewRuns[0]?.reviewRunId, "review-1")
+    assert.match(api.failedReviewRuns[0]?.error ?? "", /does not match/)
+  })
+})
+
+test("processReviewRun reports an infra failure, never a fabricated verdict, on invalid structured output", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    api.reviewerSessionError = new ReviewerOutputInvalidError(
+      "Reviewer's final message has no fenced ```json block with its verdict"
+    )
+
+    await processReviewRun(api, config, claimedReviewRun("review-1"), deps)
+
+    assert.deepEqual(api.completedReviewRuns, [])
+    assert.equal(api.failedReviewRuns.length, 1)
+    assert.match(api.failedReviewRuns[0]?.error ?? "", /no fenced/)
+  })
+})
+
+test("processReviewRun always discards the disposable checkout, on both success and failure", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    const successDir = join(config.WORKDIR, "review-review-success")
+    await processReviewRun(api, config, claimedReviewRun("review-success"), deps)
+    assert.equal(existsSync(successDir), false)
+
+    api.reviewVerifyError = new Error("SHA mismatch")
+    const failureDir = join(config.WORKDIR, "review-review-failure")
+    await processReviewRun(api, config, claimedReviewRun("review-failure"), deps)
+    assert.equal(existsSync(failureDir), false)
+  })
+})
+
+test("processReviewRun streams logs to the Review Run log sink, not Issue chat", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    api.reviewerSessionLogEntries = [
+      { role: "assistant", content: "Inspecting the diff..." },
+      { role: "system", content: "Running: pnpm test" },
+    ]
+
+    await processReviewRun(api, config, claimedReviewRun("review-1"), deps)
+
+    assert.deepEqual(
+      api.reviewRunLogs.map(({ reviewRunId, input }) => ({
+        reviewRunId,
+        seq: input.seq,
+        role: input.role,
+        content: input.content,
+      })),
+      [
+        {
+          reviewRunId: "review-1",
+          seq: 1,
+          role: "assistant",
+          content: "Inspecting the diff...",
+        },
+        {
+          reviewRunId: "review-1",
+          seq: 2,
+          role: "system",
+          content: "Running: pnpm test",
+        },
+      ]
+    )
+    assert.deepEqual(
+      api.publishedReviewRunLogs.map(({ seq, role, content }) => ({
+        seq,
+        role,
+        content,
+      })),
+      [
+        { seq: 1, role: "assistant", content: "Inspecting the diff..." },
+        { seq: 2, role: "system", content: "Running: pnpm test" },
+      ]
+    )
+    assert.equal(api.closedReviewRunChannels, 1)
+  })
+})
+
 test("processReviewRun stops without reporting an infra failure once aborted", async () => {
-  await withHarness(async ({ api }) => {
+  await withHarness(async ({ api, config, deps }) => {
     const controller = new AbortController()
     let heartbeatSent = false
     api.sendReviewRunHeartbeat = async (reviewRunId: string) => {
@@ -702,7 +850,7 @@ test("processReviewRun stops without reporting an infra failure once aborted", a
     }
 
     await assert.rejects(
-      processReviewRun(api, claimedReviewRun("review-1"), {
+      processReviewRun(api, config, claimedReviewRun("review-1"), deps, {
         signal: controller.signal,
       }),
       (error: unknown) => isSessionCancelled(error)
@@ -710,6 +858,7 @@ test("processReviewRun stops without reporting an infra failure once aborted", a
 
     assert.equal(heartbeatSent, true)
     assert.deepEqual(api.failedReviewRuns, [])
+    assert.deepEqual(api.completedReviewRuns, [])
   })
 })
 
@@ -1007,7 +1156,7 @@ async function withHarness(
     config: Config
     issue: ClaimedIssue
     api: FakeApi
-    deps: ProcessIssueDeps
+    deps: ProcessIssueDeps & ProcessReviewRunDeps
     realtimeWakes: Map<string, () => void>
   }) => Promise<void>,
   options: {
@@ -1031,7 +1180,7 @@ async function withHarness(
 function fakeDeps(
   api: FakeApi,
   realtimeWakes: Map<string, () => void>
-): ProcessIssueDeps {
+): ProcessIssueDeps & ProcessReviewRunDeps {
   return {
     async connectIssueChannel(_api, issueId, _activeRunId, onUserMessage) {
       realtimeWakes.set(issueId, onUserMessage)
@@ -1070,6 +1219,41 @@ function fakeDeps(
         await input.onPromptProcessed?.(normalizeDelivery(next).messageIds)
       }
     },
+    async connectReviewRunChannel(_api, reviewRunId) {
+      return fakeReviewRunChannel(api, reviewRunId)
+    },
+    async cloneRepoAtSha(options) {
+      api.reviewCloneCalls += 1
+      // A real directory, so the cleanup-on-exit assertions in worker.test.ts
+      // observe a genuine remove rather than trivially passing against a
+      // path that was never created.
+      await mkdir(options.dir, { recursive: true })
+    },
+    async verifyHeadSha() {
+      api.reviewVerifyCalls += 1
+      if (api.reviewVerifyError) {
+        throw api.reviewVerifyError
+      }
+    },
+    async diffAgainstBase() {
+      api.reviewDiffCalls += 1
+      return "diff --git a/file b/file\n+changed"
+    },
+    async runReviewerSession(input) {
+      for (const entry of api.reviewerSessionLogEntries) {
+        await input.appendLog(entry)
+      }
+      if (api.reviewerSessionError) {
+        throw api.reviewerSessionError
+      }
+      return (
+        api.reviewerSessionOutput ?? {
+          verdict: "approved",
+          summary: null,
+          findings: [],
+        }
+      )
+    },
   }
 }
 
@@ -1081,6 +1265,20 @@ function fakeChannel(api: FakeApi): IssueRealtimeChannel {
     },
     async close() {
       api.closedChannels += 1
+    },
+  }
+}
+
+function fakeReviewRunChannel(
+  api: FakeApi,
+  reviewRunId: string
+): ReviewRunRealtimeChannel {
+  return {
+    async publishLog(entry) {
+      api.publishedReviewRunLogs.push({ reviewRunId, ...entry })
+    },
+    async close() {
+      api.closedReviewRunChannels += 1
     },
   }
 }
@@ -1116,6 +1314,17 @@ class FakeApi implements AgentApi {
   readonly reviewRunHeartbeats: string[] = []
   readonly failedReviewRuns: { reviewRunId: string; error: string }[] = []
   readonly failReviewRunResults: { retried: boolean }[] = []
+  readonly completedReviewRuns: {
+    reviewRunId: string
+    input: CompleteReviewRunInput
+  }[] = []
+  readonly completeReviewRunResults: CompleteReviewRunResponse[] = []
+  readonly reviewRunContextFetches: string[] = []
+  reviewRunContext: ReviewRunContext | null = null
+  reviewRunContextError: Error | null = null
+  readonly reviewRunRealtimeTokenFetches: string[] = []
+  readonly reviewRunLogs: { reviewRunId: string; input: ReviewRunLogInput }[] =
+    []
   readonly pendingSkillInstalls: WorkerSkillInstallCommand[] = []
   readonly skillInstallResults: {
     installId: string
@@ -1148,6 +1357,21 @@ class FakeApi implements AgentApi {
   automaticPrPublishCreated = true
   automaticPrPublishError: Error | null = null
   recordUnpublishedChangesError: Error | null = null
+  reviewCloneCalls = 0
+  reviewVerifyCalls = 0
+  reviewVerifyError: Error | null = null
+  reviewDiffCalls = 0
+  reviewerSessionLogEntries: { role: "assistant" | "system"; content: string }[] =
+    []
+  reviewerSessionError: Error | null = null
+  reviewerSessionOutput: ReviewerStructuredOutput | null = null
+  publishedReviewRunLogs: {
+    reviewRunId: string
+    seq: number
+    role: "assistant" | "system"
+    content: string
+  }[] = []
+  closedReviewRunChannels = 0
 
   addMessage(issueId: string, message: UserMessage): void {
     this.messages.set(issueId, [...(this.messages.get(issueId) ?? []), message])
@@ -1171,6 +1395,68 @@ class FakeApi implements AgentApi {
   ): Promise<{ retried: boolean }> {
     this.failedReviewRuns.push({ reviewRunId, error: input.error })
     return this.failReviewRunResults.shift() ?? { retried: false }
+  }
+
+  async completeReviewRun(
+    reviewRunId: string,
+    input: CompleteReviewRunInput
+  ): Promise<CompleteReviewRunResponse> {
+    this.completedReviewRuns.push({ reviewRunId, input })
+    return (
+      this.completeReviewRunResults.shift() ?? {
+        reviewAttemptId: "attempt-1",
+        reviewCycleId: "cycle-1",
+        issueId: "issue-1",
+        attemptNumber: 1,
+        cycleState: "active",
+        accepted: true,
+      }
+    )
+  }
+
+  async fetchReviewRunContext(reviewRunId: string): Promise<ReviewRunContext> {
+    this.reviewRunContextFetches.push(reviewRunId)
+    if (this.reviewRunContextError) {
+      throw this.reviewRunContextError
+    }
+    return (
+      this.reviewRunContext ?? {
+        issue: { code: "GEN-1", title: "Title", body: "Body" },
+        attachments: [],
+        repo: "gentic/app",
+        reviewerProvider: "claude_code",
+        reviewerModel: null,
+        reviewerInstructions: null,
+        pullRequest: {
+          url: "https://github.com/gentic/app/pull/1",
+          headSha: "sha1",
+          ciState: "success",
+          title: "PR title",
+          body: "PR body",
+          baseRef: "main",
+          baseSha: "sha0",
+        },
+      }
+    )
+  }
+
+  async fetchReviewRunRealtimeToken(
+    reviewRunId: string
+  ): Promise<RealtimeTokenResponse> {
+    this.reviewRunRealtimeTokenFetches.push(reviewRunId)
+    return {
+      url: "https://realtime.example",
+      apiKey: "key",
+      token: "token",
+      expiresAt: new Date(this.now().getTime() + 60_000).toISOString(),
+    }
+  }
+
+  async appendReviewRunLog(
+    reviewRunId: string,
+    input: ReviewRunLogInput
+  ): Promise<void> {
+    this.reviewRunLogs.push({ reviewRunId, input })
   }
 
   async setRunState(
@@ -1366,7 +1652,7 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 function loopDeps(
-  deps: ProcessIssueDeps,
+  deps: ProcessIssueDeps & ProcessReviewRunDeps,
   clock: FakeClock,
   api: FakeApi
 ): WorkerLoopDeps {

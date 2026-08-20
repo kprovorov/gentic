@@ -5,11 +5,17 @@ import {
   automaticPrPublishResponseSchema,
   automaticPrRequestSchema,
   claimedIssueSchema,
+  completeReviewRunInputSchema,
   finishRunFieldsSchema,
   finishRunResponseSchema,
   insertMessageInputSchema,
+  realtimeTokenInputSchema,
   recordUnpublishedChangesInputSchema,
   requestAutomaticPrPublishInputSchema,
+  reviewerStructuredOutputSchema,
+  reviewFindingInputSchema,
+  reviewRunContextResponseSchema,
+  reviewRunLogInputSchema,
   runStateFieldsSchema,
 } from "./agent.js"
 
@@ -204,4 +210,162 @@ test("finishRunResponseSchema accepts a database-derived PR aggregate status", (
   })
 
   assert.equal(response.status, "changes-requested")
+})
+
+test("reviewFindingInputSchema requires defect evidence, impact, and requested change", () => {
+  const finding = reviewFindingInputSchema.parse({
+    title: "Unbounded recursion",
+    evidence: "foo() calls itself with no base case",
+    impact: "stack overflow on any nonempty input",
+    requestedChange: "add a base case",
+  })
+  assert.equal(finding.requestedChange, "add a base case")
+
+  for (const missing of ["evidence", "impact", "requestedChange"] as const) {
+    const input: Record<string, unknown> = {
+      title: "Unbounded recursion",
+      evidence: "foo() calls itself with no base case",
+      impact: "stack overflow on any nonempty input",
+      requestedChange: "add a base case",
+    }
+    delete input[missing]
+    assert.throws(() => reviewFindingInputSchema.parse(input))
+  }
+
+  assert.doesNotThrow(() =>
+    completeReviewRunInputSchema.parse({
+      verdict: "changes_requested",
+      findings: [
+        {
+          title: "Unbounded recursion",
+          evidence: "foo() calls itself with no base case",
+          impact: "stack overflow on any nonempty input",
+          requestedChange: "add a base case",
+        },
+      ],
+    })
+  )
+})
+
+test("reviewerStructuredOutputSchema validates the reviewer's raw final-message payload", () => {
+  const output = reviewerStructuredOutputSchema.parse({
+    verdict: "changes_requested",
+    summary: "One blocking issue found.",
+    findings: [
+      {
+        defect: "Unbounded recursion",
+        evidence: "foo() calls itself with no base case",
+        impact: "stack overflow on any nonempty input",
+        requestedChange: "add a base case",
+        filePath: "src/foo.ts",
+        line: 12,
+      },
+    ],
+  })
+  assert.equal(output.findings.length, 1)
+
+  // Findings default to an empty array on an "approved" verdict.
+  const approved = reviewerStructuredOutputSchema.parse({
+    verdict: "approved",
+  })
+  assert.deepEqual(approved.findings, [])
+
+  for (const missing of [
+    "defect",
+    "evidence",
+    "impact",
+    "requestedChange",
+  ] as const) {
+    const finding: Record<string, unknown> = {
+      defect: "Unbounded recursion",
+      evidence: "foo() calls itself with no base case",
+      impact: "stack overflow on any nonempty input",
+      requestedChange: "add a base case",
+    }
+    delete finding[missing]
+    assert.throws(() =>
+      reviewerStructuredOutputSchema.parse({
+        verdict: "changes_requested",
+        findings: [finding],
+      })
+    )
+  }
+
+  assert.throws(() =>
+    reviewerStructuredOutputSchema.parse({ verdict: "not_a_verdict" })
+  )
+})
+
+test("reviewerStructuredOutputSchema rejects an approved verdict carrying findings", () => {
+  assert.throws(() =>
+    reviewerStructuredOutputSchema.parse({
+      verdict: "approved",
+      findings: [
+        {
+          defect: "Unbounded recursion",
+          evidence: "foo() calls itself with no base case",
+          impact: "stack overflow on any nonempty input",
+          requestedChange: "add a base case",
+        },
+      ],
+    })
+  )
+})
+
+test("reviewRunContextResponseSchema validates the assembled reviewer context", () => {
+  const context = reviewRunContextResponseSchema.parse({
+    issue: { code: "GEN-415", title: "Fix the thing", body: "Body" },
+    attachments: [],
+    repo: "gentic/app",
+    reviewerProvider: "claude_code",
+    reviewerModel: null,
+    reviewerInstructions: null,
+    pullRequest: {
+      url: "https://github.com/gentic/app/pull/42",
+      headSha: "abc123",
+      ciState: "success",
+      title: "Fix the thing",
+      body: "PR body",
+      baseRef: "main",
+      baseSha: "def456",
+    },
+  })
+  assert.equal(context.pullRequest.ciState, "success")
+})
+
+test("reviewRunLogInputSchema requires a positive seq and non-empty content", () => {
+  assert.doesNotThrow(() =>
+    reviewRunLogInputSchema.parse({
+      seq: 1,
+      role: "assistant",
+      content: "Cloning...",
+    })
+  )
+  assert.throws(() =>
+    reviewRunLogInputSchema.parse({ seq: 1, role: "assistant", content: "" })
+  )
+  assert.throws(() =>
+    reviewRunLogInputSchema.parse({
+      seq: 1,
+      role: "user",
+      content: "not allowed",
+    })
+  )
+  assert.throws(() =>
+    reviewRunLogInputSchema.parse({
+      seq: 0,
+      role: "assistant",
+      content: "bad seq",
+    })
+  )
+})
+
+test("realtimeTokenInputSchema accepts either issue chat or a review run id", () => {
+  assert.doesNotThrow(() =>
+    realtimeTokenInputSchema.parse({ issue_id: issueId, active_run_id: runId })
+  )
+  assert.doesNotThrow(() =>
+    realtimeTokenInputSchema.parse({ review_run_id: runId })
+  )
+  assert.throws(() => realtimeTokenInputSchema.parse({}))
 })

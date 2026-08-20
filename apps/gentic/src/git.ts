@@ -75,6 +75,75 @@ export async function checkoutIssueBranch(options: {
 }
 
 /**
+ * Clones a project repo into a fresh, disposable directory pinned to one
+ * exact commit SHA — not a branch tip. Used by the isolated automatic
+ * reviewer (GEN-415), which must review precisely the revision it was
+ * asked to, not whatever a branch points at moments later. GitHub (and any
+ * host with `uploadpack.allowReachableSHA1InWant` enabled) allows fetching
+ * an arbitrary reachable commit SHA directly, so this skips a full/branch
+ * clone followed by a second checkout.
+ */
+export async function cloneRepoAtSha(options: {
+  remoteBase: string
+  repo: string
+  sha: string
+  dir: string
+}): Promise<void> {
+  const remote = `${options.remoteBase}${options.repo}`
+  await rm(options.dir, { recursive: true, force: true })
+  await mkdir(options.dir, { recursive: true })
+  await run("git", ["init", "-q"], { cwd: options.dir })
+  await run("git", ["remote", "add", "origin", remote], { cwd: options.dir })
+  await run("git", ["fetch", "--depth", "1", "origin", options.sha], {
+    cwd: options.dir,
+  })
+  await run("git", ["checkout", "-q", "--detach", "FETCH_HEAD"], {
+    cwd: options.dir,
+  })
+}
+
+/**
+ * Proves the checked-out HEAD is exactly the requested SHA before review
+ * begins — the acceptance criterion GEN-415 is built around. Throws rather
+ * than returning a boolean: any mismatch is an infrastructure failure the
+ * caller must report, never a reviewable outcome.
+ */
+export async function verifyHeadSha(
+  dir: string,
+  expectedSha: string
+): Promise<void> {
+  const headSha = (
+    await runCapture("git", ["rev-parse", "HEAD"], { cwd: dir })
+  ).trim()
+  if (headSha !== expectedSha) {
+    throw new Error(
+      `Checked-out HEAD (${headSha}) does not match the requested review SHA (${expectedSha})`
+    )
+  }
+}
+
+/**
+ * Diffs the exact-SHA checkout against its pull request's base commit, which
+ * `cloneRepoAtSha` never fetched — this pulls it in (also depth 1) purely to
+ * compute the diff. A plain two-commit diff, not a three-dot merge-base
+ * diff: the two shallow fetches share no history to derive a merge base
+ * from, but a straight tree comparison is exactly what a reviewer needs to
+ * see "what changed" between the two commits.
+ */
+export async function diffAgainstBase(options: {
+  dir: string
+  baseSha: string
+  headSha: string
+}): Promise<string> {
+  await run("git", ["fetch", "--depth", "1", "origin", options.baseSha], {
+    cwd: options.dir,
+  })
+  return runCapture("git", ["diff", options.baseSha, options.headSha], {
+    cwd: options.dir,
+  })
+}
+
+/**
  * Runs a project's configured setup script (e.g. `npm install`) in the
  * cloned repo before the agent session starts.
  */

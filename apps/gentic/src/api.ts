@@ -5,21 +5,27 @@ import {
   claimIssueResponseSchema,
   claimReviewRunInputSchema,
   claimReviewRunResponseSchema,
+  completeReviewRunResponseSchema,
   failReviewRunResponseSchema,
   finishRunResponseSchema,
   insertMessageResponseSchema,
   okResponseSchema,
   pendingUserMessagesResponseSchema,
   realtimeTokenResponseSchema,
+  reviewRunContextResponseSchema,
   type AckMessagesInput,
   type Attachment,
   type AutomaticPrPublishResponse,
   type ClaimedIssue,
   type ClaimedReviewRun,
+  type CompleteReviewRunInput,
+  type CompleteReviewRunResponse,
   type FinishRunFields,
   type InsertMessageInput,
   type RecordUnpublishedChangesInput,
   type RealtimeTokenResponse,
+  type ReviewRunContext,
+  type ReviewRunLogInput,
   type RunStateFields,
   type UserMessage,
 } from "@gentic/validators/agent"
@@ -42,11 +48,15 @@ export type {
   AutomaticPrPublishResponse,
   ClaimedIssue,
   ClaimedReviewRun,
+  CompleteReviewRunInput,
+  CompleteReviewRunResponse,
   FinishRunFields,
   InsertMessageInput,
   RecordUnpublishedChangesInput,
   RealtimeRunStateStatus,
   RealtimeTokenResponse,
+  ReviewRunContext,
+  ReviewRunLogInput,
   RunStateFields,
   UserMessage,
 } from "@gentic/validators/agent"
@@ -64,6 +74,18 @@ export interface AgentApi {
     reviewRunId: string,
     input: { error: string }
   ): Promise<{ retried: boolean }>
+  completeReviewRun(
+    reviewRunId: string,
+    input: CompleteReviewRunInput
+  ): Promise<CompleteReviewRunResponse>
+  fetchReviewRunContext(reviewRunId: string): Promise<ReviewRunContext>
+  fetchReviewRunRealtimeToken(
+    reviewRunId: string
+  ): Promise<RealtimeTokenResponse>
+  appendReviewRunLog(
+    reviewRunId: string,
+    input: ReviewRunLogInput
+  ): Promise<void>
   setRunState(
     issueId: string,
     activeRunId: string,
@@ -183,6 +205,32 @@ export function createAgentApi(input: {
         `/agent/review-runs/${encodeURIComponent(reviewRunId)}/fail`,
         failReviewRunResponseSchema,
         { method: "PATCH", body: reviewInput }
+      )
+    },
+    async completeReviewRun(reviewRunId, completeInput) {
+      return request(
+        `/agent/review-runs/${encodeURIComponent(reviewRunId)}/complete`,
+        completeReviewRunResponseSchema,
+        { method: "PATCH", body: completeInput }
+      )
+    },
+    async fetchReviewRunContext(reviewRunId) {
+      return request(
+        `/agent/review-runs/${encodeURIComponent(reviewRunId)}/context`,
+        reviewRunContextResponseSchema
+      )
+    },
+    async fetchReviewRunRealtimeToken(reviewRunId) {
+      return request("/agent/realtime/token", realtimeTokenResponseSchema, {
+        method: "POST",
+        body: { review_run_id: reviewRunId },
+      })
+    },
+    async appendReviewRunLog(reviewRunId, logInput) {
+      await request(
+        `/agent/review-runs/${encodeURIComponent(reviewRunId)}/logs`,
+        okResponseSchema,
+        { method: "POST", body: logInput }
       )
     },
     async setRunState(issueId, activeRunId, fields) {

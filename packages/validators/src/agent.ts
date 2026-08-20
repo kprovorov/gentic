@@ -112,12 +112,24 @@ export const realtimeTokenResponseSchema = z.object({
 
 export type RealtimeTokenResponse = z.infer<typeof realtimeTokenResponseSchema>
 
-export const realtimeTokenInputSchema = z
-  .object({
-    issue_id: z.string().uuid(),
-    active_run_id: z.string().uuid(),
-  })
-  .strict()
+// Either an implementation-run pair (issue chat) or a `review_run_id` (the
+// Review Run log sink) — the two channels are authorized by different RLS
+// ownership joins server-side, but share one token-minting route since the
+// minted JWT itself is user-scoped, not topic-scoped (see
+// `apps/web/lib/realtime-token.ts`).
+export const realtimeTokenInputSchema = z.union([
+  z
+    .object({
+      issue_id: z.string().uuid(),
+      active_run_id: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      review_run_id: z.string().uuid(),
+    })
+    .strict(),
+])
 
 export type RealtimeTokenInput = z.infer<typeof realtimeTokenInputSchema>
 
@@ -255,16 +267,25 @@ export const failReviewRunResponseSchema = z.object({
   retried: z.boolean(),
 })
 
-const reviewFindingInputSchema = z
+// `evidence`/`impact`/`requestedChange` are required here (unlike the other
+// optional fields) because the only caller of `/complete` is the automatic
+// reviewer (GEN-415), whose own output schema (`reviewerStructuredOutput
+// Schema` below) requires them on every finding it produces.
+export const reviewFindingInputSchema = z
   .object({
     severity: z.enum(["info", "warning", "error", "blocker"]).optional(),
     filePath: z.string().nullable().optional(),
     line: z.number().int().positive().nullable().optional(),
     title: z.string(),
     body: z.string().nullable().optional(),
+    evidence: z.string().min(1),
+    impact: z.string().min(1),
+    requestedChange: z.string().min(1),
     githubCommentId: z.number().nullable().optional(),
   })
   .strict()
+
+export type ReviewFindingInput = z.infer<typeof reviewFindingInputSchema>
 
 export const completeReviewRunInputSchema = z
   .object({
@@ -288,6 +309,10 @@ export const completeReviewRunResponseSchema = z.object({
   accepted: z.boolean(),
 })
 
+export type CompleteReviewRunResponse = z.infer<
+  typeof completeReviewRunResponseSchema
+>
+
 export const attachmentSchema = z.object({
   id: z.string().uuid(),
   fileName: z.string(),
@@ -301,3 +326,90 @@ export type Attachment = z.infer<typeof attachmentSchema>
 export const attachmentsResponseSchema = z.object({
   attachments: z.array(attachmentSchema),
 })
+
+// The reviewer agent's raw final-message payload (GEN-415): the reviewer is
+// instructed to end its turn with exactly one fenced ```json block matching
+// this shape. Parsing/validating it happens entirely outside the model —
+// there is no MCP tool or other in-band enforcement — so a missing or
+// malformed block is treated as an infrastructure failure (`failReviewRun`),
+// never a fabricated verdict. Only blocking findings are ever emitted (style/
+// preference/speculative feedback is suppressed by the reviewer's own
+// instructions), so every finding requires its defect/evidence/impact/
+// requestedChange — there is no `severity` field here, unlike the general-
+// purpose `reviewFindingInputSchema` findings map into.
+export const reviewerFindingSchema = z
+  .object({
+    defect: z.string().min(1),
+    evidence: z.string().min(1),
+    impact: z.string().min(1),
+    requestedChange: z.string().min(1),
+    filePath: z.string().nullable().optional(),
+    line: z.number().int().positive().nullable().optional(),
+  })
+  .strict()
+
+export type ReviewerFinding = z.infer<typeof reviewerFindingSchema>
+
+export const reviewerStructuredOutputSchema = z
+  .object({
+    verdict: z.enum(["approved", "changes_requested", "commented"]),
+    summary: z.string().nullable().optional(),
+    findings: z.array(reviewerFindingSchema).default([]),
+  })
+  .strict()
+  // "Blocking-only findings": an approved verdict alongside a nonempty
+  // findings list is self-contradictory raw model output, not just an
+  // unusual one — treated the same as a malformed block (schema-invalid,
+  // infrastructure failure) rather than silently accepted.
+  .refine((value) => value.verdict !== "approved" || value.findings.length === 0, {
+    message: "An approved verdict must not carry any findings",
+    path: ["findings"],
+  })
+
+export type ReviewerStructuredOutput = z.infer<
+  typeof reviewerStructuredOutputSchema
+>
+
+// The full context the isolated reviewer process is given — deliberately
+// everything the spec allows and nothing more (no implementation transcript,
+// no hidden reasoning). The disposable checkout itself (and the diff
+// computed against it) travels out of band, not in this payload — see
+// `apps/gentic/src/git.ts`'s `cloneRepoAtSha`/`diffAgainstBase`.
+export const reviewRunContextResponseSchema = z.object({
+  issue: z.object({
+    code: z.string(),
+    title: z.string().nullable(),
+    body: z.string().nullable(),
+  }),
+  attachments: z.array(attachmentSchema),
+  repo: z.string(),
+  reviewerProvider: agentProviderSchema,
+  reviewerModel: issueModelSchema,
+  reviewerInstructions: z.string().nullable(),
+  pullRequest: z.object({
+    url: z.string().url(),
+    headSha: z.string(),
+    ciState: z.enum(["unknown", "pending", "success", "failure"]),
+    title: z.string().nullable(),
+    body: z.string().nullable(),
+    baseRef: z.string().nullable(),
+    baseSha: z.string().nullable(),
+  }),
+})
+
+export type ReviewRunContext = z.infer<typeof reviewRunContextResponseSchema>
+
+// `seq` is assigned client-side by the worker (a single incrementing counter
+// per review run, mirroring the `eventSeq` pattern `session.ts`'s `runTurn`
+// already uses for Issue chat) rather than computed server-side — a review
+// run has exactly one worker appending to it at a time, so there's no
+// concurrent-writer race to resolve.
+export const reviewRunLogInputSchema = z
+  .object({
+    seq: z.number().int().positive(),
+    role: z.enum(["assistant", "system"]),
+    content: z.string().min(1),
+  })
+  .strict()
+
+export type ReviewRunLogInput = z.infer<typeof reviewRunLogInputSchema>

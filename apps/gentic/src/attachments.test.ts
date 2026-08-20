@@ -23,6 +23,28 @@ function apiWithAttachments(
     async failReviewRun() {
       return { retried: false }
     },
+    async completeReviewRun() {
+      return {
+        reviewAttemptId: null,
+        reviewCycleId: null,
+        issueId: null,
+        attemptNumber: null,
+        cycleState: null,
+        accepted: false,
+      }
+    },
+    async fetchReviewRunContext() {
+      throw new Error("not implemented")
+    },
+    async fetchReviewRunRealtimeToken() {
+      return {
+        url: "http://127.0.0.1",
+        apiKey: "key",
+        token: "token",
+        expiresAt: new Date().toISOString(),
+      }
+    },
+    async appendReviewRunLog() {},
     async setRunState() {},
     async finishRun() {
       return { finished: true, status: "waiting-for-input" }
