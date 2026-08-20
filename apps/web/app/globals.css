@@ -170,6 +170,16 @@
     @apply min-w-0 text-sm leading-6;
   }
 
+  /* Not everything we render through the markdown pipeline was *written* as
+     markdown — plenty of issue bodies and chat turns are plain text where a
+     newline is meant as a line break. Markdown would fold those into one
+     paragraph, so keep them, the way GitHub's comment renderer does. Declared
+     on the paragraph itself because Streamdown puts `whitespace-normal` on its
+     root, which would otherwise win by inheritance. */
+  .chat-markdown p {
+    @apply whitespace-pre-wrap;
+  }
+
   .chat-markdown [data-streamdown="heading-1"] {
     @apply mt-4 mb-2 text-lg leading-snug;
   }
@@ -183,6 +193,13 @@
   .chat-markdown [data-streamdown="heading-5"],
   .chat-markdown [data-streamdown="heading-6"] {
     @apply mt-3 mb-1.5 text-sm leading-snug;
+  }
+
+  /* Streamdown's root already zeroes the leading block's top margin, but the
+     heading rules above outrank it on specificity and hand the margin back —
+     which shows up as a gap above a body that opens with a heading. */
+  .chat-markdown > [data-streamdown]:first-child {
+    @apply mt-0;
   }
 
   .chat-markdown [data-streamdown="code-block"],

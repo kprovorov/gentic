@@ -31,6 +31,22 @@ describe("IssueRequestBody", () => {
     expect(screen.getByText("screenshot.png")).toBeInTheDocument()
   })
 
+  it("renders the body as markdown rather than raw source", () => {
+    render(
+      <IssueRequestBody
+        body={"## Outcome\n\nShip it.\n\n- first\n- second"}
+        attachments={[]}
+      />
+    )
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Outcome" })
+    ).toBeInTheDocument()
+    expect(screen.getByRole("list")).toBeInTheDocument()
+    expect(screen.getAllByRole("listitem")).toHaveLength(2)
+    expect(screen.queryByText(/## Outcome/)).not.toBeInTheDocument()
+  })
+
   it("still shows the request when the body is empty", () => {
     render(<IssueRequestBody body={null} attachments={[attachment]} />)
 
