@@ -8,6 +8,11 @@
 -- the whole reset rolled back — the user confirmed the dialog and nothing
 -- changed.
 --
+-- Renumbered from 20260819140000: it landed in the same minute as
+-- 20260819140000_add_review_job_claiming.sql, and two files sharing a version
+-- make `supabase_migrations.schema_migrations` reject the second one on its
+-- primary key, aborting the whole push before this fix could apply.
+--
 -- Same body as the Spec version, minus the dropped column. Associated Pull
 -- Requests are still deleted on purpose: a reset starts a fresh agent
 -- conversation and a fresh association lifecycle (review cycles hang off
