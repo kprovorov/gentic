@@ -6,6 +6,7 @@ import {
   bulkUpdateIssueStatus,
   recordUnpublishedAgentChanges,
   requestAutomaticPrPublish,
+  resetIssueAgent,
   updateIssuePriority,
   updateIssueStatus,
   updateIssueStatusByPrUrl,
@@ -151,6 +152,8 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
   private upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {}
   private wantsSingle = false
   private wantsSelectAfterWrite = false
+  private ordering: { column: string; ascending: boolean } | null = null
+  private rowLimit: number | null = null
 
   constructor(
     private readonly table: TableName,
@@ -171,6 +174,16 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
 
   in(col: string, vals: unknown[]) {
     this.filters.push({ type: "in", column: col, values: vals })
+    return this
+  }
+
+  order(column: string, opts: { ascending?: boolean } = {}) {
+    this.ordering = { column, ascending: opts.ascending ?? true }
+    return this
+  }
+
+  limit(count: number) {
+    this.rowLimit = count
     return this
   }
 
@@ -277,9 +290,23 @@ class EventLogQuery implements PromiseLike<{ data: unknown; error: null }> {
       // mutating the row in place can't retroactively change a value already
       // read out by an earlier `.select()` (e.g. the "from" status captured
       // before an update).
-      const matched = this.rows()
+      let matched = this.rows()
         .filter((row) => this.matches(row))
         .map((row) => this.selected(row))
+      if (this.ordering) {
+        const { column, ascending } = this.ordering
+        matched = matched.toSorted((left, right) =>
+          String(left?.[column] ?? "").localeCompare(
+            String(right?.[column] ?? "")
+          )
+        )
+        if (!ascending) {
+          matched.reverse()
+        }
+      }
+      if (this.rowLimit !== null) {
+        matched = matched.slice(0, this.rowLimit)
+      }
       return {
         data: this.wantsSingle ? (matched[0] ?? null) : matched,
         error: null,
@@ -358,7 +385,59 @@ class EventLogSupabase {
         args as { p_issue_id: string; p_run_id: string; p_content: string }
       )
     }
+    if (name === "reset_issue_run") {
+      this.resetIssueRun(
+        args as {
+          p_issue_id: string
+          p_agent_provider: string
+          p_issue_model?: string
+        }
+      )
+    }
     return Promise.resolve({ data: null, error: null })
+  }
+
+  // Mirrors 20260819150000_fix_reset_issue_run_dropped_pr_url.sql: the
+  // transcript and pull-request links go, the run columns are cleared, and a
+  // fresh kickoff message opens the new conversation.
+  private resetIssueRun(args: {
+    p_issue_id: string
+    p_agent_provider: string
+    p_issue_model?: string
+  }) {
+    this.db.messages = this.db.messages.filter(
+      (row) => row.issue_id !== args.p_issue_id
+    )
+    this.db.issue_pull_requests = this.db.issue_pull_requests.filter(
+      (row) => row.issue_id !== args.p_issue_id
+    )
+
+    const issue = this.db.issues.find((row) => row.id === args.p_issue_id)
+    if (issue) {
+      Object.assign(issue, {
+        status: "todo",
+        agent_provider: args.p_agent_provider,
+        issue_model: args.p_issue_model ?? null,
+        session_id: null,
+        active_run_id: null,
+        active_worker_id: null,
+        run_error: null,
+        run_started_at: null,
+        run_finished_at: null,
+        usage_limit_reset_at: null,
+      })
+    }
+
+    this.db.messages.push({
+      id: "kickoff-message",
+      issue_id: args.p_issue_id,
+      role: "user",
+      kind: "text",
+      content: "Work on Gentic issue GEN-1.",
+      status: "complete",
+      author_type: "gentic",
+      created_at: new Date().toISOString(),
+    })
   }
 
   // Mirrors the `request_automatic_pr_publish` migration: the active-run
@@ -1247,4 +1326,65 @@ test("a later active run can request automatic PR publishing again once no PR ex
   assert.equal(second.created, true)
   assert.notEqual(second.requestId, first.requestId)
   assert.equal(db.issue_automatic_pr_requests.length, 2)
+})
+
+// A reset wipes the transcript, but nothing stops the worker that owns the
+// active run — it keeps broadcasting into the issue's realtime channel long
+// after its writes start getting refused. Naming the run it discarded is what
+// lets the open tab ignore those late events instead of rebuilding the
+// conversation the user just deleted.
+test("resetIssueAgent reports the run it discarded", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-reset",
+      status: "in-progress",
+      active_run_id: "run-1",
+      active_worker_id: "worker-1",
+    })
+  )
+  db.messages.push({
+    id: "assistant-1",
+    issue_id: "issue-reset",
+    role: "assistant",
+    content: "Half-finished thought",
+    created_at: "2026-08-20T10:00:00.000Z",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  const reset = await resetIssueAgent(
+    supabase as never,
+    "user-1",
+    "issue-reset",
+    "claude_code",
+    "claude-opus-5"
+  )
+
+  assert.deepEqual(reset.discardedRunIds, ["run-1"])
+  assert.equal(reset.message.author_type, "gentic")
+  assert.deepEqual(
+    db.messages.map((message) => message.id),
+    ["kickoff-message"]
+  )
+  assert.equal(db.issues[0]?.active_run_id, null)
+})
+
+// With no run in flight there is nothing broadcasting, so an empty list keeps
+// the chat from blocking the run that is about to start.
+test("resetIssueAgent discards nothing when no run is active", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({ id: "issue-idle", status: "run-failed", active_run_id: null })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  const reset = await resetIssueAgent(
+    supabase as never,
+    "user-1",
+    "issue-idle",
+    "claude_code",
+    null
+  )
+
+  assert.deepEqual(reset.discardedRunIds, [])
 })

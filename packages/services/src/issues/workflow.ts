@@ -26,16 +26,30 @@ import {
   type UserChatMessage,
 } from "./shared"
 
+/**
+ * The wiped transcript plus the runs it belonged to. A reset clears the
+ * conversation in the database but cannot stop the worker process that owns the
+ * active run: it keeps streaming `message` broadcasts on the issue's realtime
+ * channel. Those broadcasts are refused by the agent API — the run is no longer
+ * active, so they never become rows — but the browser applies every broadcast
+ * it receives, which repopulates the transcript the reset just cleared.
+ * Reporting the discarded run lets the open tab turn its late events away.
+ */
+export type IssueAgentReset = {
+  message: UserChatMessage
+  discardedRunIds: string[]
+}
+
 export async function resetIssueAgent(
   supabase: Supabase,
   userId: string,
   id: string,
   agentProvider: AgentProvider,
   issueModel: IssueModel
-): Promise<UserChatMessage> {
+): Promise<IssueAgentReset> {
   const { data: current, error: fetchError } = await supabase
     .from("issues")
-    .select("agent_provider,type,projects!inner(user_id)")
+    .select("agent_provider,type,active_run_id,projects!inner(user_id)")
     .eq("id", id)
     .eq("projects.user_id", userId)
     .maybeSingle()
@@ -61,7 +75,7 @@ export async function resetIssueAgent(
     })
   )
 
-  return unwrap(
+  const message = unwrap(
     await supabase
       .from("messages")
       .select(
@@ -73,6 +87,13 @@ export async function resetIssueAgent(
       .limit(1)
       .single<UserChatMessage>()
   )
+
+  // Only the run that was active can still be broadcasting: a worker that went
+  // silent long enough to lose its lease is not producing events either.
+  return {
+    message,
+    discardedRunIds: current.active_run_id ? [current.active_run_id] : [],
+  }
 }
 
 export async function updateIssueStatus(

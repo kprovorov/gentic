@@ -288,7 +288,7 @@ export async function resetIssueAgent(formData: FormData) {
   const issueModel = getIssueModel(formData)
   validateIssueModelForAgent(agentProvider, issueModel)
 
-  const message = await issuesService.resetIssueAgent(
+  const reset = await issuesService.resetIssueAgent(
     supabase,
     userId,
     id,
@@ -298,7 +298,7 @@ export async function resetIssueAgent(formData: FormData) {
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, id)
 
-  return message
+  return reset
 }
 
 export async function updateIssueStatus(formData: FormData) {

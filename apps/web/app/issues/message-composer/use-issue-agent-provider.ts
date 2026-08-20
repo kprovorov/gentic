@@ -24,7 +24,7 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
 
   const resetMutation = useMutation({
     mutationFn: resetIssueAgent,
-    onSuccess: async (message) => {
+    onSuccess: async ({ message, discardedRunIds }) => {
       window.dispatchEvent(
         new CustomEvent<IssueRetryResetEventDetail>(ISSUE_RETRY_RESET_EVENT, {
           detail: {
@@ -33,6 +33,7 @@ export function useIssueAgentProvider({ issueId }: { issueId: string }) {
             status: "todo",
             usageLimitResetAt: null,
             pullRequests: [],
+            discardedRunIds,
           },
         })
       )
