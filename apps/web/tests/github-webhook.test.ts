@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
 import test from "node:test"
 
+import { buildReviewMarker } from "../lib/review-marker"
 import {
   getWorkflowRunPullNumbers,
   handleGithubWebhookRequest,
@@ -385,7 +386,11 @@ function noFeedbackIssueSupabase() {
 
 test("a genuine human changes-requested review supersedes an in-flight automatic cycle", async () => {
   const recorder = pullRequestServiceRecorder(
-    { outcome: "already_associated", issueId: "issue-42", statusChanged: false },
+    {
+      outcome: "already_associated",
+      issueId: "issue-42",
+      statusChanged: false,
+    },
     { isAutomatedReview: false }
   )
 
@@ -422,7 +427,11 @@ test("a genuine human changes-requested review supersedes an in-flight automatic
 
 test("our own automated review echoed back through the webhook does not supersede its cycle", async () => {
   const recorder = pullRequestServiceRecorder(
-    { outcome: "already_associated", issueId: "issue-42", statusChanged: false },
+    {
+      outcome: "already_associated",
+      issueId: "issue-42",
+      statusChanged: false,
+    },
     { isAutomatedReview: true }
   )
 
@@ -453,6 +462,196 @@ test("our own automated review echoed back through the webhook does not supersed
   assert.equal(response.status, 200)
   assert.deepEqual(recorder.knownReviewAttemptChecks, [9003])
   assert.deepEqual(recorder.supersessions, [])
+})
+
+test("a review body carrying the Gentic marker is recognized without a database lookup", async () => {
+  // `isAutomatedReview: false` proves recognition came from the marker, not
+  // from the (deliberately wrong) mocked DB answer.
+  const recorder = pullRequestServiceRecorder(
+    {
+      outcome: "already_associated",
+      issueId: "issue-42",
+      statusChanged: false,
+    },
+    { isAutomatedReview: false }
+  )
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9004,
+        state: "changes_requested",
+        body: `Automated findings\n\n${buildReviewMarker("review-run-1")}`,
+        user: { login: "gentic-reviewer" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: noFeedbackIssueSupabase() as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(recorder.knownReviewAttemptChecks, [])
+  assert.deepEqual(recorder.supersessions, [])
+})
+
+// `applyChangesRequestedReview` inserts a Gentic-authored follow-up message
+// and requeues the Issue to `todo` (packages/services/src/issues/chat.ts).
+// Built for plain human review feedback, before Automatic Review existed —
+// without the marker/isKnownReviewAttempt gate, our own bot's echoed review
+// would also flow through here, requeuing the Issue a second time and
+// racing the automatic-review lifecycle's own status transition for the
+// same verdict (GEN-416).
+function feedbackIssueSupabase(options: { autoRespond: boolean }) {
+  const messages: Record<string, unknown>[] = []
+  const statusUpdates: Record<string, unknown>[] = []
+
+  return {
+    supabase: {
+      from(table: string) {
+        if (table === "issue_pull_requests") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve({
+                    data: { issue_id: "issue-42" },
+                    error: null,
+                  }),
+              }),
+            }),
+          }
+        }
+        if (table === "issues") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve({
+                    data: {
+                      id: "issue-42",
+                      projects: {
+                        auto_respond_to_reviews: options.autoRespond,
+                      },
+                    },
+                    error: null,
+                  }),
+              }),
+            }),
+            update: (fields: Record<string, unknown>) => ({
+              eq: () => ({
+                eq: () => {
+                  statusUpdates.push(fields)
+                  return Promise.resolve({ data: null, error: null })
+                },
+              }),
+            }),
+          }
+        }
+        if (table === "messages") {
+          return {
+            insert: (row: Record<string, unknown>) => {
+              messages.push(row)
+              return Promise.resolve({ error: null })
+            },
+          }
+        }
+        throw new Error(`Unexpected table in feedbackIssueSupabase: ${table}`)
+      },
+    },
+    messages,
+    statusUpdates,
+  }
+}
+
+test("a genuine human changes-requested review requeues the issue via applyChangesRequestedReview", async () => {
+  const recorder = pullRequestServiceRecorder(
+    {
+      outcome: "already_associated",
+      issueId: "issue-42",
+      statusChanged: false,
+    },
+    { isAutomatedReview: false }
+  )
+  const feedback = feedbackIssueSupabase({ autoRespond: true })
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9005,
+        state: "changes_requested",
+        body: "Please fix this",
+        user: { login: "alice" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: feedback.supabase as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(feedback.messages.length, 1)
+  assert.equal(feedback.statusUpdates.length, 1)
+})
+
+test("our own automated review echoed back does not requeue the issue via applyChangesRequestedReview", async () => {
+  const recorder = pullRequestServiceRecorder(
+    {
+      outcome: "already_associated",
+      issueId: "issue-42",
+      statusChanged: false,
+    },
+    { isAutomatedReview: true }
+  )
+  const feedback = feedbackIssueSupabase({ autoRespond: true })
+
+  const response = await handleGithubWebhookRequest(
+    signedWebhook("pull_request_review", {
+      action: "submitted",
+      installation: { id: 12345 },
+      repository: { name: "base", owner: { login: "acme" } },
+      review: {
+        id: 9006,
+        state: "changes_requested",
+        body: `Automated findings\n\n${buildReviewMarker("review-run-2")}`,
+        user: { login: "gentic-reviewer" },
+      },
+      pull_request: {
+        html_url: "https://github.com/acme/base/pull/42",
+        number: 42,
+      },
+    }),
+    {
+      webhookSecret,
+      supabase: feedback.supabase as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(feedback.messages, [])
+  assert.deepEqual(feedback.statusUpdates, [])
 })
 
 test("isPullRequestIssue recognizes PR issue_comment payloads", () => {

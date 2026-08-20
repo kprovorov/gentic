@@ -13,6 +13,7 @@ import {
   fetchPullRequestSnapshot,
   resolvePullRequestState,
 } from "@/lib/github-app"
+import { hasGenticReviewMarker } from "@/lib/review-marker"
 
 export const runtime = "nodejs"
 
@@ -696,30 +697,47 @@ async function handlePullRequestReviewEvent(
     payload.review.state === "changes_requested"
   ) {
     // Our own automated reviewer posts its verdict as a normal GitHub review
-    // too, so this webhook echoes it back. Only a review we didn't already
-    // record ourselves is a genuine human decision that should immediately
-    // supersede an in-flight automatic run/cycle — otherwise this would
-    // incorrectly cancel the cycle `completeReviewAttempt` just recorded.
-    try {
-      const isAutomated = await services.isKnownReviewAttempt(
-        supabase,
-        payload.review.id
-      )
-      if (!isAutomated) {
+    // too, so this webhook echoes it back. Everything below this point is
+    // for a genuine human decision only — both branches would otherwise
+    // misfire on our own echo: superseding a cycle `completeReviewAttempt`
+    // just recorded, and (via `applyChangesRequestedReview`) requeuing the
+    // issue to `todo` as if a human asked for another pass, racing the
+    // automatic-review lifecycle's own status transition for the same
+    // verdict. The marker check (GEN-416) recognizes our own review straight
+    // from the delivered payload, so it works even if the publish call's DB
+    // write lost a race with this webhook; `isKnownReviewAttempt` is the
+    // fallback for reviews published before the marker existed.
+    let isAutomated = hasGenticReviewMarker(payload.review.body)
+    if (!isAutomated) {
+      try {
+        isAutomated = await services.isKnownReviewAttempt(
+          supabase,
+          payload.review.id
+        )
+      } catch (error) {
+        console.error(
+          "[github-webhook] failed to check known review attempt:",
+          error
+        )
+      }
+    }
+
+    if (!isAutomated) {
+      try {
         await services.supersedeActiveReviewCycle(
           supabase,
           payload.pull_request.html_url,
           "human_review"
         )
+      } catch (error) {
+        console.error(
+          "[github-webhook] failed to supersede automatic review on human changes-requested:",
+          error
+        )
       }
-    } catch (error) {
-      console.error(
-        "[github-webhook] failed to supersede automatic review on human changes-requested:",
-        error
-      )
-    }
 
-    await applyChangesRequestedReview(supabase, payload)
+      await applyChangesRequestedReview(supabase, payload)
+    }
   }
 }
 

@@ -88,10 +88,25 @@ export async function getInstallationToken(
 }
 
 export type GithubReviewComment = {
+  id: number
   path: string
   line: number | null
   diff_hunk: string
   body: string
+}
+
+// Carries the GitHub response status so callers (review-publishing.ts) can
+// classify a failed publish into a `ServiceError` code — permission,
+// validation, rate-limit, and transient errors all need distinct
+// retryability, which a bare `Error` can't express.
+export class GithubApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message)
+    this.name = "GithubApiError"
+  }
 }
 
 export type GithubInstallationRepository = {
@@ -173,6 +188,7 @@ export async function fetchPullRequestReviewComments(
   }
 
   const comments = (await response.json()) as {
+    id: number
     path: string
     line: number | null
     original_line: number | null
@@ -181,11 +197,143 @@ export async function fetchPullRequestReviewComments(
   }[]
 
   return comments.map((comment) => ({
+    id: comment.id,
     path: comment.path,
     line: comment.line ?? comment.original_line ?? null,
     diff_hunk: comment.diff_hunk,
     body: comment.body,
   }))
+}
+
+export type GithubPullRequestReview = {
+  id: number
+  body: string | null
+  state: string
+  htmlUrl: string
+  submittedAt: string | null
+}
+
+type RawPullRequestReview = {
+  id: number
+  body: string | null
+  state: string
+  html_url: string
+  submitted_at: string | null
+}
+
+function toGithubPullRequestReview(
+  raw: RawPullRequestReview
+): GithubPullRequestReview {
+  return {
+    id: raw.id,
+    body: raw.body,
+    state: raw.state,
+    htmlUrl: raw.html_url,
+    submittedAt: raw.submitted_at,
+  }
+}
+
+// Used by the automatic-review publisher to search for a review it already
+// created before deciding to create another one (see review-marker.ts) — the
+// idempotency guard that keeps a retried publish from producing a second
+// GitHub review for the same run.
+export async function fetchPullRequestReviews(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<GithubPullRequestReview[]> {
+  const token = await getInstallationToken(installationId)
+  const reviews: GithubPullRequestReview[] = []
+  let page = 1
+
+  while (true) {
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/reviews?per_page=100&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    )
+
+    if (!response.ok) {
+      throw new GithubApiError(
+        response.status,
+        `Failed to fetch pull request reviews (${response.status})`
+      )
+    }
+
+    const data = (await response.json()) as RawPullRequestReview[]
+    reviews.push(...data.map(toGithubPullRequestReview))
+
+    if (data.length < 100) {
+      break
+    }
+    page += 1
+  }
+
+  return reviews
+}
+
+export type GithubReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT"
+
+export type CreatePullRequestReviewInput = {
+  // Pins the review to the exact commit it was produced for. GitHub records
+  // this on the review; it does not itself reject a mismatch against the
+  // PR's current head, which is why the caller independently compares a
+  // freshly-fetched head SHA before ever getting here (GEN-416's "never
+  // published against a different head SHA" guarantee).
+  commitId: string
+  event: GithubReviewEvent
+  body: string
+  comments?: { path: string; line: number; body: string }[]
+}
+
+// The one call in this file with a real side effect on GitHub: submits an
+// automatic-reviewer verdict as a genuine PR review (GEN-416). Every other
+// function here only reads.
+export async function createPullRequestReview(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  input: CreatePullRequestReviewInput
+): Promise<GithubPullRequestReview> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      body: JSON.stringify({
+        commit_id: input.commitId,
+        event: input.event,
+        body: input.body,
+        comments: input.comments,
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "")
+    throw new GithubApiError(
+      response.status,
+      `Failed to create pull request review (${response.status})${detail ? `: ${detail}` : ""}`
+    )
+  }
+
+  return toGithubPullRequestReview(
+    (await response.json()) as RawPullRequestReview
+  )
 }
 
 export async function fetchPullRequestHeadSha(
