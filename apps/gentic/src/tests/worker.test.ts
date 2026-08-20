@@ -678,8 +678,15 @@ test("a review job is claimed once no implementation issue is available", async 
       config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
       // No implementation issue queued — `api.claims` stays empty.
       api.reviewRunClaims.push(claimedReviewRun("review-1"))
+      // Banning on the heartbeat alone would race the review run's own
+      // (now genuinely async — real fs calls in the fakes below) work to
+      // completion: a control poll landing between the heartbeat and
+      // `completeReviewRun` would abort the run before it finished.
+      // `completedReviewRuns.length` only ever becomes true once
+      // `processReviewRun` has actually finished, so waiting for it keeps
+      // this deterministic.
       api.controlResponse = () => ({
-        worker: { banned: api.reviewRunHeartbeats.length > 0 },
+        worker: { banned: api.completedReviewRuns.length > 0 },
         runs: [],
         review_runs: [{ review_run_id: "review-1", status: "running" }],
       })
