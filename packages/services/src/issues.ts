@@ -13,6 +13,7 @@ export { logIssueEvent, type IssueEventType } from "./issues/events"
 export {
   getIssue,
   getIssueByCode,
+  getIssueReviewPolicy,
   listBlockedIssueIds,
   listBlockingIssueIds,
   listIssuePullRequests,

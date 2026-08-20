@@ -13,6 +13,8 @@ import {
   updateIssueStatusByPrUrlIfStatus,
 } from "./workflow"
 import { createIssue, updateIssue } from "./mutations"
+import { AUTOMATIC_REVIEW_OVERRIDE_LOCKED_MESSAGE } from "./shared"
+import { ServiceError } from "../errors"
 
 type IssueRecord = { id: string; status: string }
 
@@ -662,6 +664,121 @@ test("updateIssue leaves automatic PR preference historical after a PR is attach
 
   assert.equal(issue.create_pr_automatically, true)
   assert.equal(db.issues[0]?.create_pr_automatically, true)
+})
+
+test("updateIssue persists an explicit automatic review override before a PR is attached", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({ id: "issue-review-override", automatic_review_enabled: null })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssue(
+    supabase as never,
+    "user-1",
+    "issue-review-override",
+    {
+      id: "issue-review-override",
+      title: "Updated",
+      body: "Updated body",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "medium",
+      automatic_review_enabled: true,
+    }
+  )) as unknown as Row
+
+  assert.equal(issue.automatic_review_enabled, true)
+  assert.equal(db.issues[0]?.automatic_review_enabled, true)
+})
+
+test("updateIssue leaves an omitted automatic review override untouched", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({ id: "issue-review-untouched", automatic_review_enabled: true })
+  )
+  const supabase = new EventLogSupabase(db)
+
+  await updateIssue(supabase as never, "user-1", "issue-review-untouched", {
+    id: "issue-review-untouched",
+    title: "Updated",
+    body: "Updated body",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "bug",
+    priority: "medium",
+  })
+
+  assert.equal(db.issues[0]?.automatic_review_enabled, true)
+})
+
+test("updateIssue rejects an automatic review override change after a PR is attached", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-review-locked",
+      automatic_review_enabled: false,
+    })
+  )
+  db.issue_pull_requests.push({
+    id: "pull-request-1",
+    issue_id: "issue-review-locked",
+    url: "https://github.com/acme/widget/pull/1",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  await assert.rejects(
+    updateIssue(supabase as never, "user-1", "issue-review-locked", {
+      id: "issue-review-locked",
+      title: "Updated",
+      body: "Updated body",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "medium",
+      automatic_review_enabled: true,
+    }),
+    (error: unknown) =>
+      error instanceof ServiceError &&
+      error.code === "validation" &&
+      error.message === AUTOMATIC_REVIEW_OVERRIDE_LOCKED_MESSAGE
+  )
+  assert.equal(db.issues[0]?.automatic_review_enabled, false)
+})
+
+test("updateIssue allows re-submitting the same automatic review value after a PR is attached", async () => {
+  const db = new EventLogDb()
+  db.issues.push(
+    issueRow({
+      id: "issue-review-locked-noop",
+      automatic_review_enabled: true,
+    })
+  )
+  db.issue_pull_requests.push({
+    id: "pull-request-1",
+    issue_id: "issue-review-locked-noop",
+    url: "https://github.com/acme/widget/pull/1",
+  })
+  const supabase = new EventLogSupabase(db)
+
+  const issue = (await updateIssue(
+    supabase as never,
+    "user-1",
+    "issue-review-locked-noop",
+    {
+      id: "issue-review-locked-noop",
+      title: "Updated",
+      body: "Updated body",
+      agent_provider: "claude_code",
+      issue_model: null,
+      type: "bug",
+      priority: "medium",
+      automatic_review_enabled: true,
+    }
+  )) as unknown as Row
+
+  assert.equal(issue.automatic_review_enabled, true)
 })
 
 test("updateIssue does not log priority_changed when priority is unchanged", async () => {

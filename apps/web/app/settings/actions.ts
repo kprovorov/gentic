@@ -24,6 +24,15 @@ export async function createProject(formData: FormData) {
     repo: getString(formData, "repo"),
     setup_script: getString(formData, "setup_script"),
     auto_respond_to_reviews: getCheckbox(formData, "auto_respond_to_reviews"),
+    automatic_review_enabled: getCheckbox(formData, "automatic_review_enabled"),
+    automatic_review_provider:
+      getString(formData, "automatic_review_provider") || null,
+    automatic_review_model:
+      getString(formData, "automatic_review_model") || null,
+    automatic_review_instructions: getString(
+      formData,
+      "automatic_review_instructions"
+    ),
   })
 
   const githubIntegration =
@@ -61,6 +70,15 @@ export async function updateProject(formData: FormData) {
     repo: getString(formData, "repo"),
     setup_script: getString(formData, "setup_script"),
     auto_respond_to_reviews: getCheckbox(formData, "auto_respond_to_reviews"),
+    automatic_review_enabled: getCheckbox(formData, "automatic_review_enabled"),
+    automatic_review_provider:
+      getString(formData, "automatic_review_provider") || null,
+    automatic_review_model:
+      getString(formData, "automatic_review_model") || null,
+    automatic_review_instructions: getString(
+      formData,
+      "automatic_review_instructions"
+    ),
   })
 
   await projectsService.updateProject(supabase, userId, id, project)

@@ -20,6 +20,7 @@ import {
 } from "./ownership"
 import { getIssue } from "./queries"
 import {
+  AUTOMATIC_REVIEW_OVERRIDE_LOCKED_MESSAGE,
   ISSUE_WITH_PROJECT_SELECT,
   SPEC_CONVERSION_BLOCKED_MESSAGE,
 } from "./shared"
@@ -159,7 +160,7 @@ export async function updateIssue(
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select(
-      "agent_provider, issue_model, priority, type, active_run_id, issue_pull_requests(id), projects!inner(user_id)"
+      "agent_provider, issue_model, priority, type, active_run_id, automatic_review_enabled, issue_pull_requests(id), projects!inner(user_id)"
     )
     .eq("id", id)
     .eq("projects.user_id", userId)
@@ -181,6 +182,17 @@ export async function updateIssue(
 
   const hasAttachedPullRequest = hasAttachedIssuePullRequest(current)
 
+  if (
+    hasAttachedPullRequest &&
+    input.automatic_review_enabled !== undefined &&
+    input.automatic_review_enabled !== current.automatic_review_enabled
+  ) {
+    throw new ServiceError(
+      "validation",
+      AUTOMATIC_REVIEW_OVERRIDE_LOCKED_MESSAGE
+    )
+  }
+
   const { data: issue, error: updateError } = await supabase
     .from("issues")
     .update({
@@ -192,6 +204,9 @@ export async function updateIssue(
       priority: input.priority,
       ...(input.create_pr_automatically !== undefined && !hasAttachedPullRequest
         ? { create_pr_automatically: input.create_pr_automatically }
+        : {}),
+      ...(input.automatic_review_enabled !== undefined
+        ? { automatic_review_enabled: input.automatic_review_enabled }
         : {}),
       ...(current.agent_provider !== input.agent_provider ||
       current.issue_model !== input.issue_model

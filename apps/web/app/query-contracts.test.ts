@@ -25,6 +25,7 @@ const issueRow = {
   run_started_at: null,
   has_unpublished_agent_changes: false,
   create_pr_automatically: true,
+  automatic_review_enabled: null,
   issue_pull_requests: [
     {
       id: "pull-request-1",
@@ -84,6 +85,10 @@ const issueRow = {
     name: "Gentic",
     repo: "acme/gentic",
     key: "GEN",
+    automatic_review_enabled: false,
+    automatic_review_provider: null,
+    automatic_review_model: null,
+    automatic_review_instructions: null,
   },
 }
 
@@ -130,6 +135,13 @@ test("edit issue query contract parses and maps priority", () => {
   assert.equal(issue.create_pr_automatically, true)
   assert.equal(issue.has_attached_pull_request, false)
   assert.equal(issue.code, "GEN-7")
+  assert.equal(issue.automatic_review_enabled, null)
+  assert.deepEqual(issue.project_automatic_review, {
+    enabled: false,
+    provider: null,
+    model: null,
+    instructions: null,
+  })
 })
 
 test("edit issue query contract marks attached pull requests as historical", () => {

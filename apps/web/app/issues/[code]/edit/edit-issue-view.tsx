@@ -28,6 +28,7 @@ import { Label } from "@gentic/ui/label"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 import { AutomaticPrPreferenceField } from "../../automatic-pr-preference-field"
+import { AutomaticReviewPreferenceField } from "../../automatic-review-preference-field"
 
 export function EditIssueView({
   issueId,
@@ -179,9 +180,19 @@ export function EditIssueView({
               </div>
 
               <AutomaticPrPreferenceField
-                key={`${issue.id}-${issue.create_pr_automatically}-${issue.has_attached_pull_request}`}
+                key={`pr-${issue.id}-${issue.create_pr_automatically}-${issue.has_attached_pull_request}`}
                 defaultChecked={issue.create_pr_automatically}
                 disabled={issue.has_attached_pull_request}
+              />
+
+              <AutomaticReviewPreferenceField
+                key={`review-${issue.id}-${issue.automatic_review_enabled}-${issue.has_attached_pull_request}`}
+                defaultValue={issue.automatic_review_enabled}
+                disabled={issue.has_attached_pull_request}
+                projectDefault={issue.project_automatic_review}
+                policy={issue.automatic_review_policy}
+                effectiveAgentProvider={agentProvider}
+                effectiveIssueModel={issueModel}
               />
 
               <div className="flex justify-end gap-2">

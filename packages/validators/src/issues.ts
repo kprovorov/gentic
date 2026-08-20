@@ -181,6 +181,10 @@ export const updateIssueSchema = z.object({
   type: issueTypeSchema,
   priority: issuePrioritySchema.default(defaultIssuePriority),
   create_pr_automatically: z.boolean().optional(),
+  // Overrides the Project's Automatic Review default; null inherits it. Only
+  // mutable before the Issue's first pull request is associated — enforced by
+  // a DB trigger, see `enforce_issue_review_override_immutable`.
+  automatic_review_enabled: z.boolean().nullable().optional(),
 })
 
 export type UpdateIssueValues = z.infer<typeof updateIssueSchema>

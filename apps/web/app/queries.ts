@@ -12,6 +12,7 @@ import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
 import * as workersService from "@gentic/services/workers"
 import { ServiceError } from "@gentic/services/errors"
+import type { AgentProvider } from "@gentic/validators/issues"
 import {
   chatMessageSchema,
   issueEventSchema,
@@ -27,6 +28,7 @@ import {
   toHomeIssue,
   toIssueDetail,
   toIssueEdit,
+  toIssueReviewPolicySnapshot,
   type HomeIssue,
   type AssignedIssueLabel,
   type IssueDetail,
@@ -64,6 +66,10 @@ export type { HomeIssue, IssueDetail, IssueEdit, ProjectOption }
 export type SettingsProject = ProjectOption & {
   setup_script: string | null
   auto_respond_to_reviews: boolean
+  automatic_review_enabled: boolean
+  automatic_review_provider: AgentProvider | null
+  automatic_review_model: string | null
+  automatic_review_instructions: string | null
 }
 
 export type GithubRepositoryOption = {
@@ -240,6 +246,11 @@ export async function getSettingsData(
       key: project.key,
       setup_script: project.setup_script,
       auto_respond_to_reviews: project.auto_respond_to_reviews,
+      automatic_review_enabled: project.automatic_review_enabled,
+      automatic_review_provider:
+        project.automatic_review_provider as AgentProvider | null,
+      automatic_review_model: project.automatic_review_model,
+      automatic_review_instructions: project.automatic_review_instructions,
     })),
     workers,
     githubIntegration,
@@ -291,11 +302,11 @@ export async function getIssueEditData(
   id: string,
   context?: AuthenticatedContext
 ): Promise<IssueEdit> {
-  const { supabase } = await resolveContext(context)
+  const { supabase, userId } = await resolveContext(context)
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,body,agent_provider,issue_model,type,priority,create_pr_automatically,issue_pull_requests(id),projects(id,name,repo,key)"
+      "id,number,title,body,agent_provider,issue_model,type,priority,create_pr_automatically,automatic_review_enabled,issue_pull_requests(id),projects(id,name,repo,key,automatic_review_enabled,automatic_review_provider,automatic_review_model,automatic_review_instructions)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -308,7 +319,12 @@ export async function getIssueEditData(
     throw new QueryNotFoundError("Issue not found")
   }
 
-  return toIssueEdit(issueEditSchema.parse(issue))
+  const policy = await issuesService.getIssueReviewPolicy(supabase, userId, id)
+
+  return toIssueEdit(
+    issueEditSchema.parse(issue),
+    toIssueReviewPolicySnapshot(policy)
+  )
 }
 
 export async function getIssueEditDataByCode(
@@ -317,18 +333,25 @@ export async function getIssueEditDataByCode(
   context?: AuthenticatedContext
 ): Promise<IssueEdit> {
   const { supabase, userId } = await resolveContext(context)
-  const issue = await getScopedIssueByCode(
-    supabase,
-    userId,
-    projectKey,
-    issueNumber
-  )
+  let issue
+  try {
+    issue = await issuesService.getIssueByCode(
+      supabase,
+      userId,
+      projectKey,
+      issueNumber
+    )
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "not_found") {
+      throw new QueryNotFoundError("Issue not found")
+    }
+    throw error
+  }
 
-  const pullRequests = await issuesService.listIssuePullRequests(
-    supabase,
-    userId,
-    issue.id
-  )
+  const [pullRequests, policy] = await Promise.all([
+    issuesService.listIssuePullRequests(supabase, userId, issue.id),
+    issuesService.getIssueReviewPolicy(supabase, userId, issue.id),
+  ])
 
   return toIssueEdit(
     issueEditSchema.parse({
@@ -336,7 +359,8 @@ export async function getIssueEditDataByCode(
       issue_pull_requests: pullRequests.map((pullRequest) => ({
         id: pullRequest.id,
       })),
-    })
+    }),
+    toIssueReviewPolicySnapshot(policy)
   )
 }
 

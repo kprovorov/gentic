@@ -107,6 +107,40 @@ test("updateIssueSchema preserves explicit automatic PR edits", () => {
   assert.equal(updateValues.create_pr_automatically, false)
 })
 
+test("updateIssueSchema leaves automatic_review_enabled untouched when omitted", () => {
+  const updateValues = updateIssueSchema.parse({
+    id: issueId,
+    title: "Refine issue workflow",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+  })
+
+  assert.equal(updateValues.automatic_review_enabled, undefined)
+})
+
+test("updateIssueSchema accepts an explicit automatic_review_enabled override or null to inherit", () => {
+  const enabled = updateIssueSchema.parse({
+    id: issueId,
+    title: "Refine issue workflow",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+    automatic_review_enabled: true,
+  })
+  const inherited = updateIssueSchema.parse({
+    id: issueId,
+    title: "Refine issue workflow",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+    automatic_review_enabled: null,
+  })
+
+  assert.equal(enabled.automatic_review_enabled, true)
+  assert.equal(inherited.automatic_review_enabled, null)
+})
+
 test("hasAttachedIssuePullRequest detects associated PRs", () => {
   assert.equal(
     hasAttachedIssuePullRequest({

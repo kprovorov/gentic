@@ -178,6 +178,30 @@ export async function listIssuePullRequests(
   )
 }
 
+/**
+ * The frozen Automatic Review policy for an Issue, or `null` before its first
+ * pull request has been associated (nothing has been snapshotted yet).
+ */
+export async function getIssueReviewPolicy(
+  supabase: Supabase,
+  userId: string,
+  issueId: string
+) {
+  await ensureIssueOwned(supabase, userId, issueId)
+
+  const { data, error } = await supabase
+    .from("issue_review_policies")
+    .select("issue_id,enabled,reviewer_provider,reviewer_model,reviewer_instructions,created_at")
+    .eq("issue_id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data
+}
+
 export async function listBlockedIssueIds(
   supabase: Supabase,
   issueIds: string[]
