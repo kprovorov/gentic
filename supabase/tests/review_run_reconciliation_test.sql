@@ -163,13 +163,19 @@ UPDATE public.workers
        updated_at = '2026-08-19T12:24:00Z'
  WHERE id = 'd0000000-0000-4000-8000-000000000034';
 
--- The fresh worker's heartbeat was only ever set once, back at setup time;
--- without a refresh it too would read as offline by this second, much later
--- pass and get wrongly reconciled alongside the two-strikes worker's run.
+-- The fresh worker, and the run it's holding, were only ever given a
+-- timestamp once back at setup time (`started_at`, since `heartbeat_at` was
+-- never set); without refreshing both, either one reads as offline/stale by
+-- this second, much later pass and the run gets wrongly reconciled
+-- alongside the two-strikes worker's run.
 UPDATE public.workers
    SET last_seen_at = '2026-08-19T12:29:00Z',
        updated_at = '2026-08-19T12:29:00Z'
  WHERE id = 'd0000000-0000-4000-8000-000000000032';
+
+UPDATE public.review_runs
+   SET heartbeat_at = '2026-08-19T12:29:00Z'
+ WHERE id = (SELECT review_run_id FROM claim2);
 
 SELECT is(
   public.reconcile_offline_review_runs('2026-08-19T12:30:00Z'::timestamptz),
