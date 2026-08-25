@@ -2,7 +2,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { ServiceError } from "./errors"
-import { getReviewRunContext } from "./review-context"
+import {
+  getReviewRunContext,
+  getReviewRunPublishContext,
+} from "./review-context"
 import type { Supabase } from "./types"
 
 type DbRow = Record<string, unknown>
@@ -79,6 +82,10 @@ function fakeSupabase(tables: {
 
 const reviewRunRow: DbRow = {
   id: "run-1",
+  // The frozen SHA `getReviewRunPublishContext` reads — distinct from
+  // `review_cycles.issue_pull_requests.head_sha` below, which can already
+  // have moved by the time a completed run's verdict is published.
+  head_sha: "frozen-sha-abc123",
   review_cycles: {
     issue_id: "issue-1",
     issue_pull_requests: {
@@ -169,7 +176,11 @@ test("getReviewRunContext excludes attachments outside the issue's own durable s
         deleted_at: "2026-08-05T12:30:00.000Z",
       },
       // Incomplete upload — excluded.
-      { ...activeIssueAttachment, id: "att-incomplete", upload_completed_at: null },
+      {
+        ...activeIssueAttachment,
+        id: "att-incomplete",
+        upload_completed_at: null,
+      },
       // Belongs to another issue — excluded.
       { ...activeIssueAttachment, id: "att-other", issue_id: "issue-2" },
     ],
@@ -179,6 +190,29 @@ test("getReviewRunContext excludes attachments outside the issue's own durable s
   assert.deepEqual(
     context.attachments.map((attachment) => attachment.id),
     ["att-active"]
+  )
+})
+
+test("getReviewRunPublishContext reads the run's own frozen head SHA, not the pull request's current one", async () => {
+  const supabase = fakeSupabase({ review_runs: [reviewRunRow] })
+
+  assert.deepEqual(await getReviewRunPublishContext(supabase, "run-1"), {
+    repo: "gentic/app",
+    prUrl: "https://github.com/gentic/app/pull/42",
+    headSha: "frozen-sha-abc123",
+  })
+})
+
+test("getReviewRunPublishContext throws not_found for an unknown review run", async () => {
+  const supabase = fakeSupabase({ review_runs: [] })
+
+  await assert.rejects(
+    getReviewRunPublishContext(supabase, "missing-run"),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.code, "not_found")
+      return true
+    }
   )
 })
 
@@ -211,6 +245,7 @@ test("getReviewRunContext surfaces a missing frozen policy as an internal error"
 
   await assert.rejects(
     () => getReviewRunContext(supabase, "run-1"),
-    (error: unknown) => error instanceof ServiceError && error.code === "internal"
+    (error: unknown) =>
+      error instanceof ServiceError && error.code === "internal"
   )
 })

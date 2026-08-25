@@ -1,5 +1,15 @@
-import { completeReviewAttempt } from "@gentic/services/review-lifecycle"
-import { completeReviewRunInputSchema } from "@gentic/validators/agent"
+import { getReviewRunPublishContext } from "@gentic/services/review-context"
+import {
+  completeReviewAttempt,
+  type CompleteReviewAttemptResult,
+} from "@gentic/services/review-lifecycle"
+import type { Supabase } from "@gentic/services/types"
+import {
+  completeReviewRunInputSchema,
+  type CompleteReviewRunInput,
+} from "@gentic/validators/agent"
+
+import { publishReviewVerdict } from "@/lib/review-publishing"
 
 import {
   ensureActiveReviewRunClaim,
@@ -10,10 +20,42 @@ import {
 
 export const runtime = "nodejs"
 
-// Built for API completeness alongside claim/heartbeat/fail (GEN-414 scopes
-// "completion" as an in-scope deliverable), but the worker CLI does not call
-// this yet — there is no reviewer runtime to produce a verdict from. A
-// future issue that adds one only needs to call this route.
+// Publishes the validated verdict to GitHub as a real PR review (GEN-416)
+// before recording it — `publishReviewVerdict` is the only place with GitHub
+// App credentials, since the isolated reviewer runtime (ADR-0006) is
+// deliberately denied them. `githubReviewId` always comes from that publish
+// call, never from the request body: the worker has no way to produce one
+// itself, and trusting a client-supplied id here would let a request forge
+// `review_attempts.github_review_id` (the exact value the webhook's
+// bot-echo recognition trusts).
+export async function completeReviewRun(
+  supabase: Supabase,
+  userId: string,
+  reviewRunId: string,
+  fields: CompleteReviewRunInput
+): Promise<CompleteReviewAttemptResult> {
+  const publishContext = await getReviewRunPublishContext(supabase, reviewRunId)
+
+  const published = await publishReviewVerdict(supabase, {
+    reviewRunId,
+    userId,
+    repo: publishContext.repo,
+    prUrl: publishContext.prUrl,
+    expectedHeadSha: publishContext.headSha,
+    verdict: fields.verdict,
+    summary: fields.summary ?? null,
+    findings: fields.findings ?? [],
+  })
+
+  return completeReviewAttempt(supabase, {
+    reviewRunId,
+    verdict: fields.verdict,
+    summary: fields.summary,
+    githubReviewId: published.githubReviewId,
+    findings: published.findings,
+  })
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,13 +66,7 @@ export async function PATCH(
     await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
 
     const fields = completeReviewRunInputSchema.parse(await request.json())
-    const result = await completeReviewAttempt(supabase, {
-      reviewRunId: id,
-      verdict: fields.verdict,
-      summary: fields.summary,
-      githubReviewId: fields.githubReviewId,
-      findings: fields.findings,
-    })
+    const result = await completeReviewRun(supabase, userId, id, fields)
 
     return json(result)
   } catch (error) {
