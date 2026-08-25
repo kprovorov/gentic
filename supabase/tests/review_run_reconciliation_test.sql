@@ -232,9 +232,22 @@ SELECT is(
 -- had its run reconciled, and later comes back online must be able to
 -- claim the pending retry reconciliation left behind and proceed normally
 -- -- reconciliation's job is to make the work claimable again, not just to
--- mark the old run failed. Kept in its own account/timestamp namespace so
--- it doesn't disturb the finely-tuned timeline above.
+-- mark the old run failed. Kept in its own account namespace, but
+-- `reconcile_offline_review_runs` scans every account's live runs in one
+-- pass -- the Fresh Worker's still-`running` claim2 from the scenario
+-- above was last bumped to keep it fresh as of 12:29:00Z, so it must be
+-- bumped forward again before advancing the clock this far, or this
+-- section's own reconciliation pass would also sweep it up as newly stale.
 -- ---------------------------------------------------------------------
+UPDATE public.workers
+   SET last_seen_at = '2026-08-19T13:09:00Z',
+       updated_at = '2026-08-19T13:09:00Z'
+ WHERE id = 'd0000000-0000-4000-8000-000000000032';
+
+UPDATE public.review_runs
+   SET heartbeat_at = '2026-08-19T13:09:00Z'
+ WHERE id = (SELECT review_run_id FROM claim2);
+
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('d9000000-0000-4000-8000-000000000001', 'recon_restart_user', 'Restart Project', 'gentic/restart-project', 'RST', true);
 
