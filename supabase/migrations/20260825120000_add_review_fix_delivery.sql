@@ -73,7 +73,7 @@ begin
   -- `evaluate_review_eligibility` / `supersede_active_review_cycle` racing
   -- on the same pull request (e.g. a genuine human changes-requested review
   -- landing at the same moment).
-  select issue_id into v_issue_id
+  select review_cycles.issue_id into v_issue_id
     from public.review_cycles
    where id = v_attempt.review_cycle_id;
 
@@ -89,8 +89,8 @@ begin
 
   if exists (
     select 1 from public.messages
-     where issue_id = v_issue_id
-       and review_attempt_id = p_review_attempt_id
+     where messages.issue_id = v_issue_id
+       and messages.review_attempt_id = p_review_attempt_id
   ) then
     return query select p_review_attempt_id, v_issue_id, 'already_delivered', null::text;
     return;
@@ -114,7 +114,7 @@ begin
 
   select * into v_owner
     from public.issue_implementation_owners
-   where issue_id = v_issue_id
+   where issue_implementation_owners.issue_id = v_issue_id
      and superseded_at is null;
   v_owner_found := found;
 
