@@ -260,6 +260,198 @@ test("maps pr_merged events to pr-merged items carrying the PR url", () => {
   })
 })
 
+test("maps review_queued events to review-queued items with the run id and attempt number", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_queued",
+        payload: {
+          review_cycle_id: "cycle-1",
+          review_run_id: "run-1",
+          pull_request_id: "pr-1",
+          head_sha: "sha-1",
+          attempt_number: 2,
+        },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-queued",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    reviewRunId: "run-1",
+    attemptNumber: 2,
+  })
+})
+
+test("maps review_started events to review-started items with the run id", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_started",
+        payload: { review_run_id: "run-1", review_cycle_id: "cycle-1", pull_request_id: "pr-1" },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-started",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    reviewRunId: "run-1",
+  })
+})
+
+test("maps review_approved events, distinguishing an automatic verdict from a human override", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_approved",
+        payload: {
+          review_attempt_id: "attempt-1",
+          review_cycle_id: "cycle-1",
+          pull_request_id: "pr-1",
+          attempt_number: 1,
+          source: "human_override",
+        },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-approved",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    source: "human_override",
+    attemptNumber: 1,
+  })
+})
+
+test("maps review_changes_requested events with verdict and findings count", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_changes_requested",
+        payload: {
+          review_attempt_id: "attempt-1",
+          review_cycle_id: "cycle-1",
+          pull_request_id: "pr-1",
+          attempt_number: 2,
+          verdict: "changes_requested",
+          findings_count: 3,
+        },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-changes-requested",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    verdict: "changes_requested",
+    findingsCount: 3,
+    attemptNumber: 2,
+  })
+})
+
+test("maps review_failed events, distinguishing a retried infra failure from a stopped one", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_failed",
+        payload: {
+          review_run_id: "run-1",
+          review_cycle_id: "cycle-1",
+          pull_request_id: "pr-1",
+          error: "boom",
+          retried: false,
+        },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-failed",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    reviewRunId: "run-1",
+    retried: false,
+  })
+})
+
+test("maps review_superseded events with the supersede reason", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_superseded",
+        payload: {
+          review_cycle_id: "cycle-1",
+          pull_request_id: "pr-1",
+          reason: "human_review",
+        },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-superseded",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+    reason: "human_review",
+  })
+})
+
+test("maps review_fix_delivered events to a review-fix-delivered item", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "review_fix_delivered",
+        payload: { review_attempt_id: "attempt-1", message_id: "message-1" },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "review-fix-delivered",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+  })
+})
+
+test("maps implementation_ownership_reset events to an implementation-ownership-reset item", () => {
+  const [, item] = buildIssueTimeline({
+    issue,
+    messages: [],
+    events: [
+      event({
+        type: "implementation_ownership_reset",
+        payload: { generation: 2, origin: "fresh_implementation" },
+      }),
+    ],
+  })
+
+  assert.deepEqual(item, {
+    kind: "implementation-ownership-reset",
+    key: "event-1",
+    timestamp: "2026-07-01T00:10:00.000Z",
+  })
+})
+
 test("falls back to a status-milestone for unrecognized event types instead of dropping them", () => {
   const [, item] = buildIssueTimeline({
     issue,

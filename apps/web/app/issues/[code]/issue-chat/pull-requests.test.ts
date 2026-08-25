@@ -20,12 +20,18 @@ test("mergePullRequest replaces existing PRs and sorts new ones newest first", (
     issue_id: "issue",
     url: "https://github.com/acme/widget/pull/1",
     created_at: "2026-07-01",
+    head_sha: null,
+    ci_state: "unknown",
+    review_decision: "unknown",
   }
   const newer = {
     id: "2",
     issue_id: "issue",
     url: "https://github.com/acme/widget/pull/2",
     created_at: "2026-07-02",
+    head_sha: null,
+    ci_state: "unknown",
+    review_decision: "unknown",
   }
 
   assert.deepEqual(

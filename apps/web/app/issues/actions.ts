@@ -33,6 +33,7 @@ import {
 } from "@gentic/services/attachments"
 import { ServiceError } from "@gentic/services/errors"
 import * as issuesService from "@gentic/services/issues"
+import * as reviewLifecycleService from "@gentic/services/review-lifecycle"
 import type { Supabase } from "@gentic/services/types"
 import { createServiceClient } from "@gentic/supabase/service"
 
@@ -303,6 +304,53 @@ export async function resetIssueAgent(formData: FormData) {
   return reset
 }
 
+// Automatic Review recovery controls (GEN-419). Each wraps an RPC that
+// already enforces its own ownership/state checks (`retry_review_run`,
+// `continue_with_human_review`, `start_fresh_implementation`); the actions
+// here are just the Clerk-authenticated entry points plus cache revalidation.
+export async function retryReviewRunAction(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = getUuid(formData, "issue_id")
+  const reviewCycleId = getUuid(formData, "review_cycle_id")
+
+  const result = await reviewLifecycleService.retryReviewRun(
+    supabase,
+    userId,
+    reviewCycleId
+  )
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, issueId)
+  return result
+}
+
+export async function continueWithHumanReviewAction(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = getUuid(formData, "issue_id")
+
+  const result = await reviewLifecycleService.continueWithHumanReview(
+    supabase,
+    userId,
+    issueId
+  )
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, issueId)
+  return result
+}
+
+export async function startFreshImplementationAction(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = getUuid(formData, "issue_id")
+
+  const result = await issuesService.startFreshImplementation(
+    supabase,
+    userId,
+    issueId
+  )
+  revalidatePath("/issues")
+  await revalidateIssuePathById(supabase, userId, issueId)
+  return result
+}
+
 export async function updateIssueStatus(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const id = getUuid(formData, "id")
@@ -568,6 +616,16 @@ async function discardIssueMessage(
       error
     )
   })
+}
+
+// Fetched on demand from a Review Run's "View logs" trigger — deliberately
+// not part of the issue's normal page data (see `listReviewRunLogs`).
+export async function listReviewRunLogsAction(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const issueId = getUuid(formData, "issue_id")
+  const reviewRunId = getUuid(formData, "review_run_id")
+
+  return issuesService.listReviewRunLogs(supabase, userId, issueId, reviewRunId)
 }
 
 export async function createManualIssuePullRequest(formData: FormData) {

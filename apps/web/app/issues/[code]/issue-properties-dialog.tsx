@@ -22,7 +22,12 @@ import {
 } from "@gentic/ui/dialog"
 import { cn } from "@gentic/ui/utils"
 import { isSpecIssueType } from "@gentic/validators/issues"
-import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
+import type {
+  ImplementationOwner,
+  IssueRelation,
+  IssueRelationIssue,
+  ReviewCycle,
+} from "@gentic/services/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import type { Attachment } from "./attachments"
@@ -42,6 +47,8 @@ export function IssuePropertiesDialog({
   labels,
   attachments,
   messageAttachments,
+  reviewCycles,
+  implementationOwner,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
@@ -51,6 +58,8 @@ export function IssuePropertiesDialog({
   labels: LabelSnapshot[]
   attachments: Attachment[]
   messageAttachments: Attachment[]
+  reviewCycles: ReviewCycle[]
+  implementationOwner: ImplementationOwner | null
 }) {
   const isSpec = isSpecIssueType(issue.type)
 
@@ -103,6 +112,8 @@ export function IssuePropertiesDialog({
             labels={labels}
             attachments={attachments}
             messageAttachments={messageAttachments}
+            reviewCycles={reviewCycles}
+            implementationOwner={implementationOwner}
           />
         </div>
       </DialogContent>

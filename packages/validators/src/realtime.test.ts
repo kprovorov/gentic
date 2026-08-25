@@ -195,6 +195,85 @@ test("issueEventSchema rejects malformed labels_changed payloads", () => {
   )
 })
 
+test("issueEventSchema parses review_queued payloads", () => {
+  const row = {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+    type: "review_queued",
+    payload: {
+      review_cycle_id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3",
+      review_run_id: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4",
+      pull_request_id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c5",
+      head_sha: "abc123",
+      attempt_number: 1,
+    },
+    created_at: "2026-08-25T12:00:00.000Z",
+  }
+
+  assert.deepEqual(issueEventSchema.parse(row), row)
+})
+
+test("issueEventSchema rejects malformed review_queued payloads", () => {
+  assert.throws(() =>
+    issueEventSchema.parse({
+      id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+      issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+      type: "review_queued",
+      payload: { attempt_number: 0 },
+      created_at: "2026-08-25T12:00:00.000Z",
+    })
+  )
+})
+
+test("issueEventSchema parses review_changes_requested payloads", () => {
+  const row = {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+    type: "review_changes_requested",
+    payload: {
+      review_attempt_id: "5f14e45f-ceea-467e-b7ea-05a3e2b3f4c3",
+      review_cycle_id: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4",
+      pull_request_id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c5",
+      attempt_number: 2,
+      verdict: "changes_requested",
+      findings_count: 3,
+    },
+    created_at: "2026-08-25T12:00:00.000Z",
+  }
+
+  assert.deepEqual(issueEventSchema.parse(row), row)
+})
+
+test("issueEventSchema parses review_approved payloads with a null attempt (human override)", () => {
+  const row = {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+    type: "review_approved",
+    payload: {
+      review_attempt_id: null,
+      review_cycle_id: "6f14e45f-ceea-467e-b7ea-05a3e2b3f4c4",
+      pull_request_id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c5",
+      attempt_number: null,
+      source: "human_override",
+    },
+    created_at: "2026-08-25T12:00:00.000Z",
+  }
+
+  assert.deepEqual(issueEventSchema.parse(row), row)
+})
+
+test("issueEventSchema parses implementation_ownership_reset payloads", () => {
+  const row = {
+    id: "8f14e45f-ceea-467e-b7ea-05a3e2b3f4c1",
+    issue_id: "3f14e45f-ceea-467e-b7ea-05a3e2b3f4c2",
+    type: "implementation_ownership_reset",
+    payload: { generation: 2, origin: "fresh_implementation" },
+    created_at: "2026-08-25T12:00:00.000Z",
+  }
+
+  assert.deepEqual(issueEventSchema.parse(row), row)
+})
+
 test("issueEventSchema rejects rows missing required fields", () => {
   assert.throws(() =>
     issueEventSchema.parse({

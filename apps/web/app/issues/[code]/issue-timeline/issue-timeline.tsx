@@ -8,6 +8,7 @@ import {
   IconCheck,
   IconChecks,
   IconChevronDown,
+  IconClock,
   IconFilePlus,
   IconGitMerge,
   IconGitPullRequest,
@@ -16,12 +17,18 @@ import {
   IconAlertTriangle,
   IconArrowDown,
   IconArrowUp,
+  IconMessage2,
   IconMinus,
+  IconRefresh,
+  IconRobot,
+  IconSend,
   IconSparkles,
   IconTag,
   IconTagFilled,
+  IconThumbUp,
   IconTool,
   IconUserCircle,
+  IconX,
 } from "@tabler/icons-react"
 
 import { AttachmentPreviews } from "../attachments"
@@ -39,6 +46,8 @@ import {
   statusStyles,
 } from "../../issue-status-meta"
 import { priorityIconStyles } from "../../issues-columns"
+import { REVIEW_ATTEMPT_BUDGET } from "../../review-state-meta"
+import { ReviewRunLogsTrigger } from "../review-run-logs-panel"
 import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
   Collapsible,
@@ -83,11 +92,16 @@ const priorityIcons = {
 } satisfies Record<IssuePriority, typeof IconAlertTriangle>
 
 export function IssueTimeline({
+  issueId,
   items,
   archivedLabelIds,
   currentUserName,
   currentUserImageUrl,
 }: {
+  // Only needed to scope the Automatic Review "View logs" trigger — every
+  // other item kind renders from `items` alone, and a review event renders
+  // fine without it (just without the trigger).
+  issueId?: string
   items: TimelineItem[]
   // Label ids that are archived today. Historical event snapshots keep the
   // label's name and color so the entry stays readable; these ids tell the
@@ -104,11 +118,12 @@ export function IssueTimeline({
   const rows = useMemo(() => {
     const displayItems = groupTimelineItems(items)
     return buildTimelineRows(displayItems, {
+      issueId,
       archivedLabelIds: archivedLabelIdSet,
       currentUserName,
       currentUserImageUrl,
     })
-  }, [items, archivedLabelIdSet, currentUserName, currentUserImageUrl])
+  }, [items, issueId, archivedLabelIdSet, currentUserName, currentUserImageUrl])
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -134,10 +149,12 @@ export function IssueTimeline({
 function buildTimelineRows(
   displayItems: TimelineDisplayItem[],
   {
+    issueId,
     archivedLabelIds,
     currentUserName,
     currentUserImageUrl,
   }: {
+    issueId?: string
     archivedLabelIds: Set<string>
     currentUserName?: string | null
     currentUserImageUrl?: string | null
@@ -268,6 +285,138 @@ function buildTimelineRows(
             />
           ),
           markerClassName: statusStyles.merged,
+        })
+        break
+      case "review-queued":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconClock />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              reviewRunId={item.reviewRunId}
+              label={
+                item.attemptNumber
+                  ? `Automatic review queued (attempt ${item.attemptNumber} of ${REVIEW_ATTEMPT_BUDGET})`
+                  : "Automatic review queued"
+              }
+            />
+          ),
+        })
+        break
+      case "review-started":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconRobot />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              reviewRunId={item.reviewRunId}
+              label="Automatic review started"
+            />
+          ),
+          markerClassName: MARKER_TINTS.streaming,
+        })
+        break
+      case "review-approved":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconThumbUp />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              label={
+                item.source === "human_override"
+                  ? "Approved — human review accepted"
+                  : "Automatic review approved"
+              }
+            />
+          ),
+          markerClassName: MARKER_TINTS.success,
+        })
+        break
+      case "review-changes-requested":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconMessage2 />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              label={`Automatic review: ${
+                item.verdict === "commented" ? "commented" : "changes requested"
+              }${
+                item.findingsCount
+                  ? ` (${item.findingsCount} finding${item.findingsCount === 1 ? "" : "s"})`
+                  : ""
+              }${item.attemptNumber ? ` — attempt ${item.attemptNumber} of ${REVIEW_ATTEMPT_BUDGET}` : ""}`}
+            />
+          ),
+        })
+        break
+      case "review-failed":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconAlertCircle />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              reviewRunId={item.reviewRunId}
+              label={
+                item.retried
+                  ? "Reviewer infrastructure failure — retrying automatically"
+                  : "Reviewer infrastructure failure — automatic progression stopped"
+              }
+            />
+          ),
+          markerClassName: MARKER_TINTS.error,
+        })
+        break
+      case "review-superseded":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconX />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              label={
+                item.reason === "human_review"
+                  ? "Automatic review superseded by a human review"
+                  : "Automatic review superseded by a new push"
+              }
+            />
+          ),
+        })
+        break
+      case "review-fix-delivered":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconSend />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              label="Review findings delivered to the implementation session"
+            />
+          ),
+        })
+        break
+      case "implementation-ownership-reset":
+        rows.push({
+          key: item.key,
+          timestamp: item.timestamp,
+          icon: <IconRefresh />,
+          content: (
+            <ReviewEventContent
+              issueId={issueId}
+              label="Fresh implementation session started"
+            />
+          ),
         })
         break
     }
@@ -816,6 +965,31 @@ function PullRequestContent({
         </>
       ) : null}
     </p>
+  )
+}
+
+function ReviewEventContent({
+  issueId,
+  label,
+  reviewRunId,
+}: {
+  issueId?: string
+  label: string
+  reviewRunId?: string | null
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <p className="text-muted-foreground">{label}</p>
+      {issueId && reviewRunId ? (
+        // Historical entries link to a run that has already finished, so the
+        // trigger only ever fetches the durable log — never tails a live one.
+        <ReviewRunLogsTrigger
+          issueId={issueId}
+          reviewRunId={reviewRunId}
+          isLive={false}
+        />
+      ) : null}
+    </div>
   )
 }
 

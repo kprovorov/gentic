@@ -52,8 +52,27 @@ These statuses cover the period between the agent opening a pull request and the
 | `testing` | Automated tests are running against the pull request. GitHub check webhooks can set this when checks start or are re-run. |
 | `tests-failed` | Automated tests failed for the pull request. GitHub check webhooks can set this when completed checks fail and can add a Gentic-authored follow-up for the agent. |
 | `ready-for-review` | The agent has opened a pull request and it is ready for human review on GitHub. |
-| `changes-requested` | A reviewer submitted a **Request changes** review on GitHub. When automatic review responses are enabled, Gentic adds the feedback with Gentic attribution and re-queues the same agent session. |
-| `approved` | A reviewer submitted an **Approve** review on GitHub. The pull request is ready to merge. |
+| `reviewing` | Gentic's Automatic Review is evaluating the pull request — see [Automatic Review](#automatic-review) below. |
+| `changes-requested` | A reviewer (automatic or human) requested changes. When automatic review responses are enabled, Gentic adds the feedback with Gentic attribution and re-queues the same agent session. |
+| `approved` | The pull request was approved — automatically by Automatic Review, or by an explicit **Continue with human review**. The pull request is ready to merge. |
+
+## Automatic Review
+
+When a project or issue has **Automatic Review** enabled, an isolated reviewer agent evaluates each pull request instead of (or alongside) waiting on a human review. This section only covers what's visible on the Issue; the engine itself is documented in `docs/adr/0004-automatic-review-lifecycle-engine.md` and its neighbors.
+
+**Status precedence.** When several conditions could apply to a pull request at once, the issue's status reflects the most actionable one first, in this order: `changes-requested` (a reviewer — automatic or human — asked for changes) beats `tests-failed` (CI failed) beats `testing` (CI still running) beats `reviewing` (an automatic review attempt is in flight) beats `ready-for-review` / `approved`. This precedence is computed in the database and is stable regardless of which webhook or review event arrives first.
+
+**Timeline.** Every step of an automatic review attempt — queued, started, approved, changes requested, an infrastructure failure, or a cycle being superseded by a new push or a human review — appears as its own entry on the Issue's timeline, each optionally linking to that attempt's reviewer execution log. Reviewer logs are never appended to Issue chat.
+
+**Multiple pull requests.** An Issue with more than one associated pull request shows each one's review state independently in the sidebar, plus an aggregate ("2 of 3 pull requests reviewed").
+
+**Attempts.** Each pull request gets up to three automatic review attempts per review cycle (a cycle covers one line of fix-iteration pushes). A completed attempt (approved, changes requested, or commented) counts against that budget; an infrastructure failure does not — it retries once automatically, and after a second consecutive failure, automatic progress pauses until new code arrives or you intervene.
+
+**Recovery controls.** When automatic progress is paused or blocked, the Issue sidebar offers up to three actions, shown only when they apply:
+
+- **Retry review** — queue a fresh attempt after two trailing infrastructure failures, without waiting for new code.
+- **Continue with human review** — accept the current human review as sufficient and stop further automatic attempts.
+- **Start fresh implementation session** — abandon an unresumable implementation session (its worker was deleted or banned, its agent/model changed, or no session was ever recorded) so the next fix has somewhere to go.
 
 ## Merge and deploy
 
