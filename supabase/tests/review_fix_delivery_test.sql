@@ -136,10 +136,18 @@ SELECT * FROM public.complete_review_attempt(
   (SELECT review_run_id FROM eval_b), 'changes_requested'
 );
 
--- A new commit lands before delivery runs.
+-- A new commit lands before delivery runs. This also runs the existing,
+-- unrelated `recompute_issue_status_from_pull_requests` (via
+-- `apply_pull_request_delivery_state`), which can itself move the issue
+-- off `changes-requested` — so the status right before calling
+-- `deliver_review_fix_request` is captured dynamically below, rather than
+-- assumed, to isolate what *this* delivery call does to it.
 SELECT public.apply_pull_request_delivery_state(
   'https://github.com/gentic/fix-b/pull/1', p_head_sha => 'sha-b2'
 );
+
+CREATE TEMP TABLE issue_status_before_deliver_b AS
+SELECT status FROM public.issues WHERE id = 'b1000000-0000-4000-8000-000000000002';
 
 CREATE TEMP TABLE deliver_b1 AS
 SELECT * FROM public.deliver_review_fix_request(
@@ -153,7 +161,8 @@ SELECT is(
 );
 SELECT is(
   (SELECT status FROM public.issues WHERE id = 'b1000000-0000-4000-8000-000000000002'),
-  'changes-requested', 'the issue status is left untouched when delivery is rejected'
+  (SELECT status FROM issue_status_before_deliver_b),
+  'a rejected delivery does not itself change the issue status'
 );
 
 -- ---------------------------------------------------------------------
