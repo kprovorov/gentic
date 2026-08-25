@@ -9,7 +9,7 @@ SELECT plan(19);
 -- Scenario 1: the happy path — queued, started, approved.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('e1000000-0000-4000-8000-000000000001', 'user_events_1', 'Events A', 'gentic/events-a', 'EV1', true);
+  ('e1000000-0000-4000-8000-000000000001', 'user_events_1', 'Events A', 'gentic/events-a', 'EVA', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('e1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000001',
    'Events issue', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -72,7 +72,7 @@ SELECT is(
 -- Scenario 2: a changes-requested verdict carries its findings count.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('e2000000-0000-4000-8000-000000000001', 'user_events_2', 'Events B', 'gentic/events-b', 'EV2', true);
+  ('e2000000-0000-4000-8000-000000000001', 'user_events_2', 'Events B', 'gentic/events-b', 'EVB', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('e2000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000001',
    'Events issue B', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -106,7 +106,7 @@ SELECT is(
 -- Scenario 3: infrastructure failures — retried and then stopped.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('e3000000-0000-4000-8000-000000000001', 'user_events_3', 'Events C', 'gentic/events-c', 'EV3', true);
+  ('e3000000-0000-4000-8000-000000000001', 'user_events_3', 'Events C', 'gentic/events-c', 'EVC', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('e3000000-0000-4000-8000-000000000002', 'e3000000-0000-4000-8000-000000000001',
    'Events issue C', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -145,7 +145,7 @@ SELECT is(
 -- fresh one — both events land.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('e4000000-0000-4000-8000-000000000001', 'user_events_4', 'Events D', 'gentic/events-d', 'EV4', true);
+  ('e4000000-0000-4000-8000-000000000001', 'user_events_4', 'Events D', 'gentic/events-d', 'EVD', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('e4000000-0000-4000-8000-000000000002', 'e4000000-0000-4000-8000-000000000001',
    'Events issue D', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -185,7 +185,7 @@ SELECT is(
 -- a human override, distinct from an automatic verdict.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('e5000000-0000-4000-8000-000000000001', 'user_events_5', 'Events E', 'gentic/events-e', 'EV5', true);
+  ('e5000000-0000-4000-8000-000000000001', 'user_events_5', 'Events E', 'gentic/events-e', 'EVE', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('e5000000-0000-4000-8000-000000000002', 'e5000000-0000-4000-8000-000000000001',
    'Events issue E', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -210,7 +210,7 @@ SELECT is(
 -- primitive for a cycle stuck after two trailing infra failures.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('r1000000-0000-4000-8000-000000000001', 'user_retry_1', 'Retry A', 'gentic/retry-a', 'RT1', true);
+  ('r1000000-0000-4000-8000-000000000001', 'user_retry_1', 'Retry A', 'gentic/retry-a', 'RTA', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('r1000000-0000-4000-8000-000000000002', 'r1000000-0000-4000-8000-000000000001',
    'Retry issue', 'Body', 'ready-for-review', 1, 'claude_code');
@@ -278,7 +278,7 @@ SELECT throws_ok(
 -- Exhaust a fresh cycle's attempt budget, then retry_review_run must refuse
 -- the now-concluded (not `active`) cycle.
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('r2000000-0000-4000-8000-000000000001', 'user_retry_2', 'Retry B', 'gentic/retry-b', 'RT2', true);
+  ('r2000000-0000-4000-8000-000000000001', 'user_retry_2', 'Retry B', 'gentic/retry-b', 'RTB', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
   ('r2000000-0000-4000-8000-000000000002', 'r2000000-0000-4000-8000-000000000001',
    'Retry issue B', 'Body', 'ready-for-review', 1, 'claude_code');

@@ -346,8 +346,10 @@ begin
 end;
 $$;
 
--- Same as the original definition (see 20260819130000), with a
--- `review_approved` or `review_changes_requested` event added once the
+-- Same as the latest prior definition (see 20260819130000, then extended by
+-- 20260820090000 to persist evidence/impact/requested_change on findings —
+-- carried forward unchanged here), with a `review_approved` or
+-- `review_changes_requested` event added once the
 -- verdict (and any resulting cycle-exhaustion) is decided.
 create or replace function public.complete_review_attempt(
   p_review_run_id uuid,
@@ -461,7 +463,7 @@ begin
   loop
     insert into public.review_findings (
       review_attempt_id, head_sha, severity, file_path, line, title, body,
-      github_comment_id
+      evidence, impact, requested_change, github_comment_id
     ) values (
       v_attempt_id,
       v_cycle.head_sha,
@@ -470,6 +472,9 @@ begin
       nullif(v_finding->>'line', '')::integer,
       v_finding->>'title',
       v_finding->>'body',
+      v_finding->>'evidence',
+      v_finding->>'impact',
+      v_finding->>'requested_change',
       nullif(v_finding->>'github_comment_id', '')::bigint
     );
   end loop;
