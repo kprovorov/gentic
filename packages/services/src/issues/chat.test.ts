@@ -7,6 +7,7 @@ import {
   createManualFirstPrPublishMessage,
   formatChangesRequestedMessage,
   formatPullRequestCommentMessage,
+  formatReviewFixRequestMessage,
   formatTestsFailedMessage,
   GENTIC_AUTHORED_USER_MESSAGE,
 } from "./chat"
@@ -53,6 +54,52 @@ test("formatPullRequestCommentMessage includes PR comment context", () => {
   assert.match(message, /same branch/)
   assert.match(message, /discussion_r10/)
   assert.match(message, /Please cover this edge case\./)
+})
+
+test("formatReviewFixRequestMessage includes the attempt number, summary, and finding detail", () => {
+  const message = formatReviewFixRequestMessage({
+    prUrl: "https://github.com/acme/widget/pull/42",
+    attemptNumber: 2,
+    summary: "Two issues found.",
+    findings: [
+      {
+        severity: "blocker",
+        filePath: "src/app.ts",
+        line: 12,
+        title: "Null deref",
+        body: null,
+        evidence: "line 12 dereferences `user` without a null check",
+        impact: "crashes on any request with no authenticated user",
+        requestedChange: "add a null check before dereferencing `user`",
+      },
+    ],
+  })
+
+  assert.match(message, /attempt 2 of 3/)
+  assert.match(message, /same branch/)
+  assert.match(message, /Two issues found\./)
+  assert.match(message, /\[blocker\] Null deref.*src\/app\.ts:12/)
+  assert.match(message, /Evidence: line 12 dereferences/)
+  assert.match(message, /Impact: crashes on any request/)
+  assert.match(message, /Requested change: add a null check/)
+})
+
+test("formatReviewFixRequestMessage falls back to General for a review-level finding", () => {
+  const message = formatReviewFixRequestMessage({
+    prUrl: "https://github.com/acme/widget/pull/42",
+    attemptNumber: 1,
+    summary: null,
+    findings: [
+      {
+        title: "Missing tests",
+        evidence: "no test file changed",
+        impact: "regressions ship silently",
+        requestedChange: "add coverage for the new branch",
+      },
+    ],
+  })
+
+  assert.match(message, /\[info\] Missing tests\*\* \(General\)/)
 })
 
 test("formatTestsFailedMessage tells the agent to fix the same PR branch", () => {

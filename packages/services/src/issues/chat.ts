@@ -1,6 +1,7 @@
 import { isSpecIssueType } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
+import type { ReviewFindingInput } from "../review-lifecycle"
 import type { Supabase } from "../types"
 import { ensureIssueOwned } from "./ownership"
 import {
@@ -321,6 +322,48 @@ export function formatTestsFailedMessage(prUrl: string): string {
     `GitHub tests failed on ${prUrl}.`,
     "Inspect the failing checks, push fixes to the same branch, and do not open a new pull request.",
   ].join("\n")
+}
+
+// Called from `completeReviewRun` (GEN-417) once a `changes_requested`
+// automatic Review Attempt has been recorded and delivery has been cleared
+// by `deliver_review_fix_request` (owner resumable, head not stale, cycle
+// still active). Mirrors `formatChangesRequestedMessage`'s shape for a
+// genuine human review, but sourced from the reviewer's structured findings
+// rather than a GitHub payload.
+export function formatReviewFixRequestMessage(input: {
+  prUrl: string
+  attemptNumber: number
+  summary: string | null
+  findings: ReviewFindingInput[]
+}): string {
+  const lines = [
+    `Automatic review requested changes on ${input.prUrl} (attempt ${input.attemptNumber} of 3).`,
+    "Push fixes to the same branch — do not open a new pull request.",
+  ]
+
+  if (input.summary) {
+    lines.push("", input.summary)
+  }
+
+  for (const finding of input.findings) {
+    const location = finding.filePath
+      ? `${finding.filePath}:${finding.line ?? "?"}`
+      : "General"
+    lines.push(
+      "",
+      `**[${finding.severity ?? "info"}] ${finding.title}** (${location})`
+    )
+    if (finding.body) {
+      lines.push(finding.body)
+    }
+    lines.push(
+      `- Evidence: ${finding.evidence}`,
+      `- Impact: ${finding.impact}`,
+      `- Requested change: ${finding.requestedChange}`
+    )
+  }
+
+  return lines.join("\n")
 }
 
 // Called from the GitHub webhook route when a review comes back as "changes

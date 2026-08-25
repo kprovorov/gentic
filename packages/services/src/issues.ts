@@ -83,6 +83,7 @@ export {
   createManualFirstPrPublishMessage,
   deleteIssueMessage,
   formatPullRequestCommentMessage,
+  formatReviewFixRequestMessage,
   formatTestsFailedMessage,
   GENTIC_AUTHORED_USER_MESSAGE,
   requeueIssueForUserMessage,

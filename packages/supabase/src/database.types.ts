@@ -560,6 +560,7 @@ export type Database = {
           issue_id: string
           kind: string
           payload: Json | null
+          review_attempt_id: string | null
           role: string
           run_id: string | null
           seq: number
@@ -585,6 +586,7 @@ export type Database = {
           issue_id: string
           kind?: string
           payload?: Json | null
+          review_attempt_id?: string | null
           role: string
           run_id?: string | null
           seq?: number
@@ -610,6 +612,7 @@ export type Database = {
           issue_id?: string
           kind?: string
           payload?: Json | null
+          review_attempt_id?: string | null
           role?: string
           run_id?: string | null
           seq?: number
@@ -623,6 +626,13 @@ export type Database = {
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_review_attempt_id_fkey"
+            columns: ["review_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "review_attempts"
             referencedColumns: ["id"]
           },
         ]
@@ -1276,6 +1286,15 @@ export type Database = {
       delete_worker: {
         Args: { p_now?: string; p_user_id: string; p_worker_id: string }
         Returns: boolean
+      }
+      deliver_review_fix_request: {
+        Args: { p_content: string; p_now?: string; p_review_attempt_id: string }
+        Returns: {
+          issue_id: string
+          outcome: string
+          review_attempt_id: string
+          unavailable_reason: string
+        }[]
       }
       evaluate_review_eligibility: {
         Args: { p_now?: string; p_pr_url: string }

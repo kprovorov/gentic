@@ -5,9 +5,11 @@ import { ServiceError } from "./errors"
 import {
   completeReviewAttempt,
   continueWithHumanReview,
+  deliverReviewFixRequest,
   evaluateReviewEligibility,
   failReviewRun,
   isKnownReviewAttempt,
+  shouldDeliverReviewFix,
   supersedeActiveReviewCycle,
 } from "./review-lifecycle"
 
@@ -261,4 +263,106 @@ test("isKnownReviewAttempt is false for a genuine human review", async () => {
   }
 
   assert.equal(await isKnownReviewAttempt(client as never, 999), false)
+})
+
+test("deliverReviewFixRequest maps a delivered outcome", async () => {
+  const { client, calls } = rpcClient([
+    {
+      review_attempt_id: "attempt-1",
+      issue_id: "issue-1",
+      outcome: "delivered",
+      unavailable_reason: null,
+    },
+  ])
+
+  const result = await deliverReviewFixRequest(client as never, {
+    reviewAttemptId: "attempt-1",
+    content: "Push fixes to the same branch.",
+  })
+
+  assert.deepEqual(result, {
+    reviewAttemptId: "attempt-1",
+    issueId: "issue-1",
+    outcome: "delivered",
+    unavailableReason: null,
+  })
+  assert.deepEqual(calls[0].args, {
+    p_review_attempt_id: "attempt-1",
+    p_content: "Push fixes to the same branch.",
+  })
+})
+
+test("deliverReviewFixRequest maps an owner-unavailable outcome with its reason", async () => {
+  const { client } = rpcClient([
+    {
+      review_attempt_id: "attempt-1",
+      issue_id: "issue-1",
+      outcome: "owner_unavailable",
+      unavailable_reason: "worker_banned",
+    },
+  ])
+
+  const result = await deliverReviewFixRequest(client as never, {
+    reviewAttemptId: "attempt-1",
+    content: "Push fixes to the same branch.",
+  })
+
+  assert.equal(result.outcome, "owner_unavailable")
+  assert.equal(result.unavailableReason, "worker_banned")
+})
+
+test("deliverReviewFixRequest throws not_found when the RPC returns no row", async () => {
+  const { client } = rpcClient([])
+
+  await assert.rejects(
+    deliverReviewFixRequest(client as never, {
+      reviewAttemptId: "missing",
+      content: "content",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.code, "not_found")
+      return true
+    }
+  )
+})
+
+test("shouldDeliverReviewFix is true only for an accepted, active-cycle changes_requested verdict", () => {
+  const base = {
+    accepted: true as const,
+    cycleState: "active",
+    reviewAttemptId: "attempt-1",
+  }
+
+  assert.equal(shouldDeliverReviewFix(base, "changes_requested"), true)
+})
+
+test("shouldDeliverReviewFix is false when the run's verdict was not accepted (stale/superseded)", () => {
+  assert.equal(
+    shouldDeliverReviewFix(
+      { accepted: false, cycleState: null, reviewAttemptId: null },
+      "changes_requested"
+    ),
+    false
+  )
+})
+
+test("shouldDeliverReviewFix is false for a verdict other than changes_requested", () => {
+  assert.equal(
+    shouldDeliverReviewFix(
+      { accepted: true, cycleState: "active", reviewAttemptId: "attempt-1" },
+      "approved"
+    ),
+    false
+  )
+})
+
+test("shouldDeliverReviewFix is false once the cycle is exhausted (third attempt)", () => {
+  assert.equal(
+    shouldDeliverReviewFix(
+      { accepted: true, cycleState: "exhausted", reviewAttemptId: "attempt-1" },
+      "changes_requested"
+    ),
+    false
+  )
 })
