@@ -39,7 +39,12 @@ import {
 } from "@gentic/ui/dropdown-menu"
 import { cn } from "@gentic/ui/utils"
 import { isSpecIssueType } from "@gentic/validators/issues"
-import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
+import type {
+  ImplementationOwner,
+  IssueRelation,
+  IssueRelationIssue,
+  ReviewCycle,
+} from "@gentic/services/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
 import { IssueLabelChip } from "../issue-label-chip"
@@ -236,6 +241,8 @@ export function IssueDetailHeader({
   labels,
   attachments,
   messageAttachments,
+  reviewCycles,
+  implementationOwner,
 }: {
   issue: IssueDetailData["issue"]
   pullRequests: IssuePullRequest[]
@@ -248,6 +255,8 @@ export function IssueDetailHeader({
   // rail's Files section below xl.
   attachments: Attachment[]
   messageAttachments: Attachment[]
+  reviewCycles: ReviewCycle[]
+  implementationOwner: ImplementationOwner | null
 }) {
   const editHref = getIssueEditHref(issue) ?? "/issues"
   const { isPending, handleDelete } = useIssueDelete(issue.id)
@@ -433,6 +442,8 @@ export function IssueDetailHeader({
                 labels={labels}
                 attachments={attachments}
                 messageAttachments={messageAttachments}
+                reviewCycles={reviewCycles}
+                implementationOwner={implementationOwner}
               />
             </div>
 

@@ -60,7 +60,14 @@ export type IssueRelation = Pick<
 
 export type IssuePullRequest = Pick<
   IssuePullRequestRow,
-  "id" | "issue_id" | "url" | "created_at" | "state"
+  | "id"
+  | "issue_id"
+  | "url"
+  | "created_at"
+  | "state"
+  | "head_sha"
+  | "ci_state"
+  | "review_decision"
 >
 
 export type IssueAutomaticPrRequest = Pick<

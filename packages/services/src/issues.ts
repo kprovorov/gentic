@@ -46,6 +46,15 @@ export {
   startFreshImplementation,
   validateFixHandoff,
 } from "./issues/implementation-owner"
+export {
+  listReviewRunLogs,
+  listReviewStateForIssue,
+  type ReviewAttempt,
+  type ReviewCycle,
+  type ReviewFinding,
+  type ReviewRun,
+  type ReviewRunLog,
+} from "./issues/review-state"
 export { addIssueRelation, deleteIssueRelation } from "./issues/relations"
 export { addIssueLabels, removeIssueLabels } from "./issues/labels"
 export { slugifyIssueTitle } from "./issues/slug"

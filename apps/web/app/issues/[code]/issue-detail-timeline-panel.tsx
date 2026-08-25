@@ -105,6 +105,7 @@ export function IssueDetailTimelinePanel({
 
               <MessageScrollerItem scrollAnchor>
                 <IssueTimeline
+                  issueId={issueId}
                   items={timelineItems}
                   archivedLabelIds={archivedLabelIds}
                   currentUserName={currentUserName}

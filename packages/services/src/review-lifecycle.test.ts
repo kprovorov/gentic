@@ -9,6 +9,7 @@ import {
   evaluateReviewEligibility,
   failReviewRun,
   isKnownReviewAttempt,
+  retryReviewRun,
   shouldDeliverReviewFix,
   supersedeActiveReviewCycle,
 } from "./review-lifecycle"
@@ -228,6 +229,77 @@ test("continueWithHumanReview returns the approved cycle", async () => {
 
   const result = await continueWithHumanReview(client as never, "user-1", "issue-1")
   assert.deepEqual(result, { reviewCycleId: "cycle-1", issueId: "issue-1", status: "approved" })
+})
+
+test("retryReviewRun returns the queued run and cycle", async () => {
+  const client = {
+    rpc(name: string, args: Record<string, unknown>) {
+      assert.equal(name, "retry_review_run")
+      assert.deepEqual(args, {
+        p_user_id: "user-1",
+        p_review_cycle_id: "cycle-1",
+      })
+      return {
+        single: () =>
+          Promise.resolve({
+            data: { review_run_id: "run-2", review_cycle_id: "cycle-1" },
+            error: null,
+          }),
+      }
+    },
+  }
+
+  const result = await retryReviewRun(client as never, "user-1", "cycle-1")
+  assert.deepEqual(result, { reviewRunId: "run-2", reviewCycleId: "cycle-1" })
+})
+
+test("retryReviewRun maps P0002 to not_found", async () => {
+  const client = {
+    rpc() {
+      return {
+        single: () =>
+          Promise.resolve({
+            data: null,
+            error: { code: "P0002", message: "Review cycle not found" },
+          }),
+      }
+    },
+  }
+
+  await assert.rejects(
+    retryReviewRun(client as never, "user-1", "cycle-missing"),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.code, "not_found")
+      return true
+    }
+  )
+})
+
+test("retryReviewRun maps 23514 (already live / budget exhausted / not active) to validation", async () => {
+  const client = {
+    rpc() {
+      return {
+        single: () =>
+          Promise.resolve({
+            data: null,
+            error: {
+              code: "23514",
+              message: "A review run is already in flight for this cycle",
+            },
+          }),
+      }
+    },
+  }
+
+  await assert.rejects(
+    retryReviewRun(client as never, "user-1", "cycle-1"),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.code, "validation")
+      return true
+    }
+  )
 })
 
 test("isKnownReviewAttempt is true when a review_attempts row matches the GitHub review id", async () => {

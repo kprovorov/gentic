@@ -189,6 +189,12 @@ export const issuePullRequestSchema = z.object({
     .enum(["draft", "open", "merged", "closed", "queued"])
     .nullable()
     .transform((state) => state ?? undefined),
+  // Kept in step with `@gentic/services/issues`' `IssuePullRequest` (GEN-419)
+  // so a live realtime upsert never regresses the rail's review-state
+  // display back to stale/missing CI or review data.
+  head_sha: z.string().nullable(),
+  ci_state: z.string(),
+  review_decision: z.string(),
 })
 
 export type IssuePullRequestContract = z.infer<typeof issuePullRequestSchema>
@@ -215,7 +221,78 @@ export type IssueLabelsChangedPayload = z.infer<
   typeof issueLabelsChangedPayloadSchema
 >
 
-const knownIssueEventTypeSchema = z.enum(["priority_changed", "labels_changed"])
+// The Automatic Review lifecycle engine (GEN-413/414/419, see ADR-0004) and
+// its neighbors write these directly from SQL (see
+// `packages/services/src/issues/events.ts`'s `IssueEventType` for the full,
+// typed picture of every event type currently written). Payload shapes here
+// mirror the exact `jsonb_build_object(...)` each RPC inserts.
+export const reviewQueuedPayloadSchema = z.object({
+  review_cycle_id: z.string().uuid(),
+  review_run_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+  head_sha: z.string(),
+  attempt_number: z.number().int().positive(),
+})
+
+export const reviewStartedPayloadSchema = z.object({
+  review_run_id: z.string().uuid(),
+  review_cycle_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+})
+
+export const reviewApprovedPayloadSchema = z.object({
+  review_attempt_id: z.string().uuid().nullable(),
+  review_cycle_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+  attempt_number: z.number().int().positive().nullable(),
+  source: z.enum(["automatic", "human_override"]),
+})
+
+export const reviewChangesRequestedPayloadSchema = z.object({
+  review_attempt_id: z.string().uuid(),
+  review_cycle_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+  attempt_number: z.number().int().positive(),
+  verdict: z.enum(["changes_requested", "commented"]),
+  findings_count: z.number().int().nonnegative(),
+})
+
+export const reviewFailedPayloadSchema = z.object({
+  review_run_id: z.string().uuid(),
+  review_cycle_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+  error: z.string(),
+  retried: z.boolean(),
+})
+
+export const reviewSupersededPayloadSchema = z.object({
+  review_cycle_id: z.string().uuid(),
+  pull_request_id: z.string().uuid(),
+  reason: z.enum(["new_head_sha", "human_review"]),
+})
+
+export const reviewFixDeliveredPayloadSchema = z.object({
+  review_attempt_id: z.string().uuid(),
+  message_id: z.string().uuid(),
+})
+
+export const implementationOwnershipResetPayloadSchema = z.object({
+  generation: z.number().int().positive(),
+  origin: z.literal("fresh_implementation"),
+})
+
+const knownIssueEventTypeSchema = z.enum([
+  "priority_changed",
+  "labels_changed",
+  "review_queued",
+  "review_started",
+  "review_approved",
+  "review_changes_requested",
+  "review_failed",
+  "review_superseded",
+  "review_fix_delivered",
+  "implementation_ownership_reset",
+])
 
 const priorityChangedIssueEventSchema = z.object({
   id: z.string().uuid(),
@@ -233,6 +310,52 @@ const labelsChangedIssueEventSchema = z.object({
   created_at: z.string(),
 })
 
+function issueEventOfType<Type extends string, Payload extends z.ZodTypeAny>(
+  type: Type,
+  payloadSchema: Payload
+) {
+  return z.object({
+    id: z.string().uuid(),
+    issue_id: z.string().uuid(),
+    type: z.literal(type),
+    payload: payloadSchema,
+    created_at: z.string(),
+  })
+}
+
+const reviewQueuedIssueEventSchema = issueEventOfType(
+  "review_queued",
+  reviewQueuedPayloadSchema
+)
+const reviewStartedIssueEventSchema = issueEventOfType(
+  "review_started",
+  reviewStartedPayloadSchema
+)
+const reviewApprovedIssueEventSchema = issueEventOfType(
+  "review_approved",
+  reviewApprovedPayloadSchema
+)
+const reviewChangesRequestedIssueEventSchema = issueEventOfType(
+  "review_changes_requested",
+  reviewChangesRequestedPayloadSchema
+)
+const reviewFailedIssueEventSchema = issueEventOfType(
+  "review_failed",
+  reviewFailedPayloadSchema
+)
+const reviewSupersededIssueEventSchema = issueEventOfType(
+  "review_superseded",
+  reviewSupersededPayloadSchema
+)
+const reviewFixDeliveredIssueEventSchema = issueEventOfType(
+  "review_fix_delivered",
+  reviewFixDeliveredPayloadSchema
+)
+const implementationOwnershipResetIssueEventSchema = issueEventOfType(
+  "implementation_ownership_reset",
+  implementationOwnershipResetPayloadSchema
+)
+
 const genericIssueEventSchema = z.object({
   id: z.string().uuid(),
   issue_id: z.string().uuid(),
@@ -244,6 +367,14 @@ const genericIssueEventSchema = z.object({
 export const issueEventSchema = z.union([
   priorityChangedIssueEventSchema,
   labelsChangedIssueEventSchema,
+  reviewQueuedIssueEventSchema,
+  reviewStartedIssueEventSchema,
+  reviewApprovedIssueEventSchema,
+  reviewChangesRequestedIssueEventSchema,
+  reviewFailedIssueEventSchema,
+  reviewSupersededIssueEventSchema,
+  reviewFixDeliveredIssueEventSchema,
+  implementationOwnershipResetIssueEventSchema,
   genericIssueEventSchema,
 ])
 

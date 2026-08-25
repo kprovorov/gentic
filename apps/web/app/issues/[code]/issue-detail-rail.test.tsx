@@ -1,6 +1,6 @@
 import type React from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -13,6 +13,9 @@ const addIssueLabelsMock = vi.fn()
 const removeIssueLabelsMock = vi.fn()
 const startAttachmentUploadsMock = vi.fn()
 const finishAttachmentUploadsMock = vi.fn()
+const retryReviewRunActionMock = vi.fn()
+const continueWithHumanReviewActionMock = vi.fn()
+const startFreshImplementationActionMock = vi.fn()
 const toastErrorMock = vi.fn()
 const toastSuccessMock = vi.fn()
 
@@ -31,6 +34,12 @@ vi.mock("@/app/issues/actions", () => ({
     startAttachmentUploadsMock(formData),
   finishAttachmentUploads: (formData: FormData) =>
     finishAttachmentUploadsMock(formData),
+  retryReviewRunAction: (formData: FormData) =>
+    retryReviewRunActionMock(formData),
+  continueWithHumanReviewAction: (formData: FormData) =>
+    continueWithHumanReviewActionMock(formData),
+  startFreshImplementationAction: (formData: FormData) =>
+    startFreshImplementationActionMock(formData),
 }))
 
 // The real field fetches the label catalog over the network for its search
@@ -149,6 +158,8 @@ function renderRail(
         labels={[]}
         attachments={[]}
         messageAttachments={[]}
+        reviewCycles={[]}
+        implementationOwner={null}
         {...props}
       />
     </QueryClientProvider>
@@ -193,6 +204,9 @@ describe("IssueDetailRail manual Create PR", () => {
           issue_id: issueId,
           url: "https://github.com/acme/widget/pull/1",
           created_at: "2026-07-29T12:00:00.000Z",
+          head_sha: null,
+          ci_state: "unknown",
+          review_decision: "unknown",
         },
       ],
     })
@@ -557,5 +571,265 @@ describe("IssueDetailRail issue attachments", () => {
     // Nothing in this upload creates a message or wakes the agent.
     expect(finishData.get("content")).toBeNull()
     expect(finishData.get("client_message_id")).toBeNull()
+  })
+})
+
+describe("IssueDetailRail automatic review", () => {
+  it("shows per-PR attempt/verdict/findings and links to the published GitHub review", () => {
+    renderRail(createQueryClient(), {
+      pullRequests: [
+        {
+          id: "pr-1",
+          issue_id: issueId,
+          url: "https://github.com/acme/widget/pull/1",
+          created_at: "2026-07-29T12:00:00.000Z",
+          head_sha: "sha-1",
+          ci_state: "success",
+          review_decision: "changes_requested",
+        },
+      ],
+      reviewCycles: [
+        {
+          id: "cycle-1",
+          pullRequestId: "pr-1",
+          state: "active",
+          headSha: "sha-1",
+          supersededReason: null,
+          createdAt: "2026-07-29T12:01:00.000Z",
+          updatedAt: "2026-07-29T12:01:00.000Z",
+          runs: [
+            {
+              id: "run-1",
+              status: "completed",
+              error: null,
+              headSha: "sha-1",
+              startedAt: "2026-07-29T12:01:00.000Z",
+              finishedAt: "2026-07-29T12:02:00.000Z",
+              claimedByWorkerId: "worker-1",
+              heartbeatAt: null,
+              createdAt: "2026-07-29T12:01:00.000Z",
+            },
+          ],
+          attempts: [
+            {
+              id: "attempt-1",
+              attemptNumber: 1,
+              verdict: "changes_requested",
+              summary: null,
+              githubReviewId: 555,
+              publishedAt: "2026-07-29T12:02:00.000Z",
+              createdAt: "2026-07-29T12:02:00.000Z",
+              findings: [
+                {
+                  id: "finding-1",
+                  severity: "warning",
+                  filePath: "a.ts",
+                  line: 10,
+                  title: "Null deref",
+                  body: null,
+                  evidence: "line 10 dereferences without a null check",
+                  impact: "crashes",
+                  requestedChange: "add a null check",
+                  githubCommentId: null,
+                  createdAt: "2026-07-29T12:02:00.000Z",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+
+    // Scoped to the review-cycle summary row: the Status dropdown's own
+    // menu items include every possible status label, "Changes requested"
+    // (the `changes-requested` issue status) among them.
+    const summary = within(
+      screen.getByText("1/3 attempts").closest("div")!
+    )
+    expect(summary.getByText("1/3 attempts")).toBeVisible()
+    expect(summary.getByText("Changes requested")).toBeVisible()
+    expect(summary.getByText("1 finding")).toBeVisible()
+    expect(summary.getByRole("link", { name: "View review" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/widget/pull/1#pullrequestreview-555"
+    )
+  })
+
+  it("shows an aggregate summary line across multiple pull requests", () => {
+    renderRail(createQueryClient(), {
+      pullRequests: [
+        {
+          id: "pr-1",
+          issue_id: issueId,
+          url: "https://github.com/acme/widget/pull/1",
+          created_at: "2026-07-29T12:00:00.000Z",
+          head_sha: "sha-1",
+          ci_state: "success",
+          review_decision: "approved",
+        },
+        {
+          id: "pr-2",
+          issue_id: issueId,
+          url: "https://github.com/acme/widget/pull/2",
+          created_at: "2026-07-29T12:00:00.000Z",
+          head_sha: "sha-2",
+          ci_state: "success",
+          review_decision: "unknown",
+        },
+      ],
+      reviewCycles: [
+        {
+          id: "cycle-1",
+          pullRequestId: "pr-1",
+          state: "approved",
+          headSha: "sha-1",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [],
+          attempts: [],
+        },
+        {
+          id: "cycle-2",
+          pullRequestId: "pr-2",
+          state: "active",
+          headSha: "sha-2",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [],
+          attempts: [],
+        },
+      ],
+    })
+
+    expect(screen.getByText("1 of 2 pull requests reviewed")).toBeVisible()
+  })
+
+  it("shows Retry review only for a cycle stuck with no live run and budget remaining", () => {
+    renderRail(createQueryClient(), {
+      reviewCycles: [
+        {
+          id: "cycle-1",
+          pullRequestId: "pr-1",
+          state: "active",
+          headSha: "sha-1",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [
+            {
+              id: "run-1",
+              status: "failed",
+              error: "boom",
+              headSha: "sha-1",
+              startedAt: null,
+              finishedAt: "t",
+              claimedByWorkerId: null,
+              heartbeatAt: null,
+              createdAt: "t",
+            },
+            {
+              id: "run-2",
+              status: "failed",
+              error: "boom again",
+              headSha: "sha-1",
+              startedAt: null,
+              finishedAt: "t",
+              claimedByWorkerId: null,
+              heartbeatAt: null,
+              createdAt: "t",
+            },
+          ],
+          attempts: [],
+        },
+      ],
+    })
+
+    expect(screen.getByRole("button", { name: "Retry review" })).toBeVisible()
+  })
+
+  it("hides every recovery control once every cycle has concluded (approved/exhausted/superseded) — the stale-control guard", () => {
+    renderRail(createQueryClient(), {
+      reviewCycles: [
+        {
+          id: "cycle-1",
+          pullRequestId: "pr-1",
+          state: "approved",
+          headSha: "sha-1",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [],
+          attempts: [],
+        },
+        {
+          id: "cycle-2",
+          pullRequestId: "pr-2",
+          state: "exhausted",
+          headSha: "sha-2",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [],
+          attempts: [
+            {
+              id: "attempt-1",
+              attemptNumber: 3,
+              verdict: "changes_requested",
+              summary: null,
+              githubReviewId: null,
+              publishedAt: null,
+              createdAt: "t",
+              findings: [],
+            },
+          ],
+        },
+        {
+          id: "cycle-3",
+          pullRequestId: "pr-3",
+          state: "superseded",
+          headSha: "sha-3",
+          supersededReason: "new_head_sha",
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [],
+          attempts: [],
+        },
+      ],
+    })
+
+    expect(screen.queryByText("Review")).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Retry review" })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Continue with human review" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows Start fresh implementation session with the specific unavailable reason", () => {
+    renderRail(createQueryClient(), {
+      implementationOwner: {
+        id: "owner-1",
+        issueId,
+        generation: 2,
+        origin: "fresh_implementation",
+        workerId: null,
+        sessionId: "session-1",
+        agentProvider: "claude_code",
+        issueModel: null,
+        establishedAt: "2026-07-29T12:00:00.000Z",
+        resumable: false,
+        unavailableReason: "worker_deleted",
+      },
+    })
+
+    expect(
+      screen.getByRole("button", {
+        name: "Start fresh implementation session",
+      })
+    ).toBeVisible()
+    expect(screen.getByText(/the original worker was deleted/)).toBeVisible()
   })
 })

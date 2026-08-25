@@ -237,6 +237,46 @@ export async function continueWithHumanReview(
   }
 }
 
+export type RetryReviewRunResult = {
+  reviewRunId: string
+  reviewCycleId: string
+}
+
+// The explicit user "retry now" recovery action for a cycle stuck with no
+// live run (typically two trailing infra failures at the current head SHA,
+// per `failReviewRun`'s one-automatic-retry budget) — everything else about
+// recovery is derived from run history (ADR-0003/0004), but nothing else
+// re-arms progression without new code arriving or a human GitHub action.
+export async function retryReviewRun(
+  supabase: Supabase,
+  userId: string,
+  reviewCycleId: string
+): Promise<RetryReviewRunResult> {
+  const { data, error } = await supabase
+    .rpc("retry_review_run", {
+      p_user_id: userId,
+      p_review_cycle_id: reviewCycleId,
+    })
+    .single()
+
+  if (error) {
+    // P0002 = no_data_found (cycle not owned / missing); 23514 = the cycle
+    // isn't active, already has a live run, or its attempt budget is spent.
+    if (error.code === "P0002") {
+      throw new ServiceError("not_found", "Review cycle not found")
+    }
+    if (error.code === "23514") {
+      throw new ServiceError("validation", error.message)
+    }
+    throw new ServiceError("internal", error.message)
+  }
+
+  return {
+    reviewRunId: data.review_run_id,
+    reviewCycleId: data.review_cycle_id,
+  }
+}
+
 export type DeliverReviewFixRequestOutcome =
   | "delivered"
   | "already_delivered"

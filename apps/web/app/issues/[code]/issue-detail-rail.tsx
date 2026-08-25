@@ -34,6 +34,15 @@ import {
   statusLabels,
 } from "@/app/issues/issues-columns"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
+import {
+  githubReviewUrl,
+  latestReviewAttempt,
+  latestReviewCycleByPullRequest,
+  latestReviewRun,
+  reviewCycleStateMeta,
+  reviewVerdictMeta,
+  REVIEW_ATTEMPT_BUDGET,
+} from "@/app/issues/review-state-meta"
 import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
 import type { IssuePullRequest } from "@/app/queries"
@@ -41,7 +50,12 @@ import { Button } from "@gentic/ui/button"
 import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 import { cn } from "@gentic/ui/utils"
-import type { IssueRelation, IssueRelationIssue } from "@gentic/services/issues"
+import type {
+  ImplementationOwner,
+  IssueRelation,
+  IssueRelationIssue,
+  ReviewCycle,
+} from "@gentic/services/issues"
 import type { IssuePriority, IssueStatus } from "@gentic/validators/issues"
 import type { LabelSnapshot } from "@gentic/validators/realtime"
 
@@ -52,6 +66,9 @@ import {
   IssueDetailPriority,
   IssueDetailStatus,
 } from "./issue-detail-status-priority"
+import { ReviewRecoveryControls } from "./review-recovery-controls"
+import { hasReviewRecoveryControls } from "./review-recovery-visibility"
+import { ReviewRunLogsTrigger } from "./review-run-logs-panel"
 
 function parsePullRequestUrl(url: string) {
   try {
@@ -71,11 +88,13 @@ function IssueDetailPullRequests({
   pullRequests,
   issueStatus,
   showCreatePr,
+  reviewCycles,
 }: {
   issueId: string
   pullRequests: IssuePullRequest[]
   issueStatus: IssueStatus
   showCreatePr: boolean
+  reviewCycles: ReviewCycle[]
 }) {
   if (pullRequests.length === 0) {
     return (
@@ -88,46 +107,136 @@ function IssueDetailPullRequests({
     )
   }
 
-  return (
-    <ul className="grid min-w-0 gap-1.5">
-      {pullRequests.map((pullRequest) => {
-        const { repo, number } = parsePullRequestUrl(pullRequest.url)
-        const fallbackState = issueStatus === "merged" ? "merged" : "unknown"
-        const stateMeta =
-          pullRequestStateMeta[pullRequest.state ?? fallbackState]
-        const StateIcon = stateMeta.icon
+  const latestCycleByPullRequest = latestReviewCycleByPullRequest(reviewCycles)
+  const trackedPullRequests = pullRequests.filter((pullRequest) =>
+    latestCycleByPullRequest.has(pullRequest.id)
+  )
+  const reviewedPullRequestCount = trackedPullRequests.filter(
+    (pullRequest) =>
+      latestCycleByPullRequest.get(pullRequest.id)?.state === "approved"
+  ).length
 
-        return (
-          <li key={pullRequest.id} className="min-w-0">
-            <Link
-              href={pullRequest.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-1.5 ring-1 ring-border hover:bg-muted/40"
-            >
-              <span
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full",
-                  stateMeta.className
-                )}
+  return (
+    <div className="grid min-w-0 gap-2">
+      {trackedPullRequests.length > 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          {reviewedPullRequestCount} of {trackedPullRequests.length} pull
+          request{trackedPullRequests.length === 1 ? "" : "s"} reviewed
+        </p>
+      ) : null}
+      <ul className="grid min-w-0 gap-1.5">
+        {pullRequests.map((pullRequest) => {
+          const { repo, number } = parsePullRequestUrl(pullRequest.url)
+          const fallbackState = issueStatus === "merged" ? "merged" : "unknown"
+          const stateMeta =
+            pullRequestStateMeta[pullRequest.state ?? fallbackState]
+          const StateIcon = stateMeta.icon
+          const reviewCycle = latestCycleByPullRequest.get(pullRequest.id)
+
+          return (
+            <li key={pullRequest.id} className="min-w-0">
+              <Link
+                href={pullRequest.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-2.5 py-1.5 ring-1 ring-border hover:bg-muted/40"
               >
-                <StateIcon className={cn("size-4", stateMeta.iconClassName)} />
-              </span>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="truncate text-[12.5px] leading-none font-medium">
-                  {repo}
-                </p>
-                <p className="truncate font-mono text-[11px] leading-none text-muted-foreground">
-                  {number ? `#${number} · ` : ""}
-                  {stateMeta.label}
-                </p>
-              </div>
-              <IconExternalLink className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
+                <span
+                  className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-full",
+                    stateMeta.className
+                  )}
+                >
+                  <StateIcon
+                    className={cn("size-4", stateMeta.iconClassName)}
+                  />
+                </span>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="truncate text-[12.5px] leading-none font-medium">
+                    {repo}
+                  </p>
+                  <p className="truncate font-mono text-[11px] leading-none text-muted-foreground">
+                    {number ? `#${number} · ` : ""}
+                    {stateMeta.label}
+                  </p>
+                </div>
+                <IconExternalLink className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+              {reviewCycle ? (
+                <ReviewCycleSummary
+                  issueId={issueId}
+                  pullRequestUrl={pullRequest.url}
+                  cycle={reviewCycle}
+                />
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function ReviewCycleSummary({
+  issueId,
+  pullRequestUrl,
+  cycle,
+}: {
+  issueId: string
+  pullRequestUrl: string
+  cycle: ReviewCycle
+}) {
+  const cycleStateMeta =
+    reviewCycleStateMeta[cycle.state as keyof typeof reviewCycleStateMeta] ??
+    reviewCycleStateMeta.active
+  const latestAttempt = latestReviewAttempt(cycle)
+  const latestRun = latestReviewRun(cycle)
+  const verdictMeta = latestAttempt
+    ? reviewVerdictMeta[
+        latestAttempt.verdict as keyof typeof reviewVerdictMeta
+      ]
+    : null
+  const reviewUrl = latestAttempt
+    ? githubReviewUrl(pullRequestUrl, latestAttempt.githubReviewId)
+    : null
+  const isLiveRun =
+    latestRun?.status === "pending" || latestRun?.status === "running"
+
+  return (
+    <div className="mt-1 ml-10 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+      <span className={cn("font-medium", cycleStateMeta.className)}>
+        {cycleStateMeta.label}
+      </span>
+      <span className="text-muted-foreground">
+        {cycle.attempts.length}/{REVIEW_ATTEMPT_BUDGET} attempts
+      </span>
+      {verdictMeta ? (
+        <span className={verdictMeta.className}>{verdictMeta.label}</span>
+      ) : null}
+      {latestAttempt && latestAttempt.findings.length > 0 ? (
+        <span className="text-muted-foreground">
+          {latestAttempt.findings.length} finding
+          {latestAttempt.findings.length === 1 ? "" : "s"}
+        </span>
+      ) : null}
+      {reviewUrl ? (
+        <Link
+          href={reviewUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-muted-foreground underline hover:text-foreground"
+        >
+          View review
+        </Link>
+      ) : null}
+      {latestRun ? (
+        <ReviewRunLogsTrigger
+          issueId={issueId}
+          reviewRunId={latestRun.id}
+          isLive={isLiveRun}
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -683,6 +792,30 @@ export function RailSection({
   )
 }
 
+function ReviewRecoverySection({
+  issueId,
+  reviewCycles,
+  implementationOwner,
+}: {
+  issueId: string
+  reviewCycles: ReviewCycle[]
+  implementationOwner: ImplementationOwner | null
+}) {
+  if (!hasReviewRecoveryControls(reviewCycles, implementationOwner)) {
+    return null
+  }
+
+  return (
+    <RailSection title="Review">
+      <ReviewRecoveryControls
+        issueId={issueId}
+        reviewCycles={reviewCycles}
+        implementationOwner={implementationOwner}
+      />
+    </RailSection>
+  )
+}
+
 export function IssueDetailRail({
   issueId,
   issueCode,
@@ -697,6 +830,8 @@ export function IssueDetailRail({
   labels,
   attachments,
   messageAttachments,
+  reviewCycles,
+  implementationOwner,
 }: {
   issueId: string
   issueCode: string | null
@@ -713,6 +848,8 @@ export function IssueDetailRail({
   labels: LabelSnapshot[]
   attachments: Attachment[]
   messageAttachments: Attachment[]
+  reviewCycles: ReviewCycle[]
+  implementationOwner: ImplementationOwner | null
 }) {
   const showCreatePr = canShowManualCreatePrAction({
     status,
@@ -753,8 +890,17 @@ export function IssueDetailRail({
             pullRequests={pullRequests}
             issueStatus={status}
             showCreatePr={showCreatePr}
+            reviewCycles={reviewCycles}
           />
         </RailSection>
+      )}
+
+      {isSpec ? null : (
+        <ReviewRecoverySection
+          issueId={issueId}
+          reviewCycles={reviewCycles}
+          implementationOwner={implementationOwner}
+        />
       )}
 
       {/* Every file the issue holds: the ones attached to the issue itself,

@@ -21,6 +21,8 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
     events,
     labels,
     archivedLabelIds,
+    reviewCycles,
+    implementationOwner,
   } = data
   const isSpec = isSpecIssueType(issue.type)
   // Exactly one *visible* viewport tall at every breakpoint, so the composer
@@ -45,6 +47,14 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
           // only; refresh so assigned chips, counts, and the timeline's
           // archived styling stay current without a reload.
           "labels",
+          // Automatic Review lifecycle (GEN-419): the rail's per-PR review
+          // state and the recovery controls' visibility both derive from
+          // these.
+          "review_cycles",
+          "review_runs",
+          "review_attempts",
+          "review_findings",
+          "issue_implementation_owners",
         ]}
       />
       <IssueSlugUrlSync issue={issue} />
@@ -57,6 +67,8 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
         labels={labels}
         attachments={attachments}
         messageAttachments={messageAttachments}
+        reviewCycles={reviewCycles}
+        implementationOwner={implementationOwner}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col border-t xl:flex-row">
@@ -98,6 +110,8 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             labels={labels}
             attachments={attachments}
             messageAttachments={messageAttachments}
+            reviewCycles={reviewCycles}
+            implementationOwner={implementationOwner}
           />
         </aside>
       </div>

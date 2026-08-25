@@ -128,6 +128,8 @@ export type IssueDetailData = {
   events: IssueEvent[]
   labels: AssignedIssueLabel[]
   archivedLabelIds: string[]
+  reviewCycles: issuesService.ReviewCycle[]
+  implementationOwner: issuesService.ImplementationOwner | null
 }
 
 type AuthenticatedContext = Awaited<ReturnType<typeof getAuthenticatedContext>>
@@ -449,6 +451,8 @@ async function getIssueDetailDataForIssue(
     { data: automaticPrRequestRows, error: automaticPrRequestsError },
     relations,
     relationCandidates,
+    reviewCycles,
+    implementationOwner,
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -477,6 +481,8 @@ async function getIssueDetailDataForIssue(
       .in("status", ["pending", "claimed"]),
     issuesService.listIssueRelations(supabase, userId, id),
     issuesService.listIssueRelationCandidates(supabase, userId, id),
+    issuesService.listReviewStateForIssue(supabase, userId, id),
+    issuesService.resolveImplementationOwner(supabase, id),
   ])
 
   if (messagesError) {
@@ -546,6 +552,8 @@ async function getIssueDetailDataForIssue(
     events,
     labels: parsedIssue.labels,
     archivedLabelIds,
+    reviewCycles,
+    implementationOwner,
   }
 }
 
