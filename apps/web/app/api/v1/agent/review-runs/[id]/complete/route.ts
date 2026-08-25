@@ -1,6 +1,9 @@
+import { formatReviewFixRequestMessage } from "@gentic/services/issues"
 import { getReviewRunPublishContext } from "@gentic/services/review-context"
 import {
   completeReviewAttempt,
+  deliverReviewFixRequest as defaultDeliverReviewFixRequest,
+  shouldDeliverReviewFix,
   type CompleteReviewAttemptResult,
 } from "@gentic/services/review-lifecycle"
 import type { Supabase } from "@gentic/services/types"
@@ -20,6 +23,14 @@ import {
 
 export const runtime = "nodejs"
 
+export type CompleteReviewRunDeps = {
+  deliverReviewFixRequest: typeof defaultDeliverReviewFixRequest
+}
+
+const defaultDeps: CompleteReviewRunDeps = {
+  deliverReviewFixRequest: defaultDeliverReviewFixRequest,
+}
+
 // Publishes the validated verdict to GitHub as a real PR review (GEN-416)
 // before recording it — `publishReviewVerdict` is the only place with GitHub
 // App credentials, since the isolated reviewer runtime (ADR-0006) is
@@ -28,11 +39,19 @@ export const runtime = "nodejs"
 // itself, and trusting a client-supplied id here would let a request forge
 // `review_attempts.github_review_id` (the exact value the webhook's
 // bot-echo recognition trusts).
+//
+// When the recorded verdict is `changes_requested` and the cycle is still
+// `active` (not exhausted at the third attempt), also returns the findings
+// to the original implementation session (GEN-417, ADR-0007) —
+// `deliverReviewFixRequest` itself decides whether the current durable
+// owner can actually be resumed, and is a no-op if this run's delivery was
+// already applied.
 export async function completeReviewRun(
   supabase: Supabase,
   userId: string,
   reviewRunId: string,
-  fields: CompleteReviewRunInput
+  fields: CompleteReviewRunInput,
+  deps: CompleteReviewRunDeps = defaultDeps
 ): Promise<CompleteReviewAttemptResult> {
   const publishContext = await getReviewRunPublishContext(supabase, reviewRunId)
 
@@ -47,13 +66,27 @@ export async function completeReviewRun(
     findings: fields.findings ?? [],
   })
 
-  return completeReviewAttempt(supabase, {
+  const result = await completeReviewAttempt(supabase, {
     reviewRunId,
     verdict: fields.verdict,
     summary: fields.summary,
     githubReviewId: published.githubReviewId,
     findings: published.findings,
   })
+
+  if (shouldDeliverReviewFix(result, fields.verdict)) {
+    await deps.deliverReviewFixRequest(supabase, {
+      reviewAttemptId: result.reviewAttemptId,
+      content: formatReviewFixRequestMessage({
+        prUrl: publishContext.prUrl,
+        attemptNumber: result.attemptNumber ?? 1,
+        summary: fields.summary ?? null,
+        findings: published.findings,
+      }),
+    })
+  }
+
+  return result
 }
 
 export async function PATCH(

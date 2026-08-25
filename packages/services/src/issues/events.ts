@@ -10,6 +10,10 @@ export type IssueEventType =
   | "pr_opened"
   | "pr_associated"
   | "pr_merged"
+  // Written directly by the `deliver_review_fix_request` RPC (GEN-417), not
+  // through `logIssueEvent` — listed here so TypeScript readers of
+  // `issue_events` have a complete, typed picture of what they may see.
+  | "review_fix_delivered"
 
 export async function logIssueEvent(
   supabase: Supabase,

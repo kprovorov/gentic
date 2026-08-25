@@ -237,6 +237,77 @@ export async function continueWithHumanReview(
   }
 }
 
+export type DeliverReviewFixRequestOutcome =
+  | "delivered"
+  | "already_delivered"
+  | "not_found"
+  | "not_changes_requested"
+  | "cycle_not_active"
+  | "stale_head"
+  | "no_owner"
+  | "owner_unavailable"
+
+export type DeliverReviewFixRequestResult = {
+  reviewAttemptId: string
+  issueId: string | null
+  outcome: DeliverReviewFixRequestOutcome
+  // Set iff outcome is 'owner_unavailable' — one of
+  // `IMPLEMENTATION_OWNER_UNAVAILABLE_REASONS`
+  // (`@gentic/services/issues/implementation-owner`).
+  unavailableReason: string | null
+}
+
+// Delivers one `changes_requested` Review Attempt's findings to the Issue's
+// current durable implementation owner (GEN-417, see ADR-0007) — the
+// `deliver_review_fix_request` RPC does the actual work atomically (locking
+// the same way `complete_review_attempt`'s cycle/run rows are locked), so
+// this is a thin, idempotent wrapper. Call once per completed Review Attempt
+// whose verdict is `changes_requested`; replaying the same attempt id is a
+// no-op (`already_delivered`).
+export async function deliverReviewFixRequest(
+  supabase: Supabase,
+  input: { reviewAttemptId: string; content: string }
+): Promise<DeliverReviewFixRequestResult> {
+  const result = unwrap(
+    await supabase.rpc("deliver_review_fix_request", {
+      p_review_attempt_id: input.reviewAttemptId,
+      p_content: input.content,
+    })
+  )[0]
+
+  if (!result) {
+    throw new ServiceError("not_found", "Review attempt not found")
+  }
+
+  return {
+    reviewAttemptId: result.review_attempt_id,
+    issueId: result.issue_id,
+    outcome: result.outcome as DeliverReviewFixRequestOutcome,
+    unavailableReason: result.unavailable_reason,
+  }
+}
+
+// Whether a just-recorded `completeReviewAttempt` result should trigger fix
+// delivery at all: only a `changes_requested` verdict that was actually
+// accepted (not stale/superseded) and left the cycle `active` (not the
+// third-attempt `exhausted`, where automatic looping must stop) is
+// deliverable. Pulled out so the decision itself — the part with any real
+// logic — is unit-testable without a Supabase client.
+export function shouldDeliverReviewFix(
+  result: Pick<
+    CompleteReviewAttemptResult,
+    "accepted" | "cycleState" | "reviewAttemptId"
+  >,
+  verdict: ReviewVerdict
+): result is { accepted: true; cycleState: "active"; reviewAttemptId: string } {
+  return (
+    result.accepted &&
+    verdict === "changes_requested" &&
+    result.cycleState === "active" &&
+    result.reviewAttemptId !== null
+  )
+}
+
 // Distinguishes a genuine human review from our own automated review being
 // echoed back through the GitHub webhook: only an unmatched review id is a
 // real human action that should supersede an in-flight automatic cycle.
