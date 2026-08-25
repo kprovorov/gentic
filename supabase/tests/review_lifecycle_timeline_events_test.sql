@@ -210,12 +210,12 @@ SELECT is(
 -- primitive for a cycle stuck after two trailing infra failures.
 -- ---------------------------------------------------------------------
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('r1000000-0000-4000-8000-000000000001', 'user_retry_1', 'Retry A', 'gentic/retry-a', 'RTA', true);
+  ('f1000000-0000-4000-8000-000000000001', 'user_retry_1', 'Retry A', 'gentic/retry-a', 'RTA', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
-  ('r1000000-0000-4000-8000-000000000002', 'r1000000-0000-4000-8000-000000000001',
+  ('f1000000-0000-4000-8000-000000000002', 'f1000000-0000-4000-8000-000000000001',
    'Retry issue', 'Body', 'ready-for-review', 1, 'claude_code');
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
-  ('r1000000-0000-4000-8000-000000000003', 'r1000000-0000-4000-8000-000000000002',
+  ('f1000000-0000-4000-8000-000000000003', 'f1000000-0000-4000-8000-000000000002',
    'https://github.com/gentic/retry-a/pull/1', 'open', 'sha-r1', 'success');
 
 CREATE TEMP TABLE r1_eval AS
@@ -247,7 +247,7 @@ SELECT is(
 );
 SELECT is(
   (SELECT count(*)::integer FROM public.issue_events
-    WHERE issue_id = 'r1000000-0000-4000-8000-000000000002'
+    WHERE issue_id = 'f1000000-0000-4000-8000-000000000002'
       AND type = 'review_queued'
       AND (payload->>'review_cycle_id')::uuid = (SELECT review_cycle_id FROM r1_eval)),
   2,
@@ -278,12 +278,12 @@ SELECT throws_ok(
 -- Exhaust a fresh cycle's attempt budget, then retry_review_run must refuse
 -- the now-concluded (not `active`) cycle.
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
-  ('r2000000-0000-4000-8000-000000000001', 'user_retry_2', 'Retry B', 'gentic/retry-b', 'RTB', true);
+  ('f2000000-0000-4000-8000-000000000001', 'user_retry_2', 'Retry B', 'gentic/retry-b', 'RTB', true);
 INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
-  ('r2000000-0000-4000-8000-000000000002', 'r2000000-0000-4000-8000-000000000001',
+  ('f2000000-0000-4000-8000-000000000002', 'f2000000-0000-4000-8000-000000000001',
    'Retry issue B', 'Body', 'ready-for-review', 1, 'claude_code');
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
-  ('r2000000-0000-4000-8000-000000000003', 'r2000000-0000-4000-8000-000000000002',
+  ('f2000000-0000-4000-8000-000000000003', 'f2000000-0000-4000-8000-000000000002',
    'https://github.com/gentic/retry-b/pull/1', 'open', 'sha-r2', 'success');
 
 CREATE TEMP TABLE r2_eval1 AS
