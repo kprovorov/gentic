@@ -1,0 +1,78 @@
+---
+title: "Automatic Code Review"
+sidebarTitle: "Automatic Review"
+description: "Enable a separate reviewer agent to test, review, and gate pull requests before you see them, and how to observe, recover, and turn it off."
+---
+
+Automatic Review runs a second, isolated coding agent against a pull request's exact commit, tests and inspects it, and posts a real GitHub review — approving it, requesting changes (which are routed straight back to the original implementation agent), or leaving non-blocking comments. It is alpha, opt-in, and off by default.
+
+<Note>
+  This page covers the owner-facing behavior and controls. For the
+  underlying design decisions, see `docs/adr/0003` through `0008` in the
+  repository.
+</Note>
+
+## Enabling it
+
+Automatic Review has two levels of configuration, both under **Settings → Workspace**:
+
+- **Project-level** `automatic_review_enabled` (plus an optional reviewer provider, model, and custom instructions) is the default for every issue in that project.
+- **Issue-level** override lets a single issue opt in or out regardless of the project default.
+
+<Warning>
+  **The setting only matters before an issue has its first pull request.**
+  The moment a PR is associated with an issue, Gentic takes an immutable
+  snapshot of whatever the effective setting was at that instant
+  (`issue_review_policies`) and reviews that issue against the snapshot for
+  the rest of its life. Changing the project or issue setting afterward —
+  in either direction — has **no effect** on an issue that already has a
+  PR. There is no retroactive enable or disable.
+</Warning>
+
+This means: if you want an issue reviewed automatically, the setting must be on *before* its agent opens a pull request. If you turn it on after the fact, that issue's existing PR was never eligible and never will be — only issues that get a PR after the change will pick it up.
+
+## What happens during a review
+
+1. A pull request opens, updates, or its required CI finishes — Gentic re-evaluates eligibility on every one of these events.
+2. If eligible, a **Review Cycle** starts for that pull request's exact head commit, with a budget of **3 attempts**.
+3. A reviewer agent — a separate process from the one that wrote the code, with no push access and no Gentic MCP tools — clones that exact commit into a disposable checkout, inspects and can run local tests, and produces a verdict.
+4. The verdict is published as a real GitHub pull request review:
+   - **Approved** — counts toward the issue being presented as `Approved` (see [Multiple pull requests](#multiple-pull-requests) below).
+   - **Changes requested** — findings are delivered as a new message to the *same* implementation session that opened the PR, and the issue returns to `Todo`. This consumes one of the 3 attempts.
+   - **Commented** — non-blocking feedback; the issue returns to `Ready for review`.
+5. Every push while a review is in flight cancels the stale run without spending an attempt and re-evaluates at the new commit. A push after a cycle has already concluded (approved, exhausted, or superseded) starts a **fresh** cycle with a full 3-attempt budget.
+6. A genuine human GitHub review requesting changes always wins immediately — it supersedes any in-flight or already-approved automatic cycle. (The automatic reviewer's own review, echoed back through the same webhook, is recognized and ignored so it can't supersede itself.)
+
+### Multiple pull requests
+
+If an issue has more than one open, non-draft associated pull request, every one of them must independently reach an approved Review Cycle before Gentic presents the issue's overall status as `Approved`.
+
+### Infrastructure failures
+
+A crash, timeout, or malformed reviewer output is never treated as a verdict. It retries automatically once at the same commit; if that retry also fails, automatic progress stops and the Review Cycle is left `Active` with no live run, waiting for a human action or new code — see [Recovery actions](#recovery-actions).
+
+## Observability
+
+- **Issue timeline** — every lifecycle transition (`review_queued`, `review_started`, `review_approved`, `review_changes_requested`, `review_failed`, `review_superseded`, `review_fix_delivered`) appears as a timeline event on the issue, including *why* (e.g. superseded by a human review vs. a new push).
+- **Review Run logs** — each reviewer execution streams its own log (separate from the issue's chat), viewable from the issue.
+- **GitHub itself** — the published review, its verdict, and any inline/summary comments are ordinary GitHub review data, subject to your repository's own branch protection and required-review settings, which remain authoritative regardless of what Gentic shows.
+
+## Recovery actions
+
+These appear directly on the issue when applicable:
+
+| Control | When it appears | What it does |
+| --- | --- | --- |
+| **Retry review** | The active cycle has no live run and hasn't exhausted its 3-attempt budget (typically after two consecutive infrastructure failures) | Queues a fresh review run at the current commit, same cycle, same budget |
+| **Continue with human review** | The pull request has an active Review Cycle | Marks the cycle approved without a further automatic verdict — the only other way (besides an automatic approval) a cycle reaches `Approved` |
+| **Start fresh implementation session** | The durable owner of the implementation session can't resume (agent/model changed, no resumable session was ever recorded, or the original worker was deleted or banned) | Abandons the old session and starts a new one to pick up the next review fix |
+
+A cycle that has already exhausted its 3 attempts, been superseded, or been approved needs no recovery action — the next push (or **Continue with human review**) is what moves it forward.
+
+## Turning it off (safe disablement)
+
+- **New work**: flip the project or issue setting off. Any issue that has **not yet** opened a pull request picks up the change immediately.
+- **An issue with an already-open pull request**: the setting change does not reach it (see the immutability note above). To stop automatic review on that specific issue, use **Continue with human review** — this forces the current cycle to `Approved` and nothing further is automatically queued for it. Closing or merging the pull request has the same practical effect, since there is no live PR left to evaluate.
+- **Whole-workspace kill switch**: there isn't a single switch that pauses every in-flight cycle at once. Disabling the project setting stops new issues from opting in; issues already mid-cycle need the per-issue action above (or to be closed/merged) to stop.
+
+This asymmetry — instant for new work, requiring an explicit per-issue action for work already in flight — is intentional: it mirrors how the policy snapshot itself works, and it guarantees a review that's already running is never silently abandoned mid-flight by an unrelated settings change.

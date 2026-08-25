@@ -793,11 +793,18 @@ export async function processReviewRun(
       throw error
     }
     const message = describe(error)
-    logError(`review run ${reviewRun.id} failed:`, message)
+    logError(`review run ${reviewRun.id} failed:`, {
+      issueId: reviewRun.issueId,
+      pullRequestId: reviewRun.pullRequestId,
+      reviewCycleId: reviewRun.reviewCycleId,
+      headSha: reviewRun.headSha,
+      message,
+    })
     await api.failReviewRun(reviewRun.id, { error: message }).catch(
       (failError) => {
         logError(
           `review run ${reviewRun.id} failed to report infra failure:`,
+          { issueId: reviewRun.issueId, reviewCycleId: reviewRun.reviewCycleId },
           describe(failError)
         )
       }

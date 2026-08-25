@@ -46,7 +46,8 @@
               "web/labels",
               "web/github-integration",
               "web/issue-statuses",
-              "web/connected-workers"
+              "web/connected-workers",
+              "web/automatic-review"
             ]
           },
           {

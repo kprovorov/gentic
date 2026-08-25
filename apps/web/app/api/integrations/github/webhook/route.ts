@@ -320,6 +320,7 @@ async function handlePullRequestEvent(
         // can repair these deliberately unknown hydrated fields.
         console.error(
           "[github-webhook] failed to hydrate associated pull request, preserving unknown state:",
+          { prUrl: payload.pull_request.html_url, issueId: diagnostic.issueId },
           error
         )
       } else {
@@ -345,6 +346,7 @@ async function handlePullRequestEvent(
   } catch (error) {
     console.error(
       "[github-webhook] failed to evaluate automatic review eligibility:",
+      { prUrl: payload.pull_request.html_url },
       error
     )
   }
@@ -547,7 +549,8 @@ async function resolveCompletedChecksForRef(
 
   if (pullNumbers.length === 0) {
     console.error(
-      "[github-webhook] could not resolve pull requests for completed checks, skipping"
+      "[github-webhook] could not resolve pull requests for completed checks, skipping",
+      { owner, repo, headSha }
     )
     return
   }
@@ -558,6 +561,7 @@ async function resolveCompletedChecksForRef(
   } catch (error) {
     console.error(
       "[github-webhook] failed to fetch check suites for ref, skipping:",
+      { owner, repo, headSha },
       error
     )
     return
@@ -593,6 +597,7 @@ async function resolveCompletedChecksForRef(
     } catch (error) {
       console.error(
         "[github-webhook] failed to evaluate automatic review eligibility:",
+        { prUrl, headSha },
         error
       )
     }
@@ -622,6 +627,7 @@ async function resolvePullNumbersForRef(
   } catch (error) {
     console.error(
       "[github-webhook] failed to fetch pull requests for commit, falling back to payload:",
+      { owner, repo, headSha },
       error
     )
     pullNumbers = fallbackPullNumbers
@@ -659,6 +665,7 @@ async function markPendingChecksForRef(
     } catch (error) {
       console.error(
         "[github-webhook] failed to evaluate automatic review eligibility:",
+        { prUrl, headSha },
         error
       )
     }
@@ -717,6 +724,10 @@ async function handlePullRequestReviewEvent(
       } catch (error) {
         console.error(
           "[github-webhook] failed to check known review attempt:",
+          {
+            prUrl: payload.pull_request.html_url,
+            githubReviewId: payload.review.id,
+          },
           error
         )
       }
@@ -732,6 +743,10 @@ async function handlePullRequestReviewEvent(
       } catch (error) {
         console.error(
           "[github-webhook] failed to supersede automatic review on human changes-requested:",
+          {
+            prUrl: payload.pull_request.html_url,
+            githubReviewId: payload.review.id,
+          },
           error
         )
       }
@@ -765,6 +780,10 @@ async function applyChangesRequestedReview(
     } catch (error) {
       console.error(
         "[github-webhook] failed to fetch review comments, falling back to review body only",
+        {
+          prUrl: payload.pull_request.html_url,
+          githubReviewId: payload.review.id,
+        },
         error
       )
     }
