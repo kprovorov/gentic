@@ -1427,11 +1427,7 @@ export type Database = {
         Returns: undefined
       }
       retry_review_run: {
-        Args: {
-          p_now?: string
-          p_review_cycle_id: string
-          p_user_id: string
-        }
+        Args: { p_now?: string; p_review_cycle_id: string; p_user_id: string }
         Returns: {
           review_cycle_id: string
           review_run_id: string
