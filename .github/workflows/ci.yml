@@ -49,6 +49,21 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Exposes the running local instance to the live Automatic Review E2E
+      # tests (apps/web/tests/automatic-review-e2e-*.test.ts,
+      # apps/web/tests/helpers/live-review-harness.ts), which otherwise skip
+      # themselves — these are the fixed local-dev demo keys the Supabase
+      # CLI prints for every project, not secrets. If the override names
+      # below drift from a future CLI version, `pnpm dlx supabase@2.109.1
+      # status -o env` (no overrides) in this job's log shows the current
+      # dot-paths to fix them with.
+      - name: Expose local Supabase credentials to Root tests
+        run: |
+          pnpm dlx supabase@2.109.1 status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
+            >> "$GITHUB_ENV"
+
       - name: Root tests
         env:
           TZ: UTC

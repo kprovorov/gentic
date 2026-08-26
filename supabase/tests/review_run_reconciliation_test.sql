@@ -5,7 +5,7 @@
 -- that RPC's no-attempt-consumed retry-then-stop semantics rather than
 -- introducing a new terminal state.
 BEGIN;
-SELECT plan(21);
+SELECT plan(24);
 
 SELECT has_extension('pg_cron', 'pg_cron is enabled for reliable scheduling');
 
@@ -225,6 +225,83 @@ SELECT is(
   (SELECT last_seen_at FROM public.workers WHERE id = 'd0000000-0000-4000-8000-000000000031'),
   '2026-08-19T11:54:00+00'::timestamptz,
   'reconciliation does not mutate the stale worker record itself'
+);
+
+-- ---------------------------------------------------------------------
+-- Restart resumes cleanly (GEN-420): a worker that went offline mid-review,
+-- had its run reconciled, and later comes back online must be able to
+-- claim the pending retry reconciliation left behind and proceed normally
+-- -- reconciliation's job is to make the work claimable again, not just to
+-- mark the old run failed. Kept in its own account namespace, but
+-- `reconcile_offline_review_runs` scans every account's live runs in one
+-- pass -- the Fresh Worker's still-`running` claim2 from the scenario
+-- above was last bumped to keep it fresh as of 12:29:00Z, so it must be
+-- bumped forward again before advancing the clock this far, or this
+-- section's own reconciliation pass would also sweep it up as newly stale.
+-- ---------------------------------------------------------------------
+UPDATE public.workers
+   SET last_seen_at = '2026-08-19T13:09:00Z',
+       updated_at = '2026-08-19T13:09:00Z'
+ WHERE id = 'd0000000-0000-4000-8000-000000000032';
+
+UPDATE public.review_runs
+   SET heartbeat_at = '2026-08-19T13:09:00Z'
+ WHERE id = (SELECT review_run_id FROM claim2);
+
+INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
+  ('d9000000-0000-4000-8000-000000000001', 'recon_restart_user', 'Restart Project', 'gentic/restart-project', 'RST', true);
+
+INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
+  ('d9000000-0000-4000-8000-000000000011', 'd9000000-0000-4000-8000-000000000001', 'Restarted worker', 'Body', 'ready-for-review', 1, 'claude_code');
+
+INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
+  ('d9000000-0000-4000-8000-000000000021', 'd9000000-0000-4000-8000-000000000011', 'https://github.com/gentic/restart-project/pull/1', 'open', 'sha-restart-1', 'success');
+
+SELECT public.evaluate_review_eligibility('https://github.com/gentic/restart-project/pull/1');
+
+INSERT INTO public.workers (id, user_id, display_name, credential_hash, last_seen_at, updated_at) VALUES
+  ('d9000000-0000-4000-8000-000000000031', 'recon_restart_user', 'Restarting Worker', repeat('9', 64), '2026-08-19T13:00:00Z', '2026-08-19T13:00:00Z');
+
+CREATE TEMP TABLE restart_claim AS
+SELECT * FROM public.claim_review_run('d9000000-0000-4000-8000-000000000031', 'recon_restart_user', '2026-08-19T13:00:30Z'::timestamptz);
+
+-- The worker crashes: no further heartbeat, and it goes fully silent
+-- (offline) well past the 5-minute staleness window.
+UPDATE public.workers
+   SET last_seen_at = null,
+       offline_since_at = '2026-08-19T13:01:00Z'
+ WHERE id = 'd9000000-0000-4000-8000-000000000031';
+
+SELECT is(
+  public.reconcile_offline_review_runs('2026-08-19T13:10:00Z'::timestamptz),
+  1,
+  'the crashed worker''s run is reconciled'
+);
+
+CREATE TEMP TABLE restart_retry AS
+SELECT * FROM public.review_runs
+ WHERE review_cycle_id = (SELECT review_cycle_id FROM restart_claim) AND status = 'pending';
+
+-- The same worker identity restarts (per GEN-412, `GENTIC_WORKER_ID`/
+-- credential persist across restarts) and resumes polling.
+UPDATE public.workers
+   SET last_seen_at = '2026-08-19T13:15:00Z',
+       offline_since_at = null,
+       updated_at = '2026-08-19T13:15:00Z'
+ WHERE id = 'd9000000-0000-4000-8000-000000000031';
+
+CREATE TEMP TABLE restart_reclaim AS
+SELECT * FROM public.claim_review_run('d9000000-0000-4000-8000-000000000031', 'recon_restart_user', '2026-08-19T13:15:05Z'::timestamptz);
+
+SELECT is(
+  (SELECT review_run_id FROM restart_reclaim),
+  (SELECT id FROM restart_retry),
+  'the restarted worker successfully claims the pending run reconciliation freed for it'
+);
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT id FROM restart_retry)),
+  'running',
+  'the reclaimed run proceeds to running, exactly as any other fresh claim would'
 );
 
 SELECT * FROM finish();
