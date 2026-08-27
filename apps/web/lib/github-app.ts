@@ -324,6 +324,15 @@ export async function createPullRequestReview(
   )
 
   if (!response.ok) {
+    if (response.status === 403) {
+      // An installation access token carries the permissions it had at mint
+      // time, and this cache holds it for close to an hour. So after an owner
+      // grants the App write access to pull requests, a cached read-only token
+      // would keep failing this call for the rest of that hour — including the
+      // operator's manual `Retry review`. Drop it so the next attempt mints a
+      // token with the new permissions.
+      installationTokenCache.delete(installationId)
+    }
     const detail = await response.text().catch(() => "")
     throw new GithubApiError(
       response.status,

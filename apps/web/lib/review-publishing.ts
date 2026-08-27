@@ -339,6 +339,19 @@ function buildReviewBody(
   return parts.join("\n\n")
 }
 
+// Publishing a verdict is the only write Gentic makes against the GitHub
+// API — every other call in `github-app.ts` is a read. So an installation
+// whose "Pull requests" permission is still read-only sails through the
+// eligibility, snapshot, and idempotency checks and only fails here, with
+// the same opaque 403 GitHub uses for a repository the installation cannot
+// see at all. Name the missing permission: the reviewer has already done
+// its work by this point, and the operator otherwise has nothing to act on.
+const MISSING_WRITE_PERMISSION_DETAIL = "Resource not accessible by integration"
+const MISSING_WRITE_PERMISSION_HINT =
+  "The GitHub App installation cannot write reviews. Set its Pull requests " +
+  "permission to Read & write and accept the permission request on the " +
+  "installation."
+
 const GITHUB_STATUS_TO_SERVICE_ERROR: Record<number, ServiceError["code"]> = {
   401: "forbidden",
   403: "forbidden",
@@ -351,7 +364,15 @@ const GITHUB_STATUS_TO_SERVICE_ERROR: Record<number, ServiceError["code"]> = {
 function classifyGithubError(error: unknown): ServiceError {
   if (error instanceof GithubApiError) {
     const code = GITHUB_STATUS_TO_SERVICE_ERROR[error.status] ?? "internal"
-    return new ServiceError(code, error.message)
+    const missingPermission =
+      error.status === 403 &&
+      error.message.includes(MISSING_WRITE_PERMISSION_DETAIL)
+    return new ServiceError(
+      code,
+      missingPermission
+        ? `${error.message} — ${MISSING_WRITE_PERMISSION_HINT}`
+        : error.message
+    )
   }
   if (error instanceof ServiceError) {
     return error

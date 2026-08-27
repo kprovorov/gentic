@@ -381,3 +381,50 @@ test("classifies GitHub error statuses into ServiceError codes with explicit ret
     )
   }
 })
+
+test("names the missing App permission when GitHub rejects the write with a 403", async () => {
+  const deps = recordingDeps({
+    async createPullRequestReview() {
+      throw new GithubApiError(
+        403,
+        'Failed to create pull request review (403): {"message":"Resource not accessible by integration"}'
+      )
+    },
+  })
+
+  await assert.rejects(
+    publishReviewVerdict(
+      supabase,
+      baseInput({ findings: [finding({ filePath: null, line: null })] }),
+      deps
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.code, "forbidden")
+      assert.match(error.message, /Pull requests/)
+      assert.match(error.message, /Read & write/)
+      return true
+    }
+  )
+})
+
+test("leaves an unrelated 403 message untouched", async () => {
+  const deps = recordingDeps({
+    async createPullRequestReview() {
+      throw new GithubApiError(403, "Repository access blocked")
+    },
+  })
+
+  await assert.rejects(
+    publishReviewVerdict(
+      supabase,
+      baseInput({ findings: [finding({ filePath: null, line: null })] }),
+      deps
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof ServiceError)
+      assert.equal(error.message, "Repository access blocked")
+      return true
+    }
+  )
+})

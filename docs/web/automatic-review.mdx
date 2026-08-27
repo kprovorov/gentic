@@ -69,6 +69,26 @@ These appear directly on the issue when applicable:
 
 A cycle that has already exhausted its 3 attempts, been superseded, or been approved needs no recovery action — the next push (or **Continue with human review**) is what moves it forward.
 
+## Troubleshooting
+
+### Every review fails with `403 Resource not accessible by integration`
+
+The reviewer ran and produced a verdict, but Gentic could not post it: the
+GitHub App installation has read-only access to pull requests. Publishing a
+review is the only write Gentic performs against the GitHub API, so an
+installation set up before Automatic Review existed reads PR and check
+events perfectly well and still fails at this last step.
+
+Fix it by raising the app's **Pull requests** permission to **Read & write**
+and then accepting the resulting permission request on the installation —
+both halves are required. See
+[GitHub Integration](/web/github-integration#connect-github) for the full
+permission table.
+
+Each failed publish consumes the cycle's attempt budget, so after fixing the
+permission use **Retry review** on any issue whose cycle still has attempts
+left, or push a commit to start a fresh cycle on one that exhausted them.
+
 ## Turning it off (safe disablement)
 
 - **New work**: flip the project or issue setting off. Any issue that has **not yet** opened a pull request picks up the change immediately.
