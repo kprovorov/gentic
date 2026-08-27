@@ -57,11 +57,19 @@ jobs:
       # below drift from a future CLI version, `pnpm dlx supabase@2.109.1
       # status -o env` (no overrides) in this job's log shows the current
       # dot-paths to fix them with.
+      #
+      # `-o env` quotes every value (KEY="VALUE") for shell `source`/`export`
+      # use, but $GITHUB_ENV isn't shell-evaluated — it parses plain
+      # KEY=VALUE lines — so appending the CLI's output directly bakes the
+      # literal quote characters into each value (e.g. SUPABASE_URL becomes
+      # `"http://127.0.0.1:54321"`, which @supabase/supabase-js then rejects
+      # as an invalid URL). Strip the surrounding quotes before appending.
       - name: Expose local Supabase credentials to Root tests
         run: |
           pnpm dlx supabase@2.109.1 status -o env \
             --override-name api.url=SUPABASE_URL \
             --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
+            | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)="(.*)"$/\1=\2/' \
             >> "$GITHUB_ENV"
 
       - name: Root tests
