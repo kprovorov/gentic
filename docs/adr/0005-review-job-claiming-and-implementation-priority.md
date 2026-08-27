@@ -97,8 +97,9 @@ immediately.
 not by a combined atomic endpoint.** Every poll tick, `apps/gentic/src/
 worker.ts` always calls `claimNextQueuedIssue` before ever attempting
 `claimReviewRun`, and only attempts the latter if the former returned
-nothing. Because `packages/services/src/workers.ts`'s `listRunningTaskCounts`
-now unions counts from both `issues` and `review_runs` into one map,
+nothing. Because `listRunningTaskCounts` in
+`packages/services/src/workers/shared.ts` now unions counts from both
+`issues` and `review_runs` into one map,
 implementation and review jobs share a single capacity pool per worker: a
 successful implementation claim consumes the slot the review-claim's own
 capacity check sees moments later. This is a client-side sequencing
