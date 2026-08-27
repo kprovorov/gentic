@@ -505,6 +505,13 @@ export function useIssueChatState({
           setUsageLimitResetAt(event.data.usage_limit_reset_at)
         })
         .subscribe((subscribeStatus) => {
+          // Tearing this channel down drives it to CLOSED. That is us leaving,
+          // not the connection dropping, and the replacement channel owns the
+          // status from here on — reporting it would flash "reconnecting" and
+          // clear the subscribed flag out from under the live channel.
+          if (cancelled) {
+            return
+          }
           broadcastSubscribedRef.current = subscribeStatus === "SUBSCRIBED"
           if (typeof navigator !== "undefined" && !navigator.onLine) {
             setRealtimeConnectionStatus(
