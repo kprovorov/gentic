@@ -18,7 +18,13 @@
       "dependsOn": ["^lint"]
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^test"],
+      "env": [
+        "SUPABASE_URL",
+        "SUPABASE_SECRET_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "REQUIRE_LIVE_SUPABASE"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]

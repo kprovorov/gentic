@@ -67,6 +67,7 @@ jobs:
       - name: Root tests
         env:
           TZ: UTC
+          REQUIRE_LIVE_SUPABASE: "1"
         run: pnpm test
 
       - name: Agent tests in non-UTC timezone

@@ -22,10 +22,21 @@ export function hasLiveSupabase(): boolean {
 const SKIP_REASON =
   "requires a local Supabase instance (SUPABASE_URL/SUPABASE_SECRET_KEY unset — run `supabase start` first)"
 
+// CI sets REQUIRE_LIVE_SUPABASE=1 after starting the local instance and
+// exporting its credentials, so a config regression that strips those
+// credentials again (the bug this tier itself exists to catch — see
+// GEN-430) turns into a loud CI failure instead of a silent skip.
 export function liveTest(
   name: string,
   fn: (t: TestContext) => void | Promise<void>
 ) {
+  if (!hasLiveSupabase() && process.env.REQUIRE_LIVE_SUPABASE) {
+    test(name, () => {
+      throw new Error(`${SKIP_REASON} (REQUIRE_LIVE_SUPABASE is set)`)
+    })
+    return
+  }
+
   test(name, { skip: hasLiveSupabase() ? false : SKIP_REASON }, fn)
 }
 
