@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto"
 import test, { type TestContext } from "node:test"
 
 import { createServiceClient } from "@gentic/supabase/service"
+import { defaultWorkerCompatibilityPolicy } from "@gentic/services/workers"
 
 // This tier drives the real Postgres state machine and the real webhook/
 // agent-API route functions (no `supabase.rpc()` fakes) — the layer the
@@ -188,6 +189,10 @@ export async function seedWorker(
       credential_hash: randomCredentialHash(),
       setup_state: "ready",
       last_seen_at: new Date().toISOString(),
+      // Unset classifies as version_health "unsupported"
+      // (classifyWorkerVersion(null) in @gentic/services/workers), which
+      // makes claimNextReviewRun refuse to claim anything for this worker.
+      gentic_version: defaultWorkerCompatibilityPolicy.currentVersion,
       provider_capabilities: { providers: {} },
     })
     .select("id")

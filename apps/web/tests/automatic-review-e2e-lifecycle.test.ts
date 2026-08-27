@@ -385,6 +385,7 @@ liveTest(
           await applyPullRequestDeliveryState(supabase, {
             prUrl,
             headSha: sha,
+            ciState: "success",
           })
         }
         const eligibility = await evaluateReviewEligibility(supabase, prUrl)
@@ -411,8 +412,13 @@ liveTest(
       await applyPullRequestDeliveryState(supabase, {
         prUrl,
         headSha: "sha-exhaust-4",
+        ciState: "success",
       })
       const afterExhaustion = await evaluateReviewEligibility(supabase, prUrl)
+      assert.ok(
+        afterExhaustion?.reviewRunId,
+        "a push after exhaustion queues a run on the fresh cycle"
+      )
       assert.notEqual(
         afterExhaustion?.reviewCycleId,
         cycleId,
@@ -467,6 +473,7 @@ liveTest(
       await applyPullRequestDeliveryState(supabase, {
         prUrl,
         headSha: "sha-repush-2",
+        ciState: "success",
       })
       const second = await evaluateReviewEligibility(supabase, prUrl)
 
