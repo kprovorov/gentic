@@ -1,8 +1,10 @@
 -- Automatic Review lifecycle engine (GEN-413 / ADR-0004): eligibility,
 -- attempt budgeting across pushes, infra-failure retry, supersession, and
--- the gate that keeps a bare human GitHub approval from auto-approving.
+-- the gate that keeps a bare human GitHub approval from auto-approving, plus
+-- (GEN-428) the durability of an automatic approval against the GitHub
+-- deliveries that follow it.
 BEGIN;
-SELECT plan(39);
+SELECT plan(43);
 
 -- ---------------------------------------------------------------------
 -- Scenario A: one pull request's whole story — eligibility, idempotent
@@ -367,6 +369,72 @@ SELECT throws_ok(
   'P0002',
   null,
   'continue_with_human_review is scoped to the owning user'
+);
+
+-- ---------------------------------------------------------------------
+-- Scenario G (GEN-428): an automatic approval survives the PR deliveries
+-- that follow it. Publishing the verdict to GitHub makes GitHub echo the
+-- review straight back, which re-hydrates the PR snapshot and re-runs the
+-- aggregator; GitHub reports `reviewDecision` as null (delivered here as
+-- `unknown`) on any repository that does not *require* reviews, so the
+-- aggregator must take the automatic verdict — not GitHub's decision — as
+-- the approval source, or it undoes the approval it just made.
+-- ---------------------------------------------------------------------
+INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
+  ('a1000000-0000-4000-8000-000000000001', 'user_engine', 'Engine G', 'gentic/engine-g', 'ENG', true);
+INSERT INTO public.issues (id, project_id, title, body, status, number, agent_provider) VALUES
+  ('a1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000001',
+   'Approval survives echo issue', 'Body', 'ready-for-review', 1, 'claude_code');
+INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
+  ('a1000000-0000-4000-8000-000000000003', 'a1000000-0000-4000-8000-000000000002',
+   'https://github.com/gentic/engine-g/pull/1', 'open', 'sha-g1', 'success');
+
+CREATE TEMP TABLE eval_echo AS
+SELECT * FROM public.evaluate_review_eligibility('https://github.com/gentic/engine-g/pull/1');
+SELECT public.complete_review_attempt((SELECT review_run_id FROM eval_echo), 'approved');
+SELECT is(
+  (SELECT status FROM public.issues WHERE id = 'a1000000-0000-4000-8000-000000000002'),
+  'approved',
+  'the automatic verdict approves the Issue'
+);
+
+-- The `pull_request_review` delivery echoing our own APPROVE back, on a
+-- repository whose branch protection does not require reviews.
+SELECT public.apply_pull_request_delivery_state(
+  'https://github.com/gentic/engine-g/pull/1',
+  p_ci_state => 'success',
+  p_review_decision => 'unknown'
+);
+SELECT is(
+  (SELECT status FROM public.issues WHERE id = 'a1000000-0000-4000-8000-000000000002'),
+  'approved',
+  'the Issue stays approved when GitHub reports no review decision of its own'
+);
+
+-- Branch protection that still wants a human approval does not retract the
+-- automatic verdict either: Automatic Review is the gate the account opted
+-- into, and the human remains free to merge or request changes.
+SELECT public.apply_pull_request_delivery_state(
+  'https://github.com/gentic/engine-g/pull/1', p_review_decision => 'review_required'
+);
+SELECT is(
+  (SELECT status FROM public.issues WHERE id = 'a1000000-0000-4000-8000-000000000002'),
+  'approved',
+  'the Issue stays approved while GitHub still reports review_required'
+);
+
+-- New code after the approval is a different story: the latest cycle is no
+-- longer the approved one, so review reopens.
+SELECT public.apply_pull_request_delivery_state(
+  'https://github.com/gentic/engine-g/pull/1',
+  p_head_sha => 'sha-g2',
+  p_ci_state => 'success'
+);
+SELECT public.evaluate_review_eligibility('https://github.com/gentic/engine-g/pull/1');
+SELECT is(
+  (SELECT status FROM public.issues WHERE id = 'a1000000-0000-4000-8000-000000000002'),
+  'reviewing',
+  'a push after the approval reopens review instead of staying approved'
 );
 
 SELECT * FROM finish();

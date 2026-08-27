@@ -111,7 +111,7 @@ If you have configured the [GitHub integration](/web/github-integration) with a 
 | `workflow_run` | at least one suite is still running | `testing` |
 | `workflow_run.completed` | all suites completed and any suite failed | `tests-failed` |
 | `workflow_run.completed` | all suites completed and no suite failed | `ready-for-review` |
-| `pull_request_review.submitted` | `review.state: approved` | `approved` |
+| `pull_request_review.submitted` | GitHub's own review decision for the pull request is `approved` — which GitHub only reports when branch protection requires reviews. With Automatic Review enabled, the Review Cycle decides this instead (see [Automatic Review](/web/automatic-review#what-decides-approved)). | `approved` |
 | `pull_request_review.submitted` | `review.state: changes_requested` | `changes-requested` |
 | `issue_comment.created` | comment was left on a pull request | queues a follow-up |
 | `pull_request_review_comment.created` | inline review comment was left on a pull request | queues a follow-up |

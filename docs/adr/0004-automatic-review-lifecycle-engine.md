@@ -54,13 +54,26 @@ run history, not persisted.
 reaches `state = 'approved'` exactly two ways: `complete_review_attempt`
 recording a `verdict = 'approved'`, or the explicit `continue_with_human_review`
 RPC. `recompute_issue_status_from_pull_requests` (the existing PR→Issue status
-aggregator) is extended with one additional condition on its `approved`
-branch: when `issue_review_policies.enabled` is true, every reviewable PR
-must *also* have its latest cycle in `state = 'approved'` before the Issue
-status is allowed to become `approved` — a bare human GitHub approval can no
-longer flip it on its own. This was implemented as an additive condition
-rather than a rewrite specifically to keep every pre-existing (non-automatic-
-review) test passing unchanged.
+aggregator) consults that cycle state on its `approved` branch: when
+`issue_review_policies.enabled` is true, every reviewable PR's latest cycle
+must be in `state = 'approved'` before the Issue status may become
+`approved` — a bare human GitHub approval can no longer flip it on its own.
+
+> **Amended 2026-08-27 (GEN-428).** This started as an *additive* condition
+> on top of the pre-existing `review_decision = 'approved'` check,
+> specifically to keep every non-automatic-review test passing unchanged.
+> That was wrong in production: GitHub's `reviewDecision` is a
+> branch-protection field, null for any repository that does not *require*
+> reviews, so on such a repository the base condition could never hold and
+> the Issue fell back to `ready-for-review` the moment GitHub echoed our own
+> published APPROVE review back through the webhook. The cycle state now
+> *replaces* GitHub's decision when Automatic Review is enabled rather than
+> supplementing it: the latest cycle being `approved` is both necessary and
+> sufficient. The higher-precedence branches are untouched, so a human
+> `changes_requested` review, failing CI, or pending CI still outrank an
+> automatic approval, and Issues without Automatic Review keep their exact
+> GitHub-decision behavior. See
+> `supabase/migrations/20260827210000_trust_automatic_review_verdict_in_aggregator.sql`.
 
 **A genuine human `changes_requested` review supersedes automatic review
 immediately.** The webhook handler distinguishes "our own automated review
