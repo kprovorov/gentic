@@ -47,6 +47,10 @@ This means: if you want an issue reviewed automatically, the setting must be on 
 
 If an issue has more than one open, non-draft associated pull request, every one of them must independently reach an approved Review Cycle before Gentic presents the issue's overall status as `Approved`.
 
+### What decides `Approved`
+
+With Automatic Review enabled, the Review Cycle is what decides the issue's `Approved` status — not GitHub's own review decision. This matters because GitHub only reports a review decision for repositories whose branch protection *requires* reviews; everywhere else it reports nothing at all, however many approvals a pull request carries. So an automatic approval holds on any repository, and it holds even where branch protection is still waiting on a human approval before the merge button unlocks. A human review requesting changes, or failing or in-flight CI, still outranks it.
+
 ### Infrastructure failures
 
 A crash, timeout, or malformed reviewer output is never treated as a verdict. It retries automatically once at the same commit; if that retry also fails, automatic progress stops and the Review Cycle is left `Active` with no live run, waiting for a human action or new code — see [Recovery actions](#recovery-actions).

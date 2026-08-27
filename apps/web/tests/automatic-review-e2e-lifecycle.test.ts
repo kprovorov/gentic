@@ -46,7 +46,7 @@ import {
 
 const webhookSecret = "e2e-lifecycle-test-secret"
 
-function signedPullRequestWebhook(payload: Record<string, unknown>) {
+function signedWebhook(event: string, payload: Record<string, unknown>) {
   const body = JSON.stringify(payload)
   const signature = `sha256=${createHmac("sha256", webhookSecret)
     .update(body)
@@ -56,21 +56,22 @@ function signedPullRequestWebhook(payload: Record<string, unknown>) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-github-event": "pull_request",
+      "x-github-event": event,
       "x-hub-signature-256": signature,
     },
     body,
   })
 }
 
+function signedPullRequestWebhook(payload: Record<string, unknown>) {
+  return signedWebhook("pull_request", payload)
+}
+
 function fakeGithubSnapshot(overrides: {
   headSha: string
   ciState?: "unknown" | "pending" | "success" | "failure"
   reviewDecision?:
-    | "unknown"
-    | "review_required"
-    | "approved"
-    | "changes_requested"
+    "unknown" | "review_required" | "approved" | "changes_requested"
 }) {
   return async () => ({
     state: "open" as const,
@@ -250,6 +251,100 @@ liveTest(
         .eq("id", issueId)
         .single()
       assert.equal(issue?.status, "approved")
+    } finally {
+      await cleanupSeeded(supabase, tracker)
+    }
+  }
+)
+
+// GEN-428: publishing the verdict makes GitHub echo our own APPROVE review
+// straight back as a `pull_request_review` delivery, which re-hydrates the
+// PR snapshot and re-runs the status aggregator. GitHub reports
+// `reviewDecision` as null — delivered here as `unknown` — for any
+// repository that does not *require* reviews, so an aggregator that treats
+// GitHub's decision as the approval source flips the Issue it just approved
+// back to `ready-for-review` seconds later. This drives the real webhook
+// route for that echo.
+liveTest(
+  "an automatic approval survives GitHub echoing the approving review back",
+  async () => {
+    const supabase = createTestServiceClient()
+    const tracker = newSeedTracker()
+    const userId = testAccount("echo")
+
+    try {
+      const repo = `gentic-e2e/${userId}`
+      const projectId = await seedProject(supabase, tracker, {
+        userId,
+        key: "TST",
+        repo,
+        automaticReviewEnabled: true,
+      })
+      await seedGithubIntegration(supabase, tracker, {
+        userId,
+        installationId: "990009",
+      })
+      const issueId = await seedIssue(supabase, tracker, {
+        projectId,
+        number: 1,
+      })
+      const prUrl = `https://github.com/${repo}/pull/1`
+      await seedPullRequest(supabase, tracker, {
+        issueId,
+        url: prUrl,
+        headSha: "sha-echo-1",
+        ciState: "success",
+      })
+
+      const eligibility = await evaluateReviewEligibility(supabase, prUrl)
+      assert.equal(eligibility?.action, "queued")
+
+      await completeReviewAttempt(supabase, {
+        reviewRunId: eligibility!.reviewRunId!,
+        verdict: "approved",
+        githubReviewId: 778899,
+      })
+
+      const response = await handleGithubWebhookRequest(
+        signedWebhook("pull_request_review", {
+          action: "submitted",
+          installation: { id: 990009 },
+          repository: {
+            name: repo.split("/")[1],
+            owner: { login: repo.split("/")[0] },
+          },
+          review: {
+            id: 778899,
+            state: "approved",
+            body: "Automatic review approved this pull request.",
+            user: { login: "gentic-app" },
+          },
+          pull_request: { html_url: prUrl, number: 1 },
+        }),
+        {
+          webhookSecret,
+          supabase,
+          // A repository without a review requirement: GitHub's own
+          // `reviewDecision` is null however many approvals the PR carries.
+          pullRequestStateFetcher: fakeGithubSnapshot({
+            headSha: "sha-echo-1",
+            ciState: "success",
+            reviewDecision: "unknown",
+          }),
+        }
+      )
+      assert.equal(response.status, 200)
+
+      const { data: issue } = await supabase
+        .from("issues")
+        .select("status")
+        .eq("id", issueId)
+        .single()
+      assert.equal(
+        issue?.status,
+        "approved",
+        "the echoed approval must not retract the Issue's approved status"
+      )
     } finally {
       await cleanupSeeded(supabase, tracker)
     }
