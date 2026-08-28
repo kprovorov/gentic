@@ -53,20 +53,41 @@ jobs:
       # tests (apps/web/tests/automatic-review-e2e-*.test.ts,
       # apps/web/tests/helpers/live-review-harness.ts), which otherwise skip
       # themselves — these are the fixed local-dev demo keys the Supabase
-      # CLI prints for every project, not secrets. If the override names
-      # below drift from a future CLI version, `pnpm dlx supabase@2.109.1
+      # CLI prints for every project, not secrets. If the override name
+      # below drifts from a future CLI version, `pnpm dlx supabase@2.109.1
       # status -o env` (no overrides) in this job's log shows the current
-      # dot-paths to fix them with.
+      # dot-paths to fix it with.
+      #
+      # `-o env` quotes every value (KEY="VALUE") for shell `source`/`export`
+      # use, but $GITHUB_ENV isn't shell-evaluated — it parses plain
+      # KEY=VALUE lines — so appending the CLI's output directly bakes the
+      # literal quote characters into each value (e.g. SUPABASE_URL becomes
+      # `"http://127.0.0.1:54321"`, which @supabase/supabase-js then rejects
+      # as an invalid URL). Strip the surrounding quotes before appending.
+      #
+      # The secret key comes from the CLI's own default `SECRET_KEY` var
+      # (renamed below), not an `--override-name auth.service_role_key=...`
+      # dot-path: this CLI version has already migrated the project to
+      # Supabase's newer publishable/secret API key pair (also visible as
+      # `PUBLISHABLE_KEY`/`SECRET_KEY` in this step's own env dump), and the
+      # legacy `service_role_key` dot-path still resolves to *a* JWT but one
+      # PostgREST no longer maps to real `service_role` table grants under
+      # that key scheme — every table access then fails with "permission
+      # denied", exactly the class of failure this live tier exists to
+      # catch, now caught in the plumbing that feeds it rather than in the
+      # tests themselves.
       - name: Expose local Supabase credentials to Root tests
         run: |
           pnpm dlx supabase@2.109.1 status -o env \
             --override-name api.url=SUPABASE_URL \
-            --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
+            | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)="(.*)"$/\1=\2/' \
+            | sed -E 's/^SECRET_KEY=/SUPABASE_SECRET_KEY=/' \
             >> "$GITHUB_ENV"
 
       - name: Root tests
         env:
           TZ: UTC
+          REQUIRE_LIVE_SUPABASE: "1"
         run: pnpm test
 
       - name: Agent tests in non-UTC timezone
