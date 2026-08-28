@@ -1,54 +1,58 @@
 ---
 title: "Install the Gentic Agent Worker on Your Server"
 sidebarTitle: "Installation"
-description: "Deploy the Gentic agent worker using Homebrew, a Linux package, the prebuilt tarball, or from source with Node.js. Includes Git and credentials setup."
+description: "Deploy the Gentic agent worker from npm, a Linux package, the prebuilt tarball, or from source with Node.js. Includes Git and credentials setup."
 ---
 
-The agent worker ships as a standalone binary compiled with [Bun](https://bun.sh) — a single executable plus vendored agent sidecars, with no runtime dependencies on the target machine. Choose the install method that matches your environment:
+Choose the install method that matches your environment:
 
-- **[Homebrew](#option-a-homebrew-macos-and-linux)** — recommended for macOS and Linuxbrew users.
-- **[Linux packages](#option-b-linux-packages-deb-rpm-apk)** — `.deb`, `.rpm`, and `.apk` built for Debian/Ubuntu, RHEL/Fedora, and Alpine.
-- **[Prebuilt tarball](#option-c-prebuilt-tarball)** — a portable `.tar.gz` you can drop onto any Linux or macOS server.
+- **[npm](#option-a-npm-recommended)** — recommended. One command on any machine with Node.js.
+- **[Linux packages](#option-b-linux-packages-deb-rpm-apk)** — `.deb`, `.rpm`, and `.apk` built for Debian/Ubuntu, RHEL/Fedora, and Alpine. No Node.js needed.
+- **[Prebuilt tarball](#option-c-prebuilt-tarball)** — a portable `.tar.gz` you can drop onto any Linux or macOS server. No Node.js needed.
 - **[From source with Node.js](#option-d-from-source-with-nodejs)** — for development or when you need to build a target that is not published.
 
 All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) setup below, then configure credentials only for the agent providers this worker will run.
 
+Options B and C ship a standalone executable compiled with [Bun](https://bun.sh) — a single binary plus vendored agent sidecars, with no runtime dependencies at all. Reach for them when the target machine has no Node.js and you don't want to install one.
+
 **Supported platforms**
 
-| OS/arch                               | Homebrew       | `.deb` / `.rpm` / `.apk` | Tarball |
-| ------------------------------------- | -------------- | ------------------------ | ------- |
-| macOS, Apple Silicon (`darwin-arm64`) | ✅             | —                        | ✅      |
-| macOS, Intel (`darwin-x64`)           | ✅             | —                        | ✅      |
-| Linux, x86-64 (`linux-x64`)           | ✅ (Linuxbrew) | ✅                       | ✅      |
-| Linux, ARM64 (`linux-arm64`)          | ✅ (Linuxbrew) | ✅                       | ✅      |
+| OS/arch                               | npm | `.deb` / `.rpm` / `.apk` | Tarball |
+| ------------------------------------- | --- | ------------------------ | ------- |
+| macOS, Apple Silicon (`darwin-arm64`) | ✅  | —                        | ✅      |
+| macOS, Intel (`darwin-x64`)           | ✅  | —                        | ✅      |
+| Linux, x86-64 (`linux-x64`)           | ✅  | ✅                       | ✅      |
+| Linux, ARM64 (`linux-arm64`)          | ✅  | ✅                       | ✅      |
 
-## Option A: Homebrew (macOS and Linux)
+## Option A: npm (recommended)
 
-The Gentic Homebrew tap publishes a formula for every release, with per-platform bottles pointing at the official GitHub Release archives.
+The CLI is published to npm as [`gentic-cli`](https://www.npmjs.com/package/gentic-cli) on every release. It requires Node.js 20.19 or newer on the machine, and works anywhere npm does — including platforms with no prebuilt binary.
 
 <Steps>
-  <Step title="Install from the tap">
+  <Step title="Install globally">
     ```bash
-    brew install kprovorov/tap/gentic
+    npm install -g gentic-cli
     ```
 
-    Or tap and install in two steps:
+    The package name is `gentic-cli`; the command it installs is `gentic`.
 
+  </Step>
+  <Step title="Verify">
     ```bash
-    brew tap kprovorov/tap
-    brew install gentic
+    gentic --version
     ```
-
   </Step>
   <Step title="Upgrade later">
     ```bash
-    brew update
-    brew upgrade gentic
+    npm install -g gentic-cli@latest
     ```
+
+    Upgrading in place keeps the path an installed service points at, so a running `gentic` service picks up the new version on its next restart.
+
   </Step>
 </Steps>
 
-Homebrew installs the `gentic` binary and its `vendor/` sidecars into the keg and symlinks `gentic` onto your `PATH`, so `gentic` works from any shell.
+The install brings the ACP agent runtimes the worker spawns, so — as with every other option — the only things left are [Git access](#git-authentication-setup) and the [agent CLIs and credentials](#agent-credentials-setup). Run `gentic doctor` to see what is still missing.
 
 ## Option B: Linux packages (.deb, .rpm, .apk)
 
@@ -143,8 +147,9 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
   macOS binaries are not code-signed or notarized. On first run, Gatekeeper will
   block execution with a security warning. To allow it, open **System Settings →
   Privacy & Security** and click **Allow Anyway**, or run `xattr -dr
-  com.apple.quarantine ./gentic` from the terminal. The Homebrew formula handles
-  this automatically.
+  com.apple.quarantine ./gentic` from the terminal. This applies to the
+  binaries in Options B and C; the npm package (Option A) runs `gentic` itself
+  through your own Node.js install.
 </Warning>
 
 ## Option D: From source with Node.js

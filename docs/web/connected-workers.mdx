@@ -150,7 +150,7 @@ Connected worker management replaces the old shared `GENTIC_API_KEY` authenticat
 
 <Steps>
   <Step title="Update the worker code or binary">
-    Pull/upgrade the `gentic` CLI on the existing worker machine to a version that supports `gentic worker connect` (any version documented on this site). See [Installation](/agent/installation) for upgrade instructions for your install method (Homebrew, package, tarball, or source).
+    Pull/upgrade the `gentic` CLI on the existing worker machine to a version that supports `gentic worker connect` (any version documented on this site). See [Installation](/agent/installation) for upgrade instructions for your install method (npm, package, tarball, or source).
   </Step>
   <Step title="Remove the old shared key">
     Delete the `GENTIC_API_KEY` environment variable (and any reference to it in your process manager, systemd unit, or `.env` file) — it is no longer read by the worker.

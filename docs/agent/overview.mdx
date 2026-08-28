@@ -20,14 +20,17 @@ Unchanged, failed, held, usage-limited, cancelled, and interrupted runs do not t
 
 ## Deployment options
 
-You can deploy the agent worker in two ways. Choose the option that fits your server environment best.
+You can deploy the agent worker in three ways. Choose the option that fits your server environment best.
 
 <CardGroup cols={2}>
+  <Card title="npm" icon="npm">
+    `npm install -g gentic-cli` on any machine with Node.js 20.19+. Recommended for most servers.
+  </Card>
   <Card title="Standalone Binary" icon="box">
-    Download a prebuilt, self-contained binary from GitHub Releases. No Node.js, pnpm, or `node_modules` required on the target machine. Recommended for production servers.
+    Download a prebuilt, self-contained binary — or a `.deb`/`.rpm`/`.apk` — from GitHub Releases. No Node.js required on the target machine.
   </Card>
   <Card title="From Source (Node.js)" icon="code">
-    Clone the repository, install dependencies with pnpm, and run the worker with `pnpm --filter @gentic/gentic start`. Best for development or environments where you already manage a Node.js toolchain.
+    Clone the repository, install dependencies with pnpm, and run the worker with `pnpm --filter @gentic/gentic start`. Best for development.
   </Card>
 </CardGroup>
 
@@ -36,8 +39,8 @@ You can deploy the agent worker in two ways. Choose the option that fits your se
 Review these requirements before installing the agent worker. Which prerequisites apply to you depends on your chosen deployment method.
 
 <CardGroup cols={2}>
-  <Card title="Node.js 20+ & pnpm 11.9.0+" icon="node-js">
-    Required only when running from source. Not needed when using the standalone binary.
+  <Card title="Node.js 20.19+" icon="node-js">
+    Required for the npm install and when running from source (which also needs pnpm 11.9.0+). Not needed when using the standalone binary.
   </Card>
   <Card title="Bun (build-time only)" icon="circle-bolt">
     Required only if you want to compile the standalone binary yourself from source. Not needed on the target machine that runs the binary.
@@ -58,7 +61,7 @@ Run the agent worker on a **private** server or VM. It is a background polling p
 
 <CardGroup cols={2}>
   <Card title="Installation" icon="download" href="/agent/installation">
-    Install the standalone binary or run from source, and set up Git authentication.
+    Install from npm, use a prebuilt binary, or run from source, and set up Git authentication.
   </Card>
   <Card title="Configuration" icon="sliders" href="/agent/configuration">
     Configure your worker credential, API URL, and other environment variables.
