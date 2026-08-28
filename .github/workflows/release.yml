@@ -338,57 +338,58 @@ jobs:
             release-assets/*.apk \
             release-assets/checksums.txt
 
-  homebrew:
+  npm:
     needs:
       - prepare
       - release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for `npm publish --provenance`.
+      id-token: write
     env:
-      # Homebrew tap the gentic formula is published to. Requires the
-      # HOMEBREW_TAP_TOKEN secret: a PAT with contents:write on this repo.
-      # See packaging/homebrew-gentic/README.md.
-      TAP_REPO: kprovorov/homebrew-tap
+      # Registry name for the CLI: `gentic` on npm is an unrelated package
+      # owned by someone else. Requires the NPM_TOKEN secret — a granular
+      # access token with write access to this package. See
+      # packaging/npm/README.md.
+      PACKAGE_NAME: gentic-cli
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - name: Checkout release commit
         uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.commit_sha }}
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
 
-      - name: Download release checksums
+      - run: pnpm install --frozen-lockfile
+
+      # Bundles the CLI (inlining workspace-only packages) and generates the
+      # published manifest into apps/gentic/dist/npm. The workspace package
+      # itself stays private and is never what gets published.
+      - name: Stage npm package
+        run: pnpm --filter @gentic/gentic build:npm
+
+      - name: Smoke-test the bundle
+        run: |
+          test "$(node apps/gentic/dist/npm/bin/gentic.js --version)" = "$VERSION"
+
+      # Republishing an existing version is a hard error on npm, which would
+      # fail the release after the GitHub release already succeeded. Treat an
+      # already-published version as done instead, mirroring re-runs of this
+      # workflow.
+      - name: Publish to npm
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          gh release download "${{ needs.prepare.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern checksums.txt \
-            --dir .
-
-      - name: Render Homebrew formula
-        run: |
-          node packaging/homebrew-gentic/render-formula.mjs \
-            --version "${{ needs.prepare.outputs.version }}" \
-            --checksums checksums.txt > gentic.rb
-          cat gentic.rb
-
-      - name: Publish formula to tap
-        env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          git clone --depth 1 \
-            "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
-          cp gentic.rb tap/Formula/gentic.rb
-          cd tap
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          if git diff --quiet -- Formula/gentic.rb; then
-            echo "Formula already at ${VERSION}; nothing to publish"
+          if npm view "${PACKAGE_NAME}@${VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${VERSION} is already published; nothing to do"
             exit 0
           fi
-          git add Formula/gentic.rb
-          git commit -m "gentic ${VERSION}"
-          git push
+          npm publish ./apps/gentic/dist/npm --provenance --access public

@@ -97,3 +97,15 @@ jobs:
 
       - name: Production build
         run: pnpm build
+
+      # The published CLI is a bundle, not the tsc output, so `pnpm build`
+      # passing says nothing about whether `npm install -g gentic-cli` still
+      # works. Stage it here and run the real bundle so a broken bundle fails
+      # on the pull request rather than mid-release.
+      - name: Stage npm package
+        run: pnpm --filter @gentic/gentic build:npm
+
+      - name: Smoke-test the npm bundle
+        run: |
+          node apps/gentic/dist/npm/bin/gentic.js --version
+          npm pack --dry-run ./apps/gentic/dist/npm

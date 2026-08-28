@@ -11,6 +11,7 @@
     "dev": "tsx watch src/cli.ts",
     "start": "node dist/cli.js run",
     "build": "tsc -p tsconfig.build.json",
+    "build:npm": "node scripts/build-npm-package.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts"
@@ -31,6 +32,7 @@
     "@gentic/eslint-config": "workspace:*",
     "@gentic/typescript-config": "workspace:*",
     "@types/node": "^20",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "tsx": "^4.19.2",
     "typescript": "^5"

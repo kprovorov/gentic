@@ -140,6 +140,27 @@ Build the agent:
 pnpm --filter @gentic/gentic build
 ```
 
+## npm package
+
+The CLI is published to npm as [`gentic-cli`](https://www.npmjs.com/package/gentic-cli)
+(the name `gentic` belongs to an unrelated package), so a worker machine with
+Node.js 20.19+ installs it with:
+
+```bash
+npm install -g gentic-cli
+```
+
+That package is a bundle, not this workspace package. `pnpm --filter
+@gentic/gentic build:npm` stages it into `dist/npm/`: esbuild inlines the
+workspace-only imports (`@gentic/validators`, whose `exports` point at raw
+`.ts` sources) into a single `bin/gentic.js`, every real npm dependency stays
+external, and a fresh manifest is generated so `apps/gentic` can stay
+`private`. The ACP agent sidecars are ordinary dependencies there — an npm
+install has a real `node_modules`, so `src/session.ts` resolves and spawns
+them through the same path a source checkout uses, with no vendored binaries
+involved. Release automation and one-time npm token setup live in
+[`packaging/npm/README.md`](../../packaging/npm/README.md).
+
 ## Standalone binary
 
 For deploying without Node, pnpm, or `node_modules` on the target machine,
@@ -168,12 +189,12 @@ Copy the whole output directory to the target machine and run
 `./gentic run` with `GENTIC_WORKER_ID`/`GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
 no install step needed.
 
-Pushing a `v*` tag (e.g. `v0.0.1`) runs
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml),
-which builds all 4 targets and publishes them as
-`gentic-<version>-<os>-<arch>.tar.gz` archives — plus `.deb`, `.rpm`, and
-`.apk` packages for the `linux-*` targets — and a `checksums.txt` on a GitHub
-Release, so you don't have to build one yourself.
+Running [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
+(a manual `workflow_dispatch`) bumps the version, builds all 4 targets, and
+publishes them as `gentic-<version>-<os>-<arch>.tar.gz` archives — plus
+`.deb`, `.rpm`, and `.apk` packages for the `linux-*` targets — and a
+`checksums.txt` on a GitHub Release, so you don't have to build one yourself.
+The same run publishes the npm package described above.
 
 Cross-compiling the `claude` CLI sidecar for a platform other than the build
 host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
