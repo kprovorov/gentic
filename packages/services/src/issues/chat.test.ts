@@ -208,7 +208,7 @@ class TestsFailedDb {
 
 test("applyTestsFailed inserts a follow-up message and requeues the issue", async () => {
   const supabase = new TestsFailedDb()
-  supabase.issues.push({ id: "issue-1", status: "tests-failed" })
+  supabase.issues.push({ id: "issue-1", status: "tests-failed", source: "user" })
 
   await applyTestsFailed(
     supabase as never,
@@ -231,11 +231,43 @@ test("applyTestsFailed inserts a follow-up message and requeues the issue", asyn
   assert.equal(typeof supabase.issues[0]?.updated_at, "string")
 })
 
+// A tracking issue only carries a pull request no agent opened, so neither
+// failing CI nor a reviewer may put an agent to work on it.
+test("failing CI and review feedback never requeue a tracking issue", async () => {
+  const supabase = new TestsFailedDb()
+  supabase.issues.push({
+    id: "issue-1",
+    status: "tests-failed",
+    source: "external_pull_request",
+    projects: { auto_respond_to_reviews: true },
+  })
+  supabase.issue_pull_requests.push({
+    id: "pr-1",
+    issue_id: "issue-1",
+    url: "https://github.com/acme/widget/pull/42",
+  })
+
+  await applyTestsFailed(
+    supabase as never,
+    "issue-1",
+    "https://github.com/acme/widget/pull/42"
+  )
+  await applyChangesRequestedReview(
+    supabase as never,
+    "https://github.com/acme/widget/pull/42",
+    { id: 42, reviewerLogin: "reviewer", body: null, comments: [] }
+  )
+
+  assert.deepEqual(supabase.messages, [])
+  assert.equal(supabase.issues[0]?.status, "tests-failed")
+})
+
 test("applyChangesRequestedReview inserts a Gentic-authored follow-up message", async () => {
   const supabase = new TestsFailedDb()
   supabase.issues.push({
     id: "issue-1",
     status: "changes-requested",
+    source: "user",
     projects: { auto_respond_to_reviews: true },
   })
   supabase.issue_pull_requests.push({
