@@ -5,6 +5,7 @@ import { ServiceError } from "./errors"
 import {
   applyPullRequestDeliveryState,
   associatePullRequestFromWebhook,
+  buildTrackingIssueContent,
   parseCanonicalIssueBranch,
   upsertGithubIntegration,
 } from "./github-integrations"
@@ -223,11 +224,11 @@ type ScopeTable =
   "github_integrations" | "projects" | "issues" | "issue_pull_requests"
 type ScopeRow = Record<string, unknown>
 
-class ScopeQuery implements PromiseLike<{
-  data: ScopeRow | null
-  error: null
-}> {
+type ScopeResult = { data: ScopeRow | ScopeRow[] | null; error: null }
+
+class ScopeQuery implements PromiseLike<ScopeResult> {
   private filters: Array<{ column: string; value: unknown }> = []
+  private single = false
 
   constructor(private readonly rows: ScopeRow[]) {}
 
@@ -240,31 +241,35 @@ class ScopeQuery implements PromiseLike<{
     return this
   }
 
-  maybeSingle() {
+  // Row order is the fixture's own, which is what the callers that order by
+  // `created_at` are asking for.
+  order() {
     return this
   }
 
-  then<TResult1 = { data: ScopeRow | null; error: null }, TResult2 = never>(
+  maybeSingle() {
+    this.single = true
+    return this
+  }
+
+  then<TResult1 = ScopeResult, TResult2 = never>(
     onfulfilled?:
-      | ((value: {
-          data: ScopeRow | null
-          error: null
-        }) => TResult1 | PromiseLike<TResult1>)
+      | ((value: ScopeResult) => TResult1 | PromiseLike<TResult1>)
       | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
-    const data =
-      this.rows.find((row) =>
-        this.filters.every((filter) => {
-          const value = filter.column
-            .split(".")
-            .reduce<unknown>(
-              (current, part) => (current as ScopeRow | undefined)?.[part],
-              row
-            )
-          return value === filter.value
-        })
-      ) ?? null
+    const matches = this.rows.filter((row) =>
+      this.filters.every((filter) => {
+        const value = filter.column
+          .split(".")
+          .reduce<unknown>(
+            (current, part) => (current as ScopeRow | undefined)?.[part],
+            row
+          )
+        return value === filter.value
+      })
+    )
+    const data = this.single ? (matches[0] ?? null) : matches
     return Promise.resolve({ data, error: null }).then(onfulfilled, onrejected)
   }
 }
@@ -277,7 +282,7 @@ class ScopeSupabase {
 
   constructor(
     readonly tables: Record<ScopeTable, ScopeRow[]>,
-    private readonly rpcResult = {
+    private readonly rpcResult: ScopeRow = {
       association_created: true,
       associated_issue_id: "issue-42",
       issue_status_changed: true,
@@ -308,33 +313,51 @@ class ScopeSupabase {
   }
 }
 
-function scopedWebhookClient(repo = "acme/base") {
-  return new ScopeSupabase({
-    issue_pull_requests: [],
-    github_integrations: [
-      {
-        user_id: "user-1",
-        installation_id: "12345",
-        status: "connected",
-      },
-    ],
-    projects: [{ id: "project-1", user_id: "user-1", key: "GEN", repo }],
-    issues: [
-      {
-        id: "issue-42",
-        project_id: "project-1",
-        number: 42,
-        projects: { user_id: "user-1", repo },
-      },
-    ],
-  })
+function scopedWebhookClient(
+  repo = "acme/base",
+  options: { automaticReviewEnabled?: boolean; rpcResult?: ScopeRow } = {}
+) {
+  return new ScopeSupabase(
+    {
+      issue_pull_requests: [],
+      github_integrations: [
+        {
+          user_id: "user-1",
+          installation_id: "12345",
+          status: "connected",
+        },
+      ],
+      projects: [
+        {
+          id: "project-1",
+          user_id: "user-1",
+          key: "GEN",
+          repo,
+          automatic_review_enabled: options.automaticReviewEnabled ?? false,
+        },
+      ],
+      issues: [
+        {
+          id: "issue-42",
+          project_id: "project-1",
+          number: 42,
+          projects: { user_id: "user-1", repo },
+        },
+      ],
+    },
+    options.rpcResult
+  )
 }
 
 const scopedAssociationInput = {
   installationId: "12345",
   baseRepository: "Acme/Base",
+  headRepository: "Acme/Base",
   headBranch: "fork-owner/GeN-42-fix-webhook",
   prUrl: "https://github.com/acme/base/pull/42",
+  prNumber: 42,
+  prTitle: "Fix the webhook",
+  prAuthorLogin: "alice",
   prState: "open" as const,
   readyForReview: true,
   headSha: "head-42",
@@ -399,6 +422,9 @@ test("associatePullRequestFromWebhook rejects unmatched installation and reposit
   })
   assert.deepEqual(missingInstallation.rpcCalls, [])
 
+  // The branch names GEN-42, but that Project is on another repository — and
+  // no Project owns the base repository either, so there is nothing to track
+  // the pull request against.
   const wrongRepository = scopedWebhookClient("acme/other")
   const repositoryResult = await associatePullRequestFromWebhook(
     wrongRepository as never,
@@ -406,7 +432,163 @@ test("associatePullRequestFromWebhook rejects unmatched installation and reposit
   )
   assert.deepEqual(repositoryResult, {
     outcome: "no_match",
-    reason: "repository_out_of_scope",
+    reason: "project_not_found",
   })
   assert.deepEqual(wrongRepository.rpcCalls, [])
+})
+
+const externalPullRequestInput = {
+  ...scopedAssociationInput,
+  headBranch: "alice/hand-written-fix",
+  prUrl: "https://github.com/acme/base/pull/77",
+  prNumber: 77,
+  prTitle: "Bump the flaky timeout",
+  prAuthorLogin: "alice",
+  headSha: "head-77",
+}
+
+test("associatePullRequestFromWebhook tracks a pull request no issue produced when the project reviews automatically", async () => {
+  const supabase = scopedWebhookClient("acme/base", {
+    automaticReviewEnabled: true,
+    rpcResult: {
+      association_created: true,
+      associated_issue_id: "issue-77",
+      issue_status_changed: false,
+    },
+  })
+
+  const result = await associatePullRequestFromWebhook(
+    supabase as never,
+    externalPullRequestInput
+  )
+
+  assert.deepEqual(result, {
+    outcome: "associated",
+    issueId: "issue-77",
+    statusChanged: false,
+    trackedExternally: true,
+  })
+  assert.equal(supabase.rpcCalls.length, 1)
+  const call = supabase.rpcCalls[0]
+  assert.equal(call?.name, "track_external_pull_request")
+  assert.equal(call?.args?.p_project_id, "project-1")
+  assert.equal(call?.args?.p_pr_url, "https://github.com/acme/base/pull/77")
+  assert.equal(call?.args?.p_head_sha, "head-77")
+  assert.equal(call?.args?.p_title, "PR #77: Bump the flaky timeout")
+  assert.match(String(call?.args?.p_body), /acme\/base#77, opened by @alice/)
+})
+
+test("associatePullRequestFromWebhook tracks a branch whose issue code resolves to nothing", async () => {
+  const supabase = scopedWebhookClient("acme/base", {
+    automaticReviewEnabled: true,
+  })
+
+  const result = await associatePullRequestFromWebhook(supabase as never, {
+    ...externalPullRequestInput,
+    headBranch: "GEN-999-deleted-issue",
+  })
+
+  assert.equal(result.outcome, "associated")
+  assert.equal(supabase.rpcCalls[0]?.name, "track_external_pull_request")
+})
+
+test("associatePullRequestFromWebhook leaves fork, draft, and unreviewed pull requests untracked", async () => {
+  const fork = scopedWebhookClient("acme/base", {
+    automaticReviewEnabled: true,
+  })
+  assert.deepEqual(
+    await associatePullRequestFromWebhook(fork as never, {
+      ...externalPullRequestInput,
+      headRepository: "alice/base-fork",
+    }),
+    { outcome: "no_match", reason: "forked_head_repository" }
+  )
+  assert.deepEqual(fork.rpcCalls, [])
+
+  // A draft says so through `readyForReview`; the diagnostic stays the one
+  // the head branch earned, since the draft is what declined tracking.
+  const draft = scopedWebhookClient("acme/base", {
+    automaticReviewEnabled: true,
+  })
+  assert.deepEqual(
+    await associatePullRequestFromWebhook(draft as never, {
+      ...externalPullRequestInput,
+      prState: "draft",
+      readyForReview: false,
+    }),
+    { outcome: "no_match", reason: "invalid_issue_branch" }
+  )
+  assert.deepEqual(draft.rpcCalls, [])
+
+  const reviewDisabled = scopedWebhookClient("acme/base")
+  assert.deepEqual(
+    await associatePullRequestFromWebhook(
+      reviewDisabled as never,
+      externalPullRequestInput
+    ),
+    { outcome: "no_match", reason: "automatic_review_disabled" }
+  )
+  assert.deepEqual(reviewDisabled.rpcCalls, [])
+})
+
+test("associatePullRequestFromWebhook keeps a tracked pull request on its tracking issue", async () => {
+  const supabase = scopedWebhookClient("acme/base", {
+    automaticReviewEnabled: true,
+  })
+  // Once a tracking issue owns the pull request, later deliveries take the
+  // ordinary sticky-association path — no second issue is ever created.
+  supabase.tables.issue_pull_requests.push({
+    issue_id: "issue-42",
+    url: externalPullRequestInput.prUrl,
+  })
+
+  const result = await associatePullRequestFromWebhook(
+    supabase as never,
+    externalPullRequestInput
+  )
+
+  assert.deepEqual(result, {
+    outcome: "already_associated",
+    issueId: "issue-42",
+    statusChanged: true,
+  })
+  assert.equal(
+    supabase.rpcCalls[0]?.name,
+    "associate_pull_request_from_webhook"
+  )
+})
+
+test("buildTrackingIssueContent names the pull request and says no specification stands behind it", () => {
+  const content = buildTrackingIssueContent({
+    prNumber: 7,
+    prTitle: "  Tidy the parser  ",
+    prAuthorLogin: "alice",
+    prUrl: "https://github.com/acme/base/pull/7",
+    baseRepository: "acme/base",
+  })
+
+  assert.equal(content.title, "PR #7: Tidy the parser")
+  assert.match(content.body, /https:\/\/github\.com\/acme\/base\/pull\/7/)
+  assert.match(content.body, /no issue specification behind the change/)
+
+  const untitled = buildTrackingIssueContent({
+    prNumber: 8,
+    prTitle: null,
+    prAuthorLogin: null,
+    prUrl: "https://github.com/acme/base/pull/8",
+    baseRepository: "acme/base",
+  })
+
+  assert.equal(untitled.title, "PR #8: Untitled pull request")
+  assert.match(untitled.body, /opened by GitHub/)
+
+  const long = buildTrackingIssueContent({
+    prNumber: 9,
+    prTitle: "x".repeat(400),
+    prAuthorLogin: "alice",
+    prUrl: "https://github.com/acme/base/pull/9",
+    baseRepository: "acme/base",
+  })
+
+  assert.equal(long.title.length, 160)
 })

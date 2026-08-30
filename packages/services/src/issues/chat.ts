@@ -466,7 +466,9 @@ async function getIssueForPullRequestFeedback(
 
   const { data: issue, error: issueError } = await supabase
     .from("issues")
-    .select("id, projects!inner(auto_respond_to_reviews)")
+    .select("id, source, projects!inner(auto_respond_to_reviews)")
+    // Never a tracking Issue — see `isTrackingIssue` below.
+    .eq("source", "user")
     .eq("id", pullRequest.issue_id)
     .maybeSingle()
 
@@ -477,6 +479,26 @@ async function getIssueForPullRequestFeedback(
   return issue
 }
 
+/**
+ * Whether this Issue only exists to carry a pull request no agent opened
+ * (ADR-0010). None of the "hand the feedback back to the agent" paths apply
+ * to one: there is no session behind it, and re-queuing it to `todo` would
+ * put an agent to work on a pull request that is not its to fix.
+ */
+async function isTrackingIssue(supabase: Supabase, issueId: string) {
+  const { data, error } = await supabase
+    .from("issues")
+    .select("source")
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+
+  return data?.source === "external_pull_request"
+}
+
 // Called from the GitHub webhook route when CI fails after a PR run. The
 // status transition is guarded by the webhook handler, so this can safely
 // enqueue the follow-up prompt once per testing -> tests-failed transition.
@@ -485,6 +507,10 @@ export async function applyTestsFailed(
   issueId: string,
   prUrl: string
 ) {
+  if (await isTrackingIssue(supabase, issueId)) {
+    return
+  }
+
   unwrap(
     await supabase.from("messages").insert({
       issue_id: issueId,

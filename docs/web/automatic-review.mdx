@@ -8,7 +8,7 @@ Automatic Review runs a second, isolated coding agent against a pull request's e
 
 <Note>
   This page covers the owner-facing behavior and controls. For the
-  underlying design decisions, see `docs/adr/0003` through `0008` in the
+  underlying design decisions, see `docs/adr/0003` through `0010` in the
   repository.
 </Note>
 
@@ -42,6 +42,29 @@ This means: if you want an issue reviewed automatically, the setting must be on 
    - **Commented** — non-blocking feedback; the issue returns to `Ready for review`.
 5. Every push while a review is in flight cancels the stale run without spending an attempt and re-evaluates at the new commit. A push after a cycle has already concluded (approved, exhausted, or superseded) starts a **fresh** cycle with a full 3-attempt budget.
 6. A genuine human GitHub review requesting changes always wins immediately — it supersedes any in-flight or already-approved automatic cycle. (The automatic reviewer's own review, echoed back through the same webhook, is recognized and ignored so it can't supersede itself.)
+
+### Pull requests no issue produced
+
+Automatic Review is not limited to pull requests an agent opened. When it is enabled on a project, **every pull request against that project's repository is reviewed** — a branch you pushed by hand, a teammate's work, a dependency bump.
+
+A pull request that no issue produced has nothing to hang a review on, so Gentic creates one: a **tracking issue** titled `PR #<number>: <pull request title>`, in the project that owns the repository. It behaves like any other issue with an open pull request — the review runs against it, its status follows the pull request (`Reviewing` → `Approved` or `Changes requested`, then `Merged` or `Cancelled` when the pull request closes), and the review appears on GitHub as usual.
+
+A tracking issue is **review-only**: no agent is ever put to work on it. Requested changes are published on the pull request and stop there, and neither failing CI nor a reviewer's comment queues an agent run the way they do for an issue an agent implemented — there is no agent session behind a hand-written branch to hand any of it to. You act on the review yourself; your next push starts a fresh review cycle.
+
+Three kinds of pull request are deliberately left alone, with no tracking issue and no review:
+
+| Not tracked | Why |
+| --- | --- |
+| Drafts, and closed or merged pull requests | Nothing to review — a draft can't hold a review run at all. A draft marked **Ready for review** is picked up at that moment. |
+| Pull requests from a **fork** | Reviewing runs the branch's code and tests on your worker. For a fork that is an outside contributor's code running on your machine, which the reviewer's isolation does not sandbox against. |
+| Anything in a project with Automatic Review off | The project setting is the only switch; nothing opts in separately. |
+
+<Note>
+  Turning Automatic Review on for a project therefore also starts creating
+  tracking issues for new non-agent pull requests in its repository. It is not
+  retroactive: a pull request that was already open when you enabled it is
+  picked up on its next push, not immediately.
+</Note>
 
 ### Multiple pull requests
 

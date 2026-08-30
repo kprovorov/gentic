@@ -40,6 +40,8 @@ function pullRequestPayload(overrides: Record<string, unknown> = {}) {
     repository: { full_name: "acme/base" },
     pull_request: {
       html_url: "https://github.com/acme/base/pull/42",
+      title: "Fix the webhook",
+      user: { login: "alice" },
       state: "open",
       draft: false,
       merged: false,
@@ -62,6 +64,7 @@ function pullRequestServiceRecorder(
         outcome: "associated" | "already_associated"
         issueId: string
         statusChanged: boolean
+        trackedExternally?: true
       }
     | { outcome: "no_match"; reason: "invalid_issue_branch" } = {
     outcome: "associated",
@@ -155,8 +158,15 @@ test("every signed pull-request action attempts association from the current for
     assert.deepEqual(association, {
       installationId: "12345",
       baseRepository: "acme/base",
+      // Association needs the head repository to tell a same-repository
+      // branch from a fork, and the title/number/author to describe a pull
+      // request no Issue produced.
+      headRepository: "alice/base-fork",
       headBranch: "users/alice/GEN-42-fix-webhook",
       prUrl: "https://github.com/acme/base/pull/42",
+      prNumber: 42,
+      prTitle: "Fix the webhook",
+      prAuthorLogin: "alice",
       prState: "open",
       readyForReview: true,
       headSha: "head-42",
@@ -206,6 +216,34 @@ test("a signed unmatched pull-request branch is a successful no-op", async () =>
   assert.equal(recorder.associations.length, 1)
   assert.deepEqual(recorder.deliveryStates, [])
   assert.deepEqual(recorder.eligibilityEvaluations, [])
+})
+
+test("a pull request tracked by an auto-created issue is hydrated and reviewed like any other", async () => {
+  const recorder = pullRequestServiceRecorder({
+    outcome: "associated",
+    issueId: "issue-77",
+    statusChanged: false,
+    trackedExternally: true,
+  })
+
+  const payload = pullRequestPayload()
+  ;(payload.pull_request.head as { ref: string }).ref = "alice/hand-written"
+
+  const response = await handleGithubWebhookRequest(
+    signedPullRequest(payload),
+    {
+      webhookSecret,
+      supabase: {} as never,
+      pullRequestServices: recorder.services as never,
+      pullRequestStateFetcher: recorder.stateFetcher,
+    }
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(recorder.deliveryStates.length, 1)
+  assert.deepEqual(recorder.eligibilityEvaluations, [
+    "https://github.com/acme/base/pull/42",
+  ])
 })
 
 test("an existing association refreshes durable state without directly writing Issue status", async () => {
@@ -533,21 +571,24 @@ function feedbackIssueSupabase(options: { autoRespond: boolean }) {
           }
         }
         if (table === "issues") {
-          return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: () =>
-                  Promise.resolve({
-                    data: {
-                      id: "issue-42",
-                      projects: {
-                        auto_respond_to_reviews: options.autoRespond,
-                      },
-                    },
-                    error: null,
-                  }),
+          // The lookup filters on `source` as well as `id`, so a tracking
+          // issue never receives review feedback meant for an agent.
+          const issueQuery = {
+            eq: () => issueQuery,
+            maybeSingle: () =>
+              Promise.resolve({
+                data: {
+                  id: "issue-42",
+                  source: "user",
+                  projects: {
+                    auto_respond_to_reviews: options.autoRespond,
+                  },
+                },
+                error: null,
               }),
-            }),
+          }
+          return {
+            select: () => issueQuery,
             update: (fields: Record<string, unknown>) => ({
               eq: () => ({
                 eq: () => {

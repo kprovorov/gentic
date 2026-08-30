@@ -21,14 +21,23 @@ type PullRequestPayload = {
   action: string
   pull_request: {
     html_url: string
+    title: string | null
     state: string
     draft: boolean
     merged: boolean
     merged_at: string | null
     number: number
+    user?: {
+      login: string
+    }
     head: {
       ref: string
       sha: string
+      // Null once a fork has been deleted, and absent on payloads this
+      // handler predates caring about the head repository at all.
+      repo?: {
+        full_name: string
+      } | null
     }
     base: {
       repo: {
@@ -283,8 +292,12 @@ async function handlePullRequestEvent(
       ? String(payload.installation.id)
       : null,
     baseRepository: payload.pull_request.base?.repo?.full_name ?? null,
+    headRepository: payload.pull_request.head?.repo?.full_name ?? null,
     headBranch: payload.pull_request.head?.ref ?? null,
     prUrl: payload.pull_request.html_url,
+    prNumber: payload.pull_request.number,
+    prTitle: payload.pull_request.title ?? null,
+    prAuthorLogin: payload.pull_request.user?.login ?? null,
     prState,
     readyForReview: prState === "open" && payload.pull_request.draft === false,
     headSha: payload.pull_request.head?.sha ?? null,

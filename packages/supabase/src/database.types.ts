@@ -434,6 +434,7 @@ export type Database = {
           run_finished_at: string | null
           run_started_at: string | null
           session_id: string | null
+          source: string
           status: string
           title: string | null
           type: string
@@ -458,6 +459,7 @@ export type Database = {
           run_finished_at?: string | null
           run_started_at?: string | null
           session_id?: string | null
+          source?: string
           status?: string
           title?: string | null
           type?: string
@@ -482,6 +484,7 @@ export type Database = {
           run_finished_at?: string | null
           run_started_at?: string | null
           session_id?: string | null
+          source?: string
           status?: string
           title?: string | null
           type?: string
@@ -1481,6 +1484,22 @@ export type Database = {
         Returns: {
           review_cycle_id: string
           superseded: boolean
+        }[]
+      }
+      track_external_pull_request: {
+        Args: {
+          p_body: string
+          p_head_sha?: string
+          p_pr_state: string
+          p_pr_url: string
+          p_project_id: string
+          p_ready_for_review: boolean
+          p_title: string
+        }
+        Returns: {
+          associated_issue_id: string
+          association_created: boolean
+          issue_status_changed: boolean
         }[]
       }
       unban_worker: {
