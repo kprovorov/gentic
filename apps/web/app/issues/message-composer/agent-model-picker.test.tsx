@@ -58,6 +58,34 @@ describe("AgentModelPicker", () => {
     expect(
       screen.getByRole("menuitem", { name: /GPT-5\.6 Sol/ })
     ).toBeInTheDocument()
+    // Fable 5 and Fable 5.1 are both offered, so match the label exactly.
+    expect(
+      screen.getByRole("menuitem", { name: /^Claude Fable 5\.1$/ })
+    ).toBeInTheDocument()
+  })
+
+  it("selects Claude Fable 5.1 without changing agent", async () => {
+    const user = userEvent.setup()
+    const onAgentModelChange = vi.fn()
+
+    render(
+      <AgentModelPicker
+        agentProvider="claude_code"
+        issueModel="claude-sonnet-5"
+        hasMessages={false}
+        onAgentModelChange={onAgentModelChange}
+      />
+    )
+
+    await user.click(
+      screen.getByRole("menuitem", { name: /^Claude Fable 5\.1$/ })
+    )
+
+    expect(onAgentModelChange).toHaveBeenCalledWith(
+      "claude_code",
+      "claude-fable-5-1",
+      { requiresReset: false }
+    )
   })
 
   it("does nothing when re-selecting the already-active agent and model", async () => {

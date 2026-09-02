@@ -86,6 +86,7 @@ export const agentModelOptions = {
   claude_code: [
     { value: "claude-opus-5", label: "Claude Opus 5" },
     { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
+    { value: "claude-fable-5-1", label: "Claude Fable 5.1" },
     { value: "claude-fable-5", label: "Claude Fable 5" },
   ],
   codex: [
