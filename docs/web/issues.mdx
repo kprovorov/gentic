@@ -95,6 +95,18 @@ Automatic publishing runs once at most for each active run. The publishing reque
 
 If a finished, idle run has unpublished changes and no pull request, the issue sidebar shows **Create PR**. This manual action appears with your attribution. It is unavailable during an active run, while automatic publishing is pending, and after a pull request is attached.
 
+### Merging a Pull Request
+
+Once a pull request is open and approved on GitHub, the issue sidebar shows **Merge PR** beneath it, so you can land approved work without leaving Gentic. The button appears only while the PR is open, carries GitHub's `approved` review decision, and has not failed CI. Pending checks do not hide it — your repository's branch protection rules still decide whether the merge goes through.
+
+Gentic merges with the first method your repository still allows, preferring **squash**, then **merge commit**, then **rebase**, and leaves the commit message to your repository's own defaults. The merge is pinned to the exact commit the approval was checked against, so a push that lands between your click and the merge is rejected rather than merged unreviewed.
+
+Gentic re-checks the pull request's live state before merging, so if the approval was dismissed or the PR was closed since the page last refreshed, the button reports that instead of merging. Merging requires the GitHub App's **Contents** permission to be **Read & write** — see [GitHub Integration](/web/github-integration).
+
+<Warning>
+  Merging cannot be undone from Gentic, so the button asks for confirmation first.
+</Warning>
+
 ## Spec Issues
 
 A **Spec** is an issue that records intent instead of asking for it to be built — a written requirement, a design decision, a brief that other issues implement. Set the type to **Spec** from the type menu on the issue detail page or the edit page.

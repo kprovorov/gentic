@@ -292,9 +292,9 @@ export type CreatePullRequestReviewInput = {
   comments?: { path: string; line: number; body: string }[]
 }
 
-// The one call in this file with a real side effect on GitHub: submits an
-// automatic-reviewer verdict as a genuine PR review (GEN-416). Every other
-// function here only reads.
+// One of the two calls in this file with a real side effect on GitHub (the
+// other being `mergePullRequest`): submits an automatic-reviewer verdict as a
+// genuine PR review (GEN-416).
 export async function createPullRequestReview(
   installationId: string,
   owner: string,
@@ -343,6 +343,134 @@ export async function createPullRequestReview(
   return toGithubPullRequestReview(
     (await response.json()) as RawPullRequestReview
   )
+}
+
+export type GithubMergeMethod = "merge" | "squash" | "rebase"
+
+// Squash first: it is what Gentic's own repository convention expects (a PR
+// title that is a conventional commit becomes the commit message), and it is
+// the method most repositories leave enabled. A repository can disable any
+// subset of the three, and GitHub answers a disallowed method with a 405 that
+// names nothing actionable, so the merge path asks first rather than guessing.
+const MERGE_METHOD_PREFERENCE: GithubMergeMethod[] = [
+  "squash",
+  "merge",
+  "rebase",
+]
+
+export async function fetchRepositoryMergeMethods(
+  installationId: string,
+  owner: string,
+  repo: string
+): Promise<GithubMergeMethod[]> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new GithubApiError(
+      response.status,
+      `Failed to fetch repository merge settings (${response.status})`
+    )
+  }
+
+  const data = (await response.json()) as {
+    allow_merge_commit?: boolean | null
+    allow_squash_merge?: boolean | null
+    allow_rebase_merge?: boolean | null
+  }
+  const allowed: Record<GithubMergeMethod, boolean | null | undefined> = {
+    merge: data.allow_merge_commit,
+    squash: data.allow_squash_merge,
+    rebase: data.allow_rebase_merge,
+  }
+
+  // Only an explicit `false` disables a method — an older GitHub Enterprise
+  // that omits these fields should behave like a repository with all three
+  // enabled rather than like one with none.
+  return MERGE_METHOD_PREFERENCE.filter((method) => allowed[method] !== false)
+}
+
+export type MergePullRequestInput = {
+  mergeMethod: GithubMergeMethod
+  // Pins the merge to the exact commit whose approval was verified. GitHub
+  // answers with a 409 if the PR's head has moved since, rather than merging
+  // commits nobody approved — the merge equivalent of the head-SHA guard the
+  // review publish path applies (GEN-416).
+  sha: string
+}
+
+export type GithubMergeResult = {
+  merged: boolean
+  sha: string | null
+  message: string
+}
+
+// The second of this file's two writes to GitHub: merges an approved pull
+// request on an operator's explicit request (GEN-434). Commit title and
+// message are deliberately left unset so GitHub applies the repository's own
+// squash/merge commit-message defaults.
+export async function mergePullRequest(
+  installationId: string,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  input: MergePullRequestInput
+): Promise<GithubMergeResult> {
+  const token = await getInstallationToken(installationId)
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/merge`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      body: JSON.stringify({
+        merge_method: input.mergeMethod,
+        sha: input.sha,
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      // Same reasoning as `createPullRequestReview`: a cached installation
+      // token keeps the permissions it was minted with for close to an hour,
+      // so without this eviction an owner who has just granted the App
+      // Contents write access would keep hitting 403 for the rest of it.
+      installationTokenCache.delete(installationId)
+    }
+    const detail = await response.text().catch(() => "")
+    throw new GithubApiError(
+      response.status,
+      `Failed to merge pull request (${response.status})${detail ? `: ${detail}` : ""}`
+    )
+  }
+
+  const data = (await response.json()) as {
+    merged?: boolean | null
+    sha?: string | null
+    message?: string | null
+  }
+
+  return {
+    merged: data.merged ?? false,
+    sha: data.sha ?? null,
+    message: data.message ?? "",
+  }
 }
 
 export async function fetchPullRequestHeadSha(

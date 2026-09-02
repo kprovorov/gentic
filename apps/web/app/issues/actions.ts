@@ -37,6 +37,8 @@ import * as reviewLifecycleService from "@gentic/services/review-lifecycle"
 import type { Supabase } from "@gentic/services/types"
 import { createServiceClient } from "@gentic/supabase/service"
 
+import { mergeIssuePullRequest } from "@/lib/pull-request-merging"
+
 import { getAuthenticatedContext } from "../_lib/auth-context"
 import { getString, getUuid } from "../_lib/form-data"
 import type { Attachment } from "./[code]/attachments"
@@ -654,6 +656,41 @@ export async function createManualIssuePullRequest(formData: FormData) {
         ok: false,
         error: error.message,
       } as const
+    }
+    throw error
+  }
+}
+
+/**
+ * Merges an approved pull request from the issue rail (GEN-434).
+ *
+ * Returns the same `{ ok }` discriminated result as
+ * {@link createManualIssuePullRequest} rather than throwing: every rejection
+ * here is something the operator can read and act on (the PR was closed, the
+ * approval was dismissed, the App lacks Contents write), so the button shows
+ * the reason instead of a generic failure.
+ */
+export async function mergeIssuePullRequestAction(formData: FormData) {
+  const { supabase, userId } = await getAuthenticatedContext()
+  const pullRequestId = getUuid(formData, "pull_request_id")
+
+  try {
+    const result = await mergeIssuePullRequest(
+      supabase,
+      createServiceClient(),
+      {
+        userId,
+        pullRequestId,
+      }
+    )
+
+    revalidatePath("/issues")
+    await revalidateIssuePathById(supabase, userId, result.issueId)
+
+    return { ok: true, mergeMethod: result.mergeMethod } as const
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, error: error.message } as const
     }
     throw error
   }

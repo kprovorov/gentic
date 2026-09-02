@@ -78,13 +78,15 @@ Auto-respond needs two credentials **in addition to** the webhook secret used by
     | Permission | Access | Why |
     | --- | --- | --- |
     | **Pull requests** | **Read & write** | Read PR state and inline review comments; **write** is required for [Automatic Review](/web/automatic-review) to publish its verdict as a real GitHub review. |
-    | **Contents** | Read-only | Resolve commits and branches referenced by PR and check events. |
+    | **Contents** | **Read & write** | Resolve commits and branches referenced by PR and check events; **write** is what GitHub requires to merge a pull request, so it is needed for the **Merge PR** button on an issue. |
     | **Checks** | Read-only | Receive check-run and check-suite events. |
     | **Metadata** | Read-only | Mandatory for every GitHub App. |
 
     <Warning>
-      Raising **Pull requests** to **Read & write** on an app that is already installed does **not** take effect on its own. GitHub records it as a pending permission request that the account or organization owner must accept at **Settings → Applications → Installed GitHub Apps → Gentic → Review request**. Until it is accepted, the installation keeps its old read-only access and every Automatic Review publish fails with `403 Resource not accessible by integration`.
+      Raising **Pull requests** or **Contents** to **Read & write** on an app that is already installed does **not** take effect on its own. GitHub records it as a pending permission request that the account or organization owner must accept at **Settings → Applications → Installed GitHub Apps → Gentic → Review request**. Until it is accepted, the installation keeps its old read-only access and every Automatic Review publish — or **Merge PR** click — fails with `403 Resource not accessible by integration`.
     </Warning>
+
+    Leaving **Contents** at read-only is a supported setup: everything except the **Merge PR** button keeps working, and that button reports the missing permission rather than failing silently.
   </Step>
   <Step title="Add the App ID and private key">
     In the GitHub App's **General** settings, copy the **App ID** shown at the top of the page. Under **Private keys**, click **Generate a private key** to download a `.pem` file. Set both values in your web app environment:
