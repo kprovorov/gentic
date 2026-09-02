@@ -9,6 +9,7 @@ const updateIssueStatusMock = vi.fn()
 const addIssueRelationMock = vi.fn()
 const createManualIssuePullRequestMock = vi.fn()
 const deleteIssueRelationMock = vi.fn()
+const mergeIssuePullRequestActionMock = vi.fn()
 const addIssueLabelsMock = vi.fn()
 const removeIssueLabelsMock = vi.fn()
 const startAttachmentUploadsMock = vi.fn()
@@ -25,6 +26,8 @@ vi.mock("@/app/issues/actions", () => ({
     createManualIssuePullRequestMock(formData),
   deleteIssueRelation: (formData: FormData) =>
     deleteIssueRelationMock(formData),
+  mergeIssuePullRequestAction: (formData: FormData) =>
+    mergeIssuePullRequestActionMock(formData),
   updateIssuePriority: (formData: FormData) =>
     updateIssuePriorityMock(formData),
   updateIssueStatus: (formData: FormData) => updateIssueStatusMock(formData),
@@ -276,6 +279,138 @@ describe("IssueDetailRail manual Create PR", () => {
       expect(toastErrorMock).toHaveBeenCalledWith("Network failed")
     })
     expect(screen.getByRole("button", { name: "Create PR" })).toBeVisible()
+  })
+})
+
+describe("IssueDetailRail Merge PR", () => {
+  const approvedPullRequest = {
+    id: "22222222-2222-4222-8222-222222222222",
+    issue_id: issueId,
+    url: "https://github.com/acme/widget/pull/1",
+    created_at: "2026-07-29T12:00:00.000Z",
+    state: "open" as const,
+    head_sha: "head-sha-1",
+    ci_state: "success",
+    review_decision: "approved",
+  }
+
+  it("offers the merge for an approved pull request", () => {
+    renderRail(createQueryClient(), {
+      status: "approved",
+      pullRequests: [approvedPullRequest],
+    })
+
+    expect(screen.getByRole("button", { name: "Merge PR" })).toBeVisible()
+  })
+
+  it("does not offer the merge before the pull request is approved", () => {
+    renderRail(createQueryClient(), {
+      status: "ready-for-review",
+      pullRequests: [
+        { ...approvedPullRequest, review_decision: "review_required" },
+      ],
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Merge PR" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("merges the pull request the button belongs to", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    mergeIssuePullRequestActionMock.mockResolvedValue({
+      ok: true,
+      mergeMethod: "squash",
+    })
+    renderRail(createQueryClient(), {
+      status: "approved",
+      pullRequests: [
+        approvedPullRequest,
+        {
+          ...approvedPullRequest,
+          id: "33333333-3333-4333-8333-333333333333",
+          url: "https://github.com/acme/widget/pull/2",
+        },
+      ],
+    })
+
+    await user.click(screen.getAllByRole("button", { name: "Merge PR" })[1])
+
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith("Pull request merged")
+    })
+    const formData = mergeIssuePullRequestActionMock.mock
+      .calls[0][0] as FormData
+    expect(formData.get("pull_request_id")).toBe(
+      "33333333-3333-4333-8333-333333333333"
+    )
+  })
+
+  // Merging cannot be undone from Gentic, so a dismissed confirmation has to
+  // leave the pull request untouched.
+  it("does not merge when the confirmation is dismissed", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(false)
+    renderRail(createQueryClient(), {
+      status: "approved",
+      pullRequests: [approvedPullRequest],
+    })
+
+    await user.click(screen.getByRole("button", { name: "Merge PR" }))
+
+    expect(mergeIssuePullRequestActionMock).not.toHaveBeenCalled()
+  })
+
+  // Every refusal the action returns names something the operator can act on
+  // — a dismissed approval, a closed PR, a missing App permission — so it is
+  // shown verbatim rather than folded into a generic failure.
+  it("shows a returned refusal", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    mergeIssuePullRequestActionMock.mockResolvedValue({
+      ok: false,
+      error: "Pull request is not approved",
+    })
+    renderRail(createQueryClient(), {
+      status: "approved",
+      pullRequests: [approvedPullRequest],
+    })
+
+    await user.click(screen.getByRole("button", { name: "Merge PR" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Pull request is not approved"
+      )
+    })
+    expect(screen.getByRole("button", { name: "Merge PR" })).toBeVisible()
+  })
+
+  it("prevents duplicate clicks while the merge is in flight", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    let resolveMutation: () => void = () => {}
+    mergeIssuePullRequestActionMock.mockImplementation(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          resolveMutation = () => resolve({ ok: true })
+        })
+    )
+    renderRail(createQueryClient(), {
+      status: "approved",
+      pullRequests: [approvedPullRequest],
+    })
+
+    await user.dblClick(screen.getByRole("button", { name: "Merge PR" }))
+
+    expect(mergeIssuePullRequestActionMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole("button", { name: "Merging..." })).toBeVisible()
+
+    resolveMutation()
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith("Pull request merged")
+    })
   })
 })
 
@@ -643,9 +778,7 @@ describe("IssueDetailRail automatic review", () => {
     // Scoped to the review-cycle summary row: the Status dropdown's own
     // menu items include every possible status label, "Changes requested"
     // (the `changes-requested` issue status) among them.
-    const summary = within(
-      screen.getByText("1/3 attempts").closest("div")!
-    )
+    const summary = within(screen.getByText("1/3 attempts").closest("div")!)
     expect(summary.getByText("1/3 attempts")).toBeVisible()
     expect(summary.getByText("Changes requested")).toBeVisible()
     expect(summary.getByText("1 finding")).toBeVisible()

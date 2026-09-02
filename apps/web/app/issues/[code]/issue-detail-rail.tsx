@@ -12,6 +12,7 @@ import {
   IconCheck,
   IconCircleDashed,
   IconExternalLink,
+  IconGitMerge,
   IconGitPullRequest,
   IconLink,
   IconPlus,
@@ -25,6 +26,7 @@ import {
   addIssueRelation,
   createManualIssuePullRequest,
   deleteIssueRelation,
+  mergeIssuePullRequestAction,
   removeIssueLabels,
 } from "@/app/issues/actions"
 import { IssueLabelsField } from "@/app/issues/issue-labels-field"
@@ -62,6 +64,7 @@ import type { LabelSnapshot } from "@gentic/validators/realtime"
 import { IssueLabelChip } from "../issue-label-chip"
 import { Attachments, type Attachment } from "./attachments"
 import { canShowManualCreatePrAction } from "./manual-create-pr-visibility"
+import { canMergePullRequest } from "./merge-pull-request-visibility"
 import {
   IssueDetailPriority,
   IssueDetailStatus,
@@ -169,6 +172,12 @@ function IssueDetailPullRequests({
                   cycle={reviewCycle}
                 />
               ) : null}
+              {canMergePullRequest(pullRequest) ? (
+                <MergePullRequestButton
+                  issueId={issueId}
+                  pullRequestId={pullRequest.id}
+                />
+              ) : null}
             </li>
           )
         })}
@@ -192,9 +201,7 @@ function ReviewCycleSummary({
   const latestAttempt = latestReviewAttempt(cycle)
   const latestRun = latestReviewRun(cycle)
   const verdictMeta = latestAttempt
-    ? reviewVerdictMeta[
-        latestAttempt.verdict as keyof typeof reviewVerdictMeta
-      ]
+    ? reviewVerdictMeta[latestAttempt.verdict as keyof typeof reviewVerdictMeta]
     : null
   const reviewUrl = latestAttempt
     ? githubReviewUrl(pullRequestUrl, latestAttempt.githubReviewId)
@@ -238,6 +245,70 @@ function ReviewCycleSummary({
       ) : null}
     </div>
   )
+}
+
+// Merging is the one control in this rail that changes somebody's default
+// branch, and it cannot be undone from Gentic — hence the confirm, matching
+// `ReviewRecoveryControls`' treatment of its own irreversible actions.
+function MergePullRequestButton({
+  issueId,
+  pullRequestId,
+}: {
+  issueId: string
+  pullRequestId: string
+}) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: mergeIssuePullRequestAction,
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success("Pull request merged")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.issue(issueId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues }),
+      ])
+    },
+    onError: (error) => {
+      toast.error(getMergeErrorMessage(error))
+    },
+  })
+
+  function submit() {
+    if (mutation.isPending) {
+      return
+    }
+    if (!window.confirm("Merge this pull request on GitHub?")) {
+      return
+    }
+    const formData = new FormData()
+    formData.set("pull_request_id", pullRequestId)
+    mutation.mutate(formData)
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="mt-1 ml-10 h-7 gap-1.5 px-2.5 text-[11px]"
+      disabled={mutation.isPending}
+      onClick={submit}
+    >
+      <IconGitMerge className="size-3.5" />
+      {mutation.isPending ? "Merging..." : "Merge PR"}
+    </Button>
+  )
+}
+
+function getMergeErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Failed to merge the pull request"
 }
 
 function ManualCreatePrButton({ issueId }: { issueId: string }) {

@@ -13,6 +13,7 @@ export { logIssueEvent, type IssueEventType } from "./issues/events"
 export {
   getIssue,
   getIssueByCode,
+  getIssuePullRequestMergeContext,
   getIssueReviewPolicy,
   listBlockedIssueIds,
   listBlockingIssueIds,
@@ -20,6 +21,7 @@ export {
   listIssueRelationCandidates,
   listIssueRelations,
   listIssues,
+  type IssuePullRequestMergeContext,
   type ListIssuesFilters,
 } from "./issues/queries"
 export {

@@ -178,6 +178,52 @@ export async function listIssuePullRequests(
   )
 }
 
+export type IssuePullRequestMergeContext = {
+  pullRequestId: string
+  issueId: string
+  repo: string
+  prUrl: string
+}
+
+/**
+ * Resolves a single pull request to the repository it lives in, so the merge
+ * action (GEN-434) can address it on GitHub. `issue_pull_requests` stores only
+ * the PR URL; the `owner/repo` slug lives on the owning project, two joins
+ * away.
+ *
+ * Ownership goes through `ensureIssueOwned` rather than a filter on the
+ * embedded project, so this authorizes exactly the way every other
+ * issue-scoped read does — and so it holds if a caller ever reaches here with
+ * the service client, which RLS does not constrain.
+ */
+export async function getIssuePullRequestMergeContext(
+  supabase: Supabase,
+  userId: string,
+  pullRequestId: string
+): Promise<IssuePullRequestMergeContext> {
+  const { data, error } = await supabase
+    .from("issue_pull_requests")
+    .select("id,issue_id,url,issues!inner(projects!inner(repo))")
+    .eq("id", pullRequestId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Pull request not found")
+  }
+
+  await ensureIssueOwned(supabase, userId, data.issue_id)
+
+  return {
+    pullRequestId: data.id,
+    issueId: data.issue_id,
+    repo: data.issues.projects.repo,
+    prUrl: data.url,
+  }
+}
+
 /**
  * The frozen Automatic Review policy for an Issue, or `null` before its first
  * pull request has been associated (nothing has been snapshotted yet).
