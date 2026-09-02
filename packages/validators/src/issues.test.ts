@@ -1,10 +1,13 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
+import type { AgentProvider } from "./issues.js"
 import {
+  agentModelOptions,
   createIssueSchema,
   defaultIssuePriority,
   hasAttachedIssuePullRequest,
+  isIssueModelForAgent,
   issuePriorityIcons,
   issuePriorityLabels,
   issuePriorityOptions,
@@ -266,6 +269,20 @@ test("mutateIssueLabelsSchema rejects more than 20 unique label_ids", () => {
   assert.throws(() =>
     mutateIssueLabelsSchema.parse({ issue_ids: [issueId], label_ids: labelIds })
   )
+})
+
+test("isIssueModelForAgent accepts every offered model for its own agent only", () => {
+  for (const [agentProvider, options] of Object.entries(agentModelOptions)) {
+    for (const option of options) {
+      assert.equal(
+        isIssueModelForAgent(agentProvider as AgentProvider, option.value),
+        true
+      )
+    }
+  }
+
+  assert.equal(isIssueModelForAgent("codex", "claude-fable-5-1"), false)
+  assert.equal(isIssueModelForAgent("claude_code", "gpt-5.6-sol"), false)
 })
 
 test("issueTypeSchema accepts spec alongside the agent-work types", () => {
