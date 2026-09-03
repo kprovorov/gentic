@@ -1172,7 +1172,7 @@ export type Database = {
         }[]
       }
       ban_host: {
-        Args: { p_now?: string; p_user_id: string; p_host_id: string }
+        Args: { p_host_id: string; p_now?: string; p_user_id: string }
         Returns: {
           arch: string | null
           banned_at: string | null
@@ -1201,7 +1201,7 @@ export type Database = {
         }
       }
       claim_review_run: {
-        Args: { p_now?: string; p_user_id: string; p_host_id: string }
+        Args: { p_host_id: string; p_now?: string; p_user_id: string }
         Returns: {
           head_sha: string
           issue_id: string
@@ -1277,7 +1277,7 @@ export type Database = {
         }[]
       }
       delete_host: {
-        Args: { p_now?: string; p_user_id: string; p_host_id: string }
+        Args: { p_host_id: string; p_now?: string; p_user_id: string }
         Returns: boolean
       }
       delete_old_orphaned_attachments: {
@@ -1350,10 +1350,7 @@ export type Database = {
           status_changed: boolean
         }[]
       }
-      reconcile_offline_host_runs: {
-        Args: { p_now?: string }
-        Returns: number
-      }
+      reconcile_offline_host_runs: { Args: { p_now?: string }; Returns: number }
       reconcile_offline_review_runs: {
         Args: { p_now?: string }
         Returns: number
@@ -1414,11 +1411,11 @@ export type Database = {
         }[]
       }
       requeue_host_active_issues: {
-        Args: { p_now: string; p_host_id: string }
+        Args: { p_host_id: string; p_now: string }
         Returns: number
       }
       requeue_host_active_review_runs: {
-        Args: { p_now: string; p_host_id: string }
+        Args: { p_host_id: string; p_now: string }
         Returns: number
       }
       reset_issue_run: {
@@ -1459,6 +1456,7 @@ export type Database = {
           created_at: string
           established_at: string
           generation: number
+          host_id: string | null
           id: string
           issue_id: string
           issue_model: string | null
@@ -1466,7 +1464,6 @@ export type Database = {
           session_id: string | null
           superseded_at: string | null
           updated_at: string
-          host_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1503,7 +1500,7 @@ export type Database = {
         }[]
       }
       unban_host: {
-        Args: { p_now?: string; p_user_id: string; p_host_id: string }
+        Args: { p_host_id: string; p_now?: string; p_user_id: string }
         Returns: {
           arch: string | null
           banned_at: string | null
