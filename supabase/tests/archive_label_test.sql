@@ -232,7 +232,7 @@ SELECT is(
 );
 
 -- Privileges: only service_role can invoke this RPC directly, matching the
--- worker lifecycle RPC pattern (this app calls it from trusted server code
+-- host lifecycle RPC pattern (this app calls it from trusted server code
 -- with an explicit p_user_id ownership check rather than table RLS).
 SELECT ok(
   NOT has_function_privilege(

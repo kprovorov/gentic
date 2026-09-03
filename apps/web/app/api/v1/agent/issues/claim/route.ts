@@ -6,8 +6,8 @@ import {
   generateFirstPublishBranchName,
   getIssueCode,
 } from "@gentic/services/issues"
-import { getWorker } from "@gentic/services/workers"
-import type { WorkerCompatibilityPolicy } from "@gentic/services/workers"
+import { getHost } from "@gentic/services/hosts"
+import type { HostCompatibilityPolicy } from "@gentic/services/hosts"
 import type { AgentProvider } from "@gentic/validators/issues"
 import { claimIssueInputSchema } from "@gentic/validators/agent"
 
@@ -29,10 +29,10 @@ function eligibleIssueFilter(now: string): string {
 
 export async function POST(request: Request) {
   try {
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
     claimIssueInputSchema.parse(await request.json().catch(() => ({})))
     return json({
-      issue: await claimNextQueuedIssue(supabase, userId, workerId),
+      issue: await claimNextQueuedIssue(supabase, userId, hostId),
     })
   } catch (error) {
     return handleAgentError(error)
@@ -42,23 +42,23 @@ export async function POST(request: Request) {
 export async function claimNextQueuedIssue(
   supabase: Supabase,
   userId: string,
-  workerId: string,
-  options: { compatibilityPolicy?: WorkerCompatibilityPolicy } = {}
+  hostId: string,
+  options: { compatibilityPolicy?: HostCompatibilityPolicy } = {}
 ) {
-  const worker = await getWorker(supabase, userId, workerId, {
+  const host = await getHost(supabase, userId, hostId, {
     compatibilityPolicy: options.compatibilityPolicy,
   })
-  if (worker.primary_state !== "online") {
+  if (host.primary_state !== "online") {
     return null
   }
-  if (worker.version_health === "unsupported") {
+  if (host.version_health === "unsupported") {
     return null
   }
-  if (worker.running_task_count >= worker.configured_capacity) {
+  if (host.running_task_count >= host.configured_capacity) {
     return null
   }
 
-  const eligibleProviders = getWorkerEligibleIssueProviders(worker.providers)
+  const eligibleProviders = getHostEligibleIssueProviders(host.providers)
   if (eligibleProviders.length === 0) {
     return null
   }
@@ -104,7 +104,7 @@ export async function claimNextQueuedIssue(
       run_error: null,
       run_finished_at: null,
       usage_limit_reset_at: null,
-      active_worker_id: workerId,
+      active_host_id: hostId,
       updated_at: now,
     })
     .eq("id", id)
@@ -122,26 +122,26 @@ export async function claimNextQueuedIssue(
     return null
   }
 
-  const freshWorker = await getWorker(supabase, userId, workerId, {
+  const freshHost = await getHost(supabase, userId, hostId, {
     compatibilityPolicy: options.compatibilityPolicy,
   })
   if (
-    freshWorker.primary_state !== "online" ||
-    freshWorker.version_health === "unsupported"
+    freshHost.primary_state !== "online" ||
+    freshHost.version_health === "unsupported"
   ) {
     await supabase
       .from("issues")
       .update({
         status: candidate.status,
         active_run_id: null,
-        active_worker_id: null,
+        active_host_id: null,
         run_started_at: null,
         run_error: null,
         run_finished_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("active_worker_id", workerId)
+      .eq("active_host_id", hostId)
       .eq("active_run_id", activeRunId)
     return null
   }
@@ -178,8 +178,8 @@ export async function claimNextQueuedIssue(
   }
 }
 
-function getWorkerEligibleIssueProviders(
-  providers: Awaited<ReturnType<typeof getWorker>>["providers"]
+function getHostEligibleIssueProviders(
+  providers: Awaited<ReturnType<typeof getHost>>["providers"]
 ): AgentProvider[] {
   const result: AgentProvider[] = []
   if (isProviderReady(providers.codex)) {
@@ -192,7 +192,7 @@ function getWorkerEligibleIssueProviders(
 }
 
 function isProviderReady(
-  provider: Awaited<ReturnType<typeof getWorker>>["providers"]["codex"]
+  provider: Awaited<ReturnType<typeof getHost>>["providers"]["codex"]
 ): boolean {
   return Boolean(provider?.installed && provider.authenticated === true)
 }

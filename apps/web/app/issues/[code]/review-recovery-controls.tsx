@@ -25,8 +25,8 @@ const UNAVAILABLE_REASON_LABEL: Record<
 > = {
   provider_changed: "the agent or model changed since the original run",
   session_missing: "no resumable session was ever recorded",
-  worker_deleted: "the original worker was deleted",
-  worker_banned: "the original worker is banned",
+  host_deleted: "the original host was deleted",
+  host_banned: "the original host is banned",
 }
 
 /**
@@ -69,8 +69,7 @@ export function ReviewRecoveryControls({
   const freshMutation = useMutation({
     mutationFn: startFreshImplementationAction,
     onSuccess: invalidate,
-    onError: () =>
-      toast.error("Couldn't start a fresh implementation session"),
+    onError: () => toast.error("Couldn't start a fresh implementation session"),
   })
 
   const stuckCycle = reviewCycles.find(isReviewCycleStuck) ?? null
@@ -169,12 +168,7 @@ export function ReviewRecoveryControls({
           {implementationOwner?.unavailableReason ? (
             <p className="text-[11px] text-muted-foreground">
               The original session can&apos;t resume:{" "}
-              {
-                UNAVAILABLE_REASON_LABEL[
-                  implementationOwner.unavailableReason
-                ]
-              }
-              .
+              {UNAVAILABLE_REASON_LABEL[implementationOwner.unavailableReason]}.
             </p>
           ) : null}
         </>

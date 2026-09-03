@@ -261,7 +261,7 @@ export async function updateIssueType(
 }
 
 // Ownership is already established by the caller; this only asks whether a
-// worker still holds the issue, which is what makes converting it to a Spec
+// host still holds the issue, which is what makes converting it to a Spec
 // unsafe.
 async function ensureIssueRunIsFinished(supabase: Supabase, id: string) {
   const { data, error } = await supabase

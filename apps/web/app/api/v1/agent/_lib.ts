@@ -1,6 +1,6 @@
 import { ServiceError } from "@gentic/services/errors"
 import { ensureIssueOwned } from "@gentic/services/issues"
-import { authenticateWorkerCredential } from "@gentic/services/workers"
+import { authenticateHostCredential } from "@gentic/services/hosts"
 import { createServiceClient } from "@gentic/supabase/service"
 import {
   ackMessagesInputSchema,
@@ -19,7 +19,7 @@ export { ensureIssueOwned }
 
 export type Supabase = ReturnType<typeof createServiceClient>
 
-// The statuses a worker run is allowed to move an issue into via `/run-state`.
+// The statuses a host run is allowed to move an issue into via `/run-state`.
 // Everything else (e.g. `merged`, `approved`) is set by the user or the
 // GitHub webhook, not the agent run itself.
 export const runStateSchema = runStateFieldsSchema
@@ -51,23 +51,23 @@ export const automaticPrPublishRequestSchema =
   requestAutomaticPrPublishInputSchema
 export const realtimeTokenSchema = realtimeTokenInputSchema
 
-export async function ensureActiveWorkerRun(
+export async function ensureActiveHostRun(
   supabase: Supabase,
   userId: string,
-  workerId: string,
+  hostId: string,
   issueId: string,
   runId: string
 ): Promise<void> {
   const issueResult = await supabase
     .from("issues")
-    .select("id,active_worker_id,active_run_id,projects!inner(user_id)")
+    .select("id,active_host_id,active_run_id,projects!inner(user_id)")
     .eq("id", issueId)
     .maybeSingle()
 
   const { data: issue, error: issueError } = issueResult as {
     data: {
       id: string
-      active_worker_id: string | null
+      active_host_id: string | null
       active_run_id: string | null
       projects: { user_id: string }
     } | null
@@ -80,25 +80,25 @@ export async function ensureActiveWorkerRun(
   if (!issue || issue.projects.user_id !== userId) {
     throw new ApiError(404, "Issue not found")
   }
-  if (issue.active_worker_id !== workerId || issue.active_run_id !== runId) {
-    throw new ApiError(409, "Run is not active for this worker")
+  if (issue.active_host_id !== hostId || issue.active_run_id !== runId) {
+    throw new ApiError(409, "Run is not active for this host")
   }
 
-  // `last_seen_at` only drives the 90-second connected-worker display state.
+  // `last_seen_at` only drives the 90-second host display state.
   // The issue lease remains authoritative during the five-minute heartbeat
-  // grace period; reconciliation clears it when the worker is truly stale.
+  // grace period; reconciliation clears it when the host is truly stale.
 }
 
 export async function ensureActiveReviewRunClaim(
   supabase: Supabase,
   userId: string,
-  workerId: string,
+  hostId: string,
   reviewRunId: string
 ): Promise<void> {
   const reviewRunResult = await supabase
     .from("review_runs")
     .select(
-      "id,status,claimed_by_worker_id,review_cycles!inner(issues!inner(projects!inner(user_id)))"
+      "id,status,claimed_by_host_id,review_cycles!inner(issues!inner(projects!inner(user_id)))"
     )
     .eq("id", reviewRunId)
     .maybeSingle()
@@ -107,7 +107,7 @@ export async function ensureActiveReviewRunClaim(
     data: {
       id: string
       status: string
-      claimed_by_worker_id: string | null
+      claimed_by_host_id: string | null
       review_cycles: { issues: { projects: { user_id: string } } }
     } | null
     error: { message: string } | null
@@ -123,16 +123,16 @@ export async function ensureActiveReviewRunClaim(
     throw new ApiError(404, "Review run not found")
   }
   if (
-    reviewRun.claimed_by_worker_id !== workerId ||
+    reviewRun.claimed_by_host_id !== hostId ||
     reviewRun.status !== "running"
   ) {
-    throw new ApiError(409, "Review run is not claimed by this worker")
+    throw new ApiError(409, "Review run is not claimed by this host")
   }
 }
 
 export async function getAgentContext(request: Request): Promise<{
   userId: string
-  workerId: string
+  hostId: string
   banned: boolean
   supabase: Supabase
 }> {
@@ -146,12 +146,12 @@ export async function getAgentContextWithOptions(
   } = {}
 ): Promise<{
   userId: string
-  workerId: string
+  hostId: string
   banned: boolean
   supabase: Supabase
 }> {
   const supabase = createServiceClient()
-  const { userId, workerId, banned } = await authenticateWorkerRequest(
+  const { userId, hostId, banned } = await authenticateHostRequest(
     request,
     supabase,
     options
@@ -159,7 +159,7 @@ export async function getAgentContextWithOptions(
 
   return {
     userId,
-    workerId,
+    hostId,
     banned,
     supabase,
   }
@@ -208,7 +208,7 @@ export class ApiError extends Error {
   }
 }
 
-async function authenticateWorkerRequest(
+async function authenticateHostRequest(
   request: Request,
   supabase: Supabase,
   options: {
@@ -216,7 +216,7 @@ async function authenticateWorkerRequest(
   } = {}
 ): Promise<{
   userId: string
-  workerId: string
+  hostId: string
   banned: boolean
 }> {
   const authorization = request.headers.get("authorization")
@@ -227,10 +227,10 @@ async function authenticateWorkerRequest(
   }
 
   try {
-    return await authenticateWorkerCredential(supabase, token, options)
+    return await authenticateHostCredential(supabase, token, options)
   } catch (error) {
     if (error instanceof ServiceError && error.code === "forbidden") {
-      throw new ApiError(401, "Invalid worker credential")
+      throw new ApiError(401, "Invalid host credential")
     }
     throw error
   }

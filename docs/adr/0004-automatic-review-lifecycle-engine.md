@@ -15,7 +15,7 @@ each pull request and exact head SHA. The schema for it
 `issue_review_policies`) already existed, but nothing decided *when* a cycle
 is created vs. continued vs. superseded, how the three-attempt budget behaves
 across multiple pushes, or how the automatic-review path stays distinct from
-a plain human GitHub approval. Model execution, worker job claiming, and
+a plain human GitHub approval. Model execution, host job claiming, and
 GitHub review API calls are explicitly out of scope — a future issue
 dispatches the reviewer agent and publishes its verdict; this engine only
 owns the state transitions.

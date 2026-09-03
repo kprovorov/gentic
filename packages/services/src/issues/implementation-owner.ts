@@ -16,10 +16,10 @@ export const IMPLEMENTATION_OWNER_UNAVAILABLE_REASONS = [
   // No resumable ACP session was ever persisted for this owner (e.g. a
   // fresh-implementation owner still waiting for its first run).
   "session_missing",
-  // The owning worker was deleted.
-  "worker_deleted",
-  // The owning worker is banned.
-  "worker_banned",
+  // The owning host was deleted.
+  "host_deleted",
+  // The owning host is banned.
+  "host_banned",
 ] as const
 
 export type ImplementationOwnerUnavailableReason =
@@ -30,7 +30,7 @@ export type ImplementationOwner = {
   issueId: string
   generation: number
   origin: ImplementationOwnerOrigin
-  workerId: string | null
+  hostId: string | null
   sessionId: string | null
   agentProvider: AgentProvider
   issueModel: IssueModel
@@ -43,7 +43,7 @@ export type ImplementationOwner = {
 
 // The target a review fix is being handed to, as the caller understands it.
 export type FixHandoffTarget = {
-  workerId: string
+  hostId: string
   sessionId: string
   /** When provided, the owner generation must match too. */
   generation?: number
@@ -69,19 +69,19 @@ type OwnerRow = {
   issue_id: string
   generation: number
   origin: ImplementationOwnerOrigin
-  worker_id: string | null
+  host_id: string | null
   session_id: string | null
   agent_provider: AgentProvider
   issue_model: IssueModel
   established_at: string
   issues: { agent_provider: AgentProvider; issue_model: IssueModel }
-  workers: { banned_at: string | null } | null
+  hosts: { banned_at: string | null } | null
 }
 
 const OWNER_SELECT =
-  "id, issue_id, generation, origin, worker_id, session_id, agent_provider, issue_model, established_at, issues!inner(agent_provider, issue_model), workers(banned_at)"
+  "id, issue_id, generation, origin, host_id, session_id, agent_provider, issue_model, established_at, issues!inner(agent_provider, issue_model), hosts(banned_at)"
 
-// Availability is derived from the live worker + issue rows rather than stored,
+// Availability is derived from the live host + issue rows rather than stored,
 // so ban/delete/offline and provider changes are reflected the moment they
 // happen without the ownership row needing to be rewritten.
 function deriveAvailability(row: OwnerRow): {
@@ -98,11 +98,11 @@ function deriveAvailability(row: OwnerRow): {
   if (!row.session_id) {
     return { resumable: false, unavailableReason: "session_missing" }
   }
-  if (!row.worker_id) {
-    return { resumable: false, unavailableReason: "worker_deleted" }
+  if (!row.host_id) {
+    return { resumable: false, unavailableReason: "host_deleted" }
   }
-  if (row.workers?.banned_at) {
-    return { resumable: false, unavailableReason: "worker_banned" }
+  if (row.hosts?.banned_at) {
+    return { resumable: false, unavailableReason: "host_banned" }
   }
   return { resumable: true, unavailableReason: null }
 }
@@ -114,7 +114,7 @@ function toOwner(row: OwnerRow): ImplementationOwner {
     issueId: row.issue_id,
     generation: row.generation,
     origin: row.origin,
-    workerId: row.worker_id,
+    hostId: row.host_id,
     sessionId: row.session_id,
     agentProvider: row.agent_provider,
     issueModel: row.issue_model,
@@ -161,7 +161,7 @@ export async function validateFixHandoff(
   }
 
   const targetsOwner =
-    owner.workerId === target.workerId &&
+    owner.hostId === target.hostId &&
     owner.sessionId === target.sessionId &&
     (target.generation === undefined || owner.generation === target.generation)
 

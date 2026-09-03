@@ -1,7 +1,4 @@
-import type {
-  ImplementationOwner,
-  ReviewCycle,
-} from "@gentic/services/issues"
+import type { ImplementationOwner, ReviewCycle } from "@gentic/services/issues"
 
 import { isReviewCycleStuck } from "@/app/issues/review-state-meta"
 

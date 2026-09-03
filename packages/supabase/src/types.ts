@@ -21,5 +21,5 @@ export type IssueLabel = Tables<"issue_labels">
 export type Message = Tables<"messages">
 export type IssueAutomaticPrRequest = Tables<"issue_automatic_pr_requests">
 export type IssueReviewPolicy = Tables<"issue_review_policies">
-export type Worker = Tables<"workers">
-export type WorkerEnrollmentCode = Tables<"worker_enrollment_codes">
+export type Host = Tables<"hosts">
+export type HostEnrollmentCode = Tables<"host_enrollment_codes">

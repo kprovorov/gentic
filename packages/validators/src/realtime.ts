@@ -92,7 +92,7 @@ export const chatMessageSchema = z
 
 export type ChatMessageContract = z.infer<typeof chatMessageSchema>
 
-// Worker -> browser: full-snapshot upsert of one transcript message.
+// Host -> browser: full-snapshot upsert of one transcript message.
 export const messageEventSchema = z
   .object({
     id: z.string().uuid(),
@@ -153,7 +153,7 @@ export type RealtimeRunStateStatus = z.infer<
   typeof realtimeRunStateStatusSchema
 >
 
-// Worker -> browser: mirror of the run-state PATCH, for instant UI updates.
+// Host -> browser: mirror of the run-state PATCH, for instant UI updates.
 export const runStateEventSchema = z
   .object({
     status: issueStatusSchema,
@@ -386,7 +386,7 @@ export const deletedRowSchema = z.object({
 
 export type DeletedRow = z.infer<typeof deletedRowSchema>
 
-// Browser -> worker: wake-up signal for a persisted follow-up message. Workers
+// Browser -> host: wake-up signal for a persisted follow-up message. Hosts
 // fetch durable messages from the database and must not treat Broadcast as the
 // delivery source of truth.
 export const userMessageEventSchema = z.object({

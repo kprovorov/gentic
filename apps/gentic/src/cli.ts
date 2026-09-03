@@ -8,7 +8,7 @@ import { registerLogsCommand } from "./commands/logs.js"
 import { registerRunCommand } from "./commands/run.js"
 import { registerServiceCommands } from "./commands/service.js"
 import { registerStatusCommand } from "./commands/status.js"
-import { registerWorkerCommand } from "./commands/worker.js"
+import { registerHostCommand } from "./commands/host.js"
 import { checkOnboardingGate } from "./cli-gate.js"
 import { logError } from "./log.js"
 import {
@@ -34,7 +34,7 @@ registerLogsCommand(program)
 registerRunCommand(program)
 registerServiceCommands(program)
 registerStatusCommand(program)
-registerWorkerCommand(program)
+registerHostCommand(program)
 
 program
   .command("onboard")

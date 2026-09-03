@@ -1,6 +1,6 @@
-# npm packaging for the gentic worker
+# npm packaging for the gentic host
 
-The gentic worker CLI is distributed on npm as
+The gentic host CLI is distributed on npm as
 [`gentic-cli`](https://www.npmjs.com/package/gentic-cli), so users can
 `npm install -g gentic-cli`. This directory owns the published README
 ([`package-readme.md`](./package-readme.md)); the package itself is staged by

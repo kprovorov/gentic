@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
+import { defaultHostCompatibilityPolicy } from "@gentic/services/hosts"
+
 import {
   claimNextQueuedIssue,
   ensureTodoIssueHasPendingPrompt,
@@ -24,7 +26,7 @@ type FakeIssue = {
   updated_at: string
   usage_limit_reset_at: string | null
   active_run_id: string | null
-  active_worker_id: string | null
+  active_host_id: string | null
   run_started_at: string | null
   run_error: string | null
   run_finished_at: string | null
@@ -44,7 +46,7 @@ type FakeIssue = {
   >
 }
 
-type FakeWorker = {
+type FakeHost = {
   id: string
   user_id: string
   display_name: string
@@ -82,8 +84,8 @@ const PRIORITY_RANK: Record<IssuePriority, number> = {
   high: 2,
   urgent: 3,
 }
-const workerId = "worker-1"
-const claudeWorkerId = "worker-2"
+const hostId = "host-1"
+const claudeHostId = "host-2"
 
 class FakeMessagesQuery {
   private insertValues: Record<string, unknown> | null = null
@@ -133,7 +135,7 @@ class FakeIssuesQuery {
     eligibleAt?: string
     requireNoUnfinishedBlockers?: boolean
     agentProviders?: string[]
-    activeWorkerIds?: string[]
+    activeHostIds?: string[]
     activeRunIdIsNull?: boolean
     excludedType?: string
   } = {}
@@ -179,8 +181,8 @@ class FakeIssuesQuery {
   in(column: string, values: unknown[]) {
     if (column === "agent_provider") {
       this.filters.agentProviders = values.map(String)
-    } else if (column === "active_worker_id") {
-      this.filters.activeWorkerIds = values.map(String)
+    } else if (column === "active_host_id") {
+      this.filters.activeHostIds = values.map(String)
     }
     return this
   }
@@ -193,10 +195,10 @@ class FakeIssuesQuery {
     const data = this.matchingIssues()
       .filter(
         (issue) =>
-          issue.active_worker_id &&
+          issue.active_host_id &&
           !["completed", "cancelled"].includes(issue.status)
       )
-      .map((issue) => ({ active_worker_id: issue.active_worker_id }))
+      .map((issue) => ({ active_host_id: issue.active_host_id }))
     return Promise.resolve({ data: data as T, error: null })
   }
 
@@ -264,9 +266,9 @@ class FakeIssuesQuery {
         return false
       }
       if (
-        this.filters.activeWorkerIds &&
-        (!issue.active_worker_id ||
-          !this.filters.activeWorkerIds.includes(issue.active_worker_id))
+        this.filters.activeHostIds &&
+        (!issue.active_host_id ||
+          !this.filters.activeHostIds.includes(issue.active_host_id))
       ) {
         return false
       }
@@ -290,7 +292,7 @@ class FakeIssuesQuery {
   }
 }
 
-class FakeWorkersQuery {
+class FakeHostsQuery {
   private readonly filters: {
     id?: string
     userId?: string
@@ -312,8 +314,8 @@ class FakeWorkersQuery {
   }
 
   maybeSingle() {
-    const worker =
-      this.db.workers.find((entry) => {
+    const host =
+      this.db.hosts.find((entry) => {
         if (this.filters.id && entry.id !== this.filters.id) return false
         if (this.filters.userId && entry.user_id !== this.filters.userId) {
           return false
@@ -323,13 +325,13 @@ class FakeWorkersQuery {
 
     return {
       returns<T>() {
-        return Promise.resolve({ data: worker as T, error: null })
+        return Promise.resolve({ data: host as T, error: null })
       },
     }
   }
 }
 
-// Implementation issues and review runs share one worker capacity pool
+// Implementation issues and review runs share one host capacity pool
 // (GEN-414); this fake always has zero claimed review runs, so
 // `listRunningTaskCounts`'s review-run query is a harmless no-op here.
 class FakeReviewRunsQuery {
@@ -358,15 +360,15 @@ class FakeSupabase {
   constructor(
     readonly pendingMessages: Record<string, unknown>[] = [],
     readonly issues: FakeIssue[] = [],
-    readonly workers: FakeWorker[] = [worker()]
+    readonly hosts: FakeHost[] = [host()]
   ) {}
 
   from(table: string) {
     if (table === "issues") {
       return new FakeIssuesQuery(this)
     }
-    if (table === "workers") {
-      return new FakeWorkersQuery(this)
+    if (table === "hosts") {
+      return new FakeHostsQuery(this)
     }
     if (table === "review_runs") {
       return new FakeReviewRunsQuery()
@@ -376,18 +378,20 @@ class FakeSupabase {
   }
 }
 
-function worker(overrides: Partial<FakeWorker> = {}): FakeWorker {
+function host(overrides: Partial<FakeHost> = {}): FakeHost {
   return {
-    id: workerId,
+    id: hostId,
     user_id: "user-1",
-    display_name: "Worker",
+    display_name: "Host",
     setup_state: "ready",
     banned_at: null,
     created_at: "2026-07-01T00:00:00.000Z",
     updated_at: "2026-07-01T00:00:00.000Z",
     last_seen_at: new Date().toISOString(),
     process_started_at: "2026-07-01T00:00:00.000Z",
-    gentic_version: "0.15.0",
+    // Tracks the policy so raising the supported floor never silently turns
+    // this shared fixture into an unsupported host.
+    gentic_version: defaultHostCompatibilityPolicy.currentVersion,
     os: "linux",
     arch: "x64",
     configured_capacity: 1,
@@ -417,7 +421,7 @@ function issue(
     updated_at: "2026-07-01T00:00:00.000Z",
     usage_limit_reset_at: null,
     active_run_id: null,
-    active_worker_id: null,
+    active_host_id: null,
     run_started_at: null,
     run_error: "previous error",
     run_finished_at: "2026-07-01T00:01:00.000Z",
@@ -514,7 +518,7 @@ test("claim keeps existing pending user messages intact", async () => {
   assert.deepEqual(supabase.inserts, [])
 })
 
-test("claim includes the issue code inputs and current title the worker needs", async () => {
+test("claim includes the issue code inputs and current title the host needs", async () => {
   const supabase = new FakeSupabase(
     [],
     [
@@ -530,7 +534,7 @@ test("claim includes the issue code inputs and current title the worker needs", 
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.code, "ACME-42")
@@ -561,7 +565,7 @@ test("claim does not expose associated pull request URLs", async () => {
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal("prUrl" in (claimed ?? {}), false)
@@ -589,13 +593,12 @@ test("claim skips spec issues and takes the next agent issue instead", async () 
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "feature-low")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "spec-urgent")
-      ?.active_worker_id,
+    supabase.issues.find((entry) => entry.id === "spec-urgent")?.active_host_id,
     null
   )
 })
@@ -606,7 +609,7 @@ test("claim leaves a spec issue in todo when it is the only eligible issue", asy
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed, null)
@@ -634,14 +637,13 @@ test("claim picks urgent before older lower-priority todo issues", async () => {
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "urgent-new")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "urgent-new")
-      ?.active_worker_id,
-    workerId
+    supabase.issues.find((entry) => entry.id === "urgent-new")?.active_host_id,
+    hostId
   )
   assert.deepEqual(supabase.issueQueries[0]?.orders, [
     { column: "priority", ascending: false },
@@ -649,7 +651,7 @@ test("claim picks urgent before older lower-priority todo issues", async () => {
   ])
 })
 
-test("claim routes a shared queue by the authenticated worker's provider readiness", async () => {
+test("claim routes a shared queue by the authenticated host's provider readiness", async () => {
   const supabase = new FakeSupabase(
     [],
     [
@@ -665,9 +667,9 @@ test("claim routes a shared queue by the authenticated worker's provider readine
       }),
     ],
     [
-      worker(),
-      worker({
-        id: claudeWorkerId,
+      host(),
+      host({
+        id: claudeHostId,
         provider_capabilities: {
           providers: {
             claude_code: {
@@ -685,24 +687,24 @@ test("claim routes a shared queue by the authenticated worker's provider readine
   const codexClaim = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
   const claudeClaim = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    claudeWorkerId
+    claudeHostId
   )
 
   assert.equal(codexClaim?.id, "codex-low")
   assert.equal(claudeClaim?.id, "claude-urgent")
   assert.equal(
-    supabase.issues.find((entry) => entry.id === "codex-low")?.active_worker_id,
-    workerId
+    supabase.issues.find((entry) => entry.id === "codex-low")?.active_host_id,
+    hostId
   )
   assert.equal(
     supabase.issues.find((entry) => entry.id === "claude-urgent")
-      ?.active_worker_id,
-    claudeWorkerId
+      ?.active_host_id,
+    claudeHostId
   )
 })
 
@@ -713,7 +715,7 @@ test("claim derives capacity from active issue assignments", async () => {
       issue({
         id: "already-running",
         status: "in-progress",
-        active_worker_id: workerId,
+        active_host_id: hostId,
         active_run_id: "already-running-run",
       }),
       issue({ id: "queued-work" }),
@@ -723,7 +725,7 @@ test("claim derives capacity from active issue assignments", async () => {
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed, null)
@@ -733,20 +735,20 @@ test("claim derives capacity from active issue assignments", async () => {
   )
 })
 
-test("unsupported workers cannot claim but update-available workers can", async () => {
+test("unsupported hosts cannot claim but update-available hosts can", async () => {
   const unsupported = new FakeSupabase(
     [],
     [issue({ id: "unsupported-work" })],
-    [worker({ gentic_version: "0.13.0" })]
+    [host({ gentic_version: "0.13.0" })]
   )
   const updateAvailable = new FakeSupabase(
     [],
     [issue({ id: "update-available-work" })],
-    [worker({ gentic_version: "0.14.0" })]
+    [host({ gentic_version: "0.14.0" })]
   )
 
   assert.equal(
-    await claimNextQueuedIssue(unsupported as never, "user-1", workerId, {
+    await claimNextQueuedIssue(unsupported as never, "user-1", hostId, {
       compatibilityPolicy: {
         minimumSupportedVersion: "0.14.0",
         currentVersion: "0.15.0",
@@ -758,7 +760,7 @@ test("unsupported workers cannot claim but update-available workers can", async 
   const claimed = await claimNextQueuedIssue(
     updateAvailable as never,
     "user-1",
-    workerId,
+    hostId,
     {
       compatibilityPolicy: {
         minimumSupportedVersion: "0.14.0",
@@ -790,7 +792,7 @@ test("claim breaks equal-priority ties FIFO by oldest eligible issue", async () 
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "older")
@@ -817,7 +819,7 @@ test("claim preserves blocker checks before applying priority", async () => {
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "completed-blocker-high")
@@ -850,7 +852,7 @@ test("claim includes reset-ready held issues by priority but skips future holds"
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "ready-held")
@@ -884,7 +886,7 @@ test("claim does not start drafts or preempt active runs", async () => {
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed?.id, "todo-low")
@@ -904,7 +906,7 @@ test("claim does not start drafts or preempt active runs", async () => {
   )
 })
 
-test("claim returns null when another worker wins the conditional update", async () => {
+test("claim returns null when another host wins the conditional update", async () => {
   const supabase = new FakeSupabase([], [issue({ id: "race-winner" })])
   supabase.beforeIssueUpdate = () => {
     supabase.issues[0]!.status = "queued"
@@ -913,7 +915,7 @@ test("claim returns null when another worker wins the conditional update", async
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed, null)
@@ -939,7 +941,7 @@ test("claim returns null when a held issue becomes reset-ineligible before updat
   const claimed = await claimNextQueuedIssue(
     supabase as never,
     "user-1",
-    workerId
+    hostId
   )
 
   assert.equal(claimed, null)
@@ -947,7 +949,12 @@ test("claim returns null when a held issue becomes reset-ineligible before updat
   assert.equal(supabase.issues[0]?.active_run_id, null)
 })
 
-test("worker selection index update is in a forward migration", async () => {
+// Asserts on already-applied migrations, so the file names and the index name
+// are quoted verbatim as history recorded them — back when a host was still
+// called a worker. GEN-435 renamed the index to
+// `issues_host_selection_priority_idx` in a forward migration of its own; these
+// two files must keep spelling it the old way.
+test("host selection index update is in a forward migration", async () => {
   const appliedMigration = await readFile(
     new URL(
       "../../../supabase/migrations/20260729072347_add_issue_priorities.sql",
@@ -972,8 +979,17 @@ test("worker selection index update is in a forward migration", async () => {
     forwardMigration,
     /drop index if exists public\.issues_worker_selection_priority_idx;\s+create index issues_worker_selection_priority_idx\s+on public\.issues\(priority desc, updated_at asc\)\s+where status in \('todo', 'held'\);/
   )
+
+  const renameMigration = await readFile(
+    new URL(
+      "../../../supabase/migrations/20260903120000_rename_workers_to_hosts.sql",
+      import.meta.url
+    ),
+    "utf8"
+  )
+
   assert.match(
-    forwardMigration,
-    /create index issues_worker_selection_priority_idx\s+on public\.issues\(priority desc, updated_at asc\)\s+where status in \('todo', 'held'\);/
+    renameMigration,
+    /alter index public\.issues_worker_selection_priority_idx\s+rename to issues_host_selection_priority_idx;/
   )
 })

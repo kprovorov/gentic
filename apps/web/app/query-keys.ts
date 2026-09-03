@@ -6,7 +6,7 @@ export const queryKeys = {
   // root refreshes the whole label catalog (all searches, every picker) at once.
   settingsLabelsRoot: ["settings", "labels"] as const,
   settingsLabels: (search = "") => ["settings", "labels", search] as const,
-  settingsWorkers: ["settings", "workers"] as const,
+  settingsHosts: ["settings", "hosts"] as const,
   newIssue: ["issues", "new"] as const,
   issue: (id: string) => ["issues", id] as const,
   issueEdit: (id: string) => ["issues", id, "edit"] as const,
@@ -15,6 +15,6 @@ export const queryKeys = {
 export const queryStaleTimes = {
   realtime: 30_000,
   settings: 60_000,
-  settingsWorkersPoll: 15_000,
+  settingsHostsPoll: 15_000,
   formOptions: 60_000,
 } as const

@@ -29,7 +29,7 @@
             ]
           },
           {
-            "group": "Agent Worker",
+            "group": "Agent Host",
             "pages": [
               "agent/overview",
               "agent/installation",
@@ -59,7 +59,7 @@
   },
   "keyFeatures": [
     "Create and manage coding issues assigned to AI agents (Claude Code or Codex)",
-    "Background agent worker that polls for queued issues and autonomously writes code",
+    "Background agent host that polls for queued issues and autonomously writes code",
     "Automated pull request creation after each agent run",
     "Real-time issue status tracking through the full development lifecycle",
     "GitHub App integration for repository and PR automation",

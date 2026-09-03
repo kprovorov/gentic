@@ -5,14 +5,17 @@ import { join } from "node:path"
 import { after, afterEach, beforeEach, test } from "node:test"
 
 const CONFIG_KEYS = [
-  "GENTIC_WORKER_ID",
-  "GENTIC_WORKER_CREDENTIAL",
+  "GENTIC_HOST_ID",
+  "GENTIC_HOST_CREDENTIAL",
   "GENTIC_API_URL",
   "AGENT_PROVIDERS",
   "GIT_REMOTE_BASE",
   "WORKDIR",
   "POLL_INTERVAL_MS",
   "MAX_CONCURRENT_ISSUES",
+  // Pre-GEN-435 names, still honored; cleared between tests like the rest.
+  "GENTIC_WORKER_ID",
+  "GENTIC_WORKER_CREDENTIAL",
 ] as const
 
 // GENTIC_CONFIG_DIR redirects config-store reads/writes to a temp dir so this
@@ -48,12 +51,12 @@ after(() => {
 })
 
 test("loadConfig works with only env vars set (no config file)", () => {
-  process.env.GENTIC_WORKER_ID = "env-worker"
-  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
+  process.env.GENTIC_HOST_ID = "env-host"
+  process.env.GENTIC_HOST_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "env-key")
+  assert.equal(loaded.GENTIC_HOST_CREDENTIAL, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://env.example.com")
   assert.equal(loaded.GIT_REMOTE_BASE, "git@github.com:")
   assert.equal(loaded.POLL_INTERVAL_MS, 3000)
@@ -62,49 +65,49 @@ test("loadConfig works with only env vars set (no config file)", () => {
 
 test("loadConfig works with only the config file set", () => {
   writeConfigFile({
-    GENTIC_WORKER_ID: "file-worker",
-    GENTIC_WORKER_CREDENTIAL: "file-key",
+    GENTIC_HOST_ID: "file-host",
+    GENTIC_HOST_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "file-key")
+  assert.equal(loaded.GENTIC_HOST_CREDENTIAL, "file-key")
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
 })
 
 test("loadConfig prefers env over the config file for the same key", () => {
   writeConfigFile({
-    GENTIC_WORKER_ID: "file-worker",
-    GENTIC_WORKER_CREDENTIAL: "file-key",
+    GENTIC_HOST_ID: "file-host",
+    GENTIC_HOST_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
-  process.env.GENTIC_WORKER_ID = "env-worker"
-  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
+  process.env.GENTIC_HOST_ID = "env-host"
+  process.env.GENTIC_HOST_CREDENTIAL = "env-key"
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "env-key")
+  assert.equal(loaded.GENTIC_HOST_CREDENTIAL, "env-key")
   assert.equal(loaded.GENTIC_API_URL, "https://file.example.com")
 })
 
 test("loadConfig ignores blank env vars in favor of the config file", () => {
   writeConfigFile({
-    GENTIC_WORKER_ID: "file-worker",
-    GENTIC_WORKER_CREDENTIAL: "file-key",
+    GENTIC_HOST_ID: "file-host",
+    GENTIC_HOST_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
   // Mirrors a stray `.env` copied from .env.example, where these keys are
   // left as blank placeholders rather than removed.
-  process.env.GENTIC_WORKER_ID = ""
-  process.env.GENTIC_WORKER_CREDENTIAL = ""
+  process.env.GENTIC_HOST_ID = ""
+  process.env.GENTIC_HOST_CREDENTIAL = ""
 
   const loaded = loadConfig()
-  assert.equal(loaded.GENTIC_WORKER_ID, "file-worker")
-  assert.equal(loaded.GENTIC_WORKER_CREDENTIAL, "file-key")
+  assert.equal(loaded.GENTIC_HOST_ID, "file-host")
+  assert.equal(loaded.GENTIC_HOST_CREDENTIAL, "file-key")
 })
 
 test("loadConfig accepts a concurrent-issue limit", () => {
-  process.env.GENTIC_WORKER_ID = "env-worker"
-  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
+  process.env.GENTIC_HOST_ID = "env-host"
+  process.env.GENTIC_HOST_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.MAX_CONCURRENT_ISSUES = "3"
 
@@ -112,8 +115,8 @@ test("loadConfig accepts a concurrent-issue limit", () => {
 })
 
 test("loadConfig ignores legacy selected agent providers from env", () => {
-  process.env.GENTIC_WORKER_ID = "env-worker"
-  process.env.GENTIC_WORKER_CREDENTIAL = "env-key"
+  process.env.GENTIC_HOST_ID = "env-host"
+  process.env.GENTIC_HOST_CREDENTIAL = "env-key"
   process.env.GENTIC_API_URL = "https://env.example.com"
   process.env.AGENT_PROVIDERS = "claude_code,codex"
 
@@ -122,10 +125,29 @@ test("loadConfig ignores legacy selected agent providers from env", () => {
 
 test("loadConfig ignores legacy selected agent providers from config file", () => {
   writeConfigFile({
-    GENTIC_WORKER_ID: "file-worker",
-    GENTIC_WORKER_CREDENTIAL: "file-key",
+    GENTIC_HOST_ID: "file-host",
+    GENTIC_HOST_CREDENTIAL: "file-key",
     GENTIC_API_URL: "https://file.example.com",
   })
 
   assert.equal("AGENT_PROVIDERS" in loadConfig(), false)
+})
+
+test("loadConfig falls back to the pre-rename GENTIC_WORKER_* env vars", () => {
+  process.env.GENTIC_WORKER_ID = "legacy-host"
+  process.env.GENTIC_WORKER_CREDENTIAL = "legacy-key"
+  process.env.GENTIC_API_URL = "https://env.example.com"
+
+  const loaded = loadConfig()
+  assert.equal(loaded.GENTIC_HOST_ID, "legacy-host")
+  assert.equal(loaded.GENTIC_HOST_CREDENTIAL, "legacy-key")
+})
+
+test("the current env var wins over its pre-rename counterpart", () => {
+  process.env.GENTIC_WORKER_ID = "legacy-host"
+  process.env.GENTIC_HOST_ID = "current-host"
+  process.env.GENTIC_HOST_CREDENTIAL = "env-key"
+  process.env.GENTIC_API_URL = "https://env.example.com"
+
+  assert.equal(loadConfig().GENTIC_HOST_ID, "current-host")
 })

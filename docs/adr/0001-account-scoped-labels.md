@@ -55,7 +55,7 @@ in **any project that Account owns**. There is no project-scoped catalog.
   assignments**; a single user-driven bulk assignment request covers at most
   **100 issues**.
 - **Labels are passive metadata.** They never change status, priority, workflow
-  transitions, worker selection, agent scheduling, kickoff prompts, or stored
+  transitions, host selection, agent scheduling, kickoff prompts, or stored
   sessions, and they are never synchronized to GitHub.
 - The catalog is reachable through both the web app and the Gentic MCP server,
   which resolve to the same Account and therefore the same catalog.

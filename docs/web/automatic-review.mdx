@@ -56,7 +56,7 @@ Three kinds of pull request are deliberately left alone, with no tracking issue 
 | Not tracked | Why |
 | --- | --- |
 | Drafts, and closed or merged pull requests | Nothing to review — a draft can't hold a review run at all. A draft marked **Ready for review** is picked up at that moment. |
-| Pull requests from a **fork** | Reviewing runs the branch's code and tests on your worker. For a fork that is an outside contributor's code running on your machine, which the reviewer's isolation does not sandbox against. |
+| Pull requests from a **fork** | Reviewing runs the branch's code and tests on your host. For a fork that is an outside contributor's code running on your machine, which the reviewer's isolation does not sandbox against. |
 | Anything in a project with Automatic Review off | The project setting is the only switch; nothing opts in separately. |
 
 <Note>
@@ -92,7 +92,7 @@ These appear directly on the issue when applicable:
 | --- | --- | --- |
 | **Retry review** | The active cycle has no live run and hasn't exhausted its 3-attempt budget (typically after two consecutive infrastructure failures) | Queues a fresh review run at the current commit, same cycle, same budget |
 | **Continue with human review** | The pull request has an active Review Cycle | Marks the cycle approved without a further automatic verdict — the only other way (besides an automatic approval) a cycle reaches `Approved` |
-| **Start fresh implementation session** | The durable owner of the implementation session can't resume (agent/model changed, no resumable session was ever recorded, or the original worker was deleted or banned) | Abandons the old session and starts a new one to pick up the next review fix |
+| **Start fresh implementation session** | The durable owner of the implementation session can't resume (agent/model changed, no resumable session was ever recorded, or the original host was deleted or banned) | Abandons the old session and starts a new one to pick up the next review fix |
 
 A cycle that has already exhausted its 3 attempts, been superseded, or been approved needs no recovery action — the next push (or **Continue with human review**) is what moves it forward.
 

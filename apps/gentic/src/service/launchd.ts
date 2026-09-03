@@ -107,7 +107,7 @@ ${programArguments}
     }
   }
 
-  // `stop()` records a persistent disable so the worker stays down across a
+  // `stop()` records a persistent disable so the host stays down across a
   // reboot. That override outlives the plist, so every path that loads the job
   // has to clear it first — `bootstrap` on a disabled label fails outright.
   private async enable(): Promise<void> {
@@ -171,8 +171,8 @@ ${programArguments}
 
     // Booting the job out only unloads it for this boot session: launchd
     // re-reads ~/Library/LaunchAgents at the next login and RunAtLoad starts
-    // the worker again. The disable override lives in launchd's own database
-    // and survives the reboot, so a stopped worker stays stopped until
+    // the host again. The disable override lives in launchd's own database
+    // and survives the reboot, so a stopped host stays stopped until
     // `gentic start` clears it.
     try {
       await this.exec("launchctl", ["disable", serviceTarget()])

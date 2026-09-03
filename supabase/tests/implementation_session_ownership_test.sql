@@ -1,25 +1,25 @@
 BEGIN;
 SELECT plan(32);
 
--- Two workers and one issue owned by the same user, so the ownership trigger's
--- `ensure_issue_active_worker_owner` check is satisfied throughout.
-INSERT INTO public.workers (
+-- Two hosts and one issue owned by the same user, so the ownership trigger's
+-- `ensure_issue_active_host_owner` check is satisfied throughout.
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES
-  ('00000000-0000-4000-8000-412000000001', 'user_gen412', 'Worker A',
+  ('00000000-0000-4000-8000-412000000001', 'user_gen412', 'Host A',
    repeat('a', 64), 'ready', '2026-08-19T09:00:00Z', '{"providers":{}}'::jsonb),
-  ('00000000-0000-4000-8000-412000000002', 'user_gen412', 'Worker B',
+  ('00000000-0000-4000-8000-412000000002', 'user_gen412', 'Host B',
    repeat('c', 64), 'ready', '2026-08-19T09:00:00Z', '{"providers":{}}'::jsonb);
 
 INSERT INTO public.projects (id, user_id, name, repo, key)
 VALUES ('10000000-0000-4000-8000-412000000001', 'user_gen412',
         'GEN-412 Project', 'gentic/gen412', 'GFR');
 
--- A live implementation run: lease held by Worker A, no session persisted yet.
+-- A live implementation run: lease held by Host A, no session persisted yet.
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   '20000000-0000-4000-8000-412000000001',
   '10000000-0000-4000-8000-412000000001',
@@ -60,11 +60,11 @@ SELECT is(
   'implementation', 'the first owner originates from implementation'
 );
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   '00000000-0000-4000-8000-412000000001'::uuid,
-  'the owner is bound to the running worker'
+  'the owner is bound to the running host'
 );
 SELECT is(
   (SELECT session_id FROM public.issue_implementation_owners
@@ -73,14 +73,14 @@ SELECT is(
   'sess-1', 'the owner records the resume handle'
 );
 
--- === Reconnect / restart: same worker, new run, refreshed session ===
--- Run finishes (lease released), then the same worker re-claims and resumes.
+-- === Reconnect / restart: same host, new run, refreshed session ===
+-- Run finishes (lease released), then the same host re-claims and resumes.
 UPDATE public.issues SET status = 'waiting-for-input'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 UPDATE public.issues
    SET status = 'queued',
        active_run_id = '30000000-0000-4000-8000-412000000002',
-       active_worker_id = '00000000-0000-4000-8000-412000000001'
+       active_host_id = '00000000-0000-4000-8000-412000000001'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 UPDATE public.issues SET session_id = 'sess-2'
  WHERE id = '20000000-0000-4000-8000-412000000001';
@@ -89,7 +89,7 @@ SELECT is(
   (SELECT generation FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
-  1, 'the same worker resuming keeps the same owner generation'
+  1, 'the same host resuming keeps the same owner generation'
 );
 SELECT is(
   (SELECT session_id FROM public.issue_implementation_owners
@@ -98,7 +98,7 @@ SELECT is(
   'sess-2', 'resuming refreshes the resume handle'
 );
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   '00000000-0000-4000-8000-412000000001'::uuid,
@@ -115,12 +115,12 @@ SELECT is(
 UPDATE public.issues
    SET status = 'run-failed',
        active_run_id = NULL,
-       active_worker_id = NULL,
-       run_error = 'Assigned worker went offline'
+       active_host_id = NULL,
+       run_error = 'Assigned host went offline'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   '00000000-0000-4000-8000-412000000001'::uuid,
@@ -133,28 +133,28 @@ SELECT is(
   'sess-2', 'lease expiry keeps the resume handle'
 );
 
--- === Worker reassignment does not change ownership ===
--- A different worker claims and even persists its own session; ownership stays.
+-- === Host reassignment does not change ownership ===
+-- A different host claims and even persists its own session; ownership stays.
 UPDATE public.issues
    SET status = 'queued',
        active_run_id = '30000000-0000-4000-8000-412000000003',
-       active_worker_id = '00000000-0000-4000-8000-412000000002'
+       active_host_id = '00000000-0000-4000-8000-412000000002'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 UPDATE public.issues SET session_id = 'sess-3'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   '00000000-0000-4000-8000-412000000001'::uuid,
-  'a different worker running the issue does not take ownership'
+  'a different host running the issue does not take ownership'
 );
 SELECT is(
   (SELECT session_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
-  'sess-2', 'a non-owner worker does not overwrite the resume handle'
+  'sess-2', 'a non-owner host does not overwrite the resume handle'
 );
 
 -- === Fresh implementation transition ===
@@ -182,7 +182,7 @@ SELECT is(
   'fresh_implementation', 'the new owner records the fresh-implementation origin'
 );
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   NULL, 'the fresh owner starts unbound'
@@ -221,15 +221,15 @@ SELECT is(
   1, 'exactly one current owner survives a fresh implementation'
 );
 
--- === The fresh owner binds to the next run (from any worker) ===
+-- === The fresh owner binds to the next run (from any host) ===
 UPDATE public.issues
    SET status = 'queued',
        active_run_id = '30000000-0000-4000-8000-412000000004',
-       active_worker_id = '00000000-0000-4000-8000-412000000002'
+       active_host_id = '00000000-0000-4000-8000-412000000002'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL),
   NULL, 'claiming without a session does not bind the fresh owner'
@@ -239,7 +239,7 @@ UPDATE public.issues SET session_id = 'sess-4'
  WHERE id = '20000000-0000-4000-8000-412000000001';
 
 SELECT is(
-  (SELECT worker_id FROM public.issue_implementation_owners
+  (SELECT host_id FROM public.issue_implementation_owners
     WHERE issue_id = '20000000-0000-4000-8000-412000000001'
       AND superseded_at IS NULL AND generation = 2),
   '00000000-0000-4000-8000-412000000002'::uuid,
@@ -255,7 +255,7 @@ SELECT public.start_fresh_implementation(
 UPDATE public.issues SET session_id = 'sess-late'
  WHERE id = '20000000-0000-4000-8000-412000000001'
    AND active_run_id = '30000000-0000-4000-8000-412000000004'
-   AND active_worker_id = '00000000-0000-4000-8000-412000000002';
+   AND active_host_id = '00000000-0000-4000-8000-412000000002';
 
 SELECT is(
   (SELECT session_id FROM public.issues
@@ -278,7 +278,7 @@ SELECT is(
 -- === Clearing the session (reset / provider change) supersedes ownership ===
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id, session_id
+  active_host_id, active_run_id, session_id
 ) VALUES (
   '20000000-0000-4000-8000-412000000002',
   '10000000-0000-4000-8000-412000000001',

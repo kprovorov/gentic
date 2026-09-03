@@ -53,7 +53,7 @@ test("interleaves messages and events in chronological order regardless of input
   const claimedMessage = message({
     id: "msg-claimed",
     role: "system",
-    content: "claimed by worker",
+    content: "claimed by host",
     created_at: "2026-07-01T00:01:00.000Z",
   })
   const replyMessage = message({
@@ -294,7 +294,11 @@ test("maps review_started events to review-started items with the run id", () =>
     events: [
       event({
         type: "review_started",
-        payload: { review_run_id: "run-1", review_cycle_id: "cycle-1", pull_request_id: "pr-1" },
+        payload: {
+          review_run_id: "run-1",
+          review_cycle_id: "cycle-1",
+          pull_request_id: "pr-1",
+        },
       }),
     ],
   })
@@ -493,7 +497,7 @@ test("keeps system lifecycle messages as plain message items instead of reinvent
   const claimedMessage = message({
     id: "msg-claimed",
     role: "system",
-    content: "claimed by worker",
+    content: "claimed by host",
   })
 
   const timeline = buildIssueTimeline({

@@ -24,7 +24,7 @@ import {
   seedIssue,
   seedPullRequest,
   seedProject,
-  seedWorker,
+  seedHost,
   testAccount,
 } from "./helpers/live-review-harness"
 
@@ -189,9 +189,9 @@ liveTest(
         projectId,
         number: 1,
       })
-      const workerId = await seedWorker(supabase, tracker, {
+      const hostId = await seedHost(supabase, tracker, {
         userId,
-        displayName: "E2E Worker",
+        displayName: "E2E Host",
       })
 
       const prUrl = `https://github.com/${repo}/pull/1`
@@ -235,7 +235,7 @@ liveTest(
       assert.equal(eligibility?.action, "queued")
       assert.ok(eligibility?.reviewRunId)
 
-      const claimed = await claimNextReviewRun(supabase, userId, workerId)
+      const claimed = await claimNextReviewRun(supabase, userId, hostId)
       assert.equal(claimed?.id, eligibility?.reviewRunId)
 
       const completed = await completeReviewAttempt(supabase, {
@@ -630,9 +630,9 @@ liveTest(
         repo,
         automaticReviewEnabled: true,
       })
-      const workerId = await seedWorker(supabase, tracker, {
+      const hostId = await seedHost(supabase, tracker, {
         userId,
-        displayName: "Owner Worker",
+        displayName: "Owner Host",
       })
       const issueId = await seedIssue(supabase, tracker, {
         projectId,
@@ -646,7 +646,7 @@ liveTest(
       // the session — mirrors supabase/tests/review_fix_delivery_test.sql.
       await supabase
         .from("issues")
-        .update({ active_worker_id: workerId, active_run_id: runId })
+        .update({ active_host_id: hostId, active_run_id: runId })
         .eq("id", issueId)
       await supabase
         .from("issues")
@@ -657,7 +657,7 @@ liveTest(
         .update({
           status: "ready-for-review",
           active_run_id: null,
-          active_worker_id: null,
+          active_host_id: null,
         })
         .eq("id", issueId)
 

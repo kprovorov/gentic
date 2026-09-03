@@ -6,7 +6,7 @@ import type {
   NewIssueData,
   SettingsData,
   SettingsLabelsData,
-  SettingsWorkersData,
+  SettingsHostsData,
 } from "./queries"
 
 type ApiErrorBody = {
@@ -71,8 +71,8 @@ export const fetchIssuesData = () => getJson<IssuesData>("/api/app/issues")
 export const fetchSettingsData = () =>
   getJson<SettingsData>("/api/app/settings")
 
-export const fetchSettingsWorkersData = () =>
-  getJson<SettingsWorkersData>("/api/app/settings/workers")
+export const fetchSettingsHostsData = () =>
+  getJson<SettingsHostsData>("/api/app/settings/hosts")
 
 export const fetchSettingsLabelsData = (search?: string) => {
   const params = new URLSearchParams()

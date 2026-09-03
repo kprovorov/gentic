@@ -69,7 +69,7 @@ async function downloadBytes(url: string, fileName: string): Promise<Uint8Array>
  * swept into the commit the agent is instructed to make.
  *
  * `includeIssueAttachments` additionally pulls in the issue's own durable
- * attachments, which have no message of their own. The worker asks for them on
+ * attachments, which have no message of their own. The host asks for them on
  * the first prompt of a run so a fresh session (including one started by a
  * reset) still sees the files attached to the issue, without re-sending them
  * on every follow-up turn.

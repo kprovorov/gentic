@@ -38,7 +38,7 @@ async function captureJsonOutput(run: () => Promise<void>): Promise<unknown> {
   return JSON.parse(output) as unknown
 }
 
-test("status JSON includes config file location when worker is not connected", async () => {
+test("status JSON includes config file location when host is not connected", async () => {
   const output = await captureJsonOutput(() =>
     status(
       { json: true },
@@ -50,7 +50,7 @@ test("status JSON includes config file location when worker is not connected", a
   )
 
   assert.deepEqual(output, {
-    worker: "not-connected",
+    host: "not-connected",
     configFile: configFilePath(),
     tools: {
       github: { installed: true, authenticated: true, version: "2.74.2" },
@@ -58,7 +58,7 @@ test("status JSON includes config file location when worker is not connected", a
   })
 })
 
-test("status JSON includes config file location when worker is connected", async () => {
+test("status JSON includes config file location when host is connected", async () => {
   const backend: ServiceBackend = {
     name: "test",
     isAvailable: () => true,
@@ -79,9 +79,9 @@ test("status JSON includes config file location when worker is connected", async
       {
         getAuthState: () => ({
           authenticated: true,
-          workerId: "worker-1",
+          hostId: "host-1",
           apiUrl: "https://api.example.com",
-          maskedWorkerCredential: "abc...1234",
+          maskedHostCredential: "abc...1234",
           setupState: "ready",
         }),
         getToolStatuses: async () => tools,

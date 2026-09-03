@@ -8,18 +8,18 @@ SELECT plan(33);
 -- Scenario A: the happy path — delivered to the resumable owner, and a
 -- replay of the same Review Attempt is an idempotent no-op.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  'a1000000-0000-4000-8000-000000000004', 'user_417', 'Worker A',
+  'a1000000-0000-4000-8000-000000000004', 'user_417', 'Host A',
   repeat('a', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('a1000000-0000-4000-8000-000000000001', 'user_417', 'Project A', 'gentic/fix-a', 'FXA', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   'a1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000001',
   'Fix issue A', 'Body', 'in-progress', 1, 'claude_code',
@@ -30,7 +30,7 @@ UPDATE public.issues SET session_id = 'sess-a1'
  WHERE id = 'a1000000-0000-4000-8000-000000000002';
 -- The run ends; the lease releases but the owner (and its session) persists.
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = 'a1000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -76,7 +76,7 @@ SELECT is(
 );
 SELECT is(
   (SELECT status FROM public.issues WHERE id = 'a1000000-0000-4000-8000-000000000002'),
-  'todo', 'the issue is requeued so the owning worker resumes the session'
+  'todo', 'the issue is requeued so the owning host resumes the session'
 );
 SELECT is(
   (SELECT count(*)::integer FROM public.issue_events
@@ -102,18 +102,18 @@ SELECT is(
 -- Scenario B: a push lands between the attempt completing and delivery —
 -- stale findings are never applied to the newer head.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  'b1000000-0000-4000-8000-000000000004', 'user_417', 'Worker B',
+  'b1000000-0000-4000-8000-000000000004', 'user_417', 'Host B',
   repeat('b', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('b1000000-0000-4000-8000-000000000001', 'user_417', 'Project B', 'gentic/fix-b', 'FXB', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   'b1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001',
   'Fix issue B', 'Body', 'in-progress', 1, 'claude_code',
@@ -122,7 +122,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-b1'
  WHERE id = 'b1000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = 'b1000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -170,18 +170,18 @@ SELECT is(
 -- in the third-attempt cap — automatic looping stops and delivery of the
 -- exhausting attempt is rejected.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  'c1000000-0000-4000-8000-000000000004', 'user_417', 'Worker C',
+  'c1000000-0000-4000-8000-000000000004', 'user_417', 'Host C',
   repeat('c', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('c1000000-0000-4000-8000-000000000001', 'user_417', 'Project C', 'gentic/fix-c', 'FXC', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   'c1000000-0000-4000-8000-000000000002', 'c1000000-0000-4000-8000-000000000001',
   'Fix issue C', 'Body', 'in-progress', 1, 'claude_code',
@@ -190,7 +190,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-c1'
  WHERE id = 'c1000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = 'c1000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -251,18 +251,18 @@ SELECT is(
 -- Scenario D: a genuine human changes-requested review supersedes the
 -- cycle before delivery runs — the pending automatic handoff is dropped.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  'd1000000-0000-4000-8000-000000000004', 'user_417', 'Worker D',
+  'd1000000-0000-4000-8000-000000000004', 'user_417', 'Host D',
   repeat('d', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('d1000000-0000-4000-8000-000000000001', 'user_417', 'Project D', 'gentic/fix-d', 'FXD', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   'd1000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001',
   'Fix issue D', 'Body', 'in-progress', 1, 'claude_code',
@@ -271,7 +271,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-d1'
  WHERE id = 'd1000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = 'd1000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -328,18 +328,18 @@ SELECT is((SELECT unavailable_reason FROM deliver_e1), NULL, 'no_owner carries n
 -- yet) — the Issue no longer owns the session the findings were produced
 -- against.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  'f1000000-0000-4000-8000-000000000004', 'user_417', 'Worker F',
+  'f1000000-0000-4000-8000-000000000004', 'user_417', 'Host F',
   repeat('f', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('f1000000-0000-4000-8000-000000000001', 'user_417', 'Project F', 'gentic/fix-f', 'FXF', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   'f1000000-0000-4000-8000-000000000002', 'f1000000-0000-4000-8000-000000000001',
   'Fix issue F', 'Body', 'in-progress', 1, 'claude_code',
@@ -348,7 +348,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-f1'
  WHERE id = 'f1000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = 'f1000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -376,20 +376,20 @@ SELECT is(
 );
 
 -- ---------------------------------------------------------------------
--- Scenario G: the owning worker was banned after the owner was established.
+-- Scenario G: the owning host was banned after the owner was established.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  '10000000-0000-4000-8000-000000000004', 'user_417', 'Worker G',
+  '10000000-0000-4000-8000-000000000004', 'user_417', 'Host G',
   repeat('1', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('10000000-0000-4000-8000-000000000001', 'user_417', 'Project G', 'gentic/fix-g', 'FXG', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001',
   'Fix issue G', 'Body', 'in-progress', 1, 'claude_code',
@@ -398,7 +398,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-g1'
  WHERE id = '10000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = '10000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -410,29 +410,29 @@ SELECT * FROM public.evaluate_review_eligibility('https://github.com/gentic/fix-
 CREATE TEMP TABLE attempt_g1 AS
 SELECT * FROM public.complete_review_attempt((SELECT review_run_id FROM eval_g), 'changes_requested');
 
-UPDATE public.workers SET banned_at = now()
+UPDATE public.hosts SET banned_at = now()
  WHERE id = '10000000-0000-4000-8000-000000000004';
 
 CREATE TEMP TABLE deliver_g1 AS
 SELECT * FROM public.deliver_review_fix_request((SELECT review_attempt_id FROM attempt_g1), 'Fix these.');
-SELECT is((SELECT outcome FROM deliver_g1), 'owner_unavailable', 'a banned owning worker cannot receive a fix request');
-SELECT is((SELECT unavailable_reason FROM deliver_g1), 'worker_banned', 'the reason names the ban specifically');
+SELECT is((SELECT outcome FROM deliver_g1), 'owner_unavailable', 'a banned owning host cannot receive a fix request');
+SELECT is((SELECT unavailable_reason FROM deliver_g1), 'host_banned', 'the reason names the ban specifically');
 
 -- ---------------------------------------------------------------------
--- Scenario H: the owning worker was deleted after the owner was established.
+-- Scenario H: the owning host was deleted after the owner was established.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  '11000000-0000-4000-8000-000000000004', 'user_417', 'Worker H',
+  '11000000-0000-4000-8000-000000000004', 'user_417', 'Host H',
   repeat('2', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('11000000-0000-4000-8000-000000000001', 'user_417', 'Project H', 'gentic/fix-h', 'FXH', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   '11000000-0000-4000-8000-000000000002', '11000000-0000-4000-8000-000000000001',
   'Fix issue H', 'Body', 'in-progress', 1, 'claude_code',
@@ -441,7 +441,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-h1'
  WHERE id = '11000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = '11000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES
@@ -453,29 +453,29 @@ SELECT * FROM public.evaluate_review_eligibility('https://github.com/gentic/fix-
 CREATE TEMP TABLE attempt_h1 AS
 SELECT * FROM public.complete_review_attempt((SELECT review_run_id FROM eval_h), 'changes_requested');
 
-DELETE FROM public.workers WHERE id = '11000000-0000-4000-8000-000000000004';
+DELETE FROM public.hosts WHERE id = '11000000-0000-4000-8000-000000000004';
 
 CREATE TEMP TABLE deliver_h1 AS
 SELECT * FROM public.deliver_review_fix_request((SELECT review_attempt_id FROM attempt_h1), 'Fix these.');
-SELECT is((SELECT outcome FROM deliver_h1), 'owner_unavailable', 'a deleted owning worker cannot receive a fix request');
-SELECT is((SELECT unavailable_reason FROM deliver_h1), 'worker_deleted', 'the reason names the deletion specifically');
+SELECT is((SELECT outcome FROM deliver_h1), 'owner_unavailable', 'a deleted owning host cannot receive a fix request');
+SELECT is((SELECT unavailable_reason FROM deliver_h1), 'host_deleted', 'the reason names the deletion specifically');
 
 -- ---------------------------------------------------------------------
 -- Scenario I: the issue's agent provider changed after the owner was
 -- established, invalidating the recorded session.
 -- ---------------------------------------------------------------------
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id, user_id, display_name, credential_hash, setup_state, last_seen_at,
   provider_capabilities
 ) VALUES (
-  '12000000-0000-4000-8000-000000000004', 'user_417', 'Worker I',
+  '12000000-0000-4000-8000-000000000004', 'user_417', 'Host I',
   repeat('3', 64), 'ready', '2026-08-25T09:00:00Z', '{"providers":{}}'::jsonb
 );
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
   ('12000000-0000-4000-8000-000000000001', 'user_417', 'Project I', 'gentic/fix-i', 'FXI', true);
 INSERT INTO public.issues (
   id, project_id, title, body, status, number, agent_provider,
-  active_worker_id, active_run_id
+  active_host_id, active_run_id
 ) VALUES (
   '12000000-0000-4000-8000-000000000002', '12000000-0000-4000-8000-000000000001',
   'Fix issue I', 'Body', 'in-progress', 1, 'claude_code',
@@ -484,7 +484,7 @@ INSERT INTO public.issues (
 UPDATE public.issues SET session_id = 'sess-i1'
  WHERE id = '12000000-0000-4000-8000-000000000002';
 UPDATE public.issues
-   SET status = 'ready-for-review', active_run_id = null, active_worker_id = null
+   SET status = 'ready-for-review', active_run_id = null, active_host_id = null
  WHERE id = '12000000-0000-4000-8000-000000000002';
 
 INSERT INTO public.issue_pull_requests (id, issue_id, url, state, head_sha, ci_state) VALUES

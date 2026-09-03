@@ -740,7 +740,7 @@ describe("IssueDetailRail automatic review", () => {
               headSha: "sha-1",
               startedAt: "2026-07-29T12:01:00.000Z",
               finishedAt: "2026-07-29T12:02:00.000Z",
-              claimedByWorkerId: "worker-1",
+              claimedByHostId: "host-1",
               heartbeatAt: null,
               createdAt: "2026-07-29T12:01:00.000Z",
             },
@@ -858,7 +858,7 @@ describe("IssueDetailRail automatic review", () => {
               headSha: "sha-1",
               startedAt: null,
               finishedAt: "t",
-              claimedByWorkerId: null,
+              claimedByHostId: null,
               heartbeatAt: null,
               createdAt: "t",
             },
@@ -869,7 +869,7 @@ describe("IssueDetailRail automatic review", () => {
               headSha: "sha-1",
               startedAt: null,
               finishedAt: "t",
-              claimedByWorkerId: null,
+              claimedByHostId: null,
               heartbeatAt: null,
               createdAt: "t",
             },
@@ -948,13 +948,13 @@ describe("IssueDetailRail automatic review", () => {
         issueId,
         generation: 2,
         origin: "fresh_implementation",
-        workerId: null,
+        hostId: null,
         sessionId: "session-1",
         agentProvider: "claude_code",
         issueModel: null,
         establishedAt: "2026-07-29T12:00:00.000Z",
         resumable: false,
-        unavailableReason: "worker_deleted",
+        unavailableReason: "host_deleted",
       },
     })
 
@@ -963,6 +963,6 @@ describe("IssueDetailRail automatic review", () => {
         name: "Start fresh implementation session",
       })
     ).toBeVisible()
-    expect(screen.getByText(/the original worker was deleted/)).toBeVisible()
+    expect(screen.getByText(/the original host was deleted/)).toBeVisible()
   })
 })

@@ -18,7 +18,7 @@ export type SkillsRouteInput = {
 }
 
 /**
- * Wraps a skill route in the same authenticate-then-authorize shape the worker
+ * Wraps a skill route in the same authenticate-then-authorize shape the host
  * management routes use: the service client bypasses RLS, so every handler
  * scopes its own reads and writes to `context.userId`.
  */

@@ -5,7 +5,7 @@ import { finishIssueRun } from "../app/api/v1/agent/issues/[id]/run-state/route"
 
 const issueId = "11111111-1111-4111-8111-111111111111"
 const runId = "22222222-2222-4222-8222-222222222222"
-const workerId = "33333333-3333-4333-8333-333333333333"
+const hostId = "33333333-3333-4333-8333-333333333333"
 
 class FakeSupabase {
   readonly rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = []
@@ -40,7 +40,7 @@ class FakeIssueQuery {
     return Promise.resolve({
       data: {
         id: issueId,
-        active_worker_id: workerId,
+        active_host_id: hostId,
         active_run_id: runId,
         projects: { user_id: "user-1" },
       },
@@ -62,7 +62,7 @@ test("finish rejects a pull request URL at the route boundary", async () => {
   const supabase = new FakeSupabase()
 
   await assert.rejects(
-    finishIssueRun(supabase as never, "user-1", workerId, issueId, {
+    finishIssueRun(supabase as never, "user-1", hostId, issueId, {
       ...finishBody(),
       pr_url: "https://github.com/acme/repo/pull/42",
     }),
@@ -77,7 +77,7 @@ test("finish omits the legacy URL argument and returns association-derived statu
   const result = await finishIssueRun(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     issueId,
     finishBody()
   )

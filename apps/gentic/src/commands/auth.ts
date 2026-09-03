@@ -15,9 +15,9 @@ import {
 
 export interface AuthState {
   authenticated: boolean
-  workerId?: string
+  hostId?: string
   apiUrl?: string
-  maskedWorkerCredential?: string
+  maskedHostCredential?: string
   setupState?: "setup-incomplete" | "ready"
 }
 
@@ -25,24 +25,24 @@ export interface AuthState {
 export function getAuthState(): AuthState {
   const config = getConfigInput()
   if (
-    !config.GENTIC_WORKER_ID ||
-    !config.GENTIC_WORKER_CREDENTIAL ||
+    !config.GENTIC_HOST_ID ||
+    !config.GENTIC_HOST_CREDENTIAL ||
     !config.GENTIC_API_URL
   ) {
     return { authenticated: false }
   }
   return {
     authenticated: true,
-    workerId: config.GENTIC_WORKER_ID,
+    hostId: config.GENTIC_HOST_ID,
     apiUrl: config.GENTIC_API_URL,
-    maskedWorkerCredential: maskWorkerCredential(
-      config.GENTIC_WORKER_CREDENTIAL
+    maskedHostCredential: maskHostCredential(
+      config.GENTIC_HOST_CREDENTIAL
     ),
-    setupState: config.GENTIC_WORKER_SETUP_STATE ?? "ready",
+    setupState: config.GENTIC_HOST_SETUP_STATE ?? "ready",
   }
 }
 
-function maskWorkerCredential(credential: string): string {
+function maskHostCredential(credential: string): string {
   const suffix = credential.slice(-4)
   return `${credential.slice(0, 3)}...${suffix}`
 }
@@ -54,10 +54,10 @@ export function registerAuthCommand(program: Command): void {
 
   auth
     .command("login")
-    .description("Deprecated: connect a Gentic worker instead")
+    .description("Deprecated: connect a Gentic host instead")
     .action(() => {
       logError(
-        "auth login has been replaced. Generate a worker code in Gentic, then run `gentic worker connect <code>`."
+        "auth login has been replaced. Generate a host code in Gentic, then run `gentic host connect <code>`."
       )
       process.exitCode = 1
     })
@@ -80,7 +80,7 @@ export function registerAuthCommand(program: Command): void {
 
 export async function loginInteractive(): Promise<void> {
   logError(
-    "auth login has been replaced. Generate a worker code in Gentic, then run `gentic worker connect <code>`."
+    "auth login has been replaced. Generate a host code in Gentic, then run `gentic host connect <code>`."
   )
   process.exitCode = 1
 }
@@ -99,25 +99,25 @@ async function logout(opts: { yes?: boolean }): Promise<void> {
   // Clears only the auth keys, not the whole config file, so unrelated
   // settings (GIT_REMOTE_BASE, WORKDIR, POLL_INTERVAL_MS) survive a logout.
   writeConfigFile({
-    GENTIC_WORKER_ID: undefined,
-    GENTIC_WORKER_CREDENTIAL: undefined,
+    GENTIC_HOST_ID: undefined,
+    GENTIC_HOST_CREDENTIAL: undefined,
     GENTIC_API_URL: undefined,
-    GENTIC_WORKER_SETUP_STATE: undefined,
+    GENTIC_HOST_SETUP_STATE: undefined,
   })
-  log.success("Cleared stored Gentic worker registration.")
+  log.success("Cleared stored Gentic host registration.")
 }
 
 function status(): void {
   const state = getAuthState()
 
   if (!state.authenticated) {
-    log.info("No worker connected. Run `gentic worker connect <code>`.")
+    log.info("No host connected. Run `gentic host connect <code>`.")
     return
   }
 
-  log.info(`Worker ID: ${state.workerId ?? "unknown"}`)
+  log.info(`Host ID: ${state.hostId ?? "unknown"}`)
   log.info(`API URL: ${state.apiUrl}`)
-  log.info(`Worker credential: ${state.maskedWorkerCredential}`)
+  log.info(`Host credential: ${state.maskedHostCredential}`)
   log.info(`Setup: ${state.setupState ?? "ready"}`)
   log.info(`Agents: ${formatAgentProviders([...agentProviders])}`)
 }

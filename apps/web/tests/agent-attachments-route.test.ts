@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { listWorkerIssueAttachments } from "../app/api/v1/agent/issues/[id]/attachments/route"
+import { listHostIssueAttachments } from "../app/api/v1/agent/issues/[id]/attachments/route"
 
 const issueId = "11111111-1111-4111-8111-111111111111"
 const runId = "22222222-2222-4222-8222-222222222222"
-const workerId = "33333333-3333-4333-8333-333333333333"
+const hostId = "33333333-3333-4333-8333-333333333333"
 const messageId = "44444444-4444-4444-8444-444444444444"
 
 type AttachmentRow = {
@@ -119,7 +119,7 @@ class FakeIssuesQuery {
     return Promise.resolve({
       data: {
         id: issueId,
-        active_worker_id: workerId,
+        active_host_id: hostId,
         active_run_id: runId,
         projects: { user_id: "user-1" },
       },
@@ -164,10 +164,10 @@ const rows = [
 ]
 
 test("serves only the issue's own attachments when no message is named", async () => {
-  const { attachments } = await listWorkerIssueAttachments(
+  const { attachments } = await listHostIssueAttachments(
     createSupabase(rows) as never,
     "user-1",
-    workerId,
+    hostId,
     issueId,
     { messageId: null, runId }
   )
@@ -183,10 +183,10 @@ test("serves only the issue's own attachments when no message is named", async (
 })
 
 test("serves only that message's attachments for a prompt turn", async () => {
-  const { attachments } = await listWorkerIssueAttachments(
+  const { attachments } = await listHostIssueAttachments(
     createSupabase(rows) as never,
     "user-1",
-    workerId,
+    hostId,
     issueId,
     { messageId, runId }
   )
@@ -199,10 +199,10 @@ test("serves only that message's attachments for a prompt turn", async () => {
 
 test("rejects an issue the caller does not own", async () => {
   await assert.rejects(
-    listWorkerIssueAttachments(
+    listHostIssueAttachments(
       createSupabase(rows) as never,
       "someone-else",
-      workerId,
+      hostId,
       issueId,
       { messageId: null, runId }
     ),
@@ -210,15 +210,15 @@ test("rejects an issue the caller does not own", async () => {
   )
 })
 
-test("rejects a run that is not active for the calling worker", async () => {
+test("rejects a run that is not active for the calling host", async () => {
   await assert.rejects(
-    listWorkerIssueAttachments(
+    listHostIssueAttachments(
       createSupabase(rows) as never,
       "user-1",
-      workerId,
+      hostId,
       issueId,
       { messageId: null, runId: "55555555-5555-4555-8555-555555555555" }
     ),
-    { status: 409, message: "Run is not active for this worker" }
+    { status: 409, message: "Run is not active for this host" }
   )
 })

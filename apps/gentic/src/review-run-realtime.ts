@@ -28,7 +28,7 @@ export interface ReviewRunRealtimeChannel {
  * `connectIssueChannel` (Issue chat), per GEN-415's "stream execution logs
  * to the Review Run log sink, not Issue chat" requirement.
  *
- * Unlike Issue chat, this is one-directional (worker -> browser only): a
+ * Unlike Issue chat, this is one-directional (host -> browser only): a
  * review run is a single, non-interactive turn, so there is no inbound
  * "wake up for a new prompt" event to listen for.
  */

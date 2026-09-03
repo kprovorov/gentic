@@ -28,7 +28,7 @@ import {
 
 /**
  * The wiped transcript plus the runs it belonged to. A reset clears the
- * conversation in the database but cannot stop the worker process that owns the
+ * conversation in the database but cannot stop the host process that owns the
  * active run: it keeps streaming `message` broadcasts on the issue's realtime
  * channel. Those broadcasts are refused by the agent API — the run is no longer
  * active, so they never become rows — but the browser applies every broadcast
@@ -88,7 +88,7 @@ export async function resetIssueAgent(
       .single<UserChatMessage>()
   )
 
-  // Only the run that was active can still be broadcasting: a worker that went
+  // Only the run that was active can still be broadcasting: a host that went
   // silent long enough to lose its lease is not producing events either.
   return {
     message,
@@ -520,10 +520,10 @@ export async function updatePullRequestStateByPrUrl(
   )
 }
 
-// Called from the worker-facing `/agent/issues/[id]/unpublished-changes`
+// Called from the host-facing `/agent/issues/[id]/unpublished-changes`
 // route whenever the agent commits work without opening a PR itself. Scoped
 // to `active_run_id` (a single conditional `UPDATE`, so the check-and-write
-// is atomic) so a worker whose run has since finished, been superseded by a
+// is atomic) so a host whose run has since finished, been superseded by a
 // re-claim, or belongs to a different run entirely can't resurrect state for
 // a run it no longer owns.
 export async function recordUnpublishedAgentChanges(

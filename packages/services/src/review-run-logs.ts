@@ -3,7 +3,7 @@ import type { Supabase } from "./types"
 
 // The durable side of the Review Run log sink (GEN-415) — deliberately
 // separate from Issue chat's `chat_messages`. Append-only; `seq` is assigned
-// by the worker (a single incrementing counter per run), not computed here.
+// by the host (a single incrementing counter per run), not computed here.
 export async function appendReviewRunLog(
   supabase: Supabase,
   reviewRunId: string,

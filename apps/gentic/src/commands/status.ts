@@ -117,14 +117,14 @@ export async function status(
     if (opts.json) {
       console.log(
         JSON.stringify({
-          worker: "not-connected",
+          host: "not-connected",
           configFile,
           tools: toolsJson(tools),
         })
       )
       return
     }
-    log.warn('Worker: not connected - run "gentic worker connect <code>"')
+    log.warn('Host: not connected - run "gentic host connect <code>"')
     note(`Config: ${configFile}`, "Configuration")
     note(formatToolLines(tools).join("\n"), "Tools")
     return
@@ -147,10 +147,10 @@ export async function status(
       console.log(
         JSON.stringify({
           auth: "configured",
-          worker: "connected",
-          workerId: auth.workerId,
+          host: "connected",
+          hostId: auth.hostId,
           apiUrl: auth.apiUrl,
-          maskedWorkerCredential: auth.maskedWorkerCredential,
+          maskedHostCredential: auth.maskedHostCredential,
           setupState: auth.setupState,
           configFile,
           agents: agentProviders,
@@ -174,10 +174,10 @@ export async function status(
     console.log(
       JSON.stringify({
         auth: "configured",
-        worker: "connected",
-        workerId: auth.workerId,
+        host: "connected",
+        hostId: auth.hostId,
         apiUrl: auth.apiUrl,
-        maskedWorkerCredential: auth.maskedWorkerCredential,
+        maskedHostCredential: auth.maskedHostCredential,
         setupState: auth.setupState,
         configFile,
         agents: agentProviders,
@@ -200,9 +200,9 @@ export async function status(
 
   note(
     [
-      `Auth:     configured (worker credential: ${auth.maskedWorkerCredential}, url: ${auth.apiUrl})`,
+      `Auth:     configured (host credential: ${auth.maskedHostCredential}, url: ${auth.apiUrl})`,
       `Config:   ${configFile}`,
-      `Worker:   ${auth.workerId ?? "unknown"} (${auth.setupState ?? "ready"})`,
+      `Host:     ${auth.hostId ?? "unknown"} (${auth.setupState ?? "ready"})`,
       `Agents:   ${formatAgentProviders([...agentProviders])}`,
       `Service:  ${formatServiceLine(scope, backendName, serviceStatus)}`,
       `Boot:     ${bootEnabled ? "enabled" : "disabled"}`,

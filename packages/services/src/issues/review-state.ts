@@ -4,7 +4,7 @@ import { ensureIssueOwned } from "./ownership"
 
 // The first user-facing (RLS-scoped) read path into the Automatic Review
 // lifecycle tables (GEN-419) — everything in `review-context.ts` is
-// worker/service-role-only, built for a different trust boundary. Shaped
+// host/service-role-only, built for a different trust boundary. Shaped
 // flat (one row per cycle, carrying its `pullRequestId`) rather than nested
 // under each pull request, so a caller with several pull requests can group
 // by `pullRequestId` and take the newest cycle per group for that PR's
@@ -42,7 +42,7 @@ export type ReviewRun = {
   headSha: string
   startedAt: string | null
   finishedAt: string | null
-  claimedByWorkerId: string | null
+  claimedByHostId: string | null
   heartbeatAt: string | null
   createdAt: string
 }
@@ -74,7 +74,7 @@ type ReviewCycleRow = {
     head_sha: string
     started_at: string | null
     finished_at: string | null
-    claimed_by_worker_id: string | null
+    claimed_by_host_id: string | null
     heartbeat_at: string | null
     created_at: string
   }[]
@@ -106,7 +106,7 @@ const REVIEW_CYCLE_SELECT = `
   id, pull_request_id, state, head_sha, superseded_reason, created_at, updated_at,
   review_runs (
     id, status, error, head_sha, started_at, finished_at,
-    claimed_by_worker_id, heartbeat_at, created_at
+    claimed_by_host_id, heartbeat_at, created_at
   ),
   review_attempts (
     id, attempt_number, verdict, summary, github_review_id, published_at, created_at,
@@ -158,7 +158,7 @@ function toReviewCycle(row: ReviewCycleRow): ReviewCycle {
         headSha: run.head_sha,
         startedAt: run.started_at,
         finishedAt: run.finished_at,
-        claimedByWorkerId: run.claimed_by_worker_id,
+        claimedByHostId: run.claimed_by_host_id,
         heartbeatAt: run.heartbeat_at,
         createdAt: run.created_at,
       })),

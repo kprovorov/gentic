@@ -422,7 +422,7 @@ class EventLogSupabase {
         issue_model: args.p_issue_model ?? null,
         session_id: null,
         active_run_id: null,
-        active_worker_id: null,
+        active_host_id: null,
         run_error: null,
         run_started_at: null,
         run_finished_at: null,
@@ -446,7 +446,7 @@ class EventLogSupabase {
   // trigger rejects a mismatched run, and `on conflict (issue_id, run_id) do
   // nothing` means only the first caller for a given run inserts the request
   // + message — every later caller (concurrent or a retried/restarted
-  // worker) gets the same ids back with `created: false`.
+  // host) gets the same ids back with `created: false`.
   private requestAutomaticPrPublish(args: {
     p_issue_id: string
     p_run_id: string
@@ -1352,7 +1352,7 @@ test("requestAutomaticPrPublish rejects when there are no unpublished changes", 
   )
 })
 
-test("requestAutomaticPrPublish is idempotent for a duplicate or worker-restart retry", async () => {
+test("requestAutomaticPrPublish is idempotent for a duplicate or host-restart retry", async () => {
   const db = new EventLogDb()
   db.issues.push(automaticPrIssueRow())
   const supabase = new EventLogSupabase(db)
@@ -1445,7 +1445,7 @@ test("a later active run can request automatic PR publishing again once no PR ex
   assert.equal(db.issue_automatic_pr_requests.length, 2)
 })
 
-// A reset wipes the transcript, but nothing stops the worker that owns the
+// A reset wipes the transcript, but nothing stops the host that owns the
 // active run — it keeps broadcasting into the issue's realtime channel long
 // after its writes start getting refused. Naming the run it discarded is what
 // lets the open tab ignore those late events instead of rebuilding the
@@ -1457,7 +1457,7 @@ test("resetIssueAgent reports the run it discarded", async () => {
       id: "issue-reset",
       status: "in-progress",
       active_run_id: "run-1",
-      active_worker_id: "worker-1",
+      active_host_id: "host-1",
     })
   )
   db.messages.push({

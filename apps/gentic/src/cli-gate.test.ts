@@ -11,9 +11,9 @@ const readyStatus: OnboardingStatus = {
   ready: true,
   auth: {
     authenticated: true,
-    workerId: "worker-1",
+    hostId: "host-1",
     apiUrl: "https://gentic.example/api/v1",
-    maskedWorkerCredential: "gen...test",
+    maskedHostCredential: "gen...test",
     setupState: "ready",
     missing: [],
   },
@@ -29,7 +29,7 @@ const unmetStatus: OnboardingStatus = {
   ready: false,
   auth: {
     authenticated: false,
-    missing: ["GENTIC_WORKER_ID", "GENTIC_WORKER_CREDENTIAL", "GENTIC_API_URL"],
+    missing: ["GENTIC_HOST_ID", "GENTIC_HOST_CREDENTIAL", "GENTIC_API_URL"],
   },
   agentProviders: ["codex"],
   tools: {
@@ -51,7 +51,7 @@ test("shouldBypassOnboardingGate bypasses setup and informational commands", () 
     true
   )
   assert.equal(
-    shouldBypassOnboardingGate(["node", "gentic", "worker", "connect", "code"]),
+    shouldBypassOnboardingGate(["node", "gentic", "host", "connect", "code"]),
     true
   )
   assert.equal(shouldBypassOnboardingGate(["node", "gentic", "onboard"]), true)
@@ -135,7 +135,7 @@ test("checkOnboardingGate prints setup instructions and exits 1 without promptin
   )
 
   assert.equal(prompted, false)
-  assert.match(output, /GENTIC_WORKER_ID and GENTIC_WORKER_CREDENTIAL/)
-  assert.match(output, /gentic worker connect <code>/)
+  assert.match(output, /GENTIC_HOST_ID and GENTIC_HOST_CREDENTIAL/)
+  assert.match(output, /gentic host connect <code>/)
   assert.match(output, /gentic onboard/)
 })

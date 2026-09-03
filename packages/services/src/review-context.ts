@@ -41,7 +41,7 @@ export type ReviewRunContext = {
  * request's own title/body/base ref — those live on GitHub, not in this
  * database. The agent-API route (the only place with GitHub App credentials)
  * fetches them separately and merges them into the full payload it returns to
- * the worker. `reviewerProvider`/`reviewerModel`/`reviewerInstructions` come
+ * the host. `reviewerProvider`/`reviewerModel`/`reviewerInstructions` come
  * straight from the frozen `issue_review_policies` row: "Same as Issue"
  * resolution already happened at policy-snapshot time
  * (`snapshot_issue_review_policy`, see
@@ -158,7 +158,7 @@ export async function getReviewRunContext(
 /**
  * The issue's durable attachments (kind = issue, not tied to a chat message),
  * signed for direct download — the same query shape
- * `listWorkerIssueAttachments` uses for the implementation agent's `message_
+ * `listHostIssueAttachments` uses for the implementation agent's `message_
  * id === null` case, in `apps/web/app/api/v1/agent/issues/[id]/attachments/
  * route.ts`.
  */

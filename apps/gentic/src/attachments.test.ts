@@ -77,8 +77,8 @@ function apiWithAttachments(
     },
     async sendHeartbeat() {},
     async markOffline() {},
-    async fetchWorkerControl() {
-      return { worker: { banned: false }, runs: [], review_runs: [] }
+    async fetchHostControl() {
+      return { host: { banned: false }, runs: [], review_runs: [] }
     },
     async claimSkillInstall() {
       return null

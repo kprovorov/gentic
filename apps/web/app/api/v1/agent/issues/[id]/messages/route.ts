@@ -1,6 +1,6 @@
 import {
   ackMessagesSchema,
-  ensureActiveWorkerRun,
+  ensureActiveHostRun,
   ensureIssueOwned,
   getAgentContext,
   handleAgentError,
@@ -18,13 +18,13 @@ export async function GET(
   try {
     const { id } = await params
     const runId = new URL(request.url).searchParams.get("run_id")
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
     if (!runId) {
       return json({ error: "Missing run_id" }, { status: 400 })
     }
-    await ensureActiveWorkerRun(supabase, userId, workerId, id, runId)
+    await ensureActiveHostRun(supabase, userId, hostId, id, runId)
 
     const { data, error } = await supabase
       .from("messages")
@@ -51,10 +51,10 @@ export async function PATCH(
   try {
     const { id } = await params
     const fields = ackMessagesSchema.parse(await request.json())
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
-    await ensureActiveWorkerRun(supabase, userId, workerId, id, fields.run_id)
+    await ensureActiveHostRun(supabase, userId, hostId, id, fields.run_id)
 
     const { error } = await supabase
       .from("messages")
@@ -84,10 +84,10 @@ export async function POST(
   try {
     const { id } = await params
     const fields = insertMessageSchema.parse(await request.json())
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
-    await ensureActiveWorkerRun(supabase, userId, workerId, id, fields.run_id)
+    await ensureActiveHostRun(supabase, userId, hostId, id, fields.run_id)
 
     const { data, error } = await supabase
       .from("messages")

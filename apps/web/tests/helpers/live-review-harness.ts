@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto"
 import test, { type TestContext } from "node:test"
 
 import { createServiceClient } from "@gentic/supabase/service"
-import { defaultWorkerCompatibilityPolicy } from "@gentic/services/workers"
+import { defaultHostCompatibilityPolicy } from "@gentic/services/hosts"
 
 // This tier drives the real Postgres state machine and the real webhook/
 // agent-API route functions (no `supabase.rpc()` fakes) — the layer the
@@ -61,7 +61,7 @@ type SeededIds = {
   projectIds: string[]
   issueIds: string[]
   pullRequestIds: string[]
-  workerIds: string[]
+  hostIds: string[]
   githubIntegrationUserIds: string[]
 }
 
@@ -70,7 +70,7 @@ export function newSeedTracker(): SeededIds {
     projectIds: [],
     issueIds: [],
     pullRequestIds: [],
-    workerIds: [],
+    hostIds: [],
     githubIntegrationUserIds: [],
   }
 }
@@ -176,13 +176,13 @@ export async function seedPullRequest(
   return data.id as string
 }
 
-export async function seedWorker(
+export async function seedHost(
   supabase: TestSupabase,
   tracker: SeededIds,
   input: { userId: string; displayName: string }
 ) {
   const { data, error } = await supabase
-    .from("workers")
+    .from("hosts")
     .insert({
       user_id: input.userId,
       display_name: input.displayName,
@@ -190,16 +190,16 @@ export async function seedWorker(
       setup_state: "ready",
       last_seen_at: new Date().toISOString(),
       // Unset classifies as version_health "unsupported"
-      // (classifyWorkerVersion(null) in @gentic/services/workers), which
-      // makes claimNextReviewRun refuse to claim anything for this worker.
-      gentic_version: defaultWorkerCompatibilityPolicy.currentVersion,
+      // (classifyHostVersion(null) in @gentic/services/hosts), which
+      // makes claimNextReviewRun refuse to claim anything for this host.
+      gentic_version: defaultHostCompatibilityPolicy.currentVersion,
       provider_capabilities: { providers: {} },
     })
     .select("id")
     .single()
 
   if (error) throw error
-  tracker.workerIds.push(data.id as string)
+  tracker.hostIds.push(data.id as string)
   return data.id as string
 }
 
@@ -248,7 +248,10 @@ export async function cleanupSeeded(
     )
 
     if (runIds.length > 0) {
-      await supabase.from("review_run_logs").delete().in("review_run_id", runIds)
+      await supabase
+        .from("review_run_logs")
+        .delete()
+        .in("review_run_id", runIds)
     }
     if (attemptIds.length > 0) {
       await supabase
@@ -257,8 +260,14 @@ export async function cleanupSeeded(
         .in("review_attempt_id", attemptIds)
     }
     if (cycleIds.length > 0) {
-      await supabase.from("review_attempts").delete().in("review_cycle_id", cycleIds)
-      await supabase.from("review_runs").delete().in("review_cycle_id", cycleIds)
+      await supabase
+        .from("review_attempts")
+        .delete()
+        .in("review_cycle_id", cycleIds)
+      await supabase
+        .from("review_runs")
+        .delete()
+        .in("review_cycle_id", cycleIds)
       await supabase.from("review_cycles").delete().in("id", cycleIds)
     }
     await supabase
@@ -284,8 +293,8 @@ export async function cleanupSeeded(
     await supabase.from("issues").delete().in("id", tracker.issueIds)
   }
 
-  if (tracker.workerIds.length > 0) {
-    await supabase.from("workers").delete().in("id", tracker.workerIds)
+  if (tracker.hostIds.length > 0) {
+    await supabase.from("hosts").delete().in("id", tracker.hostIds)
   }
 
   if (tracker.githubIntegrationUserIds.length > 0) {

@@ -60,7 +60,7 @@ async function writePlist(runAtLoad: boolean): Promise<void> {
   )
 }
 
-test("stop records a persistent disable so a reboot doesn't relaunch the worker", async () => {
+test("stop records a persistent disable so a reboot doesn't relaunch the host", async () => {
   await writePlist(true)
   const { exec, calls } = fakeExec()
 

@@ -13,13 +13,13 @@ type OwnerRow = {
   issue_id: string
   generation: number
   origin: "implementation" | "fresh_implementation"
-  worker_id: string | null
+  host_id: string | null
   session_id: string | null
   agent_provider: "claude_code" | "codex"
   issue_model: string | null
   established_at: string
   issues: { agent_provider: string; issue_model: string | null }
-  workers: { banned_at: string | null } | null
+  hosts: { banned_at: string | null } | null
 }
 
 function ownerRow(overrides: Partial<OwnerRow> = {}): OwnerRow {
@@ -28,13 +28,13 @@ function ownerRow(overrides: Partial<OwnerRow> = {}): OwnerRow {
     issue_id: "issue-1",
     generation: 1,
     origin: "implementation",
-    worker_id: "worker-1",
+    host_id: "host-1",
     session_id: "session-1",
     agent_provider: "claude_code",
     issue_model: null,
     established_at: "2026-08-19T09:00:00Z",
     issues: { agent_provider: "claude_code", issue_model: null },
-    workers: { banned_at: null },
+    hosts: { banned_at: null },
     ...overrides,
   }
 }
@@ -83,7 +83,7 @@ test("resolveImplementationOwner reports a healthy owner as resumable", async ()
   const owner = await resolveImplementationOwner(supabase as never, "issue-1")
   assert.equal(owner?.resumable, true)
   assert.equal(owner?.unavailableReason, null)
-  assert.equal(owner?.workerId, "worker-1")
+  assert.equal(owner?.hostId, "host-1")
   assert.equal(owner?.sessionId, "session-1")
 })
 
@@ -109,33 +109,33 @@ test("resolveImplementationOwner flags a changed issue model", async () => {
 
 test("resolveImplementationOwner flags a missing session", async () => {
   const supabase = new FakeSupabase({
-    owner: ownerRow({ session_id: null, worker_id: null }),
+    owner: ownerRow({ session_id: null, host_id: null }),
   })
   const owner = await resolveImplementationOwner(supabase as never, "issue-1")
   assert.equal(owner?.unavailableReason, "session_missing")
 })
 
-test("resolveImplementationOwner flags a deleted worker", async () => {
+test("resolveImplementationOwner flags a deleted host", async () => {
   const supabase = new FakeSupabase({
-    owner: ownerRow({ worker_id: null, workers: null }),
+    owner: ownerRow({ host_id: null, hosts: null }),
   })
   const owner = await resolveImplementationOwner(supabase as never, "issue-1")
-  assert.equal(owner?.unavailableReason, "worker_deleted")
+  assert.equal(owner?.unavailableReason, "host_deleted")
 })
 
-test("resolveImplementationOwner flags a banned worker", async () => {
+test("resolveImplementationOwner flags a banned host", async () => {
   const supabase = new FakeSupabase({
-    owner: ownerRow({ workers: { banned_at: "2026-08-19T10:00:00Z" } }),
+    owner: ownerRow({ hosts: { banned_at: "2026-08-19T10:00:00Z" } }),
   })
   const owner = await resolveImplementationOwner(supabase as never, "issue-1")
-  assert.equal(owner?.unavailableReason, "worker_banned")
+  assert.equal(owner?.unavailableReason, "host_banned")
 })
 
-test("resolveImplementationOwner prefers provider_changed over worker_deleted", async () => {
+test("resolveImplementationOwner prefers provider_changed over host_deleted", async () => {
   const supabase = new FakeSupabase({
     owner: ownerRow({
-      worker_id: null,
-      workers: null,
+      host_id: null,
+      hosts: null,
       issues: { agent_provider: "codex", issue_model: null },
     }),
   })
@@ -146,16 +146,16 @@ test("resolveImplementationOwner prefers provider_changed over worker_deleted", 
 test("validateFixHandoff accepts the current owner", async () => {
   const supabase = new FakeSupabase({ owner: ownerRow() })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-1",
   })
   assert.equal(result.ok, true)
 })
 
-test("validateFixHandoff rejects a different worker", async () => {
+test("validateFixHandoff rejects a different host", async () => {
   const supabase = new FakeSupabase({ owner: ownerRow() })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-2",
+    hostId: "host-2",
     sessionId: "session-1",
   })
   assert.equal(result.ok, false)
@@ -165,7 +165,7 @@ test("validateFixHandoff rejects a different worker", async () => {
 test("validateFixHandoff rejects a stale session", async () => {
   const supabase = new FakeSupabase({ owner: ownerRow() })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-old",
   })
   assert.equal(result.ok === false && result.reason, "not_owner")
@@ -174,7 +174,7 @@ test("validateFixHandoff rejects a stale session", async () => {
 test("validateFixHandoff rejects a stale generation", async () => {
   const supabase = new FakeSupabase({ owner: ownerRow({ generation: 3 }) })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-1",
     generation: 2,
   })
@@ -184,7 +184,7 @@ test("validateFixHandoff rejects a stale generation", async () => {
 test("validateFixHandoff rejects when no owner exists", async () => {
   const supabase = new FakeSupabase({ owner: null })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-1",
   })
   assert.equal(result.ok === false && result.reason, "no_owner")
@@ -193,13 +193,13 @@ test("validateFixHandoff rejects when no owner exists", async () => {
 
 test("validateFixHandoff surfaces the unavailable reason for the owner", async () => {
   const supabase = new FakeSupabase({
-    owner: ownerRow({ workers: { banned_at: "2026-08-19T10:00:00Z" } }),
+    owner: ownerRow({ hosts: { banned_at: "2026-08-19T10:00:00Z" } }),
   })
   const result = await validateFixHandoff(supabase as never, "issue-1", {
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-1",
   })
-  assert.equal(result.ok === false && result.reason, "worker_banned")
+  assert.equal(result.ok === false && result.reason, "host_banned")
 })
 
 test("startFreshImplementation returns the newly established owner", async () => {
@@ -207,9 +207,9 @@ test("startFreshImplementation returns the newly established owner", async () =>
     id: "owner-2",
     generation: 2,
     origin: "fresh_implementation",
-    worker_id: null,
+    host_id: null,
     session_id: null,
-    workers: null,
+    hosts: null,
   })
   const supabase = new FakeSupabase({
     owner: freshOwner,

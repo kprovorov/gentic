@@ -13,7 +13,7 @@ Review Attempt, but nothing turned that verdict into work: no fix-turn ever
 reached the agent, so the Issue sat at `changes-requested` until a human
 intervened. Two prior pieces of infrastructure exist specifically to make this
 possible but were not yet wired together: `issue_implementation_owners`
-(ADR-0003) durably records which worker/session produced the pull request, and
+(ADR-0003) durably records which host/session produced the pull request, and
 `complete_review_attempt` (ADR-0004) already returns the exact Review Attempt,
 its cycle, and the Issue the moment a verdict is recorded.
 
@@ -60,7 +60,7 @@ it. Concretely:
 - **Only the current, resumable owner receives the delivery.** The RPC
   re-derives resumability the same way `resolveImplementationOwner`
   (`packages/services/src/issues/implementation-owner.ts`) does —
-  `provider_changed`, `session_missing`, `worker_deleted`, `worker_banned` —
+  `provider_changed`, `session_missing`, `host_deleted`, `host_banned` —
   deliberately duplicated in SQL rather than shared, since this must be
   atomic with the message insert and status flip, not a separate read. An
   unavailable owner is a stop condition: the Issue stays at
@@ -96,7 +96,7 @@ it. Concretely:
   because both are gated by the identical `cycle.state = 'active'` check
   under the same row lock.
 - **Deliberately out of scope, building on this**: routing the Issue *claim*
-  itself to the owning worker specifically (today, any eligible worker can
+  itself to the owning host specifically (today, any eligible host can
   claim a re-queued Issue — a pre-existing property of the claim path shared
   by every resumption flow, not unique to review fixes) and the recovery UI
   that surfaces an unavailable owner's reason code. Both remain future work

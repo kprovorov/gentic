@@ -44,7 +44,7 @@ export function parsePullNumber(prUrl: string): number | null {
   return match ? Number(match[1]) : null
 }
 
-// Called right after the worker reports a freshly opened/updated PR. If the
+// Called right after the host reports a freshly opened/updated PR. If the
 // repo has CI check suites configured for the PR's head commit, the issue
 // should wait in `testing` for the github webhook (`check_suite` completed)
 // to resolve it to `ready-for-review` / `tests-failed` instead of jumping

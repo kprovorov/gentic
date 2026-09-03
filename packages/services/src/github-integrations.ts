@@ -233,7 +233,7 @@ async function resolveIssueForHeadBranch(
  *   merged one never will; both would only leave an Issue behind. A draft
  *   marked ready arrives here again as `ready_for_review`.
  * - The head branch lives in **the base repository itself**, not a fork.
- *   Reviewing means running a fork author's code on the owner's worker, and
+ *   Reviewing means running a fork author's code on the owner's host, and
  *   an unvetted fork pull request is the one place that code is untrusted.
  * - The base repository belongs to a Project of the installation's owner
  *   whose **Automatic Review is enabled** — the same setting that decides

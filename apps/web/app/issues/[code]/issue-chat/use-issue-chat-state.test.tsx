@@ -26,7 +26,7 @@ let persistedMessages: unknown[] = []
 // Enough of the Supabase client for the two channels the hook joins: the
 // `postgres_changes` one and the private Broadcast one that carries the
 // transcript. Handlers are captured so a test can push events at the hook the
-// way a worker would.
+// way a host would.
 // One client for the lifetime of the module, the way the real hook hands back
 // one client for the lifetime of the component. A client that changed identity
 // per render would rejoin both channels on every state update.
@@ -201,7 +201,7 @@ describe("useIssueChatState after a reset", () => {
     persistedMessages = []
   })
 
-  // The bug: resetting wipes the transcript in the database, but the worker
+  // The bug: resetting wipes the transcript in the database, but the host
   // that owned the wiped run keeps broadcasting. Its events were rebuilding
   // the conversation the user had just deleted, and nothing removed them
   // again — hydration and reconnect reconciliation merge rather than replace —
@@ -228,7 +228,7 @@ describe("useIssueChatState after a reset", () => {
       "kickoff-2",
     ])
 
-    // The old worker is still alive and still streaming into the channel.
+    // The old host is still alive and still streaming into the channel.
     pushBroadcast(
       assistantBroadcast(
         "run-1",

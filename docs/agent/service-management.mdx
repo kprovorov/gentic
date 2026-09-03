@@ -1,10 +1,10 @@
 ---
-title: "Run the Gentic Worker as a Background Service"
+title: "Run the Gentic Host as a Background Service"
 sidebarTitle: "Service Management"
-description: "Use gentic start, stop, reload, restart, status, and logs to manage the agent worker as a system service on Linux (systemd) or macOS (launchd) with automatic restarts."
+description: "Use gentic start, stop, reload, restart, status, and logs to manage the agent host as a system service on Linux (systemd) or macOS (launchd) with automatic restarts."
 ---
 
-The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. Use `gentic reload` after changing runtime configuration, or `gentic restart` after upgrading the worker or changing its connection settings.
+The `gentic` CLI manages its own background service — you do not need a separate process manager like `pm2` or a hand-written `systemd` unit file. Running `gentic start` installs and starts a native OS service for your platform, configures it to restart automatically on crash, and registers it to launch again on reboot. Use `gentic reload` after changing runtime configuration, or `gentic restart` after upgrading the host or changing its connection settings.
 
 <Tip>
   Always use `gentic start` in production instead of running `gentic run`
@@ -26,7 +26,7 @@ The service backend is selected automatically based on the host operating system
 <Warning>
   On platforms without a native service manager (anything other than Linux with
   systemd or macOS), `gentic start` falls back to launching a detached
-  background process tracked by a pidfile. The worker will **not** restart on
+  background process tracked by a pidfile. The host will **not** restart on
   crash and **will not** survive a reboot. Use a dedicated process manager on
   those platforms.
 </Warning>
@@ -37,7 +37,7 @@ The service backend is selected automatically based on the host operating system
 
 ### Start the service
 
-Install the service unit (if it does not already exist) and start the worker:
+Install the service unit (if it does not already exist) and start the host:
 
 ```bash
 gentic start
@@ -61,7 +61,7 @@ gentic start --system
 gentic stop
 ```
 
-A stop is durable: the worker stays stopped across logouts and reboots until you run `gentic start` (or `gentic restart`) again. On macOS this records a launchd disable override alongside the agent's plist; on Linux it disables the systemd unit. `gentic status` reports `Boot: disabled` while a worker is stopped this way.
+A stop is durable: the host stays stopped across logouts and reboots until you run `gentic start` (or `gentic restart`) again. On macOS this records a launchd disable override alongside the agent's plist; on Linux it disables the systemd unit. `gentic status` reports `Boot: disabled` while a host is stopped this way.
 
 Stop the **system-wide** service instead of the per-user one (Linux/systemd only):
 
@@ -81,7 +81,7 @@ Restart the **system-wide** service instead of the per-user one (Linux/systemd o
 gentic restart --system
 ```
 
-### Reload worker configuration
+### Reload host configuration
 
 Re-read runtime configuration without interrupting active issue runs:
 
@@ -89,13 +89,13 @@ Re-read runtime configuration without interrupting active issue runs:
 gentic reload
 ```
 
-For a system-wide worker on Linux:
+For a system-wide host on Linux:
 
 ```bash
 gentic reload --system
 ```
 
-Worker identity, credential, and API URL changes still require `gentic restart`.
+Host identity, credential, and API URL changes still require `gentic restart`.
 
 ### Check service status
 
@@ -119,7 +119,7 @@ gentic status --system
 
 ### View service logs
 
-Stream the worker service's logs. On Linux with systemd this delegates to `journalctl` for the `gentic` unit; on other platforms it tails the log file that the fallback backend writes to:
+Stream the host service's logs. On Linux with systemd this delegates to `journalctl` for the `gentic` unit; on other platforms it tails the log file that the fallback backend writes to:
 
 ```bash
 gentic logs
@@ -141,7 +141,7 @@ gentic logs --system
 
 ### Run in the foreground
 
-Run the worker directly in the current terminal session. Use this during local development or when debugging an issue — not in production:
+Run the host directly in the current terminal session. Use this during local development or when debugging an issue — not in production:
 
 ```bash
 gentic run
@@ -155,26 +155,26 @@ gentic run
 
 | Field        | Description                                                                                                                                                                                                                                                                                          |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auth**     | Whether credentials are configured, with the worker credential masked (first 3 and last 4 characters shown) and the API URL displayed in full.                                                                                                                                                        |
+| **Auth**     | Whether credentials are configured, with the host credential masked (first 3 and last 4 characters shown) and the API URL displayed in full.                                                                                                                                                        |
 | **Config**   | The absolute path of the config file the CLI read, so you can see which file a setting came from.                                                                                                                                                                                                     |
-| **Worker**   | This machine's worker id, followed by its setup state (`ready` or `setup-incomplete`). A `setup-incomplete` worker cannot claim issues — run `gentic onboard` to finish setup.                                                                                                                        |
-| **Agents**   | The agent providers this worker is configured to run.                                                                                                                                                                                                                                                |
+| **Host**     | This machine's host id, followed by its setup state (`ready` or `setup-incomplete`). A `setup-incomplete` host cannot claim issues — run `gentic onboard` to finish setup.                                                                                                                        |
+| **Agents**   | The agent providers this host is configured to run.                                                                                                                                                                                                                                                |
 | **Service**  | The service state (`running`, `stopped`, or `not-installed`), then the backend and scope (e.g. `systemd --user`), the process PID if running, and the uptime since the process started.                                                                                                               |
 | **Boot**     | Whether the service is registered to start automatically on boot or login (`enabled` or `disabled`).                                                                                                                                                                                                  |
 | **Last run** | Currently reports `unknown (no API support yet)`. The CLI does not yet receive a last-run timestamp from the API.                                                                                                                                                                                     |
-| **Tools**    | Install and authentication state of the external CLIs this worker shells out to: `GitHub CLI` (`gh`), `Claude`, and `Codex`. Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
+| **Tools**    | Install and authentication state of the external CLIs this host shells out to: `GitHub CLI` (`gh`), `Claude`, and `Codex`. Each row shows a colored icon (✓ green when authenticated, ⚠ yellow when installed but not authenticated, ✗ red when missing), the status text, and the detected version. |
 
-If no worker is connected, `gentic status` skips the service and worker fields entirely and instead prints the connect hint, the config file path, and the tools check.
+If no host is connected, `gentic status` skips the service and host fields entirely and instead prints the connect hint, the config file path, and the tools check.
 
 ### Why the tools check matters
 
-Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the issue's agent provider. The worker can claim issues for all supported providers, so `gentic status` checks both agent CLIs. Checking `gentic status` after installing the worker — and any time you rotate credentials — surfaces those problems before you queue a real issue.
+Every issue run shells out to `gh` to interact with GitHub, and to either `claude` or `codex` depending on the issue's agent provider. The host can claim issues for all supported providers, so `gentic status` checks both agent CLIs. Checking `gentic status` after installing the host — and any time you rotate credentials — surfaces those problems before you queue a real issue.
 
-The `--json` flag returns the same information as a JSON object. For a connected worker the top-level keys are `auth`, `worker`, `workerId`, `apiUrl`, `maskedWorkerCredential`, `setupState`, `configFile`, `agents`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
+The `--json` flag returns the same information as a JSON object. For a connected host the top-level keys are `auth`, `host`, `hostId`, `apiUrl`, `maskedHostCredential`, `setupState`, `configFile`, `agents`, `service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`, and `tools`. The `tools` object contains `github`, `claude`, and `codex` entries, and each entry has `installed` (boolean), `authenticated` (boolean), and `version` (string or `null`). Colored icons are only emitted in text output; `--json` is unaffected by `NO_COLOR` or non-TTY stdout.
 
-Two shapes differ, so scripts should branch on `worker` before reading service fields:
+Two shapes differ, so scripts should branch on `host` before reading service fields:
 
-- **No worker connected** — only `worker` (set to `"not-connected"`), `configFile`, and `tools` are returned.
+- **No host connected** — only `host` (set to `"not-connected"`), `configFile`, and `tools` are returned.
 - **Service state unavailable** — the service keys (`service`, `serviceBackend`, `pid`, `uptimeSeconds`, `bootEnabled`, `lastRun`) are replaced by a single `serviceError` string describing why the backend could not be queried.
 
 `pid` and `uptimeSeconds` are omitted when the service is not running.
@@ -183,7 +183,7 @@ Two shapes differ, so scripts should branch on `worker` before reading service f
 
 ## The `--no-boot` flag
 
-Pass `--no-boot` to `gentic start` when you want the service to run right now but not register itself to start automatically after a system reboot. This is useful for short-lived worker environments — such as CI-backed VMs or spot instances — where you control the lifecycle externally.
+Pass `--no-boot` to `gentic start` when you want the service to run right now but not register itself to start automatically after a system reboot. This is useful for short-lived host environments — such as CI-backed VMs or spot instances — where you control the lifecycle externally.
 
 ```bash
 gentic start --no-boot
@@ -191,7 +191,7 @@ gentic start --no-boot
 
 When `--no-boot` is set, `gentic status` reports `Boot: disabled`. You can re-enable boot registration at any time by running `gentic start` again without the flag.
 
-The preference sticks across a stop: `gentic restart` after a `gentic stop` restores whatever the last `gentic start` asked for, so a `--no-boot` worker is never silently promoted to starting on boot.
+The preference sticks across a stop: `gentic restart` after a `gentic stop` restores whatever the last `gentic start` asked for, so a `--no-boot` host is never silently promoted to starting on boot.
 
 ---
 
@@ -207,7 +207,7 @@ scp -r dist/linux-x64 deploy@prod-server:/opt/gentic
 
 # On the production server
 cd /opt/gentic
-./gentic worker connect <code>
+./gentic host connect <code>
 ./gentic start
 
 # Verify it is running

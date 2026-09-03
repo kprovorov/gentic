@@ -2,7 +2,7 @@ import { mintRealtimeToken } from "@/lib/realtime-token"
 
 import {
   ensureActiveReviewRunClaim,
-  ensureActiveWorkerRun,
+  ensureActiveHostRun,
   getAgentContext,
   handleAgentError,
   json,
@@ -20,20 +20,20 @@ export const runtime = "nodejs"
 export async function POST(request: Request) {
   try {
     const fields = realtimeTokenSchema.parse(await request.json())
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     if ("review_run_id" in fields) {
       await ensureActiveReviewRunClaim(
         supabase,
         userId,
-        workerId,
+        hostId,
         fields.review_run_id
       )
     } else {
-      await ensureActiveWorkerRun(
+      await ensureActiveHostRun(
         supabase,
         userId,
-        workerId,
+        hostId,
         fields.issue_id,
         fields.active_run_id
       )

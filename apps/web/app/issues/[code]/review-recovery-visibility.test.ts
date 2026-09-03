@@ -1,10 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import type {
-  ImplementationOwner,
-  ReviewCycle,
-} from "@gentic/services/issues"
+import type { ImplementationOwner, ReviewCycle } from "@gentic/services/issues"
 
 import { hasReviewRecoveryControls } from "./review-recovery-visibility"
 
@@ -31,7 +28,7 @@ function owner(
     issueId: "issue-1",
     generation: 1,
     origin: "implementation",
-    workerId: "worker-1",
+    hostId: "host-1",
     sessionId: "session-1",
     agentProvider: "claude_code",
     issueModel: null,
@@ -49,8 +46,28 @@ test("no controls when there are no cycles and no owner", () => {
 test("Retry: a cycle stuck with two trailing failures and budget left is a retry target", () => {
   const stuck = cycle({
     runs: [
-      { id: "run-1", status: "failed", error: "boom", headSha: "sha-1", startedAt: null, finishedAt: "t", claimedByWorkerId: null, heartbeatAt: null, createdAt: "t" },
-      { id: "run-2", status: "failed", error: "boom again", headSha: "sha-1", startedAt: null, finishedAt: "t", claimedByWorkerId: null, heartbeatAt: null, createdAt: "t" },
+      {
+        id: "run-1",
+        status: "failed",
+        error: "boom",
+        headSha: "sha-1",
+        startedAt: null,
+        finishedAt: "t",
+        claimedByHostId: null,
+        heartbeatAt: null,
+        createdAt: "t",
+      },
+      {
+        id: "run-2",
+        status: "failed",
+        error: "boom again",
+        headSha: "sha-1",
+        startedAt: null,
+        finishedAt: "t",
+        claimedByHostId: null,
+        heartbeatAt: null,
+        createdAt: "t",
+      },
     ],
   })
 
@@ -60,7 +77,17 @@ test("Retry: a cycle stuck with two trailing failures and budget left is a retry
 test("Retry: a cycle with a live run is not a retry target", () => {
   const live = cycle({
     runs: [
-      { id: "run-1", status: "running", error: null, headSha: "sha-1", startedAt: "t", finishedAt: null, claimedByWorkerId: "worker-1", heartbeatAt: "t", createdAt: "t" },
+      {
+        id: "run-1",
+        status: "running",
+        error: null,
+        headSha: "sha-1",
+        startedAt: "t",
+        finishedAt: null,
+        claimedByHostId: "host-1",
+        heartbeatAt: "t",
+        createdAt: "t",
+      },
     ],
   })
 
@@ -70,7 +97,10 @@ test("Retry: a cycle with a live run is not a retry target", () => {
 })
 
 test("Continue with human review: an active cycle counts even with no runs yet", () => {
-  assert.equal(hasReviewRecoveryControls([cycle({ state: "active" })], null), true)
+  assert.equal(
+    hasReviewRecoveryControls([cycle({ state: "active" })], null),
+    true
+  )
 })
 
 test("Stale-control guard: approved, exhausted, and superseded cycles show nothing on their own", () => {
@@ -79,7 +109,11 @@ test("Stale-control guard: approved, exhausted, and superseded cycles show nothi
       [
         cycle({ id: "c1", state: "approved" }),
         cycle({ id: "c2", state: "exhausted" }),
-        cycle({ id: "c3", state: "superseded", supersededReason: "new_head_sha" }),
+        cycle({
+          id: "c3",
+          state: "superseded",
+          supersededReason: "new_head_sha",
+        }),
       ],
       null
     ),
@@ -92,7 +126,7 @@ test("Fresh implementation session: shown only when the owner is unresumable", (
   assert.equal(
     hasReviewRecoveryControls(
       [],
-      owner({ resumable: false, unavailableReason: "worker_banned" })
+      owner({ resumable: false, unavailableReason: "host_banned" })
     ),
     true
   )

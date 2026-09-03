@@ -157,7 +157,7 @@ SELECT is(
 );
 
 -- A duplicate/retried call for the same run must not create a second
--- request or message (idempotent under a worker restart replaying the
+-- request or message (idempotent under a host restart replaying the
 -- same run id), and must report the winning caller's own ids.
 SELECT lives_ok(
   $$

@@ -9,9 +9,9 @@ Accepted
 ## Context
 
 GEN-413 (ADR-0004) built the Automatic Review lifecycle state machine and
-GEN-414 (ADR-0005) built the worker-facing claim/lease/heartbeat/reconcile
+GEN-414 (ADR-0005) built the host-facing claim/lease/heartbeat/reconcile
 pipeline on top of it, but both deliberately left the reviewer runtime
-itself unbuilt: `apps/gentic/src/worker.ts`'s `processReviewRun` sent one
+itself unbuilt: `apps/gentic/src/host.ts`'s `processReviewRun` sent one
 heartbeat and then reported every claimed review run as an infrastructure
 failure, on purpose, so the pipeline could ship and be exercised end to end
 before anything tried to produce a real verdict. GEN-415 replaces that stub
@@ -23,7 +23,7 @@ revision but cannot modify or publish repository changes.
 
 **Isolation is a distinct directory, a scrubbed environment, and no MCP
 server — not a container.** The implementation agent already runs with full
-worker-machine filesystem access; building genuine process/container
+host-machine filesystem access; building genuine process/container
 sandboxing for the reviewer would be a much larger undertaking than the
 spec's own framing ("mechanically isolated") asks for. Instead: the
 reviewer's disposable checkout lives at `review-{reviewRunId}`, a directory
@@ -33,7 +33,7 @@ capable of authenticating a `git push` or a credential-helper prompt removed
 (`SSH_AUTH_SOCK`, `SSH_AGENT_PID`, `GIT_ASKPASS`, `GIT_SSH_COMMAND`,
 `GIT_SSH`, `GH_TOKEN`, `GITHUB_TOKEN`) and `GIT_CONFIG_GLOBAL`/
 `GIT_CONFIG_SYSTEM` pointed at `/dev/null` so a stray `credential.helper`
-entry in the worker machine's own gitconfig is never reachable either; and
+entry in the host's own gitconfig is never reachable either; and
 no Gentic MCP server is attached at all, so the reviewer has no
 mutation-capable channel to the issue tracker either. Local edits and test
 runs inside the checkout are still permitted — "permit local inspection and
@@ -44,7 +44,7 @@ was never reachable from the implementation worktree in the first place.
 **Credential removal is a denylist over `process.env`, not an allowlist.**
 An allowlist would need to enumerate every environment variable the model
 provider's auth and the ACP agent binary itself might need (API keys,
-locale, proxy settings, `PATH` extensions, ...), none of which this worker
+locale, proxy settings, `PATH` extensions, ...), none of which this host
 can predict in advance; missing one would silently break the reviewer. A
 denylist only needs to name the specific credentials capable of doing the
 one thing isolation must prevent (pushing, or authenticating as the
@@ -119,7 +119,7 @@ in `apps/gentic` at all.
 
 ## Consequences
 
-- `apps/gentic/src/worker.ts`'s `processReviewRun` now clones the exact SHA,
+- `apps/gentic/src/host.ts`'s `processReviewRun` now clones the exact SHA,
   verifies it, computes the diff, runs an isolated `runReviewerSession`, and
   routes the result to `completeReviewRun` (success) or `failReviewRun`
   (any failure, including an invalid structured output) — always discarding

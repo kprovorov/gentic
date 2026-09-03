@@ -483,7 +483,7 @@ export function useIssueChatState({
           if (!event.success) {
             return
           }
-          // The worker behind a reset run keeps streaming for a while; its
+          // The host behind a reset run keeps streaming for a while; its
           // events would otherwise rebuild the transcript the reset cleared.
           if (isDiscardedRunEvent(discardedRunIdsRef.current, event.data)) {
             return

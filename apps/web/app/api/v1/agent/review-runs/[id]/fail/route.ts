@@ -16,8 +16,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const { supabase, userId, workerId } = await getAgentContext(request)
-    await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
+    const { supabase, userId, hostId } = await getAgentContext(request)
+    await ensureActiveReviewRunClaim(supabase, userId, hostId, id)
 
     const fields = failReviewRunInputSchema.parse(await request.json())
     const result = await failReviewRun(supabase, {

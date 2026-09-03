@@ -1,7 +1,7 @@
 BEGIN;
 SELECT plan(11);
 
-INSERT INTO public.workers (
+INSERT INTO public.hosts (
   id,
   user_id,
   display_name,
@@ -12,7 +12,7 @@ INSERT INTO public.workers (
 ) VALUES (
   '00000000-0000-4000-8000-300000000001',
   'user_lease',
-  'Lease Worker',
+  'Lease Host',
   repeat('b', 64),
   'ready',
   '2026-07-30T07:00:00Z',
@@ -40,7 +40,7 @@ INSERT INTO public.issues (
   body,
   status,
   number,
-  active_worker_id,
+  active_host_id,
   active_run_id
 ) VALUES (
   '20000000-0000-4000-8000-300000000001',
@@ -71,7 +71,7 @@ INSERT INTO public.issues (
   '30000000-0000-4000-8000-300000000003'
 );
 
--- A worker reporting its own failure goes through a plain status update.
+-- A host reporting its own failure goes through a plain status update.
 UPDATE public.issues
    SET status = 'run-failed',
        run_error = 'agent crashed',
@@ -90,12 +90,12 @@ SELECT is(
 
 SELECT is(
   (
-    SELECT active_worker_id
+    SELECT active_host_id
       FROM public.issues
      WHERE id = '20000000-0000-4000-8000-300000000001'
   ),
   null,
-  'a failed run releases worker capacity'
+  'a failed run releases host capacity'
 );
 
 SELECT is(
@@ -127,12 +127,12 @@ SELECT is(
 
 SELECT is(
   (
-    SELECT active_worker_id
+    SELECT active_host_id
       FROM public.issues
      WHERE id = '20000000-0000-4000-8000-300000000002'
   ),
   null,
-  'a usage-limit hold releases worker capacity'
+  'a usage-limit hold releases host capacity'
 );
 
 SELECT is(
@@ -145,7 +145,7 @@ SELECT is(
   'releasing the lease keeps the usage limit reset time'
 );
 
--- Live runs keep their lease, otherwise the worker loses the issue mid-run.
+-- Live runs keep their lease, otherwise the host loses the issue mid-run.
 SELECT is(
   (
     SELECT active_run_id
@@ -162,12 +162,12 @@ UPDATE public.issues
 
 SELECT is(
   (
-    SELECT active_worker_id
+    SELECT active_host_id
       FROM public.issues
      WHERE id = '20000000-0000-4000-8000-300000000003'
   ),
   '00000000-0000-4000-8000-300000000001'::uuid,
-  'starting a queued run keeps the worker attached'
+  'starting a queued run keeps the host attached'
 );
 
 -- Unrelated updates during a live run must not disturb the lease.
@@ -186,30 +186,30 @@ SELECT is(
 );
 
 -- Cancelling from the issue status dropdown is how a user stops a live run:
--- dropping the lease is what the worker polls for to abort.
+-- dropping the lease is what the host polls for to abort.
 UPDATE public.issues
    SET status = 'cancelled'
  WHERE id = '20000000-0000-4000-8000-300000000003';
 
 SELECT is(
   (
-    SELECT active_worker_id
+    SELECT active_host_id
       FROM public.issues
      WHERE id = '20000000-0000-4000-8000-300000000003'
   ),
   null,
-  'cancelling a live run releases its worker'
+  'cancelling a live run releases its host'
 );
 
 SELECT is(
   (
     SELECT count(*)::integer
       FROM public.issues
-     WHERE active_worker_id = '00000000-0000-4000-8000-300000000001'
+     WHERE active_host_id = '00000000-0000-4000-8000-300000000001'
        AND active_run_id IS NOT NULL
   ),
   0,
-  'no dead run counts against the worker capacity'
+  'no dead run counts against the host capacity'
 );
 
 SELECT * FROM finish();

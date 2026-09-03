@@ -1,25 +1,25 @@
 ---
-title: "Troubleshoot Gentic Worker, Auth, and Agent Run Issues"
+title: "Troubleshoot Gentic Host, Auth, and Agent Run Issues"
 sidebarTitle: "Troubleshooting"
-description: "Solutions for common problems with the Gentic agent worker, GitHub integration, and issue runs — including auth errors, stuck issues, and agent failures."
+description: "Solutions for common problems with the Gentic agent host, GitHub integration, and issue runs — including auth errors, stuck issues, and agent failures."
 ---
 
-Most problems with Gentic fall into one of three categories: the worker is not running or not authenticated, the agent encountered an error during a run, or GitHub access is not set up correctly. Work through the relevant accordion below for step-by-step fixes.
+Most problems with Gentic fall into one of three categories: the host is not running or not authenticated, the agent encountered an error during a run, or GitHub access is not set up correctly. Work through the relevant accordion below for step-by-step fixes.
 
 <Note>
   Run `gentic status --json` for machine-readable diagnostics you can pipe into other tools or include in a support request. The JSON output includes configured auth details, service state, backend, PID and uptime when available, boot state, and external tool checks. It does not currently test API connectivity or report the last poll.
 </Note>
 
 <Accordion title="Issue stuck on 'todo' — agent never starts">
-  The agent worker polls the Gentic API every few seconds looking for issues in the `todo` pool. If an issue sits on `todo` indefinitely, the worker is either not running or cannot reach the API.
+  The agent host polls the Gentic API every few seconds looking for issues in the `todo` pool. If an issue sits on `todo` indefinitely, the host is either not running or cannot reach the API.
 
-  **Step 1 — Check whether the worker is running:**
+  **Step 1 — Check whether the host is running:**
 
   ```bash
   gentic status
   ```
 
-  If the worker is stopped, start it:
+  If the host is stopped, start it:
 
   ```bash
   gentic start
@@ -31,23 +31,23 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   gentic auth status
   ```
 
-  You should see a worker id, masked worker credential, and valid API URL. If any registration value is missing, generate a worker code in Gentic and reconnect:
+  You should see a host id, masked host credential, and valid API URL. If any registration value is missing, generate a host code in Gentic and reconnect:
 
   ```bash
-  gentic worker connect <code>
+  gentic host connect <code>
   ```
 
   If setup was interrupted after connecting, run `gentic onboard` to resume without another code.
 
-  **Step 3 — Restart the worker:**
+  **Step 3 — Restart the host:**
 
-  If the worker shows as running but issues are still not being picked up, restart it to clear any stale state:
+  If the host shows as running but issues are still not being picked up, restart it to clear any stale state:
 
   ```bash
   gentic restart
   ```
 
-  Then watch the issue — it should move to `Queued` and then `In Progress` within a few seconds if the worker is healthy.
+  Then watch the issue — it should move to `Queued` and then `In Progress` within a few seconds if the host is healthy.
 </Accordion>
 
 <Accordion title="Issue stuck on 'in-progress' — agent appears frozen">
@@ -80,13 +80,13 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   | Cause | Fix |
   |-------|-----|
   | Git clone failed (`Permission denied (publickey)`) | Add an SSH deploy key or machine user key to the GitHub repository. See the [agent can't clone the repo](#) accordion below. |
-  | Agent credentials invalid or expired | Re-authenticate Claude Code or Codex on the worker machine. |
-  | Repository not found (404) | Confirm the project `owner/repo` in Settings is correct and the worker's SSH key has access. |
-  | Out of disk space | Free up disk on the worker machine; the work directory defaults to `~/.local/share/gentic/workspaces`. |
+  | Agent credentials invalid or expired | Re-authenticate Claude Code or Codex on the host. |
+  | Repository not found (404) | Confirm the project `owner/repo` in Settings is correct and the host's SSH key has access. |
+  | Out of disk space | Free up disk on the host; the work directory defaults to `~/.local/share/gentic/workspaces`. |
 
   **Step 3 — Retry the agent:**
 
-  After fixing the underlying issue, click **Retry with Claude Code** or choose another agent from its dropdown. The issue moves back to `todo` and the worker attempts a fresh run on its next poll.
+  After fixing the underlying issue, click **Retry with Claude Code** or choose another agent from its dropdown. The issue moves back to `todo` and the host attempts a fresh run on its next poll.
 </Accordion>
 
 <Accordion title="Automatic pull request was not created">
@@ -108,31 +108,31 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   **Step 4 — Check a mixed-version deployment:**
 
-  Roll out this feature in this order: apply the database migration, deploy the web app and API, then update agent workers. This order preserves compatibility because old issues and non-web callers default to automatic publishing disabled.
+  Roll out this feature in this order: apply the database migration, deploy the web app and API, then update agent hosts. This order preserves compatibility because old issues and non-web callers default to automatic publishing disabled.
 </Accordion>
 
 <Accordion title="Issue stuck on 'held' — waiting for a usage limit reset">
-  A `held` status means the agent hit a usage limit, session limit, rate limit, or quota during its last run. The worker parses a reset time out of the error message and skips the issue until that time has passed.
+  A `held` status means the agent hit a usage limit, session limit, rate limit, or quota during its last run. The host parses a reset time out of the error message and skips the issue until that time has passed.
 
   **Step 1 — Check the parsed reset time:**
 
-  Open the issue detail page. The status badge shows when the worker will retry (for example, "held until 15:00 UTC"). Until that timestamp, no worker will claim the issue — even if you restart it.
+  Open the issue detail page. The status badge shows when the host will retry (for example, "held until 15:00 UTC"). Until that timestamp, no host will claim the issue — even if you restart it.
 
   **Step 2 — Wait, or reassign the run:**
 
-  In most cases, waiting is correct. The worker automatically re-claims the issue on the first poll after the reset time and resumes the same agent session, so the transcript context is preserved.
+  In most cases, waiting is correct. The host automatically re-claims the issue on the first poll after the reset time and resumes the same agent session, so the transcript context is preserved.
 
   If you cannot wait, use the retry dropdown to start a fresh run with a different provider. Retrying clears the stored conversation and pull-request links for the issue.
 
   **Step 3 — If the reset time looks wrong:**
 
-  The worker recognises relative resets (`try again in 2h`), absolute timestamps, and `HH:MM (UTC)`-style formats emitted by Claude Code and Codex. If a reset time cannot be parsed out of the error, the run is marked `run-failed` instead so you can intervene manually.
+  The host recognises relative resets (`try again in 2h`), absolute timestamps, and `HH:MM (UTC)`-style formats emitted by Claude Code and Codex. If a reset time cannot be parsed out of the error, the run is marked `run-failed` instead so you can intervene manually.
 </Accordion>
 
 <Accordion title="Agent can't clone the repo (git error)">
-  Gentic clones repositories over SSH using the `GIT_REMOTE_BASE` setting (default: `git@github.com:`). If git fails to clone, the worker's SSH key is not trusted by GitHub.
+  Gentic clones repositories over SSH using the `GIT_REMOTE_BASE` setting (default: `git@github.com:`). If git fails to clone, the host's SSH key is not trusted by GitHub.
 
-  **Step 1 — Test SSH connectivity from the worker server:**
+  **Step 1 — Test SSH connectivity from the host server:**
 
   ```bash
   ssh -T git@github.com
@@ -144,7 +144,7 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   **Step 2 — Add a deploy key to the GitHub repository:**
 
-  1. Generate an SSH key pair on the worker machine (if you do not already have one): `ssh-keygen -t ed25519 -C "gentic-worker"`
+  1. Generate an SSH key pair on the host (if you do not already have one): `ssh-keygen -t ed25519 -C "gentic-host"`
   2. Copy the **public** key: `cat ~/.ssh/id_ed25519.pub`
   3. In GitHub, open the repository → **Settings → Deploy keys → Add deploy key**.
   4. Paste the public key, give it a descriptive title, and leave **Allow write access** enabled (the agent pushes branches).
@@ -174,8 +174,8 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   If the approval link has expired, re-initiate the installation from Gentic Settings.
 </Accordion>
 
-<Accordion title="Worker starts but immediately stops">
-  If `gentic start` appears to succeed but the worker is not running moments later (confirmed by `gentic status`), the process is exiting due to a startup error.
+<Accordion title="Host starts but immediately stops">
+  If `gentic start` appears to succeed but the host is not running moments later (confirmed by `gentic status`), the process is exiting due to a startup error.
 
   **Step 1 — Run in the foreground to see error output directly:**
 
@@ -190,16 +190,16 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   The three values that cause an immediate exit if missing are:
 
   ```bash
-  GENTIC_WORKER_ID=<worker-id>
-  GENTIC_WORKER_CREDENTIAL=<your-worker-credential>
+  GENTIC_HOST_ID=<host-id>
+  GENTIC_HOST_CREDENTIAL=<your-host-credential>
   GENTIC_API_URL=https://app.gentic.chat/api/v1
   ```
 
-  Verify them with `gentic auth status`. If they are missing, generate a worker code in Gentic and run `gentic worker connect <code>` to save them.
+  Verify them with `gentic auth status`. If they are missing, generate a host code in Gentic and run `gentic host connect <code>` to save them.
 
   **Step 3 — Check for port or network conflicts:**
 
-  The worker does not bind to a port, but it does make outbound HTTPS requests to `GENTIC_API_URL`. Ensure the worker machine can reach that URL from the command line:
+  The host does not bind to a port, but it does make outbound HTTPS requests to `GENTIC_API_URL`. Ensure the host can reach that URL from the command line:
 
   ```bash
   curl -I https://app.gentic.chat/api/v1
@@ -226,17 +226,17 @@ Most problems with Gentic fall into one of three categories: the worker is not r
   </Warning>
 </Accordion>
 
-<Accordion title="Worker suddenly gets 401 Unauthorized / GENTIC_API_KEY no longer works">
-  Connected worker management replaced the old shared `GENTIC_API_KEY` bearer token with a worker-specific credential (`GENTIC_WORKER_CREDENTIAL`) issued per machine. This is an intentional, alpha-stage breaking change — the API no longer accepts the old shared key at all, and there is no automatic migration of a previously running worker into a connected-worker identity.
+<Accordion title="Host suddenly gets 401 Unauthorized / GENTIC_API_KEY no longer works">
+  Host management replaced the old shared `GENTIC_API_KEY` bearer token with a host-specific credential (`GENTIC_HOST_CREDENTIAL`) issued per machine. This is an intentional, alpha-stage breaking change — the API no longer accepts the old shared key at all, and there is no automatic migration of a previously running agent process into a host identity.
 
-  **If a worker that used to work now fails every poll with 401:**
+  **If a host that used to work now fails every poll with 401:**
 
-  1. Upgrade the `gentic` CLI on that machine to a version that supports `gentic worker connect` (see [Installation](/agent/installation)).
+  1. Upgrade the `gentic` CLI on that machine to a version that supports `gentic host connect` (see [Installation](/agent/installation)).
   2. Remove `GENTIC_API_KEY` from its environment — it is no longer read.
-  3. In **Settings → Workspace → Connected workers**, click **Connect worker** to generate a code, then run `gentic worker connect <code>` on that machine.
+  3. In **Settings → Workspace → Hosts**, click **Connect host** to generate a code, then run `gentic host connect <code>` on that machine.
   4. Run `gentic onboard` if setup didn't finish automatically, then `gentic start` (or `gentic restart`).
 
-  This enrolls the machine as a new worker — no live credentials are changed automatically, and no prior worker identity is carried over. See [Connected Workers → Re-enrolling an existing worker](/web/connected-workers#re-enrolling-an-existing-worker-after-upgrading) for the full walkthrough.
+  This enrolls the machine as a new host — no live credentials are changed automatically, and no prior host identity is carried over. See [Hosts → Re-enrolling an existing host](/web/hosts#re-enrolling-an-existing-host-after-upgrading) for the full walkthrough.
 </Accordion>
 
 <Accordion title="Issue re-queues itself unexpectedly">
@@ -244,5 +244,5 @@ Most problems with Gentic fall into one of three categories: the worker is not r
 
   **This is expected behaviour.** Sending any message to an issue that has already finished its run automatically re-queues it by moving the status back to `todo`. The agent resumes the same session (using the stored `session_id`) so the full prior conversation is available as context. This makes it easy to continue iterating: just send a follow-up message describing the next change.
 
-  If you do not want the agent to run again, change the issue status to `Cancelled` after the re-queue occurs to stop the worker from picking it up.
+  If you do not want the agent to run again, change the issue status to `Cancelled` after the re-queue occurs to stop the host from picking it up.
 </Accordion>

@@ -1,6 +1,6 @@
 import {
-  createWorkerSkillInstalls,
-  listWorkerSkillInstalls,
+  createHostSkillInstalls,
+  listHostSkillInstalls,
 } from "@gentic/services/skills"
 
 import { skillsRoute } from "../_lib"
@@ -11,12 +11,12 @@ const MAX_POLLED_INSTALLS = 64
 
 export function createSkillInstallsRoute(
   deps: {
-    createInstalls?: typeof createWorkerSkillInstalls
+    createInstalls?: typeof createHostSkillInstalls
   } & Parameters<typeof skillsRoute>[1] = {}
 ) {
   return skillsRoute(
     async ({ context, request }) =>
-      (deps.createInstalls ?? createWorkerSkillInstalls)(
+      (deps.createInstalls ?? createHostSkillInstalls)(
         context.supabase,
         context.userId,
         await request.json()
@@ -27,7 +27,7 @@ export function createSkillInstallsRoute(
 
 export function createSkillInstallsPollRoute(
   deps: {
-    listInstalls?: typeof listWorkerSkillInstalls
+    listInstalls?: typeof listHostSkillInstalls
   } & Parameters<typeof skillsRoute>[1] = {}
 ) {
   return skillsRoute(async ({ context, request }) => {
@@ -38,7 +38,7 @@ export function createSkillInstallsPollRoute(
       .slice(0, MAX_POLLED_INSTALLS)
 
     return {
-      installs: await (deps.listInstalls ?? listWorkerSkillInstalls)(
+      installs: await (deps.listInstalls ?? listHostSkillInstalls)(
         context.supabase,
         context.userId,
         ids

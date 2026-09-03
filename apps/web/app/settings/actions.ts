@@ -154,7 +154,7 @@ export async function updateLabel(formData: FormData) {
 }
 
 // Uses the service-role client because archiving calls the `archive_label`
-// SECURITY DEFINER RPC (granted to service_role only, like the worker
+// SECURITY DEFINER RPC (granted to service_role only, like the host
 // lifecycle RPCs), which atomically marks the label archived, removes
 // every assignment, and records one grouped removal event per affected
 // issue — see 20260805130000_add_archive_label_rpc.sql.

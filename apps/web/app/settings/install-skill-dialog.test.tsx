@@ -7,16 +7,16 @@ import { InstallSkillDialog } from "./install-skill-dialog"
 const SKILL_URL = "https://skills.sh/anthropics/skills/pdf"
 
 const targets = [
-  { worker_id: "w1", display_name: "laptop", eligible: true, reason: null },
-  { worker_id: "w2", display_name: "build host", eligible: true, reason: null },
+  { host_id: "w1", display_name: "laptop", eligible: true, reason: null },
+  { host_id: "w2", display_name: "build host", eligible: true, reason: null },
   {
-    worker_id: "w3",
+    host_id: "w3",
     display_name: "old mac",
     eligible: false,
     reason: "offline" as const,
   },
   {
-    worker_id: "w4",
+    host_id: "w4",
     display_name: "busy box",
     eligible: false,
     reason: "installing" as const,
@@ -40,7 +40,7 @@ function stubFetch(route: Route = {}) {
       })
 
       if (input.startsWith("/api/app/skills/install-targets")) {
-        return jsonResponse({ workers: targets })
+        return jsonResponse({ hosts: targets })
       }
       if (input.startsWith("/api/app/skills/audit")) {
         if (!input.includes(encodeURIComponent("skills.sh"))) {
@@ -93,7 +93,7 @@ describe("InstallSkillDialog", () => {
     vi.unstubAllGlobals()
   })
 
-  it("selects every eligible worker by default and disables the rest with a reason", async () => {
+  it("selects every eligible host by default and disables the rest with a reason", async () => {
     stubFetch()
     renderDialog()
 
@@ -177,7 +177,7 @@ describe("InstallSkillDialog", () => {
     expect(screen.getByRole("button", { name: /^Install on/ })).toBeDisabled()
   })
 
-  it("submits the selected workers and shows a per-worker outcome with failure output", async () => {
+  it("submits the selected hosts and shows a per-host outcome with failure output", async () => {
     const calls = stubFetch({
       post: {
         status: 200,
@@ -185,14 +185,14 @@ describe("InstallSkillDialog", () => {
           installs: [
             {
               id: "i1",
-              worker_id: "w1",
+              host_id: "w1",
               status: "installed",
               error_summary: null,
               output: null,
             },
             {
               id: "i2",
-              worker_id: "w2",
+              host_id: "w2",
               status: "failed",
               error_summary: "npx skills add exited with code 1.",
               output: "npm error 404 Not Found",
@@ -222,7 +222,7 @@ describe("InstallSkillDialog", () => {
       calls.find((call) => call.url === "/api/app/skills/installs")?.body
     ).toEqual({
       url: SKILL_URL,
-      worker_ids: ["w1", "w2"],
+      host_ids: ["w1", "w2"],
       accept_risk: false,
     })
     // Dispatched commands are not cancellable, so no cancel affordance exists.

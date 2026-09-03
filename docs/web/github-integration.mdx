@@ -12,7 +12,7 @@ The GitHub integration card in Settings displays one of three states:
 
 <CardGroup cols={3}>
   <Card title="Not connected" icon="plug">
-    No GitHub App installation is linked to your workspace. Agent runs can still open pull requests if the agent worker has direct Git access, but PR status events will not flow back into Gentic automatically.
+    No GitHub App installation is linked to your workspace. Agent runs can still open pull requests if the agent host has direct Git access, but PR status events will not flow back into Gentic automatically.
   </Card>
   <Card title="Pending approval" icon="clock">
     You have submitted an installation request, but an organization administrator has not yet approved the GitHub App. This state applies to organization-owned repositories only.
@@ -115,4 +115,4 @@ Open **Settings → Workspace**, find the project card, uncheck **Auto-respond t
 
 ## Agent Repository Access
 
-The GitHub App integration controls **PR status webhooks and review auto-response**. It is separate from the credentials the agent worker uses to clone and push to repositories. The agent worker requires its own direct Git or SSH access to your repositories — configure this in your self-hosted agent worker environment, not through the GitHub App settings in Gentic.
+The GitHub App integration controls **PR status webhooks and review auto-response**. It is separate from the credentials the agent host uses to clone and push to repositories. The agent host requires its own direct Git or SSH access to your repositories — configure this on the machine where you run the agent host, not through the GitHub App settings in Gentic.

@@ -23,15 +23,12 @@ import {
   updateProject,
 } from "@/app/settings/actions"
 import { AutomaticReviewFields } from "@/app/settings/automatic-review-fields"
-import { ConnectedWorkersSection } from "@/app/settings/connected-workers-section"
+import { HostsSection } from "@/app/settings/hosts-section"
 import {
   agentProviderLabels,
   agentProviderOptions,
 } from "@/app/issues/agent-provider-options"
-import {
-  fetchSettingsData,
-  fetchSettingsWorkersData,
-} from "@/app/client-queries"
+import { fetchSettingsData, fetchSettingsHostsData } from "@/app/client-queries"
 import type { SettingsData } from "@/app/queries"
 import { queryKeys, queryStaleTimes } from "@/app/query-keys"
 import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
@@ -66,15 +63,15 @@ export function SettingsView({
     initialData,
     staleTime: queryStaleTimes.settings,
   })
-  const workersQuery = useQuery({
-    queryKey: queryKeys.settingsWorkers,
-    queryFn: fetchSettingsWorkersData,
-    refetchInterval: queryStaleTimes.settingsWorkersPoll,
+  const hostsQuery = useQuery({
+    queryKey: queryKeys.settingsHosts,
+    queryFn: fetchSettingsHostsData,
+    refetchInterval: queryStaleTimes.settingsHostsPoll,
   })
   const invalidateProjects = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.settings }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.settingsWorkers }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.settingsHosts }),
       queryClient.invalidateQueries({ queryKey: queryKeys.newIssue }),
     ])
   }
@@ -104,7 +101,7 @@ export function SettingsView({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settingsWorkers }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.settingsHosts }),
       ])
     },
   })
@@ -176,13 +173,13 @@ export function SettingsView({
               </Link>
             </Button>
           </div>
-          {workersQuery.isLoading ? (
+          {hostsQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">
-              Loading worker status...
+              Loading host status...
             </p>
-          ) : workersQuery.isError ? (
+          ) : hostsQuery.isError ? (
             <p className="text-sm text-destructive">
-              Unable to load worker status.
+              Unable to load host status.
             </p>
           ) : null}
         </header>
@@ -322,13 +319,13 @@ export function SettingsView({
           </CardContent>
         </Card>
 
-        <ConnectedWorkersSection
-          data={workersQuery.data}
-          isLoading={workersQuery.isLoading}
-          isError={workersQuery.isError}
+        <HostsSection
+          data={hostsQuery.data}
+          isLoading={hostsQuery.isLoading}
+          isError={hostsQuery.isError}
           onRefresh={() =>
             queryClient.invalidateQueries({
-              queryKey: queryKeys.settingsWorkers,
+              queryKey: queryKeys.settingsHosts,
             })
           }
         />

@@ -103,7 +103,7 @@ export interface RunSessionInput {
   /**
    * Credentials for the owner's Gentic MCP endpoint, injected into every
    * session so the coding agent can read and update its own issue tracker.
-   * Omitted only when the worker has no usable connection details.
+   * Omitted only when the host has no usable connection details.
    */
   genticMcp?: GenticMcpAccess | null
   /** Called once with the ACP session id after the session starts. */
@@ -152,7 +152,7 @@ export async function runAgentSession(input: RunSessionInput): Promise<void> {
         clientInfo: { name: "gentic", version: "0.0.1" },
         // Ask for full terminal output snapshots (rather than the default
         // incremental deltas) on each tool_call/tool_call_update's `_meta` so
-        // a polling worker like this one can just read the latest value
+        // a polling host like this one can just read the latest value
         // instead of accumulating a stream. Both claude-agent-acp and
         // codex-acp honor this same non-standard `_meta.terminal_output` key.
         clientCapabilities: { _meta: { terminal_output: true } },

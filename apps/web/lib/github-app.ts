@@ -513,7 +513,7 @@ export type GithubPullRequestMetadata = {
 // disposable checkout the way the diff is, so this is the one GitHub API
 // call the reviewer's context assembly makes. `baseSha` (not just the base
 // branch's current tip, which can move after the PR was opened) is what the
-// worker actually diffs the disposable checkout against.
+// host actually diffs the disposable checkout against.
 export async function fetchPullRequestMetadata(
   installationId: string,
   owner: string,
@@ -732,7 +732,7 @@ export function resolvePullRequestSnapshot(
 
 // The check_suite webhook payload's own `pull_requests` array is only
 // populated when a PR was already open at the moment the check suite was
-// created. The worker pushes commits (which creates the check suite) and
+// created. The host pushes commits (which creates the check suite) and
 // only opens the PR afterward, so that array comes back empty on every
 // delivery. This dedicated endpoint resolves PRs from the commit SHA instead,
 // which has no such ordering requirement.
