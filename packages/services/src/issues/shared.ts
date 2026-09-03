@@ -2,7 +2,7 @@ import type { Tables } from "@gentic/supabase/types"
 import type { ChatMessageContract } from "@gentic/validators/realtime"
 
 const ISSUE_SELECT =
-  "id,project_id,number,title,body,status,type,priority,agent_provider,issue_model,session_id,active_run_id,active_worker_id,run_started_at,run_finished_at,run_error,usage_limit_reset_at,create_pr_automatically,automatic_review_enabled,has_unpublished_agent_changes,created_at,updated_at"
+  "id,project_id,number,title,body,status,type,priority,agent_provider,issue_model,session_id,active_run_id,active_host_id,run_started_at,run_finished_at,run_error,usage_limit_reset_at,create_pr_automatically,automatic_review_enabled,has_unpublished_agent_changes,created_at,updated_at"
 
 const PROJECT_JOIN_COLUMNS =
   "id,name,repo,user_id,key,automatic_review_enabled,automatic_review_provider,automatic_review_model,automatic_review_instructions"

@@ -18,7 +18,7 @@ export type IssueEventType =
   | "review_fix_delivered"
   // `start_fresh_implementation` (GEN-403):
   | "implementation_ownership_reset"
-  // `reconcile_offline_worker_runs`:
+  // `reconcile_offline_host_runs`:
   | "run_failed"
   // The Automatic Review lifecycle engine (GEN-413/414/419, see ADR-0004):
   // `evaluate_review_eligibility` and `retry_review_run`:

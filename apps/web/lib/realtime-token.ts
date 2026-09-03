@@ -1,6 +1,6 @@
 import { importJWK, SignJWT } from "jose"
 
-// Comfortably inside a run; the worker refreshes before this via
+// Comfortably inside a run; the host refreshes before this via
 // realtime.setAuth (see apps/gentic/src/realtime.ts).
 const TOKEN_TTL_SECONDS = 60 * 60
 
@@ -16,7 +16,7 @@ export interface RealtimeToken {
  * project's asymmetric JWT signing key (see docs/realtime-transport.md
  * "JWT signing key setup"). Its claims mirror what Supabase sees from a
  * Clerk-issued session token, so the same `realtime.messages` RLS policies
- * authorize both browser and worker connections to a private issue channel.
+ * authorize both browser and host connections to a private issue channel.
  */
 export async function mintRealtimeToken(
   userId: string

@@ -522,8 +522,8 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
     },
     async sendHeartbeat() {},
     async markOffline() {},
-    async fetchWorkerControl() {
-      return { worker: { banned: false }, runs: [], review_runs: [] }
+    async fetchHostControl() {
+      return { host: { banned: false }, runs: [], review_runs: [] }
     },
     async claimSkillInstall() {
       return null

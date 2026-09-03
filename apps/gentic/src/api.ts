@@ -31,15 +31,15 @@ import {
 } from "@gentic/validators/agent"
 import type { IssueStatus } from "@gentic/validators/issues"
 import {
-  claimWorkerSkillInstallResponseSchema,
-  type ReportWorkerSkillInstallResultInput,
-  type WorkerSkillInstallCommand,
+  claimHostSkillInstallResponseSchema,
+  type ReportHostSkillInstallResultInput,
+  type HostSkillInstallCommand,
 } from "@gentic/validators/skills"
 import {
-  workerControlResponseSchema,
-  type WorkerControlResponse,
-  type WorkerHeartbeatTelemetry,
-} from "@gentic/validators/workers"
+  hostControlResponseSchema,
+  type HostControlResponse,
+  type HostHeartbeatTelemetry,
+} from "@gentic/validators/hosts"
 import type { z } from "zod"
 
 export type {
@@ -120,14 +120,14 @@ export interface AgentApi {
     issueId: string,
     activeRunId: string
   ): Promise<RealtimeTokenResponse>
-  sendHeartbeat(telemetry: WorkerHeartbeatTelemetry): Promise<void>
+  sendHeartbeat(telemetry: HostHeartbeatTelemetry): Promise<void>
   markOffline(): Promise<void>
-  fetchWorkerControl(): Promise<WorkerControlResponse>
-  /** Accepts this worker's pending skill install, if it has one. */
-  claimSkillInstall(): Promise<WorkerSkillInstallCommand | null>
+  fetchHostControl(): Promise<HostControlResponse>
+  /** Accepts this host's pending skill install, if it has one. */
+  claimSkillInstall(): Promise<HostSkillInstallCommand | null>
   reportSkillInstall(
     installId: string,
-    result: ReportWorkerSkillInstallResultInput
+    result: ReportHostSkillInstallResultInput
   ): Promise<void>
 }
 
@@ -325,31 +325,31 @@ export function createAgentApi(input: {
       })
     },
     async sendHeartbeat(telemetry) {
-      await request("/agent/worker/heartbeat", okResponseSchema, {
+      await request("/agent/host/heartbeat", okResponseSchema, {
         method: "PATCH",
         body: telemetry,
       })
     },
     async markOffline() {
-      await request("/agent/worker/heartbeat", okResponseSchema, {
+      await request("/agent/host/heartbeat", okResponseSchema, {
         method: "DELETE",
         body: {},
       })
     },
-    async fetchWorkerControl() {
-      return request("/agent/worker/control", workerControlResponseSchema)
+    async fetchHostControl() {
+      return request("/agent/host/control", hostControlResponseSchema)
     },
     async claimSkillInstall() {
       const data = await request(
-        "/agent/worker/skill-installs",
-        claimWorkerSkillInstallResponseSchema,
+        "/agent/host/skill-installs",
+        claimHostSkillInstallResponseSchema,
         { method: "POST", body: {} }
       )
       return data.command
     },
     async reportSkillInstall(installId, result) {
       await request(
-        `/agent/worker/skill-installs/${encodeURIComponent(installId)}`,
+        `/agent/host/skill-installs/${encodeURIComponent(installId)}`,
         okResponseSchema,
         { method: "PATCH", body: result }
       )

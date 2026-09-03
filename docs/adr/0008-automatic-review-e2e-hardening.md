@@ -9,14 +9,14 @@ Accepted
 ## Context
 
 GEN-411 through GEN-419 built the complete Automatic Review feature — the
-lifecycle engine, worker claiming, isolated reviewer runtime, GitHub
+lifecycle engine, host claiming, isolated reviewer runtime, GitHub
 publishing, fix delivery, and recovery UI (ADRs 0003–0007) — before it is
 turned on for users. GEN-420 asks to prove the whole thing under real event
-ordering, concurrency, worker failure, and GitHub retry conditions first.
+ordering, concurrency, host failure, and GitHub retry conditions first.
 
 Two test tiers already existed. pgTAP (`supabase/tests/*.sql`) runs against
 real local Postgres and proves the SQL state machine directly, but its
-"two workers cannot claim the same job" coverage
+"two hosts cannot claim the same job" coverage
 (`review_run_claiming_test.sql`) is two *sequential* RPC calls inside one
 transaction — it proves the end state is correct, not that the `for update
 skip locked` guarantee holds under a genuine concurrent race. The
@@ -56,8 +56,8 @@ time, so proving a real race requires either a second raw connection
 (`dblink`, holding a lock open across statements) or two real, separate
 HTTP requests racing on the same Postgres rows — which is also a more
 faithful model of how these races actually happen in production (two
-workers polling independently, or GitHub redelivering a webhook while a
-worker's request is still in flight), and needs no new Postgres extension.
+hosts polling independently, or GitHub redelivering a webhook while a
+host's request is still in flight), and needs no new Postgres extension.
 
 **This tier skips itself, rather than failing, when no live Supabase
 instance is reachable.** `liveTest` (`apps/web/tests/helpers/
@@ -103,5 +103,5 @@ self-contained (no shared fixture data to leak between runs).
 - `supabase/tests/review_run_reconciliation_test.sql` gained one scenario
   proving the property the file's existing coverage stopped short of: a
   reconciled run's automatic retry is actually claimable again once the
-  crashed worker (or its replacement) comes back online, not just marked
+  crashed host (or its replacement) comes back online, not just marked
   failed.

@@ -117,7 +117,7 @@ export function isIssueModelForAgent(
 // callers should pick deliberately.
 //
 // "spec" is the one type that is not agent work: it documents intent instead of
-// requesting it, so no worker ever claims it and it carries no agent
+// requesting it, so no host ever claims it and it carries no agent
 // conversation (see `isSpecIssueType`). The classifier never produces it — a
 // Spec is always a deliberate choice.
 export const issueTypeSchema = z.enum([
@@ -132,7 +132,7 @@ export const issueTypeSchema = z.enum([
 export type IssueType = z.infer<typeof issueTypeSchema>
 
 /**
- * A Spec is documentation, not a task: workers skip it when claiming, the
+ * A Spec is documentation, not a task: hosts skip it when claiming, the
  * draft → todo transition never opens an agent run for it, and its detail page
  * has no chat. Every other type is agent work.
  */

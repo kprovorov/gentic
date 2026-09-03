@@ -4,7 +4,7 @@ sidebarTitle: "Attachments"
 description: "Upload images, text files, and documents to Gentic issues to give the AI coding agent additional context like screenshots, logs, or spec files."
 ---
 
-Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded to the worker and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the issue body.
+Attachments let you hand the AI agent more than words. Images and text files become prompt content blocks; other files are downloaded onto the host and referenced by local path. This supports screenshots, logs, design mockups, and specification documents without pasting everything into the issue body.
 
 ## What attachments do
 
@@ -49,7 +49,7 @@ Gentic handles different file types differently to give the agent the most usefu
 </CardGroup>
 
 <Note>
-  Attachments are fetched when a worker prepares the prompt. The issue's own files are handed over on the first prompt of each run, so a reset session sees them again; files added to a follow-up message are delivered on that message's prompt turn. To rebuild an issue from its original body and current attachments, use **Retry with...** on the issue detail page.
+  Attachments are fetched when a host prepares the prompt. The issue's own files are handed over on the first prompt of each run, so a reset session sees them again; files added to a follow-up message are delivered on that message's prompt turn. To rebuild an issue from its original body and current attachments, use **Retry with...** on the issue detail page.
 </Note>
 
 ## How to upload attachments

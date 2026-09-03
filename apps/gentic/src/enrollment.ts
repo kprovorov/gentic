@@ -1,6 +1,6 @@
 import { arch, hostname, platform } from "node:os"
 
-import { workerCredentialSchema } from "@gentic/validators/workers"
+import { hostCredentialSchema } from "@gentic/validators/hosts"
 import { z } from "zod"
 
 import packageJson from "../package.json" with { type: "json" }
@@ -14,49 +14,49 @@ export const DEFAULT_API_URL = "https://app.gentic.chat/api/v1"
 const exchangeResponseSchema = z
   .object({
     api_url: z.string().url().optional(),
-    worker: z
+    host: z
       .object({
         id: z.string().min(1),
         display_name: z.string().min(1).optional(),
         setup_state: z.string().optional(),
       }),
-    credential: workerCredentialSchema,
+    credential: hostCredentialSchema,
   })
 
-export interface WorkerEnrollment {
+export interface HostEnrollment {
   apiUrl: string
-  workerId: string
-  workerCredential: string
+  hostId: string
+  hostCredential: string
   displayName?: string
 }
 
-export interface ConnectWorkerDeps {
+export interface ConnectHostDeps {
   fetch?: typeof fetch
   getTools?: () => Promise<ToolStatuses>
   hostname?: () => string
   now?: () => Date
 }
 
-export function suggestedWorkerName(
+export function suggestedHostName(
   getHostname: () => string = hostname
 ): string {
   const name = getHostname().trim()
-  return name.length > 0 ? name : "Gentic Worker"
+  return name.length > 0 ? name : "Gentic Host"
 }
 
-export async function connectWorkerWithCode(
+export async function connectHostWithCode(
   code: string,
   options: {
     apiUrl?: string
     configuredCapacity?: number
   } = {},
-  deps: ConnectWorkerDeps = {}
-): Promise<WorkerEnrollment> {
+  deps: ConnectHostDeps = {}
+): Promise<HostEnrollment> {
   const apiUrl = (options.apiUrl ?? DEFAULT_API_URL).replace(/\/+$/, "")
   const getTools = deps.getTools ?? getToolStatuses
   const tools = await getTools()
   const response = await (deps.fetch ?? fetch)(
-    `${apiUrl}/workers/exchange`,
+    `${apiUrl}/hosts/exchange`,
     {
       method: "POST",
       headers: {
@@ -64,7 +64,7 @@ export async function connectWorkerWithCode(
       },
       body: JSON.stringify({
         code,
-        display_name: suggestedWorkerName(deps.hostname),
+        display_name: suggestedHostName(deps.hostname),
         telemetry: {
           gentic_version: packageJson.version ?? null,
           os: platform(),
@@ -88,54 +88,54 @@ export async function connectWorkerWithCode(
       response.status === 429
         ? " Too many failed attempts; wait a few minutes and try again."
         : ""
-    throw new Error(`Invalid or expired worker connection code.${retrySuffix}`)
+    throw new Error(`Invalid or expired host connection code.${retrySuffix}`)
   }
 
   const parsed = exchangeResponseSchema.parse(payload)
   const enrollment = {
     apiUrl: (parsed.api_url ?? apiUrl).replace(/\/+$/, ""),
-    workerId: parsed.worker.id,
-    workerCredential: parsed.credential,
-    displayName: parsed.worker.display_name,
+    hostId: parsed.host.id,
+    hostCredential: parsed.credential,
+    displayName: parsed.host.display_name,
   }
 
   writeConfigFile({
     GENTIC_API_URL: enrollment.apiUrl,
-    GENTIC_WORKER_ID: enrollment.workerId,
-    GENTIC_WORKER_CREDENTIAL: enrollment.workerCredential,
-    GENTIC_WORKER_SETUP_STATE: "setup-incomplete",
+    GENTIC_HOST_ID: enrollment.hostId,
+    GENTIC_HOST_CREDENTIAL: enrollment.hostCredential,
+    GENTIC_HOST_SETUP_STATE: "setup-incomplete",
   })
 
   return enrollment
 }
 
-export async function markWorkerSetupReady(
+export async function markHostSetupReady(
   deps: {
     fetch?: typeof fetch
   } = {}
 ): Promise<void> {
   const config = getConfigInput()
   const apiUrl = config.GENTIC_API_URL
-  const workerCredential = config.GENTIC_WORKER_CREDENTIAL
-  const workerId = config.GENTIC_WORKER_ID
+  const hostCredential = config.GENTIC_HOST_CREDENTIAL
+  const hostId = config.GENTIC_HOST_ID
   const missing = [
     apiUrl ? null : "GENTIC_API_URL",
-    workerCredential ? null : "GENTIC_WORKER_CREDENTIAL",
-    workerId ? null : "GENTIC_WORKER_ID",
+    hostCredential ? null : "GENTIC_HOST_CREDENTIAL",
+    hostId ? null : "GENTIC_HOST_ID",
   ].filter((key): key is string => key !== null)
-  if (!apiUrl || !workerCredential || !workerId) {
+  if (!apiUrl || !hostCredential || !hostId) {
     logError(
-      `cannot mark worker setup ready: missing ${missing.join(" and ")}`
+      `cannot mark host setup ready: missing ${missing.join(" and ")}`
     )
     return
   }
 
   const response = await (deps.fetch ?? fetch)(
-    `${apiUrl.replace(/\/+$/, "")}/agent/worker/setup`,
+    `${apiUrl.replace(/\/+$/, "")}/agent/host/setup`,
     {
       method: "PATCH",
       headers: {
-        authorization: `Bearer ${workerCredential}`,
+        authorization: `Bearer ${hostCredential}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ setup_state: "ready" }),
@@ -154,7 +154,7 @@ export async function markWorkerSetupReady(
     throw new Error(message)
   }
 
-  writeConfigFile({ GENTIC_WORKER_SETUP_STATE: "ready" })
+  writeConfigFile({ GENTIC_HOST_SETUP_STATE: "ready" })
 }
 
 function toolCapability(status: ToolStatuses["claude"]) {

@@ -14,7 +14,7 @@ export async function getOptionalAuthenticatedContext() {
   return { supabase: await createClient(), userId }
 }
 
-// For routes that call SECURITY DEFINER RPCs (worker lifecycle management)
+// For routes that call SECURITY DEFINER RPCs (host lifecycle management)
 // which are granted to service_role only and enforce ownership themselves
 // via a p_user_id check, rather than relying on table RLS.
 export async function getOptionalAuthenticatedServiceContext() {
@@ -39,7 +39,7 @@ export async function getAuthenticatedContext() {
 
 // Redirect-wrapped counterpart to getOptionalAuthenticatedServiceContext,
 // for Server Actions that call SECURITY DEFINER RPCs the same way the
-// worker mutation API routes do.
+// host mutation API routes do.
 export async function getAuthenticatedServiceContext() {
   const context = await getOptionalAuthenticatedServiceContext()
 

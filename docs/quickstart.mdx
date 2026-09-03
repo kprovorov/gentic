@@ -1,10 +1,10 @@
 ---
 title: "Gentic Quickstart: From Sign-Up to First Pull Request"
 sidebarTitle: "Quickstart"
-description: "Create a Gentic project, deploy the agent worker, write your first issue, and receive an AI-generated pull request in a single sitting."
+description: "Create a Gentic project, deploy the agent host, write your first issue, and receive an AI-generated pull request in a single sitting."
 ---
 
-This guide takes you from a blank account to a merged pull request. You will sign up, connect a GitHub repository, deploy the agent worker on a server, create an issue, and watch the AI agent write code and open a PR — all in one sitting.
+This guide takes you from a blank account to a merged pull request. You will sign up, connect a GitHub repository, deploy the agent host on a server, create an issue, and watch the AI agent write code and open a PR — all in one sitting.
 
 <Steps>
 
@@ -17,24 +17,24 @@ Open [app.gentic.chat](https://app.gentic.chat) in your browser and create an ac
 Open **Settings** from the sidebar. In **Add project**, enter a display name and your repository in `owner/repo` format — for example, `acme-corp/backend`. Optionally add a setup script that installs dependencies before an agent session starts, then click **Add project**.
 
 <Tip>
-  You can add as many projects as you need. Each issue is scoped to a single project, so the worker always knows which repository to clone.
+  You can add as many projects as you need. Each issue is scoped to a single project, so the host always knows which repository to clone.
 </Tip>
 
 ### Connect GitHub
 
-Still in **Settings**, click **Connect GitHub** and install the configured GitHub App on the repositories you want Gentic to track. The integration sends pull-request status and review events back to Gentic. It does not replace the worker's own Git and GitHub CLI credentials, which are used to clone, push, and open pull requests.
+Still in **Settings**, click **Connect GitHub** and install the configured GitHub App on the repositories you want Gentic to track. The integration sends pull-request status and review events back to Gentic. It does not replace the host's own Git and GitHub CLI credentials, which are used to clone, push, and open pull requests.
 
-### Install and configure the agent worker
+### Install and configure the agent host
 
-The agent worker is a CLI you run on a server, VM, or any machine that can reach both the Gentic API and GitHub. Download the latest pre-built binary for your platform from the [GitHub Releases page](https://github.com/kprovorov/gentic/releases), or build from source.
+The agent host is a CLI you run on a server, VM, or any machine that can reach both the Gentic API and GitHub. Download the latest pre-built binary for your platform from the [GitHub Releases page](https://github.com/kprovorov/gentic/releases), or build from source.
 
-Once the binary is on your server, generate a worker enrollment code in the Gentic web app and connect the machine:
+Once the binary is on your server, generate a host enrollment code in the Gentic web app and connect the machine:
 
 ```bash
-gentic worker connect <code>
+gentic host connect <code>
 ```
 
-The exchange stores the API URL, stable worker id, and worker-specific credential locally, then immediately runs GitHub CLI, Codex, and Claude Code onboarding. If you cancel before local setup finishes, resume without another code:
+The exchange stores the API URL, stable host id, and host-specific credential locally, then immediately runs GitHub CLI, Codex, and Claude Code onboarding. If you cancel before local setup finishes, resume without another code:
 
 ```bash
 gentic onboard
@@ -44,33 +44,33 @@ Alternatively, create a `.env` file next to the binary and set the variables the
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1
-GENTIC_WORKER_ID=worker-id-from-enrollment
-GENTIC_WORKER_CREDENTIAL=your-worker-credential-here
+GENTIC_HOST_ID=host-id-from-enrollment
+GENTIC_HOST_CREDENTIAL=your-host-credential-here
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
 ```
 
-After onboarding succeeds, the CLI asks whether to install and start the worker as a managed OS service so it restarts automatically. You can also do that later:
+After onboarding succeeds, the CLI asks whether to install and start the host as a managed OS service so it restarts automatically. You can also do that later:
 
 ```bash
 gentic start
 ```
 
-Verify the worker configuration, service, and required external tools:
+Verify the host configuration, service, and required external tools:
 
 ```bash
 gentic status
 ```
 
 <Note>
-  The agent worker must be running before you move an issue to Todo. If no worker is polling, issues remain in Todo. See the [Agent Worker installation guide](/agent/installation) for service management, SSH deploy keys, and agent prerequisites.
+  The agent host must be running before you move an issue to Todo. If no host is polling, issues remain in Todo. See the [Agent Host installation guide](/agent/installation) for service management, SSH deploy keys, and agent prerequisites.
 </Note>
 
 ### Create your first issue
 
 Back in the Gentic web app, open **Issues** and click **New issue**. Choose a project, then write a detailed body. You can attach supporting files in the same composer.
 
-Leave **Create PR automatically** enabled if you want Gentic to publish successful code changes. New web issues enable it by default. Click **Save draft** to review the issue before it runs; the draft keeps your publishing selection. Gentic generates the title and type in the background. Draft issues are never picked up by the worker, so you can refine the generated fields, body, attachments, and publishing preference before running it.
+Leave **Create PR automatically** enabled if you want Gentic to publish successful code changes. New web issues enable it by default. Click **Save draft** to review the issue before it runs; the draft keeps your publishing selection. Gentic generates the title and type in the background. Draft issues are never picked up by the host, so you can refine the generated fields, body, attachments, and publishing preference before running it.
 
 <Tip>
   Write issue bodies the same way you would write a detailed ticket for a junior engineer: describe the goal, the acceptance criteria, any relevant file paths, and the coding style you expect. The more context you give, the better the output.
@@ -78,20 +78,20 @@ Leave **Create PR automatically** enabled if you want Gentic to publish successf
 
 ### Move the issue to Todo
 
-When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the body as the first message and makes the issue eligible for a worker.
+When your issue is ready, change its **Status** from `Draft` to `Todo`. You can also skip the draft step by choosing **Run with Claude Code** or **Run with Codex** on the new-issue form. Either path records the body as the first message and makes the issue eligible for a host.
 
-On the worker's next poll (within a few seconds), it claims the issue, clones the repository into a fresh working directory, and starts the AI agent.
+On the host's next poll (within a few seconds), it claims the issue, clones the repository into a fresh working directory, and starts the AI agent.
 
 ### Watch the pull request appear
 
-Switch to the **Issues** view and open your issue. You will see the status move through `todo → queued → in-progress` as the worker picks it up, and real-time agent output stream into the transcript panel. If the successful run changes the repository, Gentic adds a visible publishing message and continues the same agent session. The agent creates or reuses the issue-named branch, commits and pushes the changes, and opens a ready-for-review pull request. The issue status updates to `ready-for-review` and a link to the PR appears.
+Switch to the **Issues** view and open your issue. You will see the status move through `todo → queued → in-progress` as the host picks it up, and real-time agent output stream into the transcript panel. If the successful run changes the repository, Gentic adds a visible publishing message and continues the same agent session. The agent creates or reuses the issue-named branch, commits and pushes the changes, and opens a ready-for-review pull request. The issue status updates to `ready-for-review` and a link to the PR appears.
 
 If the run makes no changes, fails, is held by a usage limit, or is cancelled or interrupted, Gentic does not start automatic publishing. A finished run with unpublished work and no pull request shows **Create PR** so you can request publishing manually.
 
 Open the pull request on GitHub, review the changes, and merge when you are satisfied.
 
 <CardGroup cols={2}>
-  <Card title="Agent Worker Setup" icon="server" href="/agent/overview">
+  <Card title="Agent Host Setup" icon="server" href="/agent/overview">
     Full installation guide: service management, SSH keys, Claude Code and Codex credentials.
   </Card>
   <Card title="How It Works" icon="circle-info" href="/how-it-works">

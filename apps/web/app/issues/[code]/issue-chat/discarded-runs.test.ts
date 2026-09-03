@@ -25,7 +25,7 @@ test("does not mutate the discarded set it was given", () => {
   assert.deepEqual([...current], ["run-1"])
 })
 
-// The whole point: the worker behind the wiped run is still streaming.
+// The whole point: the host behind the wiped run is still streaming.
 test("rejects a broadcast from a run a reset threw away", () => {
   assert.equal(
     isDiscardedRunEvent(new Set(["run-1"]), { run_id: "run-1" }),

@@ -1,0 +1,180 @@
+---
+title: "Manage Hosts from Settings"
+sidebarTitle: "Hosts"
+description: "Enroll, monitor, rename, ban, unban, and delete Gentic agent host machines from Settings → Workspace, and understand online, offline, setup-incomplete, and banned states."
+---
+
+The **Hosts** card in **Settings → Workspace** lists every host enrolled in your Gentic workspace, its live status, and the actions you can take on it. Each host is a separate identity with its own credential — there is no shared API key. This page covers the owner-facing side; see [Agent Host](/agent/overview) for how to install and run the host CLI itself.
+
+<Note>
+  This is a new, alpha feature. If you had an agent running before host
+  enrollment shipped, it authenticated with a shared `GENTIC_API_KEY` that no
+  longer works. See [Re-enrolling an existing
+  host](#re-enrolling-an-existing-host-after-upgrading) below.
+</Note>
+
+## Connect a host
+
+<Steps>
+  <Step title="Open Settings → Workspace">
+    Scroll to the **Hosts** card.
+  </Step>
+  <Step title="Click Connect host">
+    Gentic generates a single-use enrollment code and shows the exact command to run:
+
+    ```bash
+    gentic host connect <code>
+    ```
+
+    The code expires **10 minutes** after it's generated. Only one code can be active per workspace at a time — generating a new one (**New code**) immediately invalidates any previous unused code.
+  </Step>
+  <Step title="Run the command on the host">
+    Paste the command into the terminal on the server or VM that will run the host. See [Installation](/agent/installation) if `gentic` isn't installed yet.
+
+    The exchange is single-use: once the code is consumed, it can't be reused, and it returns a host-specific credential that is never shown again in the UI. `gentic host connect` saves the host id, API URL, and credential to a local config file, and that identity is what makes the host survive process restarts, service restarts, and reboots — reconnecting with a new code always creates a **new** host entry rather than reclaiming an old one.
+  </Step>
+  <Step title="Finish onboarding on the host">
+    `gentic host connect` runs interactive onboarding automatically unless you pass `--no-onboard`. If onboarding is interrupted (Ctrl-C, a missing `gh`/agent CLI, and so on), rerun it without generating another code:
+
+    ```bash
+    gentic onboard
+    ```
+
+    Onboarding only reports the host as **ready** once it confirms GitHub CLI and at least one agent CLI are installed and authenticated, and offers to start the background service (`gentic start`) as its last step.
+  </Step>
+</Steps>
+
+## Host states
+
+Each host shows one status badge:
+
+| State | Meaning |
+| --- | --- |
+| **Setup incomplete** | The enrollment code was exchanged, but the host hasn't finished onboarding (`gentic onboard`) yet, so it can't claim work. |
+| **Online** | The host has sent a heartbeat within the last 90 seconds. |
+| **Offline** | Setup is complete, but no heartbeat has arrived in the last 90 seconds (or ever). A host also reports itself offline immediately on a graceful stop (`gentic stop`, Ctrl-C). |
+| **Banned** | An owner banned the host. It can't claim new work and its heartbeats are rejected until unbanned. |
+
+A host's Gentic version is shown next to its status: **Current**, **Update available**, or **Unsupported** (an unsupported host cannot claim new issues — update it to the latest release).
+
+<Warning>
+  Gentic 0.26.0 renamed "connected workers" to hosts throughout, including the
+  agent API the CLI calls. Every CLI older than 0.26.0 is **Unsupported** and
+  will not be given work until it is upgraded. Upgrading keeps the host's
+  existing identity and credential — no re-enrollment is needed. See
+  [Installation](/agent/installation).
+</Warning>
+
+The card refreshes automatically every 15 seconds, so status changes (a host going online, finishing onboarding, or going offline) generally appear without a manual reload.
+
+### Metrics per host
+
+- **Running** — active task count out of the host's configured concurrency (`MAX_CONCURRENT_ISSUES`).
+- **Last seen** — time since the last heartbeat.
+- **OS / arch**, **Uptime**, **Connected** — platform and process telemetry reported at enrollment and on every heartbeat.
+- **Claude Code** / **Codex** — each provider shows **Ready**, **Needs auth**, or **Missing**, plus the detected CLI version, so you can see at a glance which issue types a host is eligible to claim.
+
+<Note>
+  Gentic only stores whether a provider is enabled, installed, authenticated, and its version. Any local model lists or provider metadata a host reports are discarded before they reach the database — they never leave the host process.
+</Note>
+
+## Install a skill on hosts
+
+Click **Install skill** on the **Hosts** card to install one [skills.sh](https://skills.sh) skill on the hosts you choose. This is a one-time remote command, not a skill manager: Gentic keeps no inventory of what is installed, and never syncs, updates, or removes skills afterwards.
+
+<Steps>
+  <Step title="Paste a canonical skill URL">
+    The dialog accepts exactly one skill page URL:
+
+    ```
+    https://skills.sh/{owner}/{repo}/{skill}
+    ```
+
+    Repository pages, pack (`/p/...`) and topic (`/t/...`) URLs, the leaderboard, and non-skills.sh URLs are rejected — each of them names either no skill or several.
+  </Step>
+  <Step title="Review the security audits">
+    Gentic loads the current skills.sh audits for that skill and shows every partner's result. A **failed** audit blocks installation outright. A warning, a missing audit, an audit older than 30 days, or an audit lookup that fails requires you to tick the risk checkbox before the **Install** button becomes available.
+  </Step>
+  <Step title="Pick the hosts">
+    Every eligible host is selected by default. Ineligible hosts stay in the list, disabled, with the reason: **Offline**, **Banned**, **Setup incomplete**, or **Installing another skill** — only one install may be in flight per host.
+  </Step>
+  <Step title="Watch the results">
+    Each selected host moves through **Waiting** → **Installing** → **Installed**, **Failed**, or **Timed out**. Failures show a short summary with the CLI output available behind **Show output**, with credentials and machine paths stripped out.
+  </Step>
+</Steps>
+
+Each targeted host runs the official skills CLI once, globally, for both agents:
+
+```bash
+DISABLE_TELEMETRY=1 npx -y skills@latest add owner/repo \
+  --skill skill --global --agent claude-code --agent codex --yes
+```
+
+Node.js and `npx` are assumed to be present — a missing executable is reported as an ordinary install failure. Downloading, repeated-install behaviour, and the on-disk layout are entirely the CLI's business.
+
+A few consequences worth knowing:
+
+- **Installs never interrupt work.** A host installs a skill while it keeps running and claiming issues.
+- **Commands expire after 10 minutes.** A host that is selected and then disconnects still runs the command if it reconnects inside that window; after that the result is **Timed out**.
+- **There is no retry and no cancel.** Once a host accepts a command it is attempted exactly once, and closing the dialog hides the results without stopping anything.
+- **Results are transient.** Closing the dialog loses them, and reopening it shows no history — Gentic stores no record of past installations.
+
+## Rename a host
+
+Click the pencil icon next to a host's name, edit it inline, and press **Save**. Names must be unique (case-insensitively) within your workspace and up to 80 characters; a duplicate name is rejected before the request is sent.
+
+## Ban and unban a host
+
+Use the **⋮** menu on a host row to **Ban** it. Banning:
+
+- Immediately requeues any active, non-terminal tasks assigned to that host back to `Todo` so another host (or the same one, once unbanned) can pick them up.
+- Blocks the host from claiming new work and rejects its heartbeats.
+- Does **not** delete the host or its credential — **Unban** from the same menu fully restores it, and it starts claiming work again once it heartbeats.
+
+If the host process is actively running a task when you ban it, that in-process run is aborted on the host's side within about 10 seconds (the host polls a control endpoint on that interval to check whether it's been banned).
+
+## Delete a host
+
+Open the **⋮** menu and choose **Delete**. Deleting permanently revokes the host's credential and requeues any active tasks, exactly like a ban, but it cannot be undone — there is no "undelete." To confirm, type the host's exact current name into the dialog; the **Delete host** button stays disabled until it matches.
+
+<Warning>
+  Deletion is immediate and irreversible. The host's credential stops
+  working right away; to reconnect that machine, generate a new enrollment
+  code and run `gentic host connect <code>` again — it enrolls as a new
+  host.
+</Warning>
+
+## What happens if a host goes silent
+
+If a host's process crashes or loses network connectivity without a chance to report itself offline, Gentic doesn't wait forever:
+
+- After 90 seconds without a heartbeat, the host shows **Offline** in Settings, but its active tasks are left alone in case it's a brief blip.
+- After **5 minutes** without a heartbeat, a background job fails any task still assigned to that host (moving it to `Run failed`) so it doesn't stay stuck indefinitely. This does **not** automatically requeue the task to `Todo` — use the retry action on the issue to start a fresh run once you've confirmed the host is healthy again.
+- If the original host process reconnects later, it cannot resume the run that was already failed out from under it; the issue needs an explicit retry.
+
+## Re-enrolling an existing host after upgrading
+
+Host management replaces the old shared `GENTIC_API_KEY` authentication model. This is an **intentional, alpha-stage breaking change** — the Gentic API no longer accepts a shared key at all, and there is no automatic migration or backfill of a previously running agent process into the new `hosts` table. If you already had an agent running against this API before this feature shipped, it will start failing every poll (401 Unauthorized) as soon as the new web app and API are deployed, and it must be **manually** re-enrolled. No live credentials are changed automatically as part of this migration.
+
+<Steps>
+  <Step title="Update the host code or binary">
+    Pull/upgrade the `gentic` CLI on the existing host to a version that supports `gentic host connect` (any version documented on this site). See [Installation](/agent/installation) for upgrade instructions for your install method (npm, package, tarball, or source).
+  </Step>
+  <Step title="Remove the old shared key">
+    Delete the `GENTIC_API_KEY` environment variable (and any reference to it in your process manager, systemd unit, or `.env` file) — it is no longer read by the host.
+  </Step>
+  <Step title="Generate a code and connect">
+    In **Settings → Workspace → Hosts**, click **Connect host**, then run the resulting command on that same machine:
+
+    ```bash
+    gentic host connect <code>
+    ```
+
+    This enrolls the machine as a **new** host with its own id and credential — it does not reuse or restore the identity your old shared-key setup had, because that identity never existed as a row in the `hosts` table.
+  </Step>
+  <Step title="Finish setup and restart the service">
+    Run `gentic onboard` if it didn't run automatically, then `gentic start` (or `gentic restart` if a service unit already exists) to bring the host back online under its new credential. Confirm it shows **Online** in Settings within about 15–90 seconds.
+  </Step>
+</Steps>
+
+Any issues that were stuck mid-run under the old key are unaffected by this migration — they simply resume being claimable once a host is enrolled and online again, the same as any other `Todo`/`Held` issue.

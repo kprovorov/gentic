@@ -11,7 +11,7 @@ import {
 
 const access = {
   apiUrl: "https://app.gentic.chat/api/v1",
-  credential: "gtwc_worker-credential",
+  credential: "gtwc_host-credential",
 }
 
 test("the Gentic MCP server points at the app origin with a bearer credential", () => {
@@ -20,7 +20,7 @@ test("the Gentic MCP server points at the app origin with a bearer credential", 
     name: GENTIC_MCP_SERVER_NAME,
     url: "https://app.gentic.chat/mcp",
     headers: [
-      { name: "Authorization", value: "Bearer gtwc_worker-credential" },
+      { name: "Authorization", value: "Bearer gtwc_host-credential" },
     ],
   })
 })

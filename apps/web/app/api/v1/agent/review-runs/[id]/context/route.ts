@@ -20,7 +20,7 @@ export const runtime = "nodejs"
 // picked up by the agent itself once it's running in the disposable
 // checkout, so it never needs to travel through this payload), additive
 // Project reviewer instructions, pull-request metadata, and CI evidence for
-// the exact head SHA. The diff itself is computed locally by the worker
+// the exact head SHA. The diff itself is computed locally by the host
 // against the disposable checkout, not fetched here.
 export async function GET(
   request: Request,
@@ -28,8 +28,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const { supabase, userId, workerId } = await getAgentContext(request)
-    await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
+    const { supabase, userId, hostId } = await getAgentContext(request)
+    await ensureActiveReviewRunClaim(supabase, userId, hostId, id)
 
     const context = await getReviewRunContext(supabase, id)
     const pullRequestMetadata = await resolvePullRequestMetadata(

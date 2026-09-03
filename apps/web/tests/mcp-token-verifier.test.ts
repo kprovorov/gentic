@@ -3,27 +3,27 @@ import test from "node:test"
 
 import { ServiceError } from "@gentic/services/errors"
 import {
-  authenticateWorkerCredential,
-  hashWorkerSecret,
-} from "@gentic/services/workers"
+  authenticateHostCredential,
+  hashHostSecret,
+} from "@gentic/services/hosts"
 
 import { resolveMcpUserId } from "../lib/mcp/lib"
 import {
   createMcpTokenVerifier,
-  isWorkerCredentialToken,
-  WORKER_CREDENTIAL_PREFIX,
+  isHostCredentialToken,
+  HOST_CREDENTIAL_PREFIX,
   type McpTokenVerifier,
 } from "../lib/mcp/token-verifier"
 
 const now = new Date("2026-01-01T00:00:00.000Z")
 const request = new Request("https://app.gentic.chat/mcp", { method: "POST" })
 
-const activeCredential = `${WORKER_CREDENTIAL_PREFIX}${"a".repeat(43)}`
-const bannedCredential = `${WORKER_CREDENTIAL_PREFIX}${"b".repeat(43)}`
-const expiredCredential = `${WORKER_CREDENTIAL_PREFIX}${"c".repeat(43)}`
-const unknownCredential = `${WORKER_CREDENTIAL_PREFIX}${"d".repeat(43)}`
+const activeCredential = `${HOST_CREDENTIAL_PREFIX}${"a".repeat(43)}`
+const bannedCredential = `${HOST_CREDENTIAL_PREFIX}${"b".repeat(43)}`
+const expiredCredential = `${HOST_CREDENTIAL_PREFIX}${"c".repeat(43)}`
+const unknownCredential = `${HOST_CREDENTIAL_PREFIX}${"d".repeat(43)}`
 
-type WorkerRow = {
+type HostRow = {
   id: string
   user_id: string
   banned_at: string | null
@@ -31,26 +31,26 @@ type WorkerRow = {
   credential_expires_at: string | null
 }
 
-const workers: WorkerRow[] = [
+const hosts: HostRow[] = [
   {
-    id: "worker-1",
+    id: "host-1",
     user_id: "user_owner",
     banned_at: null,
-    credential_hash: hashWorkerSecret(activeCredential),
+    credential_hash: hashHostSecret(activeCredential),
     credential_expires_at: null,
   },
   {
-    id: "worker-2",
+    id: "host-2",
     user_id: "user_owner",
     banned_at: now.toISOString(),
-    credential_hash: hashWorkerSecret(bannedCredential),
+    credential_hash: hashHostSecret(bannedCredential),
     credential_expires_at: null,
   },
   {
-    id: "worker-3",
+    id: "host-3",
     user_id: "user_owner",
     banned_at: null,
-    credential_hash: hashWorkerSecret(expiredCredential),
+    credential_hash: hashHostSecret(expiredCredential),
     credential_expires_at: new Date(now.getTime() - 1).toISOString(),
   },
 ]
@@ -68,9 +68,8 @@ function fakeServiceClient() {
                   return {
                     returns: async () => ({
                       data:
-                        workers.find(
-                          (worker) => worker.credential_hash === value
-                        ) ?? null,
+                        hosts.find((host) => host.credential_hash === value) ??
+                        null,
                       error: null,
                     }),
                   }
@@ -100,8 +99,8 @@ function verifier(
       fakeServiceClient) as never,
     // Deliberately the real credential check, so this covers the same
     // ban/expiry controls the agent REST API relies on.
-    authenticateWorkerCredential: ((supabase: never, credential: string) =>
-      authenticateWorkerCredential(supabase, credential, { now })) as never,
+    authenticateHostCredential: ((supabase: never, credential: string) =>
+      authenticateHostCredential(supabase, credential, { now })) as never,
     verifyOAuthToken:
       options.verifyOAuthToken ??
       (async (_req, bearerToken) => {
@@ -118,13 +117,13 @@ function verifier(
   return { verify, oauthCalls }
 }
 
-test("worker credentials are recognized by prefix only", () => {
-  assert.equal(isWorkerCredentialToken(activeCredential), true)
-  assert.equal(isWorkerCredentialToken("clerk_oauth_token"), false)
-  assert.equal(isWorkerCredentialToken(`x${activeCredential}`), false)
+test("host credentials are recognized by prefix only", () => {
+  assert.equal(isHostCredentialToken(activeCredential), true)
+  assert.equal(isHostCredentialToken("clerk_oauth_token"), false)
+  assert.equal(isHostCredentialToken(`x${activeCredential}`), false)
 })
 
-test("a valid worker credential resolves to the worker owner", async () => {
+test("a valid host credential resolves to the host owner", async () => {
   const { verify, oauthCalls } = verifier()
 
   const authInfo = await verify(request, activeCredential)
@@ -133,27 +132,27 @@ test("a valid worker credential resolves to the worker owner", async () => {
   assert.equal(resolveMcpUserId(authInfo), "user_owner")
   assert.deepEqual(authInfo.extra, {
     userId: "user_owner",
-    workerId: "worker-1",
+    hostId: "host-1",
   })
   assert.equal(authInfo.token, activeCredential)
-  assert.equal(authInfo.clientId, "worker:worker-1")
+  assert.equal(authInfo.clientId, "host:host-1")
   // Account-wide access comes from the resolved owner, exactly as it does for
-  // a Clerk client — a worker credential never smuggles in extra scopes.
+  // a Clerk client — a host credential never smuggles in extra scopes.
   assert.deepEqual(authInfo.scopes, [])
   assert.deepEqual(oauthCalls, [])
 })
 
-test("banned, expired, unknown, and malformed worker credentials are rejected", async () => {
+test("banned, expired, unknown, and malformed host credentials are rejected", async () => {
   for (const credential of [
     bannedCredential,
     expiredCredential,
     unknownCredential,
-    `${WORKER_CREDENTIAL_PREFIX}short`,
+    `${HOST_CREDENTIAL_PREFIX}short`,
   ]) {
     const { verify, oauthCalls } = verifier()
 
     assert.equal(await verify(request, credential), undefined, credential)
-    // A failed worker credential is never retried against Clerk.
+    // A failed host credential is never retried against Clerk.
     assert.deepEqual(oauthCalls, [])
   }
 })
@@ -183,7 +182,7 @@ test("unexpected credential-store failures are not treated as anonymous", async 
   )
 })
 
-test("non-worker tokens keep flowing through the Clerk OAuth path", async () => {
+test("non-host tokens keep flowing through the Clerk OAuth path", async () => {
   const { verify, oauthCalls } = verifier()
 
   const authInfo = await verify(request, "clerk_oauth_token")
@@ -211,11 +210,11 @@ test("a missing bearer token authenticates neither path", async () => {
 test("both auth paths resolve to a tool-context user id", async () => {
   const { verify } = verifier()
 
-  const worker = await verify(request, activeCredential)
+  const host = await verify(request, activeCredential)
   const clerk = await verify(request, "clerk_oauth_token")
 
-  assert.ok(worker)
+  assert.ok(host)
   assert.ok(clerk)
-  assert.equal(resolveMcpUserId(worker), "user_owner")
+  assert.equal(resolveMcpUserId(host), "user_owner")
   assert.equal(resolveMcpUserId(clerk), "user_clerk")
 })

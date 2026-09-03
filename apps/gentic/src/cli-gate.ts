@@ -25,6 +25,8 @@ export function shouldBypassOnboardingGate(argv: string[]): boolean {
   const command = args.find((arg) => !arg.startsWith("-"))
   return (
     command === "auth" ||
+    command === "host" ||
+    // The hidden pre-GEN-435 alias for `host`; see `registerHostCommand`.
     command === "worker" ||
     command === "onboard" ||
     command === "status" ||
@@ -54,8 +56,8 @@ export async function checkOnboardingGate(
 
   const message = [
     "Gentic onboarding is required before running this command.",
-    "Generate a worker code in Gentic, then run:",
-    "  gentic worker connect <code>",
+    "Generate a host code in Gentic, then run:",
+    "  gentic host connect <code>",
     "Resume interrupted local setup with:",
     "  gentic onboard",
     "",
@@ -68,8 +70,8 @@ export async function checkOnboardingGate(
     log.error("Gentic onboarding is required before running this command.")
     note(
       [
-        "Generate a worker code in Gentic, then run:",
-        "  gentic worker connect <code>",
+        "Generate a host code in Gentic, then run:",
+        "  gentic host connect <code>",
         "Resume interrupted local setup with:",
         "  gentic onboard",
         "",

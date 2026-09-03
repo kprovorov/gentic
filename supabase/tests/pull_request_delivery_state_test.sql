@@ -217,7 +217,7 @@ SELECT is(
      WHERE number = 4
   ),
   '31000000-0000-4000-8000-600000000004'::uuid,
-  'webhook aggregation does not revoke an active worker lease'
+  'webhook aggregation does not revoke an active host lease'
 );
 
 SET LOCAL ROLE authenticated;

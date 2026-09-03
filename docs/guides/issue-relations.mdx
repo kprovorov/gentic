@@ -1,14 +1,14 @@
 ---
 title: "Sequence and Block Issues with Gentic Issue Relations"
 sidebarTitle: "Issue Relations"
-description: "Use issue relations in Gentic to declare dependencies between tasks. A blocked issue is skipped by the worker until its blocker completes or cancels."
+description: "Use issue relations in Gentic to declare dependencies between tasks. A blocked issue is skipped by the host until its blocker completes or cancels."
 ---
 
-Issue relations let you describe dependencies between coding tasks so the agent worker executes them in the right order. When one issue blocks another, Gentic automatically holds the blocked issue in the queue until its dependency is completed or cancelled — no manual coordination required.
+Issue relations let you describe dependencies between coding tasks so the agent host executes them in the right order. When one issue blocks another, Gentic automatically holds the blocked issue in the queue until its dependency is completed or cancelled — no manual coordination required.
 
 ## What issue relations are
 
-A relation connects two issues with a directional dependency: issue A **blocks** issue B. The agent worker respects this constraint at the moment it polls for work. If issue B is in the `Todo` queue but it is blocked by issue A, the worker skips issue B and moves on. Once issue A reaches a `completed` or `cancelled` state, issue B becomes eligible and the worker picks it up on the next poll cycle.
+A relation connects two issues with a directional dependency: issue A **blocks** issue B. The agent host respects this constraint at the moment it polls for work. If issue B is in the `Todo` queue but it is blocked by issue A, the host skips issue B and moves on. Once issue A reaches a `completed` or `cancelled` state, issue B becomes eligible and the host picks it up on the next poll cycle.
 
 This is useful any time one piece of work must land before another can safely begin — for example, a database migration that must run before the API layer that depends on the new schema, or a shared utility module that must exist before the features that import it.
 
@@ -18,7 +18,7 @@ This is useful any time one piece of work must land before another can safely be
 
 ## How blocking works
 
-The enforcement happens at the worker level, not the UI level. The Gentic API filters out issues that have unresolved blockers when it responds to the worker's poll. This means:
+The enforcement happens at the host level, not the UI level. The Gentic API filters out issues that have unresolved blockers when it responds to the host's poll. This means:
 
 - You can move a blocked issue to `Todo` at any time — it simply will not be executed until the blocker clears.
 - The issue detail page shows a **Blocked** badge when an issue has an unresolved blocker.
@@ -53,12 +53,12 @@ Click **Add** to save. The relation appears in the **Relations** card immediatel
 
 | Direction | Meaning | Effect |
 |-----------|---------|--------|
-| **This issue is blocked by** issue A | Issue A must complete before this issue runs | Worker skips this issue until A is `completed` or `cancelled` |
-| **This issue blocks** issue B | This issue must complete before issue B runs | Worker skips issue B until this issue is `completed` or `cancelled` |
+| **This issue is blocked by** issue A | Issue A must complete before this issue runs | Host skips this issue until A is `completed` or `cancelled` |
+| **This issue blocks** issue B | This issue must complete before issue B runs | Host skips issue B until this issue is `completed` or `cancelled` |
 
 ## How to remove a relation
 
-Open either issue in the relation and scroll to the **Relations** section. Click the remove (×) icon next to the relation you want to delete. The relation is removed immediately and the blocked issue becomes eligible for the worker on its next poll.
+Open either issue in the relation and scroll to the **Relations** section. Click the remove (×) icon next to the relation you want to delete. The relation is removed immediately and the blocked issue becomes eligible for the host on its next poll.
 
 ## Manage relations from an AI assistant
 
@@ -80,5 +80,5 @@ Imagine you are building a new notifications system. You might create the follow
 Each issue has a tight, well-defined scope. The agent works through them in order, and each pull request builds cleanly on the previous one.
 
 <Note>
-  Issue relations only affect the **agent worker's** execution order. You can still manually change an issue's status or retry the agent regardless of its blocked state. The **Blocked** badge is a reminder, not a hard lock on your own actions.
+  Issue relations only affect the **agent host's** execution order. You can still manually change an issue's status or retry the agent regardless of its blocked state. The **Blocked** badge is a reminder, not a hard lock on your own actions.
 </Note>

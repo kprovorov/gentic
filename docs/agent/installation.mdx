@@ -1,7 +1,7 @@
 ---
-title: "Install the Gentic Agent Worker on Your Server"
+title: "Install the Gentic Agent Host on Your Server"
 sidebarTitle: "Installation"
-description: "Deploy the Gentic agent worker from npm, a Linux package, the prebuilt tarball, or from source with Node.js. Includes Git and credentials setup."
+description: "Deploy the Gentic agent host from npm, a Linux package, the prebuilt tarball, or from source with Node.js. Includes Git and credentials setup."
 ---
 
 Choose the install method that matches your environment:
@@ -11,7 +11,7 @@ Choose the install method that matches your environment:
 - **[Prebuilt tarball](#option-c-prebuilt-tarball)** — a portable `.tar.gz` you can drop onto any Linux or macOS server. No Node.js needed.
 - **[From source with Node.js](#option-d-from-source-with-nodejs)** — for development or when you need to build a target that is not published.
 
-All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) setup below, then configure credentials only for the agent providers this worker will run.
+All methods produce the same `gentic` CLI. After installing, follow the [Git](#git-authentication-setup) setup below, then configure credentials only for the agent providers this host will run.
 
 Options B and C ship a standalone executable compiled with [Bun](https://bun.sh) — a single binary plus vendored agent sidecars, with no runtime dependencies at all. Reach for them when the target machine has no Node.js and you don't want to install one.
 
@@ -52,7 +52,7 @@ The CLI is published to npm as [`gentic-cli`](https://www.npmjs.com/package/gent
   </Step>
 </Steps>
 
-The install brings the ACP agent runtimes the worker spawns, so — as with every other option — the only things left are [Git access](#git-authentication-setup) and the [agent CLIs and credentials](#agent-credentials-setup). Run `gentic doctor` to see what is still missing.
+The install brings the ACP agent runtimes the host spawns, so — as with every other option — the only things left are [Git access](#git-authentication-setup) and the [agent CLIs and credentials](#agent-credentials-setup). Run `gentic doctor` to see what is still missing.
 
 ## Option B: Linux packages (.deb, .rpm, .apk)
 
@@ -129,12 +129,12 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
     You will see the `gentic` binary and the `vendor/` directory alongside it.
 
   </Step>
-  <Step title="Run the worker">
-    Set your credentials in the environment and start the worker:
+  <Step title="Run the host">
+    Set your credentials in the environment and start the host:
 
     ```bash
     GENTIC_API_URL=https://app.gentic.chat/api/v1 \
-    GENTIC_WORKER_CREDENTIAL=<your-worker-credential> \
+    GENTIC_HOST_CREDENTIAL=<your-host-credential> \
     ./gentic run
     ```
 
@@ -154,7 +154,7 @@ Release archives are named `gentic-<version>-<os>-<arch>.tar.gz`, e.g. `gentic-0
 
 ## Option D: From source with Node.js
 
-Run from source when you need to build a platform that is not published, or when you are developing against the worker. Requires Node.js 20 or newer and pnpm 11.9.0 or newer on the machine.
+Run from source when you need to build a platform that is not published, or when you are developing against the host. Requires Node.js 20 or newer and pnpm 11.9.0 or newer on the machine.
 
 ### Compile your own standalone binary
 
@@ -203,7 +203,7 @@ If you just need a `gentic` binary for a target that is not in the release matri
     pnpm --filter @gentic/gentic build
     ```
   </Step>
-  <Step title="Start the worker">
+  <Step title="Start the host">
     ```bash
     pnpm --filter @gentic/gentic start
     ```
@@ -217,16 +217,16 @@ If you just need a `gentic` binary for a target that is not in the release matri
 
 ## Git authentication setup
 
-The worker clones repositories using the `GIT_REMOTE_BASE` value (default: `git@github.com:`). For a project stored as `owner/repo`, the worker clones `git@github.com:owner/repo`. You must give the worker SSH access to every repository it will clone.
+The host clones repositories using the `GIT_REMOTE_BASE` value (default: `git@github.com:`). For a project stored as `owner/repo`, the host clones `git@github.com:owner/repo`. You must give the host SSH access to every repository it will clone.
 
 <Steps>
   <Step title="Generate a deploy key or use a machine user key">
     ```bash
-    ssh-keygen -t ed25519 -C "gentic-worker" -f ~/.ssh/gentic_deploy
+    ssh-keygen -t ed25519 -C "gentic-host" -f ~/.ssh/gentic_deploy
     ```
   </Step>
   <Step title="Add the public key to each repository">
-    In GitHub, go to **Repository → Settings → Deploy keys** and add the contents of `~/.ssh/gentic_deploy.pub`. Enable **Allow write access** so the worker can push branches for pull requests.
+    In GitHub, go to **Repository → Settings → Deploy keys** and add the contents of `~/.ssh/gentic_deploy.pub`. Enable **Allow write access** so the host can push branches for pull requests.
   </Step>
   <Step title="Configure SSH to use the key">
     Add the following to `~/.ssh/config` on the server:
@@ -244,23 +244,23 @@ The worker clones repositories using the `GIT_REMOTE_BASE` value (default: `git@
 
 ## Agent credentials setup
 
-Gentic workers can claim issues for any supported agent provider. Install and authenticate both Claude Code and Codex in the worker environment before starting the worker.
+Gentic hosts can claim issues for any supported agent provider. Install and authenticate both Claude Code and Codex in the host environment before starting the host.
 
 ### Claude Code
 
-Claude Code credentials are managed entirely outside Gentic, the same way you would authenticate Claude Code for any other use. Ensure the credentials are present in the environment where the worker process runs. The worker picks them up automatically through the Agent Client Protocol sidecar.
+Claude Code credentials are managed entirely outside Gentic, the same way you would authenticate Claude Code for any other use. Ensure the credentials are present in the environment where the host process runs. The host picks them up automatically through the Agent Client Protocol sidecar.
 
 ### Codex
 
 <Steps>
-  <Step title="Install the Codex CLI in the worker environment">
+  <Step title="Install the Codex CLI in the host environment">
     Follow the [Codex installation instructions](https://github.com/openai/codex) for your platform.
   </Step>
   <Step title="Authenticate Codex">
-    Run `codex` once interactively to complete authentication before starting the worker.
+    Run `codex` once interactively to complete authentication before starting the host.
   </Step>
   <Step title="Set CODEX_PATH if Codex is not on PATH">
-    If the `codex` binary is not discoverable via `PATH` in the worker's environment, set the `CODEX_PATH` environment variable to its absolute path:
+    If the `codex` binary is not discoverable via `PATH` in the host's environment, set the `CODEX_PATH` environment variable to its absolute path:
 
     ```bash
     export CODEX_PATH=/usr/local/bin/codex
@@ -271,6 +271,6 @@ Claude Code credentials are managed entirely outside Gentic, the same way you wo
 
 <Tip>
   Codex runs default to `INITIAL_AGENT_MODE=agent-full-access`. You can override
-  this by setting the variable in the worker's environment before starting the
+  this by setting the variable in the host's environment before starting the
   service.
 </Tip>

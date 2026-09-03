@@ -13,7 +13,7 @@ import type {
   SkillAudit,
   SkillAuditGate,
   SkillAuditGateReason,
-  WorkerSkillInstallStatus,
+  HostSkillInstallStatus,
 } from "@gentic/validators/skills"
 import { Button } from "@gentic/ui/button"
 import { Checkbox } from "@gentic/ui/checkbox"
@@ -44,16 +44,16 @@ type SkillIdentity = {
 }
 
 type InstallTarget = {
-  worker_id: string
+  host_id: string
   display_name: string
   eligible: boolean
   reason: "offline" | "banned" | "setup-incomplete" | "installing" | null
 }
 
-type WorkerSkillInstall = {
+type HostSkillInstall = {
   id: string
-  worker_id: string
-  status: WorkerSkillInstallStatus
+  host_id: string
+  status: HostSkillInstallStatus
   error_summary: string | null
   output: string | null
 }
@@ -90,7 +90,7 @@ const gateReasonLabels: Record<SkillAuditGateReason, string> = {
   unavailable: "Audit results could not be loaded from skills.sh.",
 }
 
-const installStatusLabels: Record<WorkerSkillInstallStatus, string> = {
+const installStatusLabels: Record<HostSkillInstallStatus, string> = {
   waiting: "Waiting",
   installing: "Installing",
   installed: "Installed",
@@ -129,7 +129,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = React.useState<Set<string> | null>(null)
   const [acceptRisk, setAcceptRisk] = React.useState(false)
   const [submit, setSubmit] = React.useState<SubmitState>({ status: "idle" })
-  const [installs, setInstalls] = React.useState<WorkerSkillInstall[] | null>(
+  const [installs, setInstalls] = React.useState<HostSkillInstall[] | null>(
     null
   )
 
@@ -149,26 +149,24 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
     let cancelled = false
     const load = async () => {
       try {
-        const data = await getJson<{ workers: InstallTarget[] }>(
+        const data = await getJson<{ hosts: InstallTarget[] }>(
           "/api/app/skills/install-targets"
         )
         if (cancelled) return
-        setTargets(data.workers)
+        setTargets(data.hosts)
         setSelected((current) =>
           current
-            ? // Keep an explicit choice, but never keep a worker the server
+            ? // Keep an explicit choice, but never keep a host the server
               // would now refuse.
               new Set(
-                data.workers
-                  .filter(
-                    (worker) => worker.eligible && current.has(worker.worker_id)
-                  )
-                  .map((worker) => worker.worker_id)
+                data.hosts
+                  .filter((host) => host.eligible && current.has(host.host_id))
+                  .map((host) => host.host_id)
               )
             : new Set(
-                data.workers
-                  .filter((worker) => worker.eligible)
-                  .map((worker) => worker.worker_id)
+                data.hosts
+                  .filter((host) => host.eligible)
+                  .map((host) => host.host_id)
               )
         )
       } catch {
@@ -234,7 +232,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
     let cancelled = false
     const timer = setInterval(async () => {
       try {
-        const data = await getJson<{ installs: WorkerSkillInstall[] }>(
+        const data = await getJson<{ installs: HostSkillInstall[] }>(
           `/api/app/skills/installs?ids=${encodeURIComponent(pendingKey)}`
         )
         if (cancelled) return
@@ -269,11 +267,11 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
 
     setSubmit({ status: "pending" })
     try {
-      const data = await postJson<{ installs: WorkerSkillInstall[] }>(
+      const data = await postJson<{ installs: HostSkillInstall[] }>(
         "/api/app/skills/installs",
         {
           url: auditState.skill.url,
-          worker_ids: selectedIds,
+          host_ids: selectedIds,
           accept_risk: acceptRisk,
         }
       )
@@ -301,7 +299,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
       <DialogHeader>
         <DialogTitle>Install skill</DialogTitle>
         <DialogDescription>
-          Installs one skill from skills.sh on the workers you select, for both
+          Installs one skill from skills.sh on the hosts you select, for both
           Claude Code and Codex. Results are shown here while the dialog stays
           open and are not kept afterwards.
         </DialogDescription>
@@ -343,14 +341,14 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
         {dispatched ? (
           <InstallResults installs={installs ?? []} targets={targets ?? []} />
         ) : (
-          <WorkerPicker
+          <HostPicker
             targets={targets}
             selected={selected}
-            onToggle={(workerId, checked) =>
+            onToggle={(hostId, checked) =>
               setSelected((current) => {
                 const next = new Set(current ?? [])
-                if (checked) next.add(workerId)
-                else next.delete(workerId)
+                if (checked) next.add(hostId)
+                else next.delete(hostId)
                 return next
               })
             }
@@ -391,7 +389,7 @@ function InstallSkillFlow({ onClose }: { onClose: () => void }) {
             {submit.status === "pending"
               ? "Installing..."
               : `Install on ${selectedIds.length} ${
-                  selectedIds.length === 1 ? "worker" : "workers"
+                  selectedIds.length === 1 ? "host" : "hosts"
                 }`}
           </Button>
         )}
@@ -473,45 +471,45 @@ function AuditRow({ audit }: { audit: SkillAudit }) {
   )
 }
 
-function WorkerPicker({
+function HostPicker({
   targets,
   selected,
   onToggle,
 }: {
   targets: InstallTarget[] | null
   selected: Set<string> | null
-  onToggle: (workerId: string, checked: boolean) => void
+  onToggle: (hostId: string, checked: boolean) => void
 }) {
   if (targets === null) {
     return (
       <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-        Loading workers...
+        Loading hosts...
       </div>
     )
   }
   if (targets.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-        No connected workers yet.
+        No hosts yet.
       </div>
     )
   }
 
   return (
     <fieldset className="grid gap-2">
-      <legend className="mb-2 text-sm font-medium">Workers</legend>
+      <legend className="mb-2 text-sm font-medium">Hosts</legend>
       {targets.map((target) => (
         <label
-          key={target.worker_id}
+          key={target.host_id}
           className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm has-disabled:opacity-60"
         >
           <span className="flex min-w-0 items-center gap-2">
             <Checkbox
-              checked={selected?.has(target.worker_id) ?? false}
+              checked={selected?.has(target.host_id) ?? false}
               disabled={!target.eligible}
               aria-label={`Install on ${target.display_name}`}
               onCheckedChange={(checked) =>
-                onToggle(target.worker_id, checked === true)
+                onToggle(target.host_id, checked === true)
               }
             />
             <span className="truncate">{target.display_name}</span>
@@ -531,11 +529,11 @@ function InstallResults({
   installs,
   targets,
 }: {
-  installs: WorkerSkillInstall[]
+  installs: HostSkillInstall[]
   targets: InstallTarget[]
 }) {
   const names = new Map(
-    targets.map((target) => [target.worker_id, target.display_name])
+    targets.map((target) => [target.host_id, target.display_name])
   )
 
   return (
@@ -545,7 +543,7 @@ function InstallResults({
         <div key={install.id} className="rounded-md border p-2.5 text-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate">
-              {names.get(install.worker_id) ?? "Worker"}
+              {names.get(install.host_id) ?? "Host"}
             </span>
             <span className="flex shrink-0 items-center gap-1.5 text-xs">
               {install.status === "installed" ? (

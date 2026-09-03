@@ -13,11 +13,11 @@ const GENTIC_MCP_PATH = "/mcp"
 /** The Gentic endpoint is always reached over streamable HTTP. */
 export type GenticMcpServer = Extract<McpServer, { type: "http" }>
 
-/** Credentials a worker uses to reach its owner's Gentic MCP endpoint. */
+/** Credentials a host uses to reach its owner's Gentic MCP endpoint. */
 export interface GenticMcpAccess {
   /** `GENTIC_API_URL`, e.g. `https://app.gentic.chat/api/v1`. */
   apiUrl: string
-  /** The worker credential (`gtwc_...`) this worker authenticates with. */
+  /** The host credential (`gtwc_...`) this host authenticates with. */
   credential: string
 }
 
@@ -26,11 +26,11 @@ export interface GenticMcpAccess {
  *
  * The endpoint lives at the app origin (`/mcp`), not under the versioned agent
  * API path, so it is resolved against the origin of `GENTIC_API_URL` rather
- * than appended to it. The worker credential travels as a bearer token; the
+ * than appended to it. The host credential travels as a bearer token; the
  * web app resolves it to the same account a Clerk-authorized MCP client gets.
  *
  * Returns `null` when the access details are unusable, so a misconfigured
- * worker still runs its agent — just without Gentic tools — instead of failing
+ * host still runs its agent — just without Gentic tools — instead of failing
  * every session on a URL parse error.
  */
 export function genticMcpServer(

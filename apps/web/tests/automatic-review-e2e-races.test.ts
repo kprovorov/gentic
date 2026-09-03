@@ -18,7 +18,7 @@ import {
   seedIssue,
   seedPullRequest,
   seedProject,
-  seedWorker,
+  seedHost,
   testAccount,
 } from "./helpers/live-review-harness"
 
@@ -60,7 +60,7 @@ function fakeGithubSnapshot(headSha: string) {
 }
 
 liveTest(
-  "two workers racing to claim the same pending review run — exactly one wins",
+  "two hosts racing to claim the same pending review run — exactly one wins",
   async () => {
     const supabaseA = createTestServiceClient()
     const supabaseB = createTestServiceClient()
@@ -86,21 +86,21 @@ liveTest(
         headSha: "sha-claimrace-1",
         ciState: "success",
       })
-      const workerA = await seedWorker(supabaseA, tracker, {
+      const hostA = await seedHost(supabaseA, tracker, {
         userId,
-        displayName: "Worker A",
+        displayName: "Host A",
       })
-      const workerB = await seedWorker(supabaseA, tracker, {
+      const hostB = await seedHost(supabaseA, tracker, {
         userId,
-        displayName: "Worker B",
+        displayName: "Host B",
       })
 
       const eligibility = await evaluateReviewEligibility(supabaseA, prUrl)
       assert.ok(eligibility?.reviewRunId)
 
       const [claimedByA, claimedByB] = await Promise.all([
-        claimNextReviewRun(supabaseA, userId, workerA),
-        claimNextReviewRun(supabaseB, userId, workerB),
+        claimNextReviewRun(supabaseA, userId, hostA),
+        claimNextReviewRun(supabaseB, userId, hostB),
       ])
 
       const winners = [claimedByA, claimedByB].filter(
@@ -115,13 +115,12 @@ liveTest(
 
       const { data: run } = await supabaseA
         .from("review_runs")
-        .select("status, claimed_by_worker_id")
+        .select("status, claimed_by_host_id")
         .eq("id", eligibility!.reviewRunId!)
         .single()
       assert.equal(run?.status, "running")
       assert.ok(
-        run?.claimed_by_worker_id === workerA ||
-          run?.claimed_by_worker_id === workerB
+        run?.claimed_by_host_id === hostA || run?.claimed_by_host_id === hostB
       )
     } finally {
       await cleanupSeeded(supabaseA, tracker)

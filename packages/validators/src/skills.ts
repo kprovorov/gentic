@@ -188,7 +188,7 @@ export const skillAuditResultSchema = z
 
 export type SkillAuditResult = z.infer<typeof skillAuditResultSchema>
 
-export const workerSkillInstallStatusSchema = z.enum([
+export const hostSkillInstallStatusSchema = z.enum([
   "waiting",
   "installing",
   "installed",
@@ -196,38 +196,38 @@ export const workerSkillInstallStatusSchema = z.enum([
   "timed-out",
 ])
 
-export type WorkerSkillInstallStatus = z.infer<
-  typeof workerSkillInstallStatusSchema
+export type HostSkillInstallStatus = z.infer<
+  typeof hostSkillInstallStatusSchema
 >
 
-export const workerSkillInstallTerminalStatusSchema =
-  workerSkillInstallStatusSchema.extract(["installed", "failed"])
+export const hostSkillInstallTerminalStatusSchema =
+  hostSkillInstallStatusSchema.extract(["installed", "failed"])
 
-export const createWorkerSkillInstallsInputSchema = z
+export const createHostSkillInstallsInputSchema = z
   .object({
     url: z.string().min(1).max(2048),
-    worker_ids: z.array(z.string().uuid()).min(1).max(64),
+    host_ids: z.array(z.string().uuid()).min(1).max(64),
     accept_risk: z.boolean().default(false),
   })
   .strict()
 
-export type CreateWorkerSkillInstallsInput = z.infer<
-  typeof createWorkerSkillInstallsInputSchema
+export type CreateHostSkillInstallsInput = z.infer<
+  typeof createHostSkillInstallsInputSchema
 >
 
-export const reportWorkerSkillInstallResultInputSchema = z
+export const reportHostSkillInstallResultInputSchema = z
   .object({
-    status: workerSkillInstallTerminalStatusSchema,
+    status: hostSkillInstallTerminalStatusSchema,
     error_summary: z.string().max(500).nullable().optional(),
     output: z.string().max(20_000).nullable().optional(),
   })
   .strict()
 
-export type ReportWorkerSkillInstallResultInput = z.infer<
-  typeof reportWorkerSkillInstallResultInputSchema
+export type ReportHostSkillInstallResultInput = z.infer<
+  typeof reportHostSkillInstallResultInputSchema
 >
 
-export const workerSkillInstallCommandSchema = z
+export const hostSkillInstallCommandSchema = z
   .object({
     id: z.string().uuid(),
     source: skillSourceSchema,
@@ -236,41 +236,41 @@ export const workerSkillInstallCommandSchema = z
   })
   .strict()
 
-export type WorkerSkillInstallCommand = z.infer<
-  typeof workerSkillInstallCommandSchema
+export type HostSkillInstallCommand = z.infer<
+  typeof hostSkillInstallCommandSchema
 >
 
-export const claimWorkerSkillInstallResponseSchema = z
+export const claimHostSkillInstallResponseSchema = z
   .object({
-    command: workerSkillInstallCommandSchema.nullable(),
+    command: hostSkillInstallCommandSchema.nullable(),
   })
   .strict()
 
-export type ClaimWorkerSkillInstallResponse = z.infer<
-  typeof claimWorkerSkillInstallResponseSchema
+export type ClaimHostSkillInstallResponse = z.infer<
+  typeof claimHostSkillInstallResponseSchema
 >
 
-export const workerSkillInstallSchema = z
+export const hostSkillInstallSchema = z
   .object({
     id: z.string(),
-    worker_id: z.string(),
+    host_id: z.string(),
     source: z.string(),
     skill: z.string(),
     url: z.string(),
-    status: workerSkillInstallStatusSchema,
+    status: hostSkillInstallStatusSchema,
     error_summary: z.string().nullable(),
     output: z.string().nullable(),
     expires_at: z.string(),
   })
   .strict()
 
-export type WorkerSkillInstall = z.infer<typeof workerSkillInstallSchema>
+export type HostSkillInstall = z.infer<typeof hostSkillInstallSchema>
 
 const OUTPUT_MAX_LENGTH = 8_000
 const REDACTED = "[redacted]"
 
 const redactionPatterns: Array<[RegExp, string]> = [
-  // Gentic worker credentials and enrollment codes.
+  // Gentic host credentials and enrollment codes.
   [/\bgt(?:wc|ce)_[A-Za-z0-9_-]+/g, REDACTED],
   // Well-known provider token shapes.
   [/\bgh[pousr]_[A-Za-z0-9]{16,}/g, REDACTED],
@@ -291,7 +291,7 @@ const redactionPatterns: Array<[RegExp, string]> = [
 
 /**
  * Strips credentials and machine-identifying paths out of CLI output before it
- * is stored or shown. Applied on the worker before reporting and again on the
+ * is stored or shown. Applied on the host before reporting and again on the
  * server before persisting, so neither side has to be trusted alone.
  */
 export function sanitizeSkillInstallOutput(value: string): string {

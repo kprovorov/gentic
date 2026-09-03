@@ -24,7 +24,7 @@ pnpm dev
 The workspace is split into apps and packages:
 
 - `apps/web` - Next.js application.
-- `apps/gentic` - agent worker CLI and native service manager.
+- `apps/gentic` - agent host CLI and native service manager.
 - `packages/ui` - shared UI components and UI utilities.
 - `packages/services` - shared project and issue data-access logic.
 - `packages/supabase` - Supabase client, server, and middleware helpers.
@@ -44,7 +44,7 @@ pnpm build
 
 The agent test suite includes race/reconnect coverage for prompt replay,
 overlapping runs, final-message durability, ordering, and attachment scoping.
-Run it under both UTC and a non-UTC timezone before changing chat or worker
+Run it under both UTC and a non-UTC timezone before changing chat or host
 behavior:
 
 ```bash
@@ -64,7 +64,7 @@ pnpm db:types:check
 pnpm dlx supabase@2.109.1 db lint --local
 ```
 
-Run the agent worker tests separately:
+Run the agent host tests separately:
 
 ```bash
 pnpm --filter @gentic/gentic test
@@ -91,6 +91,6 @@ Both commands use a pinned Supabase CLI (`pnpm dlx supabase@2.109.1 gen types
 Supabase database started and migrations applied. Commit the generated diff
 with the migration.
 
-For worker installation, configuration, and service-management details, see
+For host installation, configuration, and service-management details, see
 [`apps/gentic/readme.md`](apps/gentic/readme.md). Product documentation lives
 in [`docs`](docs/README.md).

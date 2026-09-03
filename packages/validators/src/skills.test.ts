@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
-  createWorkerSkillInstallsInputSchema,
+  createHostSkillInstallsInputSchema,
   parseSkillsShSkillUrl,
   sanitizeSkillInstallOutput,
   skillsShSkillUrlSchema,
@@ -67,17 +67,17 @@ test("the URL schema surfaces the rejection message instead of throwing", () => 
   assert.match(result.error.issues[0].message, /single skill/)
 })
 
-test("install input requires at least one worker and defaults risk acceptance off", () => {
-  const parsed = createWorkerSkillInstallsInputSchema.parse({
+test("install input requires at least one host and defaults risk acceptance off", () => {
+  const parsed = createHostSkillInstallsInputSchema.parse({
     url: "https://skills.sh/anthropics/skills/pdf",
-    worker_ids: ["11111111-1111-4111-8111-111111111111"],
+    host_ids: ["11111111-1111-4111-8111-111111111111"],
   })
 
   assert.equal(parsed.accept_risk, false)
   assert.equal(
-    createWorkerSkillInstallsInputSchema.safeParse({
+    createHostSkillInstallsInputSchema.safeParse({
       url: "https://skills.sh/anthropics/skills/pdf",
-      worker_ids: [],
+      host_ids: [],
     }).success,
     false
   )
@@ -87,7 +87,7 @@ test("sanitizes credentials, machine paths and control codes out of CLI output",
   const sanitized = sanitizeSkillInstallOutput(
     [
       "\u001B[31mError\u001B[0m: install failed",
-      "worker credential gtwc_abcdefghijklmnopqrstuvwxyz012345",
+      "host credential gtwc_abcdefghijklmnopqrstuvwxyz012345",
       "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789",
       "authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N",
       "npm error path /Users/ada/.claude/skills",

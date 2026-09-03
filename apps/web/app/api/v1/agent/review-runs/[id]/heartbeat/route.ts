@@ -13,14 +13,14 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const { supabase, userId, workerId } = await getAgentContext(request)
-    await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
+    const { supabase, userId, hostId } = await getAgentContext(request)
+    await ensureActiveReviewRunClaim(supabase, userId, hostId, id)
 
     const { error } = await supabase
       .from("review_runs")
       .update({ heartbeat_at: new Date().toISOString() })
       .eq("id", id)
-      .eq("claimed_by_worker_id", workerId)
+      .eq("claimed_by_host_id", hostId)
       .eq("status", "running")
 
     if (error) {

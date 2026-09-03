@@ -1,26 +1,26 @@
 ---
-title: "Gentic Agent Worker: Background AI Coding Runner"
+title: "Gentic Agent Host: Background AI Coding Runner"
 sidebarTitle: "Overview"
-description: "The Gentic agent worker is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and can publish successful changes as pull requests."
+description: "The Gentic agent host is a CLI process you deploy on a server. It polls for queued issues, runs AI coding agents, and can publish successful changes as pull requests."
 ---
 
-The Gentic agent worker is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims work up to its configured concurrency limit, clones each associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. The default concurrency limit is one issue.
+The Gentic agent host is a long-running CLI process (`gentic`) that you deploy on a private server or VM. Once running, it continuously polls the Gentic API for issues whose status has been moved to **Todo**, claims work up to its configured concurrency limit, clones each associated GitHub repository into a local work directory, and drives an AI coding agent — Claude Code or Codex — through the Agent Client Protocol. The default concurrency limit is one issue.
 
 ## How it works
 
-When you move an issue from **Draft** to **Todo** in the Gentic web app, the API adds it to the unclaimed `todo` pool. On its next poll cycle, the agent worker claims that issue (flipping it to `queued`), creates a fresh clone of its configured repository, and runs the issue's assigned agent provider through the Agent Client Protocol. The worker streams assistant output back into the issue transcript in real time.
+When you move an issue from **Draft** to **Todo** in the Gentic web app, the API adds it to the unclaimed `todo` pool. On its next poll cycle, the agent host claims that issue (flipping it to `queued`), creates a fresh clone of its configured repository, and runs the issue's assigned agent provider through the Agent Client Protocol. The host streams assistant output back into the issue transcript in real time.
 
-The worker does not add hidden publishing instructions to the agent session. After a successful turn, it records whether that turn produced unpublished changes. If **Create PR automatically** is enabled and no pull request exists, the API atomically adds one visible Gentic-authored publishing message for the active run. The worker continues the same ACP session to process it. Worker restarts and concurrent calls reuse that request instead of creating a duplicate.
+The host does not add hidden publishing instructions to the agent session. After a successful turn, it records whether that turn produced unpublished changes. If **Create PR automatically** is enabled and no pull request exists, the API atomically adds one visible Gentic-authored publishing message for the active run. The host continues the same ACP session to process it. Host restarts and concurrent calls reuse that request instead of creating a duplicate.
 
-Unchanged, failed, held, usage-limited, cancelled, and interrupted runs do not trigger automatic publishing. Once the agent goes quiet, the run resolves to `ready-for-review` if a pull request was opened or `waiting-for-input` otherwise. If you send a follow-up message to an issue whose run has already ended, the API returns it to `todo` and the worker resumes the same ACP session — preserving the full conversation context.
+Unchanged, failed, held, usage-limited, cancelled, and interrupted runs do not trigger automatic publishing. Once the agent goes quiet, the run resolves to `ready-for-review` if a pull request was opened or `waiting-for-input` otherwise. If you send a follow-up message to an issue whose run has already ended, the API returns it to `todo` and the host resumes the same ACP session — preserving the full conversation context.
 
 <Note>
-  For a backward-compatible deployment, apply the database migration first, deploy the web app and API second, and update agent workers last. The database and non-web API default is `false`, so older workers and existing issues remain opted out until the web/API layer and then the worker understand the new fields.
+  For a backward-compatible deployment, apply the database migration first, deploy the web app and API second, and update agent hosts last. The database and non-web API default is `false`, so older hosts and existing issues remain opted out until the web/API layer and then the host understand the new fields.
 </Note>
 
 ## Deployment options
 
-You can deploy the agent worker in three ways. Choose the option that fits your server environment best.
+You can deploy the agent host in three ways. Choose the option that fits your server environment best.
 
 <CardGroup cols={2}>
   <Card title="npm" icon="npm">
@@ -30,13 +30,13 @@ You can deploy the agent worker in three ways. Choose the option that fits your 
     Download a prebuilt, self-contained binary — or a `.deb`/`.rpm`/`.apk` — from GitHub Releases. No Node.js required on the target machine.
   </Card>
   <Card title="From Source (Node.js)" icon="code">
-    Clone the repository, install dependencies with pnpm, and run the worker with `pnpm --filter @gentic/gentic start`. Best for development.
+    Clone the repository, install dependencies with pnpm, and run the host with `pnpm --filter @gentic/gentic start`. Best for development.
   </Card>
 </CardGroup>
 
 ## Prerequisites
 
-Review these requirements before installing the agent worker. Which prerequisites apply to you depends on your chosen deployment method.
+Review these requirements before installing the agent host. Which prerequisites apply to you depends on your chosen deployment method.
 
 <CardGroup cols={2}>
   <Card title="Node.js 20.19+" icon="node-js">
@@ -46,16 +46,16 @@ Review these requirements before installing the agent worker. Which prerequisite
     Required only if you want to compile the standalone binary yourself from source. Not needed on the target machine that runs the binary.
   </Card>
   <Card title="Git & SSH access" icon="key">
-    The worker clones repos over SSH by default. Add an SSH deploy key or machine user key to every repository Gentic will access.
+    The host clones repos over SSH by default. Add an SSH deploy key or machine user key to every repository Gentic will access.
   </Card>
   <Card title="AI agent credentials" icon="robot">
-    Claude Code credentials must be present in the worker environment. Codex must be installed and authenticated separately; set `CODEX_PATH` if it is not on `PATH`.
+    Claude Code credentials must be present in the host environment. Codex must be installed and authenticated separately; set `CODEX_PATH` if it is not on `PATH`.
   </Card>
 </CardGroup>
 
 ## Security note
 
-Run the agent worker on a **private** server or VM. It is a background polling process — not a web server. Do not expose it as a public HTTP endpoint. Keep your `GENTIC_WORKER_CREDENTIAL` and SSH credentials secret and limit access to the machine accordingly.
+Run the agent host on a **private** server or VM. It is a background polling process — not a web server. Do not expose it as a public HTTP endpoint. Keep your `GENTIC_HOST_CREDENTIAL` and SSH credentials secret and limit access to the machine accordingly.
 
 ## Next steps
 
@@ -64,9 +64,9 @@ Run the agent worker on a **private** server or VM. It is a background polling p
     Install from npm, use a prebuilt binary, or run from source, and set up Git authentication.
   </Card>
   <Card title="Configuration" icon="sliders" href="/agent/configuration">
-    Configure your worker credential, API URL, and other environment variables.
+    Configure your host credential, API URL, and other environment variables.
   </Card>
   <Card title="Service Management" icon="server" href="/agent/service-management">
-    Start, stop, and restart the worker as a managed system service.
+    Start, stop, and restart the host as a managed system service.
   </Card>
 </CardGroup>

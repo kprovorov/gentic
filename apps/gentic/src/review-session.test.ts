@@ -17,7 +17,7 @@ test("buildReviewerEnv strips push-capable credentials and locks git out of ever
     SSH_AUTH_SOCK: "/tmp/ssh-agent.sock",
     SSH_AGENT_PID: "1234",
     GIT_ASKPASS: "/usr/bin/askpass",
-    GIT_SSH_COMMAND: "ssh -i /home/worker/.ssh/id_ed25519",
+    GIT_SSH_COMMAND: "ssh -i /home/host/.ssh/id_ed25519",
     GIT_SSH: "/usr/bin/ssh",
     GH_TOKEN: "gho_secret",
     GITHUB_TOKEN: "ghp_secret",

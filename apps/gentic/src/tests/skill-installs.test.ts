@@ -3,8 +3,8 @@ import { EventEmitter } from "node:events"
 import test from "node:test"
 
 import type {
-  ReportWorkerSkillInstallResultInput,
-  WorkerSkillInstallCommand,
+  ReportHostSkillInstallResultInput,
+  HostSkillInstallCommand,
 } from "@gentic/validators/skills"
 
 import type { AgentApi } from "../api.js"
@@ -16,7 +16,7 @@ import {
   type SpawnProcess,
 } from "../skill-installs.js"
 
-const command: WorkerSkillInstallCommand = {
+const command: HostSkillInstallCommand = {
   id: "55555555-5555-4555-8555-555555555555",
   source: "anthropics/skills",
   skill: "pdf",
@@ -117,7 +117,7 @@ test("a missing npx is an ordinary install failure", async () => {
   const result = await runSkillInstall(command, { spawnProcess })
 
   assert.equal(result.status, "failed")
-  assert.equal(result.error_summary, "npx is not available on this worker.")
+  assert.equal(result.error_summary, "npx is not available on this host.")
 })
 
 test("an install still running at expiry is killed and reported", async () => {
@@ -137,12 +137,12 @@ test("an install still running at expiry is killed and reported", async () => {
 })
 
 test("the runner claims one command at a time and sanitizes what it reports", async () => {
-  const claimed: WorkerSkillInstallCommand[] = []
+  const claimed: HostSkillInstallCommand[] = []
   const reported: Array<{
     installId: string
-    result: ReportWorkerSkillInstallResultInput
+    result: ReportHostSkillInstallResultInput
   }> = []
-  let pending: WorkerSkillInstallCommand | null = command
+  let pending: HostSkillInstallCommand | null = command
   const finishRun: { release: () => void } = { release: () => {} }
 
   const api = {
@@ -154,7 +154,7 @@ test("the runner claims one command at a time and sanitizes what it reports", as
     },
     async reportSkillInstall(
       installId: string,
-      result: ReportWorkerSkillInstallResultInput
+      result: ReportHostSkillInstallResultInput
     ) {
       reported.push({ installId, result })
     },
@@ -174,7 +174,7 @@ test("the runner claims one command at a time and sanitizes what it reports", as
 
   await runner.poll()
   // A second tick while the first install is still running must not claim
-  // again: only one install may be in flight per worker.
+  // again: only one install may be in flight per host.
   pending = { ...command, id: "second" }
   await runner.poll()
   assert.deepEqual(

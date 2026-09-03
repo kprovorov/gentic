@@ -2,8 +2,8 @@ import { spawn } from "node:child_process"
 
 import {
   sanitizeSkillInstallOutput,
-  type ReportWorkerSkillInstallResultInput,
-  type WorkerSkillInstallCommand,
+  type ReportHostSkillInstallResultInput,
+  type HostSkillInstallCommand,
 } from "@gentic/validators/skills"
 
 import type { AgentApi } from "./api.js"
@@ -23,7 +23,7 @@ export type SpawnProcess = typeof spawn
  * skills.sh URL is never an argument, so a hostile URL cannot reach the CLI.
  */
 export function buildSkillInstallArgs(
-  command: Pick<WorkerSkillInstallCommand, "source" | "skill">
+  command: Pick<HostSkillInstallCommand, "source" | "skill">
 ): string[] {
   return [
     "-y",
@@ -47,16 +47,16 @@ export function skillInstallEnv(
 /**
  * Runs one install to completion. Every ending — success, a non-zero exit, a
  * missing `npx`, a hang past the command's expiry — resolves to a result the
- * worker reports; installs are attempted once and never retried.
+ * host reports; installs are attempted once and never retried.
  */
 export function runSkillInstall(
-  command: WorkerSkillInstallCommand,
+  command: HostSkillInstallCommand,
   deps: {
     spawnProcess?: SpawnProcess
     env?: NodeJS.ProcessEnv
     now?: () => Date
   } = {}
-): Promise<ReportWorkerSkillInstallResultInput> {
+): Promise<ReportHostSkillInstallResultInput> {
   const spawnProcess = deps.spawnProcess ?? spawn
   const now = deps.now ?? (() => new Date())
   const args = buildSkillInstallArgs(command)
@@ -75,7 +75,7 @@ export function runSkillInstall(
       captured += chunk.toString("utf8")
     }
 
-    const finish = (result: ReportWorkerSkillInstallResultInput) => {
+    const finish = (result: ReportHostSkillInstallResultInput) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
@@ -100,7 +100,7 @@ export function runSkillInstall(
       finish(
         failure(
           error.code === "ENOENT"
-            ? "npx is not available on this worker."
+            ? "npx is not available on this host."
             : `Could not start the skills CLI: ${error.message}`,
           captured
         )
@@ -127,7 +127,7 @@ export type SkillInstallRunner = {
 }
 
 /**
- * Polls the same outbound channel the worker already uses for control. An
+ * Polls the same outbound channel the host already uses for control. An
  * install runs alongside issue work: it never claims a run slot, pauses issue
  * claiming, or interrupts an active session.
  */
@@ -147,7 +147,7 @@ export function createSkillInstallRunner(
         return
       }
 
-      let command: WorkerSkillInstallCommand | null
+      let command: HostSkillInstallCommand | null
       try {
         command = await api.claimSkillInstall()
       } catch (error) {
@@ -185,13 +185,13 @@ export function createSkillInstallRunner(
 function failure(
   summary: string,
   output: string
-): ReportWorkerSkillInstallResultInput {
+): ReportHostSkillInstallResultInput {
   return { status: "failed", error_summary: summary, output }
 }
 
 function sanitizeResult(
-  result: ReportWorkerSkillInstallResultInput
-): ReportWorkerSkillInstallResultInput {
+  result: ReportHostSkillInstallResultInput
+): ReportHostSkillInstallResultInput {
   return {
     status: result.status,
     error_summary: result.error_summary

@@ -1,67 +1,67 @@
 ---
-title: "Configure the Gentic Agent Worker"
+title: "Configure the Gentic Agent Host"
 sidebarTitle: "Configuration"
-description: "Configure the Gentic agent worker with worker enrollment or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
+description: "Configure the Gentic agent host with host enrollment or environment variables. Covers credentials, Git remotes, polling, work directories, and concurrency."
 ---
 
-The primary way to configure the agent worker is with `gentic worker connect <code>`, which exchanges a single-use enrollment code for a stable worker id, API URL, and worker-specific credential. The CLI saves those values to a persistent config file on disk with owner-only permissions. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
+The primary way to configure the agent host is with `gentic host connect <code>`, which exchanges a single-use enrollment code for a stable host id, API URL, and host-specific credential. The CLI saves those values to a persistent config file on disk with owner-only permissions. Environment variables — including a `.env` file loaded at startup — are the alternative, and are the right choice for containers, CI systems, or local development where you manage secrets through the environment. When the same key appears in both sources, the environment variable takes precedence over the config file.
 
 ## First-run behavior
 
-When you run a `gentic` command for the first time, the CLI checks whether the worker is ready before it continues. This onboarding gate runs for normal worker commands, including `gentic start` and `gentic run`. It does not run for `gentic worker connect`, `gentic onboard`, `gentic status`, `gentic doctor`, `gentic auth`, `--help`, or `--version`, so you can always connect a worker, resume setup, or inspect the CLI without completing onboarding first.
+When you run a `gentic` command for the first time, the CLI checks whether the host is ready before it continues. This onboarding gate runs for normal host commands, including `gentic start` and `gentic run`. It does not run for `gentic host connect`, `gentic onboard`, `gentic status`, `gentic doctor`, `gentic auth`, `--help`, or `--version`, so you can always connect a host, resume setup, or inspect the CLI without completing onboarding first.
 
 If the command is running in an interactive terminal and any required setup is missing, Gentic starts the first-run flow automatically. The flow has four steps:
 
-1. **Gentic worker** — verifies that this machine has a stored worker id, API URL, and worker credential from `gentic worker connect <code>`. This is required.
+1. **Gentic auth** — verifies that this machine has a stored host id, API URL, and host credential from `gentic host connect <code>`. This is required.
 2. **GitHub CLI** — checks that `gh` is installed and authenticated, and offers to install or run `gh auth login` when possible. This is required because agents use GitHub CLI access to open pull requests.
-3. **Agent CLI** — checks both Claude Code and Codex. Both agent CLIs must be installed and authenticated because the worker can claim issues for either provider.
-4. **Worker service** — shows a summary and asks whether to enable the background worker with `gentic start`. This step is optional; you can decline and run `gentic start` later.
+3. **Agent CLI** — checks both Claude Code and Codex. Both agent CLIs must be installed and authenticated because the host can claim issues for either provider.
+4. **Host service** — shows a summary and asks whether to enable the background host service with `gentic start`. This step is optional; you can decline and run `gentic start` later.
 
 For CI, containers, or other non-interactive environments, bypass the prompts by providing the required settings up front:
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1 \
-GENTIC_WORKER_ID=<worker-id> \
-GENTIC_WORKER_CREDENTIAL=<your-worker-credential> \
+GENTIC_HOST_ID=<host-id> \
+GENTIC_HOST_CREDENTIAL=<your-host-credential> \
 gentic run
 ```
 
 You can also connect once, skip local onboarding, and resume setup later:
 
 ```bash
-gentic worker connect <code> --no-onboard
+gentic host connect <code> --no-onboard
 gentic onboard
 ```
 
-Non-interactive runs still require `gh`, Claude Code, and Codex to be installed and authenticated before the worker command starts. If any required item is missing, Gentic exits with the unmet requirements instead of prompting.
+Non-interactive runs still require `gh`, Claude Code, and Codex to be installed and authenticated before the host command starts. If any required item is missing, Gentic exits with the unmet requirements instead of prompting.
 
-## Worker Enrollment via CLI
+## Host Enrollment via CLI
 
-The recommended way to configure credentials is with `gentic worker connect <code>`. This command reads and writes an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
+The recommended way to configure credentials is with `gentic host connect <code>`. This command reads and writes an OS-appropriate config file — for example, `~/.config/gentic/config.json` on Linux — that persists across restarts without needing a `.env` file.
 
 <Note>
-  `GENTIC_WORKER_CREDENTIAL` is issued by the enrollment exchange. Do not reuse
-  a shared API key. Losing the config file loses the local worker identity; the
-  next enrollment creates a new worker instead of reclaiming by hostname.
+  `GENTIC_HOST_CREDENTIAL` is issued by the enrollment exchange. Do not reuse
+  a shared API key. Losing the config file loses this machine's host identity; the
+  next enrollment creates a new host instead of reclaiming by hostname.
 </Note>
 
 ### Connect
 
-Generate a worker enrollment code in the Gentic web app, then connect this machine:
+Generate a host enrollment code in the Gentic web app, then connect this machine:
 
 ```bash
-gentic worker connect <code>
+gentic host connect <code>
 ```
 
 For a self-hosted or local API, override the initial exchange URL:
 
 ```bash
-gentic worker connect <code> --api-url http://localhost:3000/api/v1
+gentic host connect <code> --api-url http://localhost:3000/api/v1
 ```
 
 ### Check authentication status
 
-Display the currently configured API URL and a masked version of your worker credential:
+Display the currently configured API URL and a masked version of your host credential:
 
 ```bash
 gentic auth status
@@ -76,7 +76,18 @@ gentic auth logout
 gentic auth logout --yes
 ```
 
-Logging out removes the local worker registration entries: `GENTIC_WORKER_ID`, `GENTIC_WORKER_CREDENTIAL`, `GENTIC_API_URL`, and `GENTIC_WORKER_SETUP_STATE`. Other settings stored in the config file — such as `GIT_REMOTE_BASE`, `WORKDIR`, and `POLL_INTERVAL_MS` — are preserved.
+Logging out removes the locally stored host registration entries: `GENTIC_HOST_ID`, `GENTIC_HOST_CREDENTIAL`, `GENTIC_API_URL`, and `GENTIC_HOST_SETUP_STATE`. Other settings stored in the config file — such as `GIT_REMOTE_BASE`, `WORKDIR`, and `POLL_INTERVAL_MS` — are preserved.
+
+### Upgrading from a pre-0.26 CLI
+
+Before 0.26.0 a host was called a "worker", and these three settings were named `GENTIC_WORKER_ID`, `GENTIC_WORKER_CREDENTIAL`, and `GENTIC_WORKER_SETUP_STATE`. The CLI still reads the old names from both the config file and the environment, so **an existing host does not need to be re-enrolled** — upgrade the CLI and it keeps its identity. The config file is rewritten under the new names the next time anything changes it.
+
+<Warning>
+  The 0.26.0 rename did change the agent API itself, so the CLI and the Gentic
+  app must move together. A CLI older than 0.26.0 is reported as
+  **Unsupported** in **Settings → Workspace → Hosts** and is refused new work.
+  Upgrade the CLI on each host — see [Installation](/agent/installation).
+</Warning>
 
 ---
 
@@ -87,8 +98,8 @@ Environment variables give you fine-grained control over every configuration val
 ```bash
 # .env
 GENTIC_API_URL=https://app.gentic.chat/api/v1
-GENTIC_WORKER_ID=worker_id_from_enrollment
-GENTIC_WORKER_CREDENTIAL=your_worker_credential_here
+GENTIC_HOST_ID=host_id_from_enrollment
+GENTIC_HOST_CREDENTIAL=your_host_credential_here
 ```
 
 The full list of supported variables is below.
@@ -104,20 +115,20 @@ GENTIC_API_URL=https://app.gentic.chat/api/v1
 
 </ParamField>
 
-<ParamField body="GENTIC_WORKER_ID" type="string" required>
-  The stable worker id returned by `gentic worker connect <code>`. Keep it paired with its credential so service and process restarts preserve the same worker identity.
+<ParamField body="GENTIC_HOST_ID" type="string" required>
+  The stable host id returned by `gentic host connect <code>`. Keep it paired with its credential so service and process restarts preserve the same host identity.
 
 ```bash
-GENTIC_WORKER_ID=worker_id_from_enrollment
+GENTIC_HOST_ID=host_id_from_enrollment
 ```
 
 </ParamField>
 
-<ParamField body="GENTIC_WORKER_CREDENTIAL" type="string" required>
-  A worker-specific credential issued by the enrollment exchange. The hosted API verifies the worker credential and only returns issues that belong to its user.
+<ParamField body="GENTIC_HOST_CREDENTIAL" type="string" required>
+  A host-specific credential issued by the enrollment exchange. The hosted API verifies the host credential and only returns issues that belong to its user.
 
 ```bash
-GENTIC_WORKER_CREDENTIAL=your_worker_credential_here
+GENTIC_HOST_CREDENTIAL=your_host_credential_here
 ```
 
 </ParamField>
@@ -125,7 +136,7 @@ GENTIC_WORKER_CREDENTIAL=your_worker_credential_here
 ### Optional
 
 <ParamField body="GIT_REMOTE_BASE" type="string" default="git@github.com:">
-  The base URL prepended to each project's `owner/repo` path when the worker clones a repository. With the default value, a project stored as `acme/backend` is cloned from `git@github.com:acme/backend`.
+  The base URL prepended to each project's `owner/repo` path when the host clones a repository. With the default value, a project stored as `acme/backend` is cloned from `git@github.com:acme/backend`.
 
 Change this if your repositories are hosted on GitHub Enterprise, GitLab, or another Git provider:
 
@@ -136,7 +147,7 @@ GIT_REMOTE_BASE=git@github.mycompany.com:
 </ParamField>
 
 <ParamField body="MAX_CONCURRENT_ISSUES" type="number" default="1">
-  The maximum number of issues this worker processes at the same time. Each active issue uses its own repository clone and realtime channel. Increase this only when the host has enough CPU, memory, disk, and agent-provider capacity.
+  The maximum number of issues this host processes at the same time. Each active issue uses its own repository clone and realtime channel. Increase this only when the machine has enough CPU, memory, disk, and agent-provider capacity.
 
 ```bash
 MAX_CONCURRENT_ISSUES=3
@@ -145,7 +156,7 @@ MAX_CONCURRENT_ISSUES=3
 </ParamField>
 
 <ParamField body="WORKDIR" type="string" default="~/.local/share/gentic/workspaces (Linux)">
-  The directory where the worker creates per-issue repository clones. Each issue gets its own subdirectory. If unset, the worker uses an OS-appropriate data directory determined by [`env-paths`](https://github.com/sindresorhus/env-paths):
+  The directory where the host creates per-issue repository clones. Each issue gets its own subdirectory. If unset, the host uses an OS-appropriate data directory determined by [`env-paths`](https://github.com/sindresorhus/env-paths):
 
 - **Linux**: `~/.local/share/gentic/workspaces`
 - **macOS**: `~/Library/Application Support/gentic/workspaces`
@@ -159,7 +170,7 @@ WORKDIR=/mnt/data/gentic-workspaces
 </ParamField>
 
 <ParamField body="POLL_INTERVAL_MS" type="number" default="3000">
-  How often (in milliseconds) the worker polls the Gentic API for issues with `status = 'todo'` (or `status = 'held'` past their usage-limit reset time). The default of `3000` ms (3 seconds) works well for most setups. Increase this value to reduce API traffic on low-priority workers.
+  How often (in milliseconds) the host polls the Gentic API for issues with `status = 'todo'` (or `status = 'held'` past their usage-limit reset time). The default of `3000` ms (3 seconds) works well for most setups. Increase this value to reduce API traffic on low-priority hosts.
 
 ```bash
 POLL_INTERVAL_MS=5000
@@ -171,13 +182,13 @@ POLL_INTERVAL_MS=5000
 
 ## Configuration precedence
 
-The worker merges all configuration sources in the following order, with later sources winning:
+The host merges all configuration sources in the following order, with later sources winning:
 
-1. **Config file** — written by `gentic worker connect <code>` (e.g. `~/.config/gentic/config.json`)
+1. **Config file** — written by `gentic host connect <code>` (e.g. `~/.config/gentic/config.json`)
 2. **`.env` file** — loaded from the working directory at startup
 3. **Shell environment variables** — exported in the process environment at runtime
 
-This means you can enroll the worker once with `gentic worker connect <code>` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.
+This means you can enroll the host once with `gentic host connect <code>` and use environment variables only for per-deployment overrides like `WORKDIR` or `POLL_INTERVAL_MS`.
 
 After editing the config file, apply runtime settings without interrupting active issues:
 
@@ -185,4 +196,4 @@ After editing the config file, apply runtime settings without interrupting activ
 gentic reload
 ```
 
-Changes to `MAX_CONCURRENT_ISSUES`, `POLL_INTERVAL_MS`, `WORKDIR`, `GIT_REMOTE_BASE`, and setup state apply to subsequent worker activity. If the new concurrency limit is below the number of issues already running, those issues continue and the worker waits before claiming more. Worker identity, credential, and API URL changes require `gentic restart` because they belong to the existing API connection.
+Changes to `MAX_CONCURRENT_ISSUES`, `POLL_INTERVAL_MS`, `WORKDIR`, `GIT_REMOTE_BASE`, and setup state apply to subsequent host activity. If the new concurrency limit is below the number of issues already running, those issues continue and the host waits before claiming more. Host identity, credential, and API URL changes require `gentic restart` because they belong to the existing API connection.

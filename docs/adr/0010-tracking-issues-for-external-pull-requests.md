@@ -68,7 +68,7 @@ head-branch resolution fails, and declines unless all of:
   tracked then.
 - **The head branch lives in the base repository, not a fork.** This is the
   one real security boundary the feature crosses. Reviewing means cloning the
-  head commit onto the owner's worker and letting a coding agent run the
+  head commit onto the owner's host and letting a coding agent run the
   repository's tests against it; for a fork pull request that is an unvetted
   contributor's code executing on the owner's machine. The reviewer runtime's
   isolation (ADR-0006) scrubs push credentials, but it is not a sandbox
@@ -76,7 +76,7 @@ head-branch resolution fails, and declines unless all of:
 
 **No path may put an agent to work on a tracking Issue.** It is created
 `ready-for-review`, with `create_pr_automatically = false` and no session, so
-no worker claims it and it has no implementation owner — which is what makes
+no host claims it and it has no implementation owner — which is what makes
 `deliver_review_fix_request` stop at `no_owner` (ADR-0007) instead of
 delivering the automatic review's findings as a fix-turn.
 

@@ -11,7 +11,7 @@ export function createSkillInstallTargetsRoute(
 ) {
   return skillsRoute(
     async ({ context }) => ({
-      workers: await (deps.listTargets ?? listSkillInstallTargets)(
+      hosts: await (deps.listTargets ?? listSkillInstallTargets)(
         context.supabase,
         context.userId
       ),

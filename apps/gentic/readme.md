@@ -1,6 +1,6 @@
 # Gentic Agent
 
-The Gentic agent is the background worker for the Gentic app. It polls the
+The Gentic agent is the background host process for the Gentic app. It polls the
 hosted Gentic API for issues with `status = 'todo'`, clones the configured
 GitHub repository into a local work directory, and runs the issue's selected
 coding agent through the Agent Client Protocol.
@@ -10,10 +10,10 @@ coding agent through the Agent Client Protocol.
 - Node.js 20 or newer.
 - pnpm 11.9.0 or newer.
 - A Gentic API URL, for example `https://app.gentic.chat/api/v1`.
-- A worker-specific credential issued from a Gentic worker enrollment code.
+- A host-specific credential issued from a Gentic host enrollment code.
 - Git access to every repository configured in the Gentic web app.
-- Claude Code credentials if this worker will run Claude Code issues.
-- Codex installed and authenticated in the worker environment if this worker
+- Claude Code credentials if this host will run Claude Code issues.
+- Codex installed and authenticated in the host environment if this host
   will run Codex issues.
 
 ## Upload or deploy the agent
@@ -28,10 +28,10 @@ the Gentic API and GitHub.
 4. Create `apps/gentic/.env` from `apps/gentic/.env.example`.
 5. Install dependencies from the repository root.
 6. Start the agent process with a process manager such as `systemd`, `pm2`, or
-   your host's worker process command.
+   your platform's service manager.
 
-Do not expose this process as a public web service. It is a private worker that
-polls the hosted Gentic API.
+Do not expose this process as a public web service. It is a private background
+process that polls the hosted Gentic API.
 
 ## Environment
 
@@ -45,8 +45,8 @@ Fill in these values:
 
 ```bash
 GENTIC_API_URL=https://app.gentic.chat/api/v1
-GENTIC_WORKER_ID=worker-id-from-enrollment
-GENTIC_WORKER_CREDENTIAL=your-worker-credential
+GENTIC_HOST_ID=host-id-from-enrollment
+GENTIC_HOST_CREDENTIAL=your-host-credential
 GIT_REMOTE_BASE=git@github.com:
 POLL_INTERVAL_MS=3000
 MAX_CONCURRENT_ISSUES=1
@@ -65,34 +65,34 @@ checkout.
 project repo of `owner/repo` and the default base of `git@github.com:`, the
 agent clones `git@github.com:owner/repo`.
 
-`MAX_CONCURRENT_ISSUES` controls how many issues this worker processes at the
+`MAX_CONCURRENT_ISSUES` controls how many issues this host processes at the
 same time. It defaults to `1`. Each active issue uses a separate clone and
-realtime channel, so raise it only when the host and agent-provider limits can
-support the additional work.
+realtime channel, so raise it only when the machine and agent-provider limits
+can support the additional work.
 
-`GENTIC_WORKER_CREDENTIAL` must be a worker-specific credential. The hosted Gentic API
+`GENTIC_HOST_CREDENTIAL` must be a host-specific credential. The hosted Gentic API
 verifies it, identifies the Clerk user, and only returns or mutates issues whose
 project belongs to that user.
 
 Besides `.env`, settings can also live in a persisted config file at an
 OS-appropriate config directory (e.g. `~/.config/gentic/config.json` on
-Linux), written by `gentic worker connect <code>` (see below). `loadConfig()` merges
+Linux), written by `gentic host connect <code>` (see below). `loadConfig()` merges
 both sources, with environment variables taking precedence over the config
 file for each key. This keeps `.env` usable for local development while
-giving an installed CLI a durable place to store settings and the worker credential.
+giving an installed CLI a durable place to store settings and the host credential.
 
-## Worker enrollment
+## Host enrollment
 
-Generate a worker enrollment code in the Gentic web app, then connect the
+Generate a host enrollment code in the Gentic web app, then connect the
 machine with that single-use code:
 
 ```bash
-gentic worker connect <code>
+gentic host connect <code>
 ```
 
-The exchange stores the API URL, stable worker id, and worker-specific
+The exchange stores the API URL, stable host id, and host-specific
 credential in the OS-appropriate config file with owner-only permissions. The
-initial suggested worker name is the machine hostname. If local onboarding is
+initial suggested display name is the machine hostname. If local onboarding is
 cancelled after the exchange, run this command later without generating another
 code:
 
@@ -100,18 +100,18 @@ code:
 gentic onboard
 ```
 
-`gentic auth status` shows the connected worker id, API URL, setup state, and
+`gentic auth status` shows the connected host's id, API URL, setup state, and
 masked credential. `gentic auth logout` clears the local registration
 (`--yes`/`-y` to skip the confirmation prompt). Losing the config file loses
-the local identity; the next `gentic worker connect <code>` creates a new
-worker identity rather than reclaiming one by hostname.
+the local identity; the next `gentic host connect <code>` creates a new
+host identity rather than reclaiming one by hostname.
 
 Each issue stores its selected agent provider. `claude_code` issues run through
 `@agentclientprotocol/claude-agent-acp`; `codex` issues run through
-`@agentclientprotocol/codex-acp`. Workers claim issues for all supported agent
+`@agentclientprotocol/codex-acp`. Hosts claim issues for all supported agent
 providers, so both Claude Code and Codex CLIs must be installed and
-authenticated in the worker environment. Codex runs default to
-`INITIAL_AGENT_MODE=agent-full-access` unless overridden in the worker
+authenticated in the host environment. Codex runs default to
+`INITIAL_AGENT_MODE=agent-full-access` unless overridden in the host
 environment.
 
 ## Setup
@@ -143,7 +143,7 @@ pnpm --filter @gentic/gentic build
 ## npm package
 
 The CLI is published to npm as [`gentic-cli`](https://www.npmjs.com/package/gentic-cli)
-(the name `gentic` belongs to an unrelated package), so a worker machine with
+(the name `gentic` belongs to an unrelated package), so a host with
 Node.js 20.19+ installs it with:
 
 ```bash
@@ -186,7 +186,7 @@ The output directory contains:
   per the Codex prerequisite above.
 
 Copy the whole output directory to the target machine and run
-`./gentic run` with `GENTIC_WORKER_ID`/`GENTIC_WORKER_CREDENTIAL`/`GENTIC_API_URL` in the environment —
+`./gentic run` with `GENTIC_HOST_ID`/`GENTIC_HOST_CREDENTIAL`/`GENTIC_API_URL` in the environment —
 no install step needed.
 
 Running [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
@@ -197,11 +197,11 @@ publishes them as `gentic-<version>-<os>-<arch>.tar.gz` archives — plus
 The same run publishes the npm package described above.
 
 Cross-compiling the `claude` CLI sidecar for a platform other than the build
-host requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
+machine requires that platform's `@anthropic-ai/claude-agent-sdk-<os>-<arch>`
 optionalDependency already present in `node_modules` (pnpm only installs the
-one matching the host by default); the build script fails with an actionable
-error rather than silently skipping it. Building each target on/for a
-matching host is the simplest way to satisfy this today.
+one matching the build machine by default); the build script fails with an
+actionable error rather than silently skipping it. Building each target on a
+matching machine is the simplest way to satisfy this today.
 
 macOS binaries are not code-signed or notarized; Gatekeeper will warn on
 first run.
@@ -248,7 +248,7 @@ dist/linux-x64/gentic start
 `gentic start` installs and starts a real OS service for the current
 platform — a systemd user unit on Linux (`~/.config/systemd/user/gentic.service`)
 or a launchd agent on macOS (`~/Library/LaunchAgents/dev.gentic.agent.plist`) —
-so the worker restarts automatically on crash and starts again on boot. Pass
+so the host restarts automatically on crash and starts again on boot. Pass
 `--system` on Linux to install a system-wide unit under
 `/etc/systemd/system/` instead (useful for package-manager postinstall
 scripts, which typically run as root); pass `--no-boot` to skip enabling the
@@ -267,7 +267,7 @@ gentic start --system    # install a system-wide unit (Linux/systemd only)
 
 ## Source layout
 
-- `src/worker.ts` — worker entrypoint. Polls the Gentic API, claims todo issues up
+- `src/host.ts` — host entrypoint. Polls the Gentic API, claims todo issues up
   to the configured concurrency limit, clones each repo, and drives an agent
   session per issue.
 - `src/session.ts` — spawns Claude Code or Codex over the Agent Client Protocol and

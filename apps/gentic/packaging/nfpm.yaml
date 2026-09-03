@@ -1,4 +1,4 @@
-# nfpm config for the gentic worker Linux packages (.deb/.rpm/.apk), built by
+# nfpm config for the gentic host Linux packages (.deb/.rpm/.apk), built by
 # the `build` job in .github/workflows/release.yml. Expects these env vars:
 #   VERSION   release version, e.g. 0.4.2
 #   PKG_ARCH  nfpm arch: amd64 | arm64

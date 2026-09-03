@@ -177,7 +177,7 @@ export async function startIssueCreation(formData: FormData) {
 
 /**
  * Phase two: the bytes are in Storage, so publish the attachments and, for
- * "Run Agent", hand the issue to the queue. Queuing happens last so a worker
+ * "Run Agent", hand the issue to the queue. Queuing happens last so a host
  * can never claim an issue whose attachments are still uploading.
  */
 export async function finishIssueCreation(formData: FormData) {

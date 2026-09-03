@@ -63,7 +63,7 @@ export class ReviewerOutputInvalidError extends Error {
  * `runAgentSession`, both load-bearing for isolation:
  *
  * - The child's environment is `buildReviewerEnv`'s scrub of `process.env`,
- *   not a raw inherit, so a push credential or credential helper the worker
+ *   not a raw inherit, so a push credential or credential helper the host
  *   machine happens to have configured is never reachable from inside it.
  * - No Gentic MCP server is attached (`genticMcp: null`) — the reviewer gets
  *   no mutation-capable channel to the issue tracker either.
@@ -156,12 +156,12 @@ const CREDENTIAL_ENV_KEYS = [
  * e.g. `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` — binary resolution, not a
  * credential), with every push-capable credential removed and git pointed at
  * no config file at all (`GIT_CONFIG_GLOBAL`/`GIT_CONFIG_SYSTEM=/dev/null`)
- * so a `credential.helper` entry in the worker machine's own gitconfig can
+ * so a `credential.helper` entry in the host's own gitconfig can
  * never be consulted even under a variable name this list doesn't know
  * about. A denylist rather than an allowlist deliberately: the reviewer
  * still needs whatever the model-provider auth and the ACP agent binary
  * itself rely on (API keys, `PATH`, locale, proxy settings, ...), none of
- * which this worker can enumerate in advance.
+ * which this host can enumerate in advance.
  */
 export function buildReviewerEnv(
   providerEnv: NodeJS.ProcessEnv,

@@ -31,7 +31,7 @@ export async function cloneRepo(options: {
 
 /**
  * Checks out the canonical remote branch for an issue when it exists so a
- * fresh worker checkout can continue previously published work without
+ * fresh host checkout can continue previously published work without
  * knowing anything about the associated pull request.
  */
 export async function checkoutIssueBranch(options: {

@@ -16,7 +16,7 @@ function describe(error: unknown): string {
 export function registerLogsCommand(program: Command): void {
   program
     .command("logs")
-    .description("Show logs for the gentic worker service")
+    .description("Show logs for the gentic host service")
     .option(
       "--system",
       "show logs for the system-wide service instead of the per-user one (Linux/systemd only)"

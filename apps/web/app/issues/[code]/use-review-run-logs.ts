@@ -22,7 +22,7 @@ export type ReviewRunLogEntry = {
  * A Review Run's execution log — fetched on demand (never bundled into the
  * Issue's normal page data, see `listReviewRunLogs`) and, while the run is
  * still live, tailed over the same private `review-run:{id}` Broadcast
- * channel the worker publishes to (`apps/gentic/src/review-run-realtime.ts`).
+ * channel the host publishes to (`apps/gentic/src/review-run-realtime.ts`).
  * Deliberately its own hook rather than folded into `use-issue-chat-state.ts`,
  * so these logs can never leak into transcript state.
  */
@@ -95,28 +95,24 @@ export function useReviewRunLogs({
         .channel(reviewRunRealtimeTopic(reviewRunId), {
           config: { private: true },
         })
-        .on(
-          "broadcast",
-          { event: REALTIME_MESSAGE_EVENT },
-          ({ payload }) => {
-            const parsed = reviewRunLogEventSchema.safeParse(payload)
-            if (!parsed.success || seenSeqRef.current.has(parsed.data.seq)) {
-              return
-            }
-            seenSeqRef.current.add(parsed.data.seq)
-            setLogs((current) =>
-              [
-                ...current,
-                {
-                  id: `live-${parsed.data.seq}`,
-                  seq: parsed.data.seq,
-                  role: parsed.data.role,
-                  content: parsed.data.content,
-                },
-              ].toSorted((a, b) => a.seq - b.seq)
-            )
+        .on("broadcast", { event: REALTIME_MESSAGE_EVENT }, ({ payload }) => {
+          const parsed = reviewRunLogEventSchema.safeParse(payload)
+          if (!parsed.success || seenSeqRef.current.has(parsed.data.seq)) {
+            return
           }
-        )
+          seenSeqRef.current.add(parsed.data.seq)
+          setLogs((current) =>
+            [
+              ...current,
+              {
+                id: `live-${parsed.data.seq}`,
+                seq: parsed.data.seq,
+                role: parsed.data.role,
+                content: parsed.data.content,
+              },
+            ].toSorted((a, b) => a.seq - b.seq)
+          )
+        })
         .subscribe()
     }
 

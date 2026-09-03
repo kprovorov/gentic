@@ -17,7 +17,7 @@ SELECT is(
     'public.finish_issue_run_if_no_pending(uuid,uuid,text,timestamp with time zone,text)'
   ),
   NULL,
-  'the worker completion compatibility overload is removed'
+  'the host completion compatibility overload is removed'
 );
 
 SELECT isnt(
@@ -25,7 +25,7 @@ SELECT isnt(
     'public.finish_issue_run_if_no_pending(uuid,uuid,text,timestamp with time zone)'
   ),
   NULL,
-  'worker completion exposes only the association-based signature'
+  'host completion exposes only the association-based signature'
 );
 
 SELECT ok(
@@ -52,7 +52,7 @@ SELECT ok(
     'public.finish_issue_run_if_no_pending(uuid,uuid,text,timestamp with time zone)',
     'EXECUTE'
   ),
-  'the service role retains worker completion access'
+  'the service role retains host completion access'
 );
 
 SELECT is(
@@ -139,7 +139,7 @@ SELECT is(
      WHERE issue_id = '20000000-0000-4000-8000-700000000001'
   ),
   1,
-  'worker completion preserves existing associations'
+  'host completion preserves existing associations'
 );
 
 SELECT is(

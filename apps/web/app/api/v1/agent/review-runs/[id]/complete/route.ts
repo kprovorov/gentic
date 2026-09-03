@@ -35,7 +35,7 @@ const defaultDeps: CompleteReviewRunDeps = {
 // before recording it — `publishReviewVerdict` is the only place with GitHub
 // App credentials, since the isolated reviewer runtime (ADR-0006) is
 // deliberately denied them. `githubReviewId` always comes from that publish
-// call, never from the request body: the worker has no way to produce one
+// call, never from the request body: the host has no way to produce one
 // itself, and trusting a client-supplied id here would let a request forge
 // `review_attempts.github_review_id` (the exact value the webhook's
 // bot-echo recognition trusts).
@@ -95,8 +95,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const { supabase, userId, workerId } = await getAgentContext(request)
-    await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
+    const { supabase, userId, hostId } = await getAgentContext(request)
+    await ensureActiveReviewRunClaim(supabase, userId, hostId, id)
 
     const fields = completeReviewRunInputSchema.parse(await request.json())
     const result = await completeReviewRun(supabase, userId, id, fields)

@@ -18,11 +18,11 @@ const clerkAuthInfo = {
   scopes: [],
   extra: { userId: "user_clerk" },
 }
-const workerAuthInfo = {
-  token: "gtwc_worker_credential",
-  clientId: "worker:worker-1",
+const hostAuthInfo = {
+  token: "gtwc_host_credential",
+  clientId: "host:host-1",
   scopes: [],
-  extra: { userId: "user_owner", workerId: "worker-1" },
+  extra: { userId: "user_owner", hostId: "host-1" },
 }
 
 /** Drive a tool handler as the real `tool` wrapper would for a given authInfo. */
@@ -393,8 +393,8 @@ test("get_issue resolves an Issue Code scoped to the authenticated account acros
       expectedUserId: "user_clerk",
     },
     {
-      label: "Worker Credential",
-      authInfo: workerAuthInfo,
+      label: "Host Credential",
+      authInfo: hostAuthInfo,
       expectedUserId: "user_owner",
     },
   ]) {
@@ -500,8 +500,8 @@ test("get_issue returns active Issue Attachment metadata scoped to the resolved 
       expectedUserId: "user_clerk",
     },
     {
-      label: "Worker Credential",
-      authInfo: workerAuthInfo,
+      label: "Host Credential",
+      authInfo: hostAuthInfo,
       expectedUserId: "user_owner",
     },
   ]) {
@@ -605,8 +605,8 @@ test("download_attachment returns a fresh signed URL and forwards ownership acro
       expectedUserId: "user_clerk",
     },
     {
-      label: "Worker Credential",
-      authInfo: workerAuthInfo,
+      label: "Host Credential",
+      authInfo: hostAuthInfo,
       expectedUserId: "user_owner",
     },
   ]) {

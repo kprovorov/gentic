@@ -10,7 +10,7 @@ import * as issuesService from "@gentic/services/issues"
 import * as labelsService from "@gentic/services/labels"
 import * as projectsService from "@gentic/services/projects"
 import * as userSettingsService from "@gentic/services/user-settings"
-import * as workersService from "@gentic/services/workers"
+import * as hostsService from "@gentic/services/hosts"
 import { ServiceError } from "@gentic/services/errors"
 import type { AgentProvider } from "@gentic/validators/issues"
 import {
@@ -39,10 +39,10 @@ import type { Attachment } from "./issues/[code]/attachments"
 import { createAttachmentSigner } from "./issues/attachment-signing"
 import type { ChatMessage } from "./issues/[code]/issue-chat-state"
 import {
-  listSettingsWorkersData,
-  type SettingsWorker,
-  type SettingsWorkersData,
-} from "./settings/workers-read-model"
+  listSettingsHostsData,
+  type SettingsHost,
+  type SettingsHostsData,
+} from "./settings/hosts-read-model"
 import {
   fetchInstallationRepositories,
   type GithubPullRequestState,
@@ -94,7 +94,7 @@ export type IssuesData = HomeData
 
 export type SettingsData = {
   projects: SettingsProject[]
-  workers: workersService.WorkerDomain[]
+  hosts: hostsService.HostDomain[]
   githubIntegration: githubIntegrationsService.GithubIntegration | null
   defaultAgentProvider: "claude_code" | "codex"
   githubAppConfigured: boolean
@@ -106,7 +106,7 @@ export type SettingsLabelsData = {
   labels: labelsService.LabelCatalogItem[]
 }
 
-export type { SettingsWorker, SettingsWorkersData }
+export type { SettingsHost, SettingsHostsData }
 
 export type NewIssueData = {
   projects: ProjectOption[]
@@ -215,13 +215,12 @@ export async function getSettingsData(
   context?: AuthenticatedContext
 ): Promise<SettingsData> {
   const { supabase, userId } = await resolveContext(context)
-  const [projects, githubIntegration, userSettings, workers] =
-    await Promise.all([
-      projectsService.listProjects(supabase, userId),
-      githubIntegrationsService.getGithubIntegration(supabase, userId),
-      userSettingsService.getUserSettings(supabase, userId),
-      workersService.listWorkers(supabase, userId),
-    ])
+  const [projects, githubIntegration, userSettings, hosts] = await Promise.all([
+    projectsService.listProjects(supabase, userId),
+    githubIntegrationsService.getGithubIntegration(supabase, userId),
+    userSettingsService.getUserSettings(supabase, userId),
+    hostsService.listHosts(supabase, userId),
+  ])
 
   let githubRepositories: GithubRepositoryOption[] = []
   let githubRepositoriesError: string | null = null
@@ -254,7 +253,7 @@ export async function getSettingsData(
       automatic_review_model: project.automatic_review_model,
       automatic_review_instructions: project.automatic_review_instructions,
     })),
-    workers,
+    hosts,
     githubIntegration,
     defaultAgentProvider: userSettings.default_agent_provider,
     githubAppConfigured: Boolean(process.env.GITHUB_APP_SLUG),
@@ -263,11 +262,11 @@ export async function getSettingsData(
   }
 }
 
-export async function getSettingsWorkersData(
+export async function getSettingsHostsData(
   context?: AuthenticatedContext
-): Promise<SettingsWorkersData> {
+): Promise<SettingsHostsData> {
   const { supabase, userId } = await resolveContext(context)
-  return listSettingsWorkersData(supabase, userId)
+  return listSettingsHostsData(supabase, userId)
 }
 
 export async function getSettingsLabelsData(

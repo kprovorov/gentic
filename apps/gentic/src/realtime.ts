@@ -22,7 +22,7 @@ export type {
 } from "@gentic/validators/realtime"
 
 // Refresh a bit before the token actually expires so a slow-running turn
-// never races the worker off an expired websocket auth.
+// never races the host off an expired websocket auth.
 const TOKEN_REFRESH_SKEW_MS = 5 * 60 * 1000
 
 export interface IssueRealtimeChannel {

@@ -370,7 +370,7 @@ test("deliverReviewFixRequest maps an owner-unavailable outcome with its reason"
       review_attempt_id: "attempt-1",
       issue_id: "issue-1",
       outcome: "owner_unavailable",
-      unavailable_reason: "worker_banned",
+      unavailable_reason: "host_banned",
     },
   ])
 
@@ -380,7 +380,7 @@ test("deliverReviewFixRequest maps an owner-unavailable outcome with its reason"
   })
 
   assert.equal(result.outcome, "owner_unavailable")
-  assert.equal(result.unavailableReason, "worker_banned")
+  assert.equal(result.unavailableReason, "host_banned")
 })
 
 test("deliverReviewFixRequest throws not_found when the RPC returns no row", async () => {

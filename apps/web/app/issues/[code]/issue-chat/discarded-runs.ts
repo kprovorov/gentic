@@ -1,6 +1,6 @@
 /**
  * Resetting an issue wipes its transcript in the database, but nothing stops
- * the worker process that owned the run: it keeps publishing `message`
+ * the host process that owned the run: it keeps publishing `message`
  * broadcasts on the issue's realtime channel until it happens to attempt a
  * write and gets a 409 back. Those broadcasts never become rows — the agent API
  * refuses them once the run is no longer active — yet the browser applies every

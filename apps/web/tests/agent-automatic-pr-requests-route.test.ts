@@ -5,12 +5,12 @@ import { requestIssueAutomaticPrPublish } from "../app/api/v1/agent/issues/[id]/
 
 const runId1 = "11111111-1111-4111-8111-111111111111"
 const runId2 = "22222222-2222-4222-8222-222222222222"
-const workerId = "33333333-3333-4333-8333-333333333333"
+const hostId = "33333333-3333-4333-8333-333333333333"
 
 type IssueRow = {
   id: string
   project_user_id: string
-  active_worker_id: string | null
+  active_host_id: string | null
   project_key: string
   active_run_id: string | null
   create_pr_automatically: boolean
@@ -20,7 +20,7 @@ type IssueRow = {
   title: string | null
 }
 
-type WorkerRow = {
+type HostRow = {
   id: string
   user_id: string
   banned_at: string | null
@@ -54,7 +54,7 @@ class FakeIssuesQuery {
       return Promise.resolve({
         data: {
           id: row.id,
-          active_worker_id: row.active_worker_id,
+          active_host_id: row.active_host_id,
           active_run_id: row.active_run_id,
           projects: { user_id: row.project_user_id },
         },
@@ -85,7 +85,7 @@ class FakeIssuesQuery {
   }
 }
 
-class FakeWorkersQuery {
+class FakeHostsQuery {
   private filters: Record<string, unknown> = {}
 
   constructor(private readonly db: FakeSupabase) {}
@@ -100,10 +100,10 @@ class FakeWorkersQuery {
   }
 
   maybeSingle() {
-    const row = this.db.workers.find((worker) =>
+    const row = this.db.hosts.find((host) =>
       Object.entries(this.filters).every(([column, value]) => {
-        if (column === "id") return worker.id === value
-        if (column === "user_id") return worker.user_id === value
+        if (column === "id") return host.id === value
+        if (column === "user_id") return host.user_id === value
         return true
       })
     )
@@ -118,7 +118,7 @@ class FakeWorkersQuery {
 
 // Mirrors the `request_automatic_pr_publish` RPC's dedup semantics: the first
 // call for a given (issue, run) pair "creates" the request, every later call
-// — concurrent or a retried/restarted worker — gets back the same ids with
+// — concurrent or a retried/restarted host — gets back the same ids with
 // `created: false`, matching the DB's `on conflict do nothing` + fallback
 // `select`.
 class FakeSupabase {
@@ -128,9 +128,9 @@ class FakeSupabase {
 
   constructor(
     readonly issues: IssueRow[],
-    readonly workers: WorkerRow[] = [
+    readonly hosts: HostRow[] = [
       {
-        id: workerId,
+        id: hostId,
         user_id: "user-1",
         banned_at: null,
         last_seen_at: new Date().toISOString(),
@@ -139,8 +139,8 @@ class FakeSupabase {
   ) {}
 
   from(table: string) {
-    if (table === "workers") {
-      return new FakeWorkersQuery(this)
+    if (table === "hosts") {
+      return new FakeHostsQuery(this)
     }
     assert.equal(table, "issues")
     return new FakeIssuesQuery(this)
@@ -179,7 +179,7 @@ class FakeSupabase {
 function issue(overrides: Partial<IssueRow> & Pick<IssueRow, "id">): IssueRow {
   return {
     project_user_id: "user-1",
-    active_worker_id: workerId,
+    active_host_id: hostId,
     project_key: "ACME",
     active_run_id: runId1,
     create_pr_automatically: true,
@@ -198,7 +198,7 @@ test("rejects a malformed body before touching supabase", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {}
     ),
@@ -215,7 +215,7 @@ test("rejects when the issue does not belong to the caller", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -234,13 +234,13 @@ test("rejects a stale or superseded run", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId2,
       }
     ),
-    { status: 409, message: "Run is not active for this worker" }
+    { status: 409, message: "Run is not active for this host" }
   )
   assert.deepEqual(supabase.rpcCalls, [])
 })
@@ -254,7 +254,7 @@ test("rejects when create_pr_automatically is not opted in", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -273,7 +273,7 @@ test("rejects when the issue already has a pull request", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -292,7 +292,7 @@ test("rejects when a webhook-owned Associated Pull Request already exists", asyn
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       { active_run_id: runId1 }
     ),
@@ -310,7 +310,7 @@ test("rejects when there are no unpublished changes", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -326,7 +326,7 @@ test("creates the automatic PR request and returns session-continuation context"
   const result = await requestIssueAutomaticPrPublish(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     "issue-1",
     { active_run_id: runId1 }
   )
@@ -360,14 +360,14 @@ test("a duplicate/retried call for the same run is idempotent, not a second mess
   const first = await requestIssueAutomaticPrPublish(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     "issue-1",
     { active_run_id: runId1 }
   )
   const second = await requestIssueAutomaticPrPublish(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     "issue-1",
     { active_run_id: runId1 }
   )
@@ -393,7 +393,7 @@ test("concurrent calls for the same run only create one message", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -402,7 +402,7 @@ test("concurrent calls for the same run only create one message", async () => {
     requestIssueAutomaticPrPublish(
       supabase as never,
       "user-1",
-      workerId,
+      hostId,
       "issue-1",
       {
         active_run_id: runId1,
@@ -421,7 +421,7 @@ test("a later active run may create another request once the previous one is set
   const first = await requestIssueAutomaticPrPublish(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     "issue-1",
     { active_run_id: runId1 }
   )
@@ -433,7 +433,7 @@ test("a later active run may create another request once the previous one is set
   const second = await requestIssueAutomaticPrPublish(
     supabase as never,
     "user-1",
-    workerId,
+    hostId,
     "issue-1",
     { active_run_id: runId2 }
   )

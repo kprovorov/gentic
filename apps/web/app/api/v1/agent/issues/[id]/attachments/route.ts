@@ -3,7 +3,7 @@ import {
   MESSAGE_ATTACHMENT_KIND,
 } from "@gentic/services/attachments"
 import {
-  ensureActiveWorkerRun,
+  ensureActiveHostRun,
   ensureIssueOwned,
   getAgentContext,
   handleAgentError,
@@ -16,7 +16,7 @@ export const runtime = "nodejs"
 const ATTACHMENTS_BUCKET = "attachments"
 const SIGNED_URL_TTL_SECONDS = 300
 
-type WorkerAttachment = {
+type HostAttachment = {
   id: string
   fileName: string
   contentType: string | null
@@ -25,22 +25,22 @@ type WorkerAttachment = {
 }
 
 /**
- * Attachments the worker may download for one prompt turn.
+ * Attachments the host may download for one prompt turn.
  *
  * A `messageId` asks for that message's own uploads; omitting it asks for the
  * issue's durable attachments. The two are matched on `kind`, not just on
  * `message_id`, so a Message Attachment whose message was wiped by a reset is
  * never mistaken for an Issue Attachment.
  */
-export async function listWorkerIssueAttachments(
+export async function listHostIssueAttachments(
   supabase: Supabase,
   userId: string,
-  workerId: string,
+  hostId: string,
   issueId: string,
   { messageId, runId }: { messageId: string | null; runId: string }
-): Promise<{ attachments: WorkerAttachment[] }> {
+): Promise<{ attachments: HostAttachment[] }> {
   await ensureIssueOwned(supabase, userId, issueId)
-  await ensureActiveWorkerRun(supabase, userId, workerId, issueId, runId)
+  await ensureActiveHostRun(supabase, userId, hostId, issueId, runId)
 
   let query = supabase
     .from("attachments")
@@ -96,7 +96,7 @@ export async function GET(
     const searchParams = new URL(request.url).searchParams
     const messageId = searchParams.get("message_id")
     const runId = searchParams.get("run_id")
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     if (!runId) {
       await ensureIssueOwned(supabase, userId, id)
@@ -104,7 +104,7 @@ export async function GET(
     }
 
     return json(
-      await listWorkerIssueAttachments(supabase, userId, workerId, id, {
+      await listHostIssueAttachments(supabase, userId, hostId, id, {
         messageId,
         runId,
       })

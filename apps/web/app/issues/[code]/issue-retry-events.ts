@@ -10,7 +10,7 @@ export type IssueRetryResetEventDetail = {
   status: IssueStatus
   usageLimitResetAt: string | null
   pullRequests: []
-  // Runs whose transcript this reset deleted. Their worker is still alive and
+  // Runs whose transcript this reset deleted. Their host is still alive and
   // still broadcasting, so the chat has to keep refusing their events for the
   // rest of this page's life. See `discarded-runs.ts`.
   discardedRunIds: string[]

@@ -4,10 +4,10 @@ sidebarTitle: "Issue Statuses"
 description: "Reference for every Gentic issue status. Learn what each state means, how issues transition between them, and how GitHub pull request events map back to status changes."
 ---
 
-Every issue in Gentic carries a single **status** field that describes both where the issue sits in your team's workflow and what the agent worker is doing with it. This page documents every possible value and the transitions between them.
+Every issue in Gentic carries a single **status** field that describes both where the issue sits in your team's workflow and what the agent host is doing with it. This page documents every possible value and the transitions between them.
 
 <Note>
-  Moving an issue from **Draft** to **Todo** is the specific transition that makes it eligible for an agent run. Until you make that change, no worker will claim it and no repository is cloned.
+  Moving an issue from **Draft** to **Todo** is the specific transition that makes it eligible for an agent run. Until you make that change, no host will claim it and no repository is cloned.
 </Note>
 
 ## Status lifecycle
@@ -21,25 +21,25 @@ draft → todo → queued → in-progress → ready-for-review
                                      ↘ changes-requested → approved → merged
 ```
 
-Not every issue visits every status. The worker drives the agent-run states, while several review and deployment states are available for manual or external workflow updates.
+Not every issue visits every status. The host drives the agent-run states, while several review and deployment states are available for manual or external workflow updates.
 
 ## Pre-work
 
-These statuses cover the period before an agent worker has claimed the issue.
+These statuses cover the period before an agent host has claimed the issue.
 
 | Status | Description |
 |---|---|
-| `draft` | The issue is being prepared. It is invisible to the worker. Use this while you are still writing or refining the body, uploading attachments, or setting blockers. |
-| `todo` | The issue is ready and sits in the unclaimed pool. The next worker poll that finds no other pending work will claim it. |
+| `draft` | The issue is being prepared. It is invisible to the host. Use this while you are still writing or refining the body, uploading attachments, or setting blockers. |
+| `todo` | The issue is ready and sits in the unclaimed pool. The next host poll that finds no other pending work will claim it. |
 
 ## Agent running
 
-These statuses indicate a worker is actively handling the issue.
+These statuses indicate a host is actively handling the issue.
 
 | Status | Description |
 |---|---|
-| `queued` | A worker has claimed the issue and is preparing the run — cloning the configured repository, running the project's setup script, and starting the agent session. This is a short-lived state; if it persists, see [Troubleshooting](/guides/troubleshooting). |
-| `held` | The agent hit a usage or session limit (for example, a Claude Code quota reset or a Codex rate-limit response). The worker parses the reset time out of the error and stores it on the issue. Once the reset time has passed, the next poll re-claims the issue automatically — you do not need to do anything. |
+| `queued` | A host has claimed the issue and is preparing the run — cloning the configured repository, running the project's setup script, and starting the agent session. This is a short-lived state; if it persists, see [Troubleshooting](/guides/troubleshooting). |
+| `held` | The agent hit a usage or session limit (for example, a Claude Code quota reset or a Codex rate-limit response). The host parses the reset time out of the error and stores it on the issue. Once the reset time has passed, the next poll re-claims the issue automatically — you do not need to do anything. |
 | `in-progress` | The agent session is live. The transcript panel streams assistant output in real time. A successful changed turn may stay in this status for one visible automatic publishing turn when **Create PR automatically** is enabled. |
 | `waiting-for-input` | The agent has finished without opening a pull request and is waiting for you to send a follow-up message. If the run left unpublished changes, the issue sidebar offers **Create PR** while the issue is idle. |
 
@@ -72,7 +72,7 @@ When a project or issue has **Automatic Review** enabled, an isolated reviewer a
 
 - **Retry review** — queue a fresh attempt after two trailing infrastructure failures, without waiting for new code.
 - **Continue with human review** — accept the current human review as sufficient and stop further automatic attempts.
-- **Start fresh implementation session** — abandon an unresumable implementation session (its worker was deleted or banned, its agent/model changed, or no session was ever recorded) so the next fix has somewhere to go.
+- **Start fresh implementation session** — abandon an unresumable implementation session (its host was deleted or banned, its agent/model changed, or no session was ever recorded) so the next fix has somewhere to go.
 
 ## Merge and deploy
 
@@ -122,11 +122,11 @@ To enable this, point a GitHub webhook at `https://<your-gentic-host>/api/integr
 
 ## Held status and usage limits
 
-The `held` status is the recovery path for temporary agent outages. When Claude Code or Codex returns a usage-limit, session-limit, rate-limit, or quota error during a run, the worker:
+The `held` status is the recovery path for temporary agent outages. When Claude Code or Codex returns a usage-limit, session-limit, rate-limit, or quota error during a run, the host:
 
 1. Parses a reset time from the error message. Relative (`try again in 2h`), absolute, and `HH:MM (UTC)`-style resets are all supported.
 2. Moves the issue to `held` and stores the parsed reset time.
 3. Skips the issue on subsequent polls until the reset time has passed.
 4. Re-claims the issue automatically once the reset window opens, resuming the same agent session.
 
-If the worker cannot parse a reset time out of the error, the run is treated as a `run-failed` instead so you can intervene manually. You can also cancel a held issue at any time by changing its status to `cancelled`.
+If the host cannot parse a reset time out of the error, the run is treated as a `run-failed` instead so you can intervene manually. You can also cancel a held issue at any time by changing its status to `cancelled`.

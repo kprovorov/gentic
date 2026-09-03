@@ -12,14 +12,14 @@ import {
 
 const genticMcp = {
   apiUrl: "https://app.gentic.chat/api/v1",
-  credential: "gtwc_worker-credential",
+  credential: "gtwc_host-credential",
 }
 
 const expectedGenticServer = {
   type: "http",
   name: GENTIC_MCP_SERVER_NAME,
   url: "https://app.gentic.chat/mcp",
-  headers: [{ name: "Authorization", value: "Bearer gtwc_worker-credential" }],
+  headers: [{ name: "Authorization", value: "Bearer gtwc_host-credential" }],
 }
 
 function newSessionServers(
@@ -128,7 +128,7 @@ test("resumed sessions for both providers receive the same MCP configuration", (
   )
 })
 
-test("sessions carry no MCP server when the worker has no MCP access", () => {
+test("sessions carry no MCP server when the host has no MCP access", () => {
   for (const provider of ["claude_code", "codex"] as const) {
     assert.deepEqual(
       getAgentProviderConfig({

@@ -251,7 +251,7 @@ Creates a new issue inside a project. Issues are created in `draft` status by de
 
   Accepted values: `feature`, `bug`, `feedback`, `idea`, `spec`
 
-  A `spec` issue records intent instead of requesting work: no worker ever claims it and it has no agent conversation. See [Spec issues](/web/issues#spec-issues).
+  A `spec` issue records intent instead of requesting work: no host ever claims it and it has no agent conversation. See [Spec issues](/web/issues#spec-issues).
 </ParamField>
 
 <ParamField body="create_pr_automatically" type="boolean">
@@ -376,11 +376,11 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 
   Accepted values: `draft`, `todo`, `queued`, `held`, `in-progress`, `waiting-for-input`, `testing`, `tests-failed`, `ready-for-review`, `changes-requested`, `approved`, `merged`, `deploying`, `deploy-failed`, `validating`, `run-failed`, `completed`, `cancelled`
 
-  See [Issue Statuses](/web/issue-statuses) for what each value means and the transitions the worker drives automatically.
+  See [Issue Statuses](/web/issue-statuses) for what each value means and the transitions the host drives automatically.
 </ParamField>
 
 <Note>
-  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message `Work on Gentic issue {Issue Code}.` (the agent reads the body itself via `get_issue`), and the next available worker claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
+  Moving an issue from **`draft` → `todo`** is the trigger for a background agent run. Gentic drops the issue into the unclaimed pool, creates the kickoff message `Work on Gentic issue {Issue Code}.` (the agent reads the body itself via `get_issue`), and the next available host claims it (flipping it to `queued`, then `in-progress` once the agent session starts). Other status transitions update the workflow state only — they do not start or restart an agent run.
 
   A [`spec`](/web/issues#spec-issues) issue is the exception: it is never claimed, so `draft` → `todo` on a spec sets the status and nothing else.
 </Note>
@@ -397,7 +397,7 @@ Moves an issue to a new workflow status. This is the primary tool for driving an
 
 Relations declare a **blocking dependency** between two issues you own: one issue
 must reach `completed` or `cancelled` before the other becomes eligible for a
-worker. Enforcement happens when a worker polls for work — a blocked issue can
+host. Enforcement happens when a host polls for work — a blocked issue can
 sit in `todo` indefinitely and is simply skipped. See the
 [Issue Relations guide](/guides/issue-relations) for the workflow behind them.
 
@@ -500,7 +500,7 @@ Creates a blocking relation between two issues you own.
 
 ### `delete_issue_relation`
 
-Removes a blocking relation. The blocked issue becomes eligible for a worker on its next poll.
+Removes a blocking relation. The blocked issue becomes eligible for a host on its next poll.
 
 <ParamField body="id" type="string (uuid)" required>
   The relation ID, from the `relations` array returned by
@@ -528,7 +528,7 @@ Removes a blocking relation. The blocked issue becomes eligible for a worker on 
 
 Labels are reusable, **account-scoped** classifications you can assign to issues
 in any project you own. They are passive metadata — assigning a Label never
-changes status, priority, worker selection, agent scheduling, prompts, or
+changes status, priority, host selection, agent scheduling, prompts, or
 sessions — and they are never synchronized to GitHub. See the
 [Labels guide](/web/labels) for the full model.
 

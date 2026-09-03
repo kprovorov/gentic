@@ -4,7 +4,7 @@ import { setupAgentCLIs } from "./agent-cli-setup.js"
 import { startGenticService } from "./commands/service.js"
 import { getConfigInput } from "./config.js"
 import type { ConfigFile } from "./config-store.js"
-import { markWorkerSetupReady } from "./enrollment.js"
+import { markHostSetupReady } from "./enrollment.js"
 import {
   detectHomebrew,
   detectLinuxPackageManager,
@@ -22,7 +22,7 @@ import { cancel, confirm, intro, isCancel, log, outro } from "./ui.js"
 
 export type OnboardingRequirement =
   | "gentic-auth"
-  | "worker-setup-incomplete"
+  | "host-setup-incomplete"
   | "github-cli-installed"
   | "github-cli-authenticated"
   | "agent-cli-installed"
@@ -30,13 +30,13 @@ export type OnboardingRequirement =
 
 export interface OnboardingAuthStatus {
   authenticated: boolean
-  workerId?: string
+  hostId?: string
   apiUrl?: string
-  maskedWorkerCredential?: string
-  setupState?: ConfigFile["GENTIC_WORKER_SETUP_STATE"]
+  maskedHostCredential?: string
+  setupState?: ConfigFile["GENTIC_HOST_SETUP_STATE"]
   missing: (
-    | "GENTIC_WORKER_ID"
-    | "GENTIC_WORKER_CREDENTIAL"
+    | "GENTIC_HOST_ID"
+    | "GENTIC_HOST_CREDENTIAL"
     | "GENTIC_API_URL"
   )[]
 }
@@ -54,7 +54,7 @@ interface OnboardingStatusDeps {
   getTools?: () => Promise<ToolStatuses>
 }
 
-type OnboardingStepId = "auth" | "gh" | "agent" | "worker"
+type OnboardingStepId = "auth" | "gh" | "agent" | "host"
 
 export interface OnboardingStep {
   id: OnboardingStepId
@@ -68,8 +68,8 @@ interface RunOnboardingDeps {
   ensureGithubCli?: typeof ensureGithubCliForOnboarding
   setupAgentCLIs?: typeof setupAgentCLIs
   ensureAgentCli?: () => Promise<OnboardingStatus>
-  markWorkerReady?: typeof markWorkerSetupReady
-  startWorker?: typeof startGenticService
+  markHostReady?: typeof markHostSetupReady
+  startHost?: typeof startGenticService
   ui?: {
     intro: typeof intro
     outro: typeof outro
@@ -83,7 +83,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   { id: "auth", label: "Gentic auth" },
   { id: "gh", label: "GitHub CLI" },
   { id: "agent", label: "Agent CLI" },
-  { id: "worker", label: "Worker service" },
+  { id: "host", label: "Host service" },
 ]
 
 export interface GithubInstallCommand {
@@ -114,36 +114,36 @@ const GITHUB_REQUIRED_MESSAGE =
 const AGENT_REQUIRED_MESSAGE =
   "both Claude Code and Codex must be installed and authenticated to run gentic"
 
-function maskWorkerCredential(apiKey: string): string {
+function maskHostCredential(apiKey: string): string {
   const suffix = apiKey.slice(-4)
   return `${apiKey.slice(0, 3)}...${suffix}`
 }
 
 function authStatus(config: Partial<ConfigFile>): OnboardingAuthStatus {
   const missing: OnboardingAuthStatus["missing"] = []
-  if (!config.GENTIC_WORKER_ID) missing.push("GENTIC_WORKER_ID")
-  if (!config.GENTIC_WORKER_CREDENTIAL) missing.push("GENTIC_WORKER_CREDENTIAL")
+  if (!config.GENTIC_HOST_ID) missing.push("GENTIC_HOST_ID")
+  if (!config.GENTIC_HOST_CREDENTIAL) missing.push("GENTIC_HOST_CREDENTIAL")
   if (!config.GENTIC_API_URL) missing.push("GENTIC_API_URL")
 
   if (missing.length > 0) {
     return {
       authenticated: false,
-      workerId: config.GENTIC_WORKER_ID,
+      hostId: config.GENTIC_HOST_ID,
       apiUrl: config.GENTIC_API_URL,
-      maskedWorkerCredential: config.GENTIC_WORKER_CREDENTIAL
-        ? maskWorkerCredential(config.GENTIC_WORKER_CREDENTIAL)
+      maskedHostCredential: config.GENTIC_HOST_CREDENTIAL
+        ? maskHostCredential(config.GENTIC_HOST_CREDENTIAL)
         : undefined,
-      setupState: config.GENTIC_WORKER_SETUP_STATE,
+      setupState: config.GENTIC_HOST_SETUP_STATE,
       missing,
     }
   }
 
   return {
     authenticated: true,
-    workerId: config.GENTIC_WORKER_ID,
+    hostId: config.GENTIC_HOST_ID,
     apiUrl: config.GENTIC_API_URL,
-    maskedWorkerCredential: maskWorkerCredential(config.GENTIC_WORKER_CREDENTIAL ?? ""),
-    setupState: config.GENTIC_WORKER_SETUP_STATE ?? "ready",
+    maskedHostCredential: maskHostCredential(config.GENTIC_HOST_CREDENTIAL ?? ""),
+    setupState: config.GENTIC_HOST_SETUP_STATE ?? "ready",
     missing,
   }
 }
@@ -163,7 +163,7 @@ function unmetRequirements(
 
   if (!auth.authenticated) unmet.push("gentic-auth")
   if (auth.authenticated && auth.setupState === "setup-incomplete") {
-    unmet.push("worker-setup-incomplete")
+    unmet.push("host-setup-incomplete")
   }
   if (!tools.github.installed) unmet.push("github-cli-installed")
   else if (!tools.github.authenticated) unmet.push("github-cli-authenticated")
@@ -200,14 +200,14 @@ export function formatOnboardingUnmet(status: OnboardingStatus): string[] {
 
   if (status.unmet.includes("gentic-auth")) {
     lines.push(
-      `Gentic worker registration: missing ${status.auth.missing.join(
+      `Gentic host registration: missing ${status.auth.missing.join(
         " and "
-      )}. Run \`gentic worker connect <code>\`.`
+      )}. Run \`gentic host connect <code>\`.`
     )
   }
 
-  if (status.unmet.includes("worker-setup-incomplete")) {
-    lines.push("Gentic worker setup: incomplete. Run `gentic onboard` to resume.")
+  if (status.unmet.includes("host-setup-incomplete")) {
+    lines.push("Gentic host setup: incomplete. Run `gentic onboard` to resume.")
   }
 
   if (status.unmet.includes("github-cli-installed")) {
@@ -248,12 +248,12 @@ async function runAuthStep(
 
   if (status.auth.authenticated) {
     ui?.success(
-      `Gentic worker connected (${status.auth.workerId}, ${status.auth.maskedWorkerCredential}, ${status.auth.apiUrl}).`
+      `Gentic host connected (${status.auth.hostId}, ${status.auth.maskedHostCredential}, ${status.auth.apiUrl}).`
     )
     return
   }
 
-  ui?.warn("No Gentic worker is connected. Run `gentic worker connect <code>`.")
+  ui?.warn("No Gentic host is connected. Run `gentic host connect <code>`.")
 }
 
 async function runGithubStep(
@@ -298,7 +298,7 @@ function reportAgentStep(
 
 function formatOnboardingSummary(status: OnboardingStatus): string[] {
   const auth = status.auth.authenticated
-    ? `connected (${status.auth.workerId}, ${status.auth.maskedWorkerCredential}, ${status.auth.apiUrl})`
+    ? `connected (${status.auth.hostId}, ${status.auth.maskedHostCredential}, ${status.auth.apiUrl})`
     : "not configured"
   const agents = Object.entries({
     Claude: status.tools.claude,
@@ -315,13 +315,13 @@ function formatOnboardingSummary(status: OnboardingStatus): string[] {
   ]
 }
 
-async function runWorkerStep(
+async function runHostStep(
   status: OnboardingStatus,
-  deps: Pick<RunOnboardingDeps, "confirm" | "startWorker" | "ui">
+  deps: Pick<RunOnboardingDeps, "confirm" | "startHost" | "ui">
 ): Promise<boolean> {
   const ui = deps.ui
   const prompt = deps.confirm ?? confirm
-  const startWorker = deps.startWorker ?? startGenticService
+  const startHost = deps.startHost ?? startGenticService
 
   ui?.info(formatStep(3, ONBOARDING_STEPS[3].label))
   for (const line of formatOnboardingSummary(status)) {
@@ -329,20 +329,20 @@ async function runWorkerStep(
   }
 
   const confirmed = await prompt({
-    message: "Enable the gentic worker now?",
+    message: "Enable the gentic host service now?",
   })
   if (isCancel(confirmed) || !confirmed) {
-    ui?.info("Run `gentic start` later to enable the worker.")
+    ui?.info("Run `gentic start` later to enable the host service.")
     return true
   }
 
-  return startWorker()
+  return startHost()
 }
 
 function hasOnlySetupIncomplete(status: OnboardingStatus): boolean {
   return (
     status.unmet.length === 1 &&
-    status.unmet[0] === "worker-setup-incomplete"
+    status.unmet[0] === "host-setup-incomplete"
   )
 }
 
@@ -367,7 +367,7 @@ export async function runOnboarding(
     for (const line of formatOnboardingUnmet(status)) {
       ui.warn(line)
     }
-    ui.outro("Connect this worker first.")
+    ui.outro("Connect this host first.")
     return
   }
 
@@ -388,7 +388,7 @@ export async function runOnboarding(
   reportAgentStep(status, ui)
 
   if (hasOnlySetupIncomplete(status)) {
-    await (deps.markWorkerReady ?? markWorkerSetupReady)()
+    await (deps.markHostReady ?? markHostSetupReady)()
     status = await getStatus()
   }
 
@@ -400,13 +400,13 @@ export async function runOnboarding(
     return
   }
 
-  const workerComplete = await runWorkerStep(status, {
+  const hostComplete = await runHostStep(status, {
     confirm: deps.confirm,
-    startWorker: deps.startWorker,
+    startHost: deps.startHost,
     ui,
   })
-  if (!workerComplete) {
-    ui.outro("Onboarding checks complete, but the worker did not start.")
+  if (!hostComplete) {
+    ui.outro("Onboarding checks complete, but the host did not start.")
     return
   }
 

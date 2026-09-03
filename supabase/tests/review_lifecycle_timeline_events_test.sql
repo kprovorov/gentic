@@ -35,8 +35,8 @@ SELECT is(
   'the first attempt on a fresh cycle is numbered 1'
 );
 
-INSERT INTO public.workers (id, user_id, display_name, credential_hash) VALUES
-  ('e1000000-0000-4000-8000-000000000004', 'user_events_1', 'Worker E1', repeat('1', 64));
+INSERT INTO public.hosts (id, user_id, display_name, credential_hash) VALUES
+  ('e1000000-0000-4000-8000-000000000004', 'user_events_1', 'Host E1', repeat('1', 64));
 
 CREATE TEMP TABLE e1_claim AS
 SELECT * FROM public.claim_review_run('e1000000-0000-4000-8000-000000000004', 'user_events_1');

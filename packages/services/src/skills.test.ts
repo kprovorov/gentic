@@ -3,33 +3,33 @@ import test from "node:test"
 
 import { ServiceError } from "./errors"
 import {
-  claimWorkerSkillInstall,
-  createWorkerSkillInstalls,
+  claimHostSkillInstall,
+  createHostSkillInstalls,
   evaluateSkillAudits,
-  expireWorkerSkillInstalls,
+  expireHostSkillInstalls,
   fetchSkillAudits,
   listSkillInstallTargets,
-  listWorkerSkillInstalls,
-  reportWorkerSkillInstallResult,
+  listHostSkillInstalls,
+  reportHostSkillInstallResult,
   SkillAuditGateError,
   SKILL_INSTALL_RETENTION_MS,
 } from "./skills"
 
 type Row = Record<string, unknown>
-type TableName = "workers" | "issues" | "review_runs" | "worker_skill_installs"
+type TableName = "hosts" | "issues" | "review_runs" | "host_skill_installs"
 
 const NOW = new Date("2026-08-12T12:00:00.000Z")
 const SKILL_URL = "https://skills.sh/anthropics/skills/pdf"
-const ONLINE_WORKER = "11111111-1111-4111-8111-111111111111"
-const OFFLINE_WORKER = "22222222-2222-4222-8222-222222222222"
-const BANNED_WORKER = "33333333-3333-4333-8333-333333333333"
-const OTHER_ACCOUNT_WORKER = "44444444-4444-4444-8444-444444444444"
+const ONLINE_HOST = "11111111-1111-4111-8111-111111111111"
+const OFFLINE_HOST = "22222222-2222-4222-8222-222222222222"
+const BANNED_HOST = "33333333-3333-4333-8333-333333333333"
+const OTHER_ACCOUNT_HOST = "44444444-4444-4444-8444-444444444444"
 
 class FakeSupabase {
-  workers: Row[] = []
+  hosts: Row[] = []
   issues: Row[] = []
   review_runs: Row[] = []
-  worker_skill_installs: Row[] = []
+  host_skill_installs: Row[] = []
   private nextId = 0
 
   from(table: TableName) {
@@ -147,7 +147,7 @@ class FakeQuery implements PromiseLike<QueryResult> {
             error: {
               code: "23505",
               message:
-                'duplicate key value violates unique constraint "worker_skill_installs_one_active_per_worker_idx"',
+                'duplicate key value violates unique constraint "host_skill_installs_one_active_per_host_idx"',
             },
           }
         }
@@ -181,12 +181,12 @@ class FakeQuery implements PromiseLike<QueryResult> {
   }
 
   private violatesActiveInstallUnique(row: Row) {
-    if (this.table !== "worker_skill_installs") return false
+    if (this.table !== "host_skill_installs") return false
     if (!["waiting", "installing"].includes(String(row.status))) return false
 
     return this.rows().some(
       (existing) =>
-        existing.worker_id === row.worker_id &&
+        existing.host_id === row.host_id &&
         ["waiting", "installing"].includes(String(existing.status))
     )
   }
@@ -194,20 +194,20 @@ class FakeQuery implements PromiseLike<QueryResult> {
 
 function seededDb(): FakeSupabase {
   const db = new FakeSupabase()
-  db.workers = [
-    workerRow({ id: ONLINE_WORKER, display_name: "online" }),
-    workerRow({
-      id: OFFLINE_WORKER,
+  db.hosts = [
+    hostRow({ id: ONLINE_HOST, display_name: "online" }),
+    hostRow({
+      id: OFFLINE_HOST,
       display_name: "offline",
       last_seen_at: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
     }),
-    workerRow({
-      id: BANNED_WORKER,
+    hostRow({
+      id: BANNED_HOST,
       display_name: "banned",
       banned_at: NOW.toISOString(),
     }),
-    workerRow({
-      id: OTHER_ACCOUNT_WORKER,
+    hostRow({
+      id: OTHER_ACCOUNT_HOST,
       display_name: "someone else",
       user_id: "user-2",
     }),
@@ -215,11 +215,11 @@ function seededDb(): FakeSupabase {
   return db
 }
 
-function workerRow(overrides: Row = {}): Row {
+function hostRow(overrides: Row = {}): Row {
   return {
-    id: ONLINE_WORKER,
+    id: ONLINE_HOST,
     user_id: "user-1",
-    display_name: "worker",
+    display_name: "host",
     setup_state: "ready",
     banned_at: null,
     created_at: NOW.toISOString(),
@@ -382,13 +382,13 @@ test("audit lookup maps registry responses onto missing and unavailable outcomes
   )
 })
 
-test("dispatch queues one waiting command per selected online worker", async () => {
+test("dispatch queues one waiting command per selected online host", async () => {
   const db = seededDb()
 
-  const result = await createWorkerSkillInstalls(
+  const result = await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
@@ -401,22 +401,22 @@ test("dispatch queues one waiting command per selected online worker", async () 
   assert.equal(result.installs.length, 1)
   assert.equal(result.installs[0].status, "waiting")
   assert.equal(
-    db.worker_skill_installs[0].expires_at,
+    db.host_skill_installs[0].expires_at,
     new Date(NOW.getTime() + 10 * 60_000).toISOString()
   )
 })
 
-test("dispatch refuses workers the account does not own or that are not eligible", async () => {
-  for (const workerId of [
-    OTHER_ACCOUNT_WORKER,
-    OFFLINE_WORKER,
-    BANNED_WORKER,
+test("dispatch refuses hosts the account does not own or that are not eligible", async () => {
+  for (const hostId of [
+    OTHER_ACCOUNT_HOST,
+    OFFLINE_HOST,
+    BANNED_HOST,
   ]) {
     await assert.rejects(
-      createWorkerSkillInstalls(
+      createHostSkillInstalls(
         seededDb() as never,
         "user-1",
-        { url: SKILL_URL, worker_ids: [workerId], accept_risk: false },
+        { url: SKILL_URL, host_ids: [hostId], accept_risk: false },
         { now: NOW, fetchImpl: passingAudits }
       ),
       (error: unknown) => {
@@ -424,30 +424,30 @@ test("dispatch refuses workers the account does not own or that are not eligible
         assert.ok(["not_found", "conflict"].includes(error.code))
         return true
       },
-      workerId
+      hostId
     )
   }
 })
 
-test("dispatch refuses a worker that is already installing a skill", async () => {
+test("dispatch refuses a host that is already installing a skill", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
   await assert.rejects(
-    createWorkerSkillInstalls(
+    createHostSkillInstalls(
       db as never,
       "user-1",
-      { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+      { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
       { now: NOW, fetchImpl: passingAudits }
     ),
     /already installing/
   )
-  assert.equal(db.worker_skill_installs.length, 1)
+  assert.equal(db.host_skill_installs.length, 1)
 })
 
 test("dispatch enforces the audit gate server-side", async () => {
@@ -470,10 +470,10 @@ test("dispatch enforces the audit gate server-side", async () => {
 
   const blocked = seededDb()
   await assert.rejects(
-    createWorkerSkillInstalls(
+    createHostSkillInstalls(
       blocked as never,
       "user-1",
-      { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: true },
+      { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: true },
       { now: NOW, fetchImpl: failing }
     ),
     (error: unknown) => {
@@ -482,14 +482,14 @@ test("dispatch enforces the audit gate server-side", async () => {
       return true
     }
   )
-  assert.equal(blocked.worker_skill_installs.length, 0)
+  assert.equal(blocked.host_skill_installs.length, 0)
 
   const unconfirmed = seededDb()
   await assert.rejects(
-    createWorkerSkillInstalls(
+    createHostSkillInstalls(
       unconfirmed as never,
       "user-1",
-      { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+      { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
       { now: NOW, fetchImpl: warning }
     ),
     (error: unknown) => {
@@ -498,81 +498,81 @@ test("dispatch enforces the audit gate server-side", async () => {
       return true
     }
   )
-  assert.equal(unconfirmed.worker_skill_installs.length, 0)
+  assert.equal(unconfirmed.host_skill_installs.length, 0)
 
   const confirmed = seededDb()
-  const result = await createWorkerSkillInstalls(
+  const result = await createHostSkillInstalls(
     confirmed as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: true },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: true },
     { now: NOW, fetchImpl: warning }
   )
   assert.equal(result.installs.length, 1)
 })
 
-test("a claimed command is handed to its worker exactly once", async () => {
+test("a claimed command is handed to its host exactly once", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
-  const claimed = await claimWorkerSkillInstall(db as never, ONLINE_WORKER, {
+  const claimed = await claimHostSkillInstall(db as never, ONLINE_HOST, {
     now: NOW,
   })
   assert.deepEqual(claimed, {
-    id: db.worker_skill_installs[0].id as string,
+    id: db.host_skill_installs[0].id as string,
     source: "anthropics/skills",
     skill: "pdf",
-    expires_at: db.worker_skill_installs[0].expires_at as string,
+    expires_at: db.host_skill_installs[0].expires_at as string,
   })
 
   assert.equal(
-    await claimWorkerSkillInstall(db as never, ONLINE_WORKER, { now: NOW }),
+    await claimHostSkillInstall(db as never, ONLINE_HOST, { now: NOW }),
     null
   )
 })
 
-test("another account's worker cannot claim the command", async () => {
+test("another account's host cannot claim the command", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
   assert.equal(
-    await claimWorkerSkillInstall(db as never, OTHER_ACCOUNT_WORKER, {
+    await claimHostSkillInstall(db as never, OTHER_ACCOUNT_HOST, {
       now: NOW,
     }),
     null
   )
   assert.deepEqual(
-    await listWorkerSkillInstalls(
+    await listHostSkillInstalls(
       db as never,
       "user-2",
-      [db.worker_skill_installs[0].id as string],
+      [db.host_skill_installs[0].id as string],
       { now: NOW }
     ),
     []
   )
 })
 
-test("a worker that reconnects before expiry still receives the command", async () => {
+test("a host that reconnects before expiry still receives the command", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
   const reconnected = new Date(NOW.getTime() + 9 * 60_000)
   assert.ok(
-    await claimWorkerSkillInstall(db as never, ONLINE_WORKER, {
+    await claimHostSkillInstall(db as never, ONLINE_HOST, {
       now: reconnected,
     })
   )
@@ -580,20 +580,20 @@ test("a worker that reconnects before expiry still receives the command", async 
 
 test("a command nobody claims before expiry times out and is never delivered", async () => {
   const db = seededDb()
-  const { installs } = await createWorkerSkillInstalls(
+  const { installs } = await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
   const late = new Date(NOW.getTime() + 11 * 60_000)
   assert.equal(
-    await claimWorkerSkillInstall(db as never, ONLINE_WORKER, { now: late }),
+    await claimHostSkillInstall(db as never, ONLINE_HOST, { now: late }),
     null
   )
 
-  const [install] = await listWorkerSkillInstalls(
+  const [install] = await listHostSkillInstalls(
     db as never,
     "user-1",
     [installs[0].id],
@@ -602,20 +602,20 @@ test("a command nobody claims before expiry times out and is never delivered", a
   assert.equal(install.status, "timed-out")
 })
 
-test("results are recorded once, sanitized, and only for the claiming worker", async () => {
+test("results are recorded once, sanitized, and only for the claiming host", async () => {
   const db = seededDb()
-  const { installs } = await createWorkerSkillInstalls(
+  const { installs } = await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
-  await claimWorkerSkillInstall(db as never, ONLINE_WORKER, { now: NOW })
+  await claimHostSkillInstall(db as never, ONLINE_HOST, { now: NOW })
 
   await assert.rejects(
-    reportWorkerSkillInstallResult(
+    reportHostSkillInstallResult(
       db as never,
-      OTHER_ACCOUNT_WORKER,
+      OTHER_ACCOUNT_HOST,
       installs[0].id,
       { status: "installed" },
       { now: NOW }
@@ -623,9 +623,9 @@ test("results are recorded once, sanitized, and only for the claiming worker", a
     /not found/
   )
 
-  const reported = await reportWorkerSkillInstallResult(
+  const reported = await reportHostSkillInstallResult(
     db as never,
-    ONLINE_WORKER,
+    ONLINE_HOST,
     installs[0].id,
     {
       status: "failed",
@@ -639,9 +639,9 @@ test("results are recorded once, sanitized, and only for the claiming worker", a
   assert.equal(reported.output, "npm error path ~/.claude")
 
   await assert.rejects(
-    reportWorkerSkillInstallResult(
+    reportHostSkillInstallResult(
       db as never,
-      ONLINE_WORKER,
+      ONLINE_HOST,
       installs[0].id,
       { status: "installed" },
       { now: NOW }
@@ -650,16 +650,16 @@ test("results are recorded once, sanitized, and only for the claiming worker", a
   )
 })
 
-test("install targets keep ineligible workers visible with their reason", async () => {
+test("install targets keep ineligible hosts visible with their reason", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
-  db.workers.push(
-    workerRow({
+  db.hosts.push(
+    hostRow({
       id: "55555555-5555-4555-8555-555555555555",
       display_name: "fresh",
       setup_state: "enrolling",
@@ -689,16 +689,16 @@ test("install targets keep ineligible workers visible with their reason", async 
 
 test("command state is swept once the retention window passes", async () => {
   const db = seededDb()
-  await createWorkerSkillInstalls(
+  await createHostSkillInstalls(
     db as never,
     "user-1",
-    { url: SKILL_URL, worker_ids: [ONLINE_WORKER], accept_risk: false },
+    { url: SKILL_URL, host_ids: [ONLINE_HOST], accept_risk: false },
     { now: NOW, fetchImpl: passingAudits }
   )
 
-  await expireWorkerSkillInstalls(db as never, {
+  await expireHostSkillInstalls(db as never, {
     now: new Date(NOW.getTime() + SKILL_INSTALL_RETENTION_MS + 1_000),
   })
 
-  assert.deepEqual(db.worker_skill_installs, [])
+  assert.deepEqual(db.host_skill_installs, [])
 })

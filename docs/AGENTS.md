@@ -6,12 +6,12 @@
 - Pages are MDX files with YAML frontmatter
 - Configuration lives in `docs.json`
 - Product behavior must be verified against the code in `../apps` and `../packages`
-- Worker CLI commands and configuration are defined in `../apps/gentic/src`
+- Host CLI commands and configuration are defined in `../apps/gentic/src`
 - Issue statuses and field constraints are defined in `../packages/validators`
 
 ## Terminology
 
-- Use **agent worker** for the self-hosted `gentic` process.
+- Use **agent host** for the self-hosted `gentic` process.
 - Use **agent** for Claude Code or Codex.
 - Use **project** for a repository configuration in Gentic.
 - Use status labels as they appear in the UI and code values in backticks.
@@ -28,6 +28,6 @@
 
 ## Content boundaries
 
-- Document user-facing web, worker, and MCP behavior.
+- Document user-facing web, host, and MCP behavior.
 - Do not present reserved workflow statuses as automated unless code drives them.
 - Do not document internal test authentication or deployment secrets as user features.

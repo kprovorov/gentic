@@ -38,9 +38,9 @@ After saving the file and restarting Claude Desktop, Claude will prompt you to a
 
 ## Managed coding agents connect automatically
 
-Coding agents that Gentic runs for you — Claude Code and Codex sessions started by a connected worker — get this same MCP server without any setup. Every session, whether it is a fresh run or a follow-up that resumes an earlier one, is started with the Gentic MCP server already configured and authenticated with that worker's credential.
+Coding agents that Gentic runs for you — Claude Code and Codex sessions started by a host — get this same MCP server without any setup. Every session, whether it is a fresh run or a follow-up that resumes an earlier one, is started with the Gentic MCP server already configured and authenticated with that host's credential.
 
-That connection resolves to **your** Gentic account, so the agent working on an issue sees exactly the projects, issues, and labels you do. Banning or deleting a worker revokes its MCP access along with its API access, immediately and through the same control.
+That connection resolves to **your** Gentic account, so the agent working on an issue sees exactly the projects, issues, and labels you do. Banning or deleting a host revokes its MCP access along with its API access, immediately and through the same control.
 
 Any MCP servers you configure yourself — in `.mcp.json`, `~/.codex/config.toml`, or your provider's own settings — are left in place; the Gentic server is added alongside them.
 
@@ -69,7 +69,7 @@ Once connected, your AI assistant can:
     Create account-scoped Labels, assign them across projects, and filter issues by Label or find unlabeled work.
   </Card>
   <Card title="Sequence work with relations" icon="link">
-    Declare that one issue blocks another so the worker runs a chain of issues in the right order.
+    Declare that one issue blocks another so the host runs a chain of issues in the right order.
   </Card>
 </CardGroup>
 

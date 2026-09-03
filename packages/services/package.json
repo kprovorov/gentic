@@ -17,7 +17,7 @@
     "./skills": "./src/skills.ts",
     "./user-settings": "./src/user-settings.ts",
     "./types": "./src/types.ts",
-    "./workers": "./src/workers.ts"
+    "./hosts": "./src/hosts.ts"
   },
   "scripts": {
     "lint": "eslint .",

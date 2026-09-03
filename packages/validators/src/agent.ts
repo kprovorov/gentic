@@ -209,7 +209,7 @@ export type RequestAutomaticPrPublishInput = z.infer<
   typeof requestAutomaticPrPublishInputSchema
 >
 
-// The full issue context a worker needs to keep acting on the same session
+// The full issue context a host needs to keep acting on the same session
 // without an extra round trip (e.g. it must not fall back to a
 // waiting-for-input transition just to learn the issue's code/title/PR
 // state) is echoed back alongside the created (or already-existing, on a
@@ -399,10 +399,10 @@ export const reviewRunContextResponseSchema = z.object({
 
 export type ReviewRunContext = z.infer<typeof reviewRunContextResponseSchema>
 
-// `seq` is assigned client-side by the worker (a single incrementing counter
+// `seq` is assigned client-side by the host (a single incrementing counter
 // per review run, mirroring the `eventSeq` pattern `session.ts`'s `runTurn`
 // already uses for Issue chat) rather than computed server-side — a review
-// run has exactly one worker appending to it at a time, so there's no
+// run has exactly one host appending to it at a time, so there's no
 // concurrent-writer race to resolve.
 export const reviewRunLogInputSchema = z
   .object({

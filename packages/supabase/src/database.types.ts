@@ -124,6 +124,176 @@ export type Database = {
         }
         Relationships: []
       }
+      host_enrollment_codes: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      host_enrollment_exchange_failures: {
+        Row: {
+          failed_count: number
+          locked_until: string | null
+          rate_limit_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          locked_until?: string | null
+          rate_limit_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      host_skill_installs: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          error_summary: string | null
+          expires_at: string
+          finished_at: string | null
+          host_id: string
+          id: string
+          output: string | null
+          skill: string
+          source: string
+          status: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          expires_at: string
+          finished_at?: string | null
+          host_id: string
+          id?: string
+          output?: string | null
+          skill: string
+          source: string
+          status?: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          expires_at?: string
+          finished_at?: string | null
+          host_id?: string
+          id?: string
+          output?: string | null
+          skill?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_skill_installs_host_owner"
+            columns: ["host_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "hosts"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      hosts: {
+        Row: {
+          arch: string | null
+          banned_at: string | null
+          configured_capacity: number
+          created_at: string
+          credential_expires_at: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version: string | null
+          id: string
+          last_seen_at: string | null
+          normalized_name: string | null
+          offline_since_at: string | null
+          os: string | null
+          process_started_at: string | null
+          provider_capabilities: Json
+          setup_state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          arch?: string | null
+          banned_at?: string | null
+          configured_capacity?: number
+          created_at?: string
+          credential_expires_at?: string | null
+          credential_hash: string
+          display_name: string
+          gentic_version?: string | null
+          id?: string
+          last_seen_at?: string | null
+          normalized_name?: string | null
+          offline_since_at?: string | null
+          os?: string | null
+          process_started_at?: string | null
+          provider_capabilities?: Json
+          setup_state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          arch?: string | null
+          banned_at?: string | null
+          configured_capacity?: number
+          created_at?: string
+          credential_expires_at?: string | null
+          credential_hash?: string
+          display_name?: string
+          gentic_version?: string | null
+          id?: string
+          last_seen_at?: string | null
+          normalized_name?: string | null
+          offline_since_at?: string | null
+          os?: string | null
+          process_started_at?: string | null
+          provider_capabilities?: Json
+          setup_state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       issue_automatic_pr_requests: {
         Row: {
           create_pr_automatically_snapshot: boolean
@@ -213,6 +383,7 @@ export type Database = {
           created_at: string
           established_at: string
           generation: number
+          host_id: string | null
           id: string
           issue_id: string
           issue_model: string | null
@@ -220,13 +391,13 @@ export type Database = {
           session_id: string | null
           superseded_at: string | null
           updated_at: string
-          worker_id: string | null
         }
         Insert: {
           agent_provider: string
           created_at?: string
           established_at?: string
           generation: number
+          host_id?: string | null
           id?: string
           issue_id: string
           issue_model?: string | null
@@ -234,13 +405,13 @@ export type Database = {
           session_id?: string | null
           superseded_at?: string | null
           updated_at?: string
-          worker_id?: string | null
         }
         Update: {
           agent_provider?: string
           created_at?: string
           established_at?: string
           generation?: number
+          host_id?: string | null
           id?: string
           issue_id?: string
           issue_model?: string | null
@@ -248,21 +419,20 @@ export type Database = {
           session_id?: string | null
           superseded_at?: string | null
           updated_at?: string
-          worker_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "issue_implementation_owners_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "hosts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "issue_implementation_owners_issue_id_fkey"
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "issues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "issue_implementation_owners_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
-            referencedRelation: "workers"
             referencedColumns: ["id"]
           },
         ]
@@ -417,8 +587,8 @@ export type Database = {
       }
       issues: {
         Row: {
+          active_host_id: string | null
           active_run_id: string | null
-          active_worker_id: string | null
           agent_provider: string
           automatic_review_enabled: boolean | null
           body: string | null
@@ -442,8 +612,8 @@ export type Database = {
           usage_limit_reset_at: string | null
         }
         Insert: {
+          active_host_id?: string | null
           active_run_id?: string | null
-          active_worker_id?: string | null
           agent_provider?: string
           automatic_review_enabled?: boolean | null
           body?: string | null
@@ -467,8 +637,8 @@ export type Database = {
           usage_limit_reset_at?: string | null
         }
         Update: {
+          active_host_id?: string | null
           active_run_id?: string | null
-          active_worker_id?: string | null
           agent_provider?: string
           automatic_review_enabled?: boolean | null
           body?: string | null
@@ -493,10 +663,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "issues_active_worker_id_fkey"
-            columns: ["active_worker_id"]
+            foreignKeyName: "issues_active_host_id_fkey"
+            columns: ["active_host_id"]
             isOneToOne: false
-            referencedRelation: "workers"
+            referencedRelation: "hosts"
             referencedColumns: ["id"]
           },
           {
@@ -883,7 +1053,7 @@ export type Database = {
       }
       review_runs: {
         Row: {
-          claimed_by_worker_id: string | null
+          claimed_by_host_id: string | null
           created_at: string
           error: string | null
           finished_at: string | null
@@ -896,7 +1066,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          claimed_by_worker_id?: string | null
+          claimed_by_host_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -909,7 +1079,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          claimed_by_worker_id?: string | null
+          claimed_by_host_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -923,10 +1093,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "review_runs_claimed_by_worker_id_fkey"
-            columns: ["claimed_by_worker_id"]
+            foreignKeyName: "review_runs_claimed_by_host_id_fkey"
+            columns: ["claimed_by_host_id"]
             isOneToOne: false
-            referencedRelation: "workers"
+            referencedRelation: "hosts"
             referencedColumns: ["id"]
           },
           {
@@ -954,176 +1124,6 @@ export type Database = {
         Update: {
           created_at?: string
           default_agent_provider?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      worker_enrollment_codes: {
-        Row: {
-          code_hash: string
-          consumed_at: string | null
-          created_at: string
-          expires_at: string
-          user_id: string
-        }
-        Insert: {
-          code_hash: string
-          consumed_at?: string | null
-          created_at?: string
-          expires_at: string
-          user_id: string
-        }
-        Update: {
-          code_hash?: string
-          consumed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      worker_enrollment_exchange_failures: {
-        Row: {
-          failed_count: number
-          locked_until: string | null
-          rate_limit_key: string
-          updated_at: string
-          window_started_at: string
-        }
-        Insert: {
-          failed_count?: number
-          locked_until?: string | null
-          rate_limit_key: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Update: {
-          failed_count?: number
-          locked_until?: string | null
-          rate_limit_key?: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Relationships: []
-      }
-      worker_skill_installs: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          error_summary: string | null
-          expires_at: string
-          finished_at: string | null
-          id: string
-          output: string | null
-          skill: string
-          source: string
-          status: string
-          updated_at: string
-          url: string
-          user_id: string
-          worker_id: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          error_summary?: string | null
-          expires_at: string
-          finished_at?: string | null
-          id?: string
-          output?: string | null
-          skill: string
-          source: string
-          status?: string
-          updated_at?: string
-          url: string
-          user_id: string
-          worker_id: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          error_summary?: string | null
-          expires_at?: string
-          finished_at?: string | null
-          id?: string
-          output?: string | null
-          skill?: string
-          source?: string
-          status?: string
-          updated_at?: string
-          url?: string
-          user_id?: string
-          worker_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "worker_skill_installs_worker_owner"
-            columns: ["worker_id", "user_id"]
-            isOneToOne: false
-            referencedRelation: "workers"
-            referencedColumns: ["id", "user_id"]
-          },
-        ]
-      }
-      workers: {
-        Row: {
-          arch: string | null
-          banned_at: string | null
-          configured_capacity: number
-          created_at: string
-          credential_expires_at: string | null
-          credential_hash: string
-          display_name: string
-          gentic_version: string | null
-          id: string
-          last_seen_at: string | null
-          normalized_name: string | null
-          offline_since_at: string | null
-          os: string | null
-          process_started_at: string | null
-          provider_capabilities: Json
-          setup_state: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          arch?: string | null
-          banned_at?: string | null
-          configured_capacity?: number
-          created_at?: string
-          credential_expires_at?: string | null
-          credential_hash: string
-          display_name: string
-          gentic_version?: string | null
-          id?: string
-          last_seen_at?: string | null
-          normalized_name?: string | null
-          offline_since_at?: string | null
-          os?: string | null
-          process_started_at?: string | null
-          provider_capabilities?: Json
-          setup_state?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          arch?: string | null
-          banned_at?: string | null
-          configured_capacity?: number
-          created_at?: string
-          credential_expires_at?: string | null
-          credential_hash?: string
-          display_name?: string
-          gentic_version?: string | null
-          id?: string
-          last_seen_at?: string | null
-          normalized_name?: string | null
-          offline_since_at?: string | null
-          os?: string | null
-          process_started_at?: string | null
-          provider_capabilities?: Json
-          setup_state?: string
           updated_at?: string
           user_id?: string
         }
@@ -1171,8 +1171,8 @@ export type Database = {
           issue_status_changed: boolean
         }[]
       }
-      ban_worker: {
-        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+      ban_host: {
+        Args: { p_now?: string; p_user_id: string; p_host_id: string }
         Returns: {
           arch: string | null
           banned_at: string | null
@@ -1195,13 +1195,13 @@ export type Database = {
         }
         SetofOptions: {
           from: "*"
-          to: "workers"
+          to: "hosts"
           isOneToOne: true
           isSetofReturn: false
         }
       }
       claim_review_run: {
-        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+        Args: { p_now?: string; p_user_id: string; p_host_id: string }
         Returns: {
           head_sha: string
           issue_id: string
@@ -1228,7 +1228,7 @@ export type Database = {
           review_cycle_id: string
         }[]
       }
-      consume_worker_enrollment_code: {
+      consume_host_enrollment_code: {
         Args: {
           p_arch: string
           p_code_hash: string
@@ -1263,7 +1263,7 @@ export type Database = {
         }
         SetofOptions: {
           from: "*"
-          to: "workers"
+          to: "hosts"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1276,6 +1276,10 @@ export type Database = {
           status: string
         }[]
       }
+      delete_host: {
+        Args: { p_now?: string; p_user_id: string; p_host_id: string }
+        Returns: boolean
+      }
       delete_old_orphaned_attachments: {
         Args: { older_than?: string }
         Returns: {
@@ -1285,10 +1289,6 @@ export type Database = {
       delete_orphaned_attachment_rows: {
         Args: { older_than?: string }
         Returns: number
-      }
-      delete_worker: {
-        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
-        Returns: boolean
       }
       deliver_review_fix_request: {
         Args: { p_content: string; p_now?: string; p_review_attempt_id: string }
@@ -1350,15 +1350,15 @@ export type Database = {
           status_changed: boolean
         }[]
       }
+      reconcile_offline_host_runs: {
+        Args: { p_now?: string }
+        Returns: number
+      }
       reconcile_offline_review_runs: {
         Args: { p_now?: string }
         Returns: number
       }
-      reconcile_offline_worker_runs: {
-        Args: { p_now?: string }
-        Returns: number
-      }
-      record_worker_enrollment_exchange_failure: {
+      record_host_enrollment_exchange_failure: {
         Args: {
           p_max_failures: number
           p_now: string
@@ -1370,12 +1370,12 @@ export type Database = {
           locked_until: string
         }[]
       }
-      rename_worker: {
+      rename_host: {
         Args: {
           p_display_name: string
+          p_host_id: string
           p_now?: string
           p_user_id: string
-          p_worker_id: string
         }
         Returns: {
           arch: string | null
@@ -1399,7 +1399,7 @@ export type Database = {
         }
         SetofOptions: {
           from: "*"
-          to: "workers"
+          to: "hosts"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1413,12 +1413,12 @@ export type Database = {
           status: string
         }[]
       }
-      requeue_worker_active_issues: {
-        Args: { p_now: string; p_worker_id: string }
+      requeue_host_active_issues: {
+        Args: { p_now: string; p_host_id: string }
         Returns: number
       }
-      requeue_worker_active_review_runs: {
-        Args: { p_now: string; p_worker_id: string }
+      requeue_host_active_review_runs: {
+        Args: { p_now: string; p_host_id: string }
         Returns: number
       }
       reset_issue_run: {
@@ -1466,7 +1466,7 @@ export type Database = {
           session_id: string | null
           superseded_at: string | null
           updated_at: string
-          worker_id: string | null
+          host_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1502,8 +1502,8 @@ export type Database = {
           issue_status_changed: boolean
         }[]
       }
-      unban_worker: {
-        Args: { p_now?: string; p_user_id: string; p_worker_id: string }
+      unban_host: {
+        Args: { p_now?: string; p_user_id: string; p_host_id: string }
         Returns: {
           arch: string | null
           banned_at: string | null
@@ -1526,7 +1526,7 @@ export type Database = {
         }
         SetofOptions: {
           from: "*"
-          to: "workers"
+          to: "hosts"
           isOneToOne: true
           isSetofReturn: false
         }

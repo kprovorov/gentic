@@ -50,7 +50,7 @@ export type PublishReviewVerdictResult = {
 }
 
 // Injectable the same way `handleGithubWebhookRequest`'s `pullRequestServices`
-// and the worker's `ProcessReviewRunDeps` are — real GitHub calls otherwise
+// and the host's `ProcessReviewRunDeps` are — real GitHub calls otherwise
 // require a live installation token, so tests substitute fakes here instead
 // of mocking global `fetch`.
 export type PublishReviewVerdictDeps = {

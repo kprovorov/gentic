@@ -4,7 +4,7 @@ sidebarTitle: "Issues"
 description: "Issues are the unit of work in Gentic. Assign an issue to an AI agent, track its code changes, and optionally publish them as a pull request."
 ---
 
-An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the worker clones your repository and the agent follows the instructions in the issue body. Every issue tracks its own status, agent conversation, publishing preference, and pull requests in one place.
+An issue represents a discrete coding task — a feature, bug fix, piece of feedback, or idea — that you hand off to an AI agent. Once you move an issue from **Draft** to **Todo**, Gentic queues an agent run: the host clones your repository and the agent follows the instructions in the issue body. Every issue tracks its own status, agent conversation, publishing preference, and pull requests in one place.
 
 ## Create an Issue
 
@@ -113,7 +113,7 @@ A **Spec** is an issue that records intent instead of asking for it to be built 
 
 A Spec differs from every other type in two ways:
 
-- **No agent runs it.** Workers skip Spec issues when claiming work, so a Spec left in **Todo** is never picked up. Its statuses are a marker of your own progress; moving one from **Draft** to **Todo** does not queue anything.
+- **No agent runs it.** Hosts skip Spec issues when claiming work, so a Spec left in **Todo** is never picked up. Its statuses are a marker of your own progress; moving one from **Draft** to **Todo** does not queue anything.
 - **It has no conversation.** The detail page shows the body and the issue's history with no chat composer, because there is no agent session to send to.
 
 Everything else — labels, priority, relations, files, and the body — works exactly as it does for other issues, so a Spec can block the issues that implement it.

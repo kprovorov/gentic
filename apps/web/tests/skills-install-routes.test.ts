@@ -110,7 +110,7 @@ test("a refused audit gate answers 409 and carries the gate back to the dialog",
   const response = await route(
     new Request("https://app.example/api/app/skills/installs", {
       method: "POST",
-      body: JSON.stringify({ url: skill.url, worker_ids: ["w1"] }),
+      body: JSON.stringify({ url: skill.url, host_ids: ["w1"] }),
     })
   )
 
@@ -121,7 +121,7 @@ test("a refused audit gate answers 409 and carries the gate back to the dialog",
   })
 })
 
-test("an ineligible worker fails the whole submission with its reason", async () => {
+test("an ineligible host fails the whole submission with its reason", async () => {
   const route = createSkillInstallsRoute({
     getContext: authenticated,
     createInstalls: async () => {
@@ -135,7 +135,7 @@ test("an ineligible worker fails the whole submission with its reason", async ()
   const response = await route(
     new Request("https://app.example/api/app/skills/installs", {
       method: "POST",
-      body: JSON.stringify({ url: skill.url, worker_ids: ["w1"] }),
+      body: JSON.stringify({ url: skill.url, host_ids: ["w1"] }),
     })
   )
 

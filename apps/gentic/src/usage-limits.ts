@@ -111,9 +111,9 @@ function parseAbsoluteReset(
   // Strip ordinal suffixes (e.g. "5th" -> "5") — Codex's usage-limit
   // messages use them, but the Date constructor can't parse them.
   const dateText = human.replace(/(\d)(?:st|nd|rd|th)\b/i, "$1")
-  // A bare "Month day, year time" string is parsed in the host's local
-  // timezone, so pin it explicitly using the message's own timezone
-  // abbreviation (if any) or the caller's default.
+  // A bare "Month day, year time" string is parsed in the local timezone of
+  // the machine running this, so pin it explicitly using the message's own
+  // timezone abbreviation (if any) or the caller's default.
   const dateTextWithZone = tz
     ? `${dateText} ${tz}`
     : defaultTimeZone === "utc"

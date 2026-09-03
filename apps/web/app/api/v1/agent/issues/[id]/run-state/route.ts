@@ -5,7 +5,7 @@ import {
   handleAgentError,
   json,
   runStateSchema,
-  ensureActiveWorkerRun,
+  ensureActiveHostRun,
   type Supabase,
 } from "../../../_lib"
 
@@ -14,15 +14,15 @@ export const runtime = "nodejs"
 export async function finishIssueRun(
   supabase: Supabase,
   userId: string,
-  workerId: string,
+  hostId: string,
   issueId: string,
   body: unknown
 ) {
   const fields = finishRunSchema.parse(body)
-  await ensureActiveWorkerRun(
+  await ensureActiveHostRun(
     supabase,
     userId,
-    workerId,
+    hostId,
     issueId,
     fields.active_run_id
   )
@@ -53,23 +53,23 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     await ensureIssueOwned(supabase, userId, id)
 
     if (body && typeof body === "object" && "finish_if_no_pending" in body) {
-      return json(await finishIssueRun(supabase, userId, workerId, id, body))
+      return json(await finishIssueRun(supabase, userId, hostId, id, body))
     }
 
     // Statuses that end a run (`run-failed`, `held`) are written here like any
     // other field. The `issues_release_run_lease` trigger clears
-    // `active_run_id`/`active_worker_id` for them, so a dead run stops counting
-    // against the worker's capacity and the issue stays re-claimable.
+    // `active_run_id`/`active_host_id` for them, so a dead run stops counting
+    // against the host's capacity and the issue stays re-claimable.
     const fields = runStateSchema.parse(body)
-    await ensureActiveWorkerRun(
+    await ensureActiveHostRun(
       supabase,
       userId,
-      workerId,
+      hostId,
       id,
       fields.active_run_id
     )
@@ -82,7 +82,7 @@ export async function PATCH(
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("active_worker_id", workerId)
+      .eq("active_host_id", hostId)
       .eq("active_run_id", fields.active_run_id)
       .select("id")
       .maybeSingle()
@@ -92,10 +92,7 @@ export async function PATCH(
       throw new Error(error.message)
     }
     if (!updatedIssue) {
-      return json(
-        { error: "Run is not active for this worker" },
-        { status: 409 }
-      )
+      return json({ error: "Run is not active for this host" }, { status: 409 })
     }
 
     return json({ ok: true })

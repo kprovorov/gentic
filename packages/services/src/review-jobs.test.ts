@@ -25,7 +25,7 @@ test("claimReviewRun maps a claimed run", async () => {
     },
   ])
 
-  const result = await claimReviewRun(client as never, "worker-1", "user-1")
+  const result = await claimReviewRun(client as never, "host-1", "user-1")
 
   assert.deepEqual(result, {
     reviewRunId: "run-1",
@@ -37,13 +37,13 @@ test("claimReviewRun maps a claimed run", async () => {
   assert.deepEqual(calls, [
     {
       name: "claim_review_run",
-      args: { p_worker_id: "worker-1", p_user_id: "user-1" },
+      args: { p_host_id: "host-1", p_user_id: "user-1" },
     },
   ])
 })
 
 test("claimReviewRun returns null when nothing is claimable", async () => {
   const { client } = rpcClient([])
-  const result = await claimReviewRun(client as never, "worker-1", "user-1")
+  const result = await claimReviewRun(client as never, "host-1", "user-1")
   assert.equal(result, null)
 })

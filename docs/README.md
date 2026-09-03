@@ -8,7 +8,7 @@ configuration and navigation live in `docs.json`.
 
 - `introduction.mdx`, `quickstart.mdx`, and `how-it-works.mdx` explain the core workflow.
 - `web/` documents projects, issues, GitHub integration, and statuses.
-- `agent/` documents worker installation, configuration, and service management.
+- `agent/` documents host installation, configuration, and service management.
 - `mcp/` documents the hosted MCP endpoint and its tools.
 - `guides/` contains task-focused walkthroughs and troubleshooting.
 
@@ -41,6 +41,6 @@ mint broken-links
 Changes under this directory are deployed by the Mintlify GitHub integration
 after they are merged into the configured production branch.
 
-Keep product behavior in sync with the implementation. The worker CLI source is
+Keep product behavior in sync with the implementation. The host CLI source is
 in `apps/gentic/src`, shared workflow rules are in `packages/services` and
 `packages/validators`, and web UI behavior is in `apps/web`.

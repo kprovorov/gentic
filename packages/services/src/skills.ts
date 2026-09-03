@@ -1,25 +1,25 @@
 import type { Tables } from "@gentic/supabase/types"
 import {
-  createWorkerSkillInstallsInputSchema,
+  createHostSkillInstallsInputSchema,
   parseSkillsShSkillUrl,
-  reportWorkerSkillInstallResultInputSchema,
+  reportHostSkillInstallResultInputSchema,
   sanitizeSkillInstallOutput,
   skillAuditsResponseSchema,
   SkillUrlError,
-  type CreateWorkerSkillInstallsInput,
-  type ReportWorkerSkillInstallResultInput,
+  type CreateHostSkillInstallsInput,
+  type ReportHostSkillInstallResultInput,
   type SkillAudit,
   type SkillAuditGate,
   type SkillAuditGateReason,
   type SkillReference,
-  type WorkerSkillInstallStatus,
+  type HostSkillInstallStatus,
 } from "@gentic/validators/skills"
 
 import { ServiceError, unwrap } from "./errors"
 import type { Supabase } from "./types"
-import { listWorkers, type WorkerDomain } from "./workers"
+import { listHosts, type HostDomain } from "./hosts"
 
-/** How long a submitted command stays claimable by its worker. */
+/** How long a submitted command stays claimable by its host. */
 export const SKILL_INSTALL_TTL_MS = 10 * 60 * 1000
 
 /**
@@ -42,29 +42,29 @@ export type SkillAuditLookup =
   | { outcome: "missing" }
   | { outcome: "unavailable" }
 
-export type WorkerSkillInstallDomain = {
+export type HostSkillInstallDomain = {
   id: string
-  worker_id: string
+  host_id: string
   source: string
   skill: string
   url: string
-  status: WorkerSkillInstallStatus
+  status: HostSkillInstallStatus
   error_summary: string | null
   output: string | null
   expires_at: string
 }
 
-export type WorkerSkillInstallCommandDomain = {
+export type HostSkillInstallCommandDomain = {
   id: string
   source: string
   skill: string
   expires_at: string
 }
 
-export type CreateWorkerSkillInstallsResult = {
+export type CreateHostSkillInstallsResult = {
   skill: SkillReference
   gate: SkillAuditGate
-  installs: WorkerSkillInstallDomain[]
+  installs: HostSkillInstallDomain[]
 }
 
 /**
@@ -82,10 +82,10 @@ export class SkillAuditGateError extends ServiceError {
   }
 }
 
-type WorkerSkillInstallRow = Tables<"worker_skill_installs">
+type HostSkillInstallRow = Tables<"host_skill_installs">
 
 const installSelect =
-  "id,worker_id,source,skill,url,status,error_summary,output,expires_at"
+  "id,host_id,source,skill,url,status,error_summary,output,expires_at"
 
 const activeStatuses = ["waiting", "installing"] as const
 
@@ -199,15 +199,15 @@ export type SkillInstallTargetReason =
   | "installing"
 
 export type SkillInstallTarget = {
-  worker_id: string
+  host_id: string
   display_name: string
   eligible: boolean
   reason: SkillInstallTargetReason | null
 }
 
 /**
- * Every existing worker with the eligibility the dispatch path will enforce.
- * Ineligible workers stay in the list with their reason rather than vanishing,
+ * Every existing host with the eligibility the dispatch path will enforce.
+ * Ineligible hosts stay in the list with their reason rather than vanishing,
  * so the dialog can explain why a machine cannot be targeted.
  */
 export async function listSkillInstallTargets(
@@ -216,82 +216,82 @@ export async function listSkillInstallTargets(
   options: { now?: Date } = {}
 ): Promise<SkillInstallTarget[]> {
   const now = options.now ?? new Date()
-  await expireWorkerSkillInstalls(supabase, { now })
+  await expireHostSkillInstalls(supabase, { now })
 
-  const workers = await listWorkers(supabase, userId, { now })
-  const activeWorkerIds = await listActiveInstallWorkerIds(
+  const hosts = await listHosts(supabase, userId, { now })
+  const activeHostIds = await listActiveInstallHostIds(
     supabase,
     userId,
-    workers.map((worker) => worker.id)
+    hosts.map((host) => host.id)
   )
 
-  return workers.map((worker) => {
+  return hosts.map((host) => {
     const reason = skillInstallIneligibilityReason(
-      worker,
-      activeWorkerIds.has(worker.id)
+      host,
+      activeHostIds.has(host.id)
     )
 
     return {
-      worker_id: worker.id,
-      display_name: worker.display_name,
+      host_id: host.id,
+      display_name: host.display_name,
       eligible: reason === null,
       reason,
     }
   })
 }
 
-/** A worker can be targeted only while it is online, unbanned, set up and idle. */
+/** A host can be targeted only while it is online, unbanned, set up and idle. */
 export function skillInstallIneligibilityReason(
-  worker: WorkerDomain,
+  host: HostDomain,
   hasActiveInstall: boolean
 ): "offline" | "banned" | "setup-incomplete" | "installing" | null {
-  if (worker.primary_state === "banned") return "banned"
-  if (worker.primary_state === "setup-incomplete") return "setup-incomplete"
-  if (worker.primary_state === "offline") return "offline"
+  if (host.primary_state === "banned") return "banned"
+  if (host.primary_state === "setup-incomplete") return "setup-incomplete"
+  if (host.primary_state === "offline") return "offline"
   if (hasActiveInstall) return "installing"
   return null
 }
 
 /**
- * Dispatches one skill install to the selected workers. Ownership, eligibility
+ * Dispatches one skill install to the selected hosts. Ownership, eligibility
  * and the audit gate are all re-checked here — the dialog's checkboxes and
  * risk acknowledgement are conveniences, not the authority.
  */
-export async function createWorkerSkillInstalls(
+export async function createHostSkillInstalls(
   supabase: Supabase,
   userId: string,
-  input: CreateWorkerSkillInstallsInput,
+  input: CreateHostSkillInstallsInput,
   options: { now?: Date; fetchImpl?: Fetch } = {}
-): Promise<CreateWorkerSkillInstallsResult> {
+): Promise<CreateHostSkillInstallsResult> {
   const fields = parseCreateInput(input)
   const skill = parseSkillUrl(fields.url)
   const now = options.now ?? new Date()
 
-  await expireWorkerSkillInstalls(supabase, { now })
+  await expireHostSkillInstalls(supabase, { now })
 
-  const workers = await listWorkers(supabase, userId, { now })
-  const activeWorkerIds = await listActiveInstallWorkerIds(
+  const hosts = await listHosts(supabase, userId, { now })
+  const activeHostIds = await listActiveInstallHostIds(
     supabase,
     userId,
-    fields.worker_ids
+    fields.host_ids
   )
-  const requested = new Set(fields.worker_ids)
-  const byId = new Map(workers.map((worker) => [worker.id, worker]))
+  const requested = new Set(fields.host_ids)
+  const byId = new Map(hosts.map((host) => [host.id, host]))
 
-  for (const workerId of requested) {
-    const worker = byId.get(workerId)
-    if (!worker) {
-      throw new ServiceError("not_found", "Worker not found")
+  for (const hostId of requested) {
+    const host = byId.get(hostId)
+    if (!host) {
+      throw new ServiceError("not_found", "Host not found")
     }
 
     const reason = skillInstallIneligibilityReason(
-      worker,
-      activeWorkerIds.has(workerId)
+      host,
+      activeHostIds.has(hostId)
     )
     if (reason) {
       throw new ServiceError(
         "conflict",
-        `${worker.display_name} can no longer be installed to (${ineligibilityMessages[reason]}).`
+        `${host.display_name} can no longer be installed to (${ineligibilityMessages[reason]}).`
       )
     }
   }
@@ -318,11 +318,11 @@ export async function createWorkerSkillInstalls(
 
   const expiresAt = new Date(now.getTime() + SKILL_INSTALL_TTL_MS)
   const result = await supabase
-    .from("worker_skill_installs")
+    .from("host_skill_installs")
     .insert(
-      fields.worker_ids.map((workerId) => ({
+      fields.host_ids.map((hostId) => ({
         user_id: userId,
-        worker_id: workerId,
+        host_id: hostId,
         source: skill.source,
         skill: skill.skill,
         url: skill.url,
@@ -333,7 +333,7 @@ export async function createWorkerSkillInstalls(
       }))
     )
     .select(installSelect)
-    .returns<WorkerSkillInstallRow[]>()
+    .returns<HostSkillInstallRow[]>()
 
   if (result.error) {
     throw toInstallWriteError(result.error)
@@ -347,57 +347,57 @@ export async function createWorkerSkillInstalls(
 }
 
 /** Powers the dialog's live result poll for the commands it just submitted. */
-export async function listWorkerSkillInstalls(
+export async function listHostSkillInstalls(
   supabase: Supabase,
   userId: string,
   installIds: string[],
   options: { now?: Date } = {}
-): Promise<WorkerSkillInstallDomain[]> {
+): Promise<HostSkillInstallDomain[]> {
   if (installIds.length === 0) {
     return []
   }
 
-  await expireWorkerSkillInstalls(supabase, { now: options.now })
+  await expireHostSkillInstalls(supabase, { now: options.now })
 
   const rows = unwrap(
     await supabase
-      .from("worker_skill_installs")
+      .from("host_skill_installs")
       .select(installSelect)
       .eq("user_id", userId)
       .in("id", installIds)
-      .returns<WorkerSkillInstallRow[]>()
+      .returns<HostSkillInstallRow[]>()
   )
 
   return rows.map(toInstallDomain)
 }
 
 /**
- * Hands a worker its own pending command, exactly once. The conditional update
+ * Hands a host its own pending command, exactly once. The conditional update
  * is the claim: two concurrent polls contend on the same row and only one sees
  * it in `waiting`, so an accepted command is never re-delivered.
  */
-export async function claimWorkerSkillInstall(
+export async function claimHostSkillInstall(
   supabase: Supabase,
-  workerId: string,
+  hostId: string,
   options: { now?: Date } = {}
-): Promise<WorkerSkillInstallCommandDomain | null> {
+): Promise<HostSkillInstallCommandDomain | null> {
   const now = options.now ?? new Date()
-  await expireWorkerSkillInstalls(supabase, { now })
+  await expireHostSkillInstalls(supabase, { now })
 
   const rows = unwrap(
     await supabase
-      .from("worker_skill_installs")
+      .from("host_skill_installs")
       .update({
         status: "installing",
         accepted_at: now.toISOString(),
         updated_at: now.toISOString(),
       })
-      .eq("worker_id", workerId)
+      .eq("host_id", hostId)
       .eq("status", "waiting")
       .gt("expires_at", now.toISOString())
       .select("id,source,skill,expires_at")
       .returns<
-        Array<Pick<WorkerSkillInstallRow, "id" | "source" | "skill" | "expires_at">>
+        Array<Pick<HostSkillInstallRow, "id" | "source" | "skill" | "expires_at">>
       >()
   )
 
@@ -413,26 +413,26 @@ export async function claimWorkerSkillInstall(
 }
 
 /**
- * Records the outcome the worker reports. Accepted only for a command this
- * worker actually claimed, and only once — there is no retry path, so a second
+ * Records the outcome the host reports. Accepted only for a command this
+ * host actually claimed, and only once — there is no retry path, so a second
  * report has nothing to update.
  */
-export async function reportWorkerSkillInstallResult(
+export async function reportHostSkillInstallResult(
   supabase: Supabase,
-  workerId: string,
+  hostId: string,
   installId: string,
-  input: ReportWorkerSkillInstallResultInput,
+  input: ReportHostSkillInstallResultInput,
   options: { now?: Date } = {}
-): Promise<WorkerSkillInstallDomain> {
+): Promise<HostSkillInstallDomain> {
   const fields = parseWithSchema(
-    () => reportWorkerSkillInstallResultInputSchema.parse(input),
+    () => reportHostSkillInstallResultInputSchema.parse(input),
     "Invalid skill install result"
   )
   const now = options.now ?? new Date()
 
   const rows = unwrap(
     await supabase
-      .from("worker_skill_installs")
+      .from("host_skill_installs")
       .update({
         status: fields.status,
         error_summary: sanitizeOptionalText(fields.error_summary, 500),
@@ -441,10 +441,10 @@ export async function reportWorkerSkillInstallResult(
         updated_at: now.toISOString(),
       })
       .eq("id", installId)
-      .eq("worker_id", workerId)
+      .eq("host_id", hostId)
       .eq("status", "installing")
       .select(installSelect)
-      .returns<WorkerSkillInstallRow[]>()
+      .returns<HostSkillInstallRow[]>()
   )
 
   if (rows.length === 0) {
@@ -459,14 +459,14 @@ export async function reportWorkerSkillInstallResult(
  * commands nobody claimed in time become `timed-out`, and everything past the
  * retention window is deleted so no install history accumulates.
  */
-export async function expireWorkerSkillInstalls(
+export async function expireHostSkillInstalls(
   supabase: Supabase,
   options: { now?: Date } = {}
 ): Promise<void> {
   const now = options.now ?? new Date()
 
   const expired = await supabase
-    .from("worker_skill_installs")
+    .from("host_skill_installs")
     .update({
       status: "timed-out",
       finished_at: now.toISOString(),
@@ -480,7 +480,7 @@ export async function expireWorkerSkillInstalls(
   }
 
   const purged = await supabase
-    .from("worker_skill_installs")
+    .from("host_skill_installs")
     .delete()
     .lte(
       "created_at",
@@ -499,36 +499,36 @@ const ineligibilityMessages = {
   installing: "already installing a skill",
 } as const
 
-async function listActiveInstallWorkerIds(
+async function listActiveInstallHostIds(
   supabase: Supabase,
   userId: string,
-  workerIds: string[]
+  hostIds: string[]
 ): Promise<Set<string>> {
-  if (workerIds.length === 0) {
+  if (hostIds.length === 0) {
     return new Set()
   }
 
   const rows = unwrap(
     await supabase
-      .from("worker_skill_installs")
-      .select("worker_id")
+      .from("host_skill_installs")
+      .select("host_id")
       .eq("user_id", userId)
-      .in("worker_id", workerIds)
+      .in("host_id", hostIds)
       .in("status", [...activeStatuses])
-      .returns<Array<{ worker_id: string }>>()
+      .returns<Array<{ host_id: string }>>()
   )
 
-  return new Set(rows.map((row) => row.worker_id))
+  return new Set(rows.map((row) => row.host_id))
 }
 
-function toInstallDomain(row: WorkerSkillInstallRow): WorkerSkillInstallDomain {
+function toInstallDomain(row: HostSkillInstallRow): HostSkillInstallDomain {
   return {
     id: row.id,
-    worker_id: row.worker_id,
+    host_id: row.host_id,
     source: row.source,
     skill: row.skill,
     url: row.url,
-    status: row.status as WorkerSkillInstallStatus,
+    status: row.status as HostSkillInstallStatus,
     error_summary: row.error_summary,
     output: row.output,
     expires_at: row.expires_at,
@@ -536,14 +536,14 @@ function toInstallDomain(row: WorkerSkillInstallRow): WorkerSkillInstallDomain {
 }
 
 function parseCreateInput(
-  input: CreateWorkerSkillInstallsInput
-): CreateWorkerSkillInstallsInput & { accept_risk: boolean } {
+  input: CreateHostSkillInstallsInput
+): CreateHostSkillInstallsInput & { accept_risk: boolean } {
   const fields = parseWithSchema(
-    () => createWorkerSkillInstallsInputSchema.parse(input),
+    () => createHostSkillInstallsInputSchema.parse(input),
     "Invalid skill install request"
   )
 
-  return { ...fields, worker_ids: [...new Set(fields.worker_ids)] }
+  return { ...fields, host_ids: [...new Set(fields.host_ids)] }
 }
 
 function parseWithSchema<T>(parse: () => T, message: string): T {
@@ -572,18 +572,18 @@ function toInstallWriteError(error: {
 }): ServiceError {
   if (
     error.code === "23505" ||
-    error.message.includes("worker_skill_installs_one_active_per_worker")
+    error.message.includes("host_skill_installs_one_active_per_host")
   ) {
     return new ServiceError(
       "conflict",
-      "A skill is already being installed on one of the selected workers."
+      "A skill is already being installed on one of the selected hosts."
     )
   }
   if (
     error.code === "23503" ||
-    error.message.includes("worker_skill_installs_worker_owner")
+    error.message.includes("host_skill_installs_host_owner")
   ) {
-    return new ServiceError("not_found", "Worker not found")
+    return new ServiceError("not_found", "Host not found")
   }
 
   return new ServiceError("internal", error.message)

@@ -1,11 +1,16 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
 
 import { ServiceError } from "@gentic/services/errors"
-import { authenticateWorkerCredential } from "@gentic/services/workers"
+import { authenticateHostCredential } from "@gentic/services/hosts"
 import { createServiceClient } from "@gentic/supabase/service"
 
-/** Prefix carried by every worker credential minted at enrollment. */
-export const WORKER_CREDENTIAL_PREFIX = "gtwc_"
+/**
+ * Prefix carried by every host credential minted at enrollment. Still spelled
+ * "gtwc" (gentic worker credential) after GEN-435: credentials are stored
+ * hashed, so the literal is frozen by every credential already issued. See
+ * `CREDENTIAL_PREFIX` in `@gentic/services/hosts`.
+ */
+export const HOST_CREDENTIAL_PREFIX = "gtwc_"
 
 export type McpTokenVerifier = (
   request: Request,
@@ -13,19 +18,19 @@ export type McpTokenVerifier = (
 ) => Promise<AuthInfo | undefined>
 
 export interface McpTokenVerifierDeps {
-  authenticateWorkerCredential: typeof authenticateWorkerCredential
+  authenticateHostCredential: typeof authenticateHostCredential
   createServiceClient: typeof createServiceClient
   /** Verifier for the pre-existing Clerk OAuth path. */
   verifyOAuthToken: McpTokenVerifier
 }
 
 /**
- * True for bearer tokens shaped like a worker credential. Clerk OAuth tokens
+ * True for bearer tokens shaped like a host credential. Clerk OAuth tokens
  * never carry this prefix, so the two credential families stay disjoint and a
  * token is only ever checked against the store it belongs to.
  */
-export function isWorkerCredentialToken(bearerToken: string): boolean {
-  return bearerToken.startsWith(WORKER_CREDENTIAL_PREFIX)
+export function isHostCredentialToken(bearerToken: string): boolean {
+  return bearerToken.startsWith(HOST_CREDENTIAL_PREFIX)
 }
 
 /**
@@ -33,10 +38,10 @@ export function isWorkerCredentialToken(bearerToken: string): boolean {
  *
  * Two credential families reach the same endpoint:
  *   - Clerk OAuth tokens from interactive MCP clients (Claude Desktop, Cursor).
- *   - Worker credentials (`gtwc_...`) presented by managed coding agents.
+ *   - Host credentials (`gtwc_...`) presented by managed coding agents.
  *
  * Both resolve to a Clerk `user_id` in `extra.userId`, which is the only
- * identity the tool registry reads — so a worker-authenticated agent gets the
+ * identity the tool registry reads — so a host-authenticated agent gets the
  * owner's normal account-wide access, no more and no less.
  *
  * Routing is by prefix and is one-way: a `gtwc_` token that fails verification
@@ -51,32 +56,32 @@ export function createMcpTokenVerifier(
       return undefined
     }
 
-    if (isWorkerCredentialToken(bearerToken)) {
-      return verifyWorkerCredentialToken(bearerToken, deps)
+    if (isHostCredentialToken(bearerToken)) {
+      return verifyHostCredentialToken(bearerToken, deps)
     }
 
     return deps.verifyOAuthToken(request, bearerToken)
   }
 }
 
-async function verifyWorkerCredentialToken(
+async function verifyHostCredentialToken(
   bearerToken: string,
   deps: McpTokenVerifierDeps
 ): Promise<AuthInfo | undefined> {
   try {
-    // Banned workers and expired credentials are rejected by the same
+    // Banned hosts and expired credentials are rejected by the same
     // credential controls the agent REST API relies on: `allowBanned` stays
     // off, and `credential_expires_at` is enforced inside the lookup.
-    const { userId, workerId } = await deps.authenticateWorkerCredential(
+    const { userId, hostId } = await deps.authenticateHostCredential(
       deps.createServiceClient(),
       bearerToken
     )
 
     return {
       token: bearerToken,
-      clientId: `worker:${workerId}`,
+      clientId: `host:${hostId}`,
       scopes: [],
-      extra: { userId, workerId },
+      extra: { userId, hostId },
     }
   } catch (error) {
     if (error instanceof ServiceError && error.code === "forbidden") {
@@ -89,6 +94,6 @@ async function verifyWorkerCredentialToken(
 }
 
 export const defaultMcpTokenVerifierDeps = {
-  authenticateWorkerCredential,
+  authenticateHostCredential,
   createServiceClient,
 } satisfies Omit<McpTokenVerifierDeps, "verifyOAuthToken">

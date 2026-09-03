@@ -626,7 +626,7 @@ async function resolvePullNumbersForRef(
 ) {
   // The payload's own `check_suite.pull_requests` is only populated when the
   // PR was already open at the moment the check suite was created. The
-  // worker pushes commits (creating the check suite) before opening the PR,
+  // host pushes commits (creating the check suite) before opening the PR,
   // so that array is unreliable here — resolve PRs from the commit SHA via
   // the API instead.
   let pullNumbers: number[]

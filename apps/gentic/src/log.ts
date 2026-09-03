@@ -1,5 +1,5 @@
 /**
- * Console logging for the worker. Each line is prefixed with an ISO timestamp
+ * Console logging for the host. Each line is prefixed with an ISO timestamp
  * and `[gentic]` so output stays legible when tailed or shipped to a log
  * aggregator.
  */

@@ -2,7 +2,7 @@ import * as issuesService from "@gentic/services/issues"
 
 import {
   automaticPrPublishRequestSchema,
-  ensureActiveWorkerRun,
+  ensureActiveHostRun,
   getAgentContext,
   handleAgentError,
   json,
@@ -14,15 +14,15 @@ export const runtime = "nodejs"
 export async function requestIssueAutomaticPrPublish(
   supabase: Supabase,
   userId: string,
-  workerId: string,
+  hostId: string,
   issueId: string,
   body: unknown
 ) {
   const fields = automaticPrPublishRequestSchema.parse(body)
-  await ensureActiveWorkerRun(
+  await ensureActiveHostRun(
     supabase,
     userId,
-    workerId,
+    hostId,
     issueId,
     fields.active_run_id
   )
@@ -50,10 +50,10 @@ export async function POST(
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
-    const { supabase, userId, workerId } = await getAgentContext(request)
+    const { supabase, userId, hostId } = await getAgentContext(request)
 
     return json(
-      await requestIssueAutomaticPrPublish(supabase, userId, workerId, id, body)
+      await requestIssueAutomaticPrPublish(supabase, userId, hostId, id, body)
     )
   } catch (error) {
     return handleAgentError(error)

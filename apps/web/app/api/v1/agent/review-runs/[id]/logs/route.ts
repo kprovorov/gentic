@@ -10,7 +10,7 @@ import {
 
 export const runtime = "nodejs"
 
-// Durable persistence for the Review Run log sink (GEN-415). The worker also
+// Durable persistence for the Review Run log sink (GEN-415). The host also
 // broadcasts the same line over the `review-run:{id}` realtime topic for live
 // streaming (see the realtime-broadcast RLS policies added alongside
 // `review_run_logs`); this route is the source of truth once the process
@@ -21,8 +21,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const { supabase, userId, workerId } = await getAgentContext(request)
-    await ensureActiveReviewRunClaim(supabase, userId, workerId, id)
+    const { supabase, userId, hostId } = await getAgentContext(request)
+    await ensureActiveReviewRunClaim(supabase, userId, hostId, id)
 
     const fields = reviewRunLogInputSchema.parse(await request.json())
     await appendReviewRunLog(supabase, id, fields)

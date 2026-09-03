@@ -50,7 +50,7 @@ async function writeUnit(enableOnBoot: boolean): Promise<void> {
   await mkdir(join(home, ".config", "systemd", "user"), { recursive: true })
   await writeFile(
     unitPath(),
-    `# gentic-enable-on-boot=${enableOnBoot}\n[Unit]\nDescription=Gentic agent worker\n`,
+    `# gentic-enable-on-boot=${enableOnBoot}\n[Unit]\nDescription=Gentic agent host\n`,
     "utf8",
   )
 }
@@ -151,7 +151,7 @@ test("install with --no-boot disables a unit an earlier install enabled", async 
 
 test("start treats a unit predating the marker as boot-enabled", async () => {
   await mkdir(join(home, ".config", "systemd", "user"), { recursive: true })
-  await writeFile(unitPath(), "[Unit]\nDescription=Gentic agent worker\n", "utf8")
+  await writeFile(unitPath(), "[Unit]\nDescription=Gentic agent host\n", "utf8")
   const { exec, calls } = fakeExec({ "is-enabled": "disabled" })
 
   await new SystemdBackend("user", exec).start()

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { defaultHostCompatibilityPolicy } from "@gentic/services/hosts"
+
 import { claimNextReviewRun } from "../app/api/v1/agent/review-runs/claim/route"
 
 type Row = Record<string, unknown>
-type TableName = "workers" | "issues" | "review_runs"
+type TableName = "hosts" | "issues" | "review_runs"
 
 class FakeDb {
-  workers: Row[] = []
+  hosts: Row[] = []
   issues: Row[] = []
   review_runs: Row[] = []
 }
@@ -111,18 +113,20 @@ class FakeSupabase {
   }
 }
 
-function workerRow(overrides: Row = {}): Row {
+function hostRow(overrides: Row = {}): Row {
   return {
-    id: "worker-1",
+    id: "host-1",
     user_id: "user-1",
-    display_name: "Worker",
+    display_name: "Host",
     setup_state: "ready",
     banned_at: null,
     created_at: "2026-07-01T00:00:00.000Z",
     updated_at: "2026-07-01T00:00:00.000Z",
     last_seen_at: new Date().toISOString(),
     process_started_at: "2026-07-01T00:00:00.000Z",
-    gentic_version: "0.14.0",
+    // Tracks the policy so raising the supported floor never silently turns
+    // this shared fixture into an unsupported host.
+    gentic_version: defaultHostCompatibilityPolicy.currentVersion,
     os: "linux",
     arch: "x64",
     configured_capacity: 1,
@@ -131,9 +135,9 @@ function workerRow(overrides: Row = {}): Row {
   }
 }
 
-test("claims the next pending review run for an eligible worker", async () => {
+test("claims the next pending review run for an eligible host", async () => {
   const supabase = new FakeSupabase()
-  supabase.db.workers.push(workerRow())
+  supabase.db.hosts.push(hostRow())
   supabase.claimResult = {
     review_run_id: "run-1",
     review_cycle_id: "cycle-1",
@@ -142,11 +146,7 @@ test("claims the next pending review run for an eligible worker", async () => {
     head_sha: "abc123",
   }
 
-  const result = await claimNextReviewRun(
-    supabase as never,
-    "user-1",
-    "worker-1"
-  )
+  const result = await claimNextReviewRun(supabase as never, "user-1", "host-1")
 
   assert.deepEqual(result, {
     id: "run-1",
@@ -156,17 +156,17 @@ test("claims the next pending review run for an eligible worker", async () => {
     headSha: "abc123",
   })
   assert.deepEqual(supabase.claimCalls, [
-    { p_worker_id: "worker-1", p_user_id: "user-1" },
+    { p_host_id: "host-1", p_user_id: "user-1" },
   ])
 })
 
 test("capacity shared with implementation runs blocks a review claim", async () => {
   const supabase = new FakeSupabase()
-  supabase.db.workers.push(workerRow({ configured_capacity: 1 }))
-  // An in-flight *implementation* run already fills the worker's only slot —
+  supabase.db.hosts.push(hostRow({ configured_capacity: 1 }))
+  // An in-flight *implementation* run already fills the host's only slot —
   // proves review runs share one capacity pool with implementation issues.
   supabase.db.issues.push({
-    active_worker_id: "worker-1",
+    active_host_id: "host-1",
     active_run_id: "run-0",
     status: "in-progress",
   })
@@ -178,49 +178,35 @@ test("capacity shared with implementation runs blocks a review claim", async () 
     head_sha: "abc123",
   }
 
-  const result = await claimNextReviewRun(
-    supabase as never,
-    "user-1",
-    "worker-1"
-  )
+  const result = await claimNextReviewRun(supabase as never, "user-1", "host-1")
 
   assert.equal(result, null)
   assert.deepEqual(supabase.claimCalls, [])
 })
 
-test("offline worker never claims a review run", async () => {
+test("offline host never claims a review run", async () => {
   const supabase = new FakeSupabase()
-  supabase.db.workers.push(
-    workerRow({ last_seen_at: "2020-01-01T00:00:00.000Z" })
-  )
+  supabase.db.hosts.push(hostRow({ last_seen_at: "2020-01-01T00:00:00.000Z" }))
 
-  const result = await claimNextReviewRun(
-    supabase as never,
-    "user-1",
-    "worker-1"
-  )
+  const result = await claimNextReviewRun(supabase as never, "user-1", "host-1")
 
   assert.equal(result, null)
   assert.deepEqual(supabase.claimCalls, [])
 })
 
-test("unsupported worker version never claims a review run", async () => {
+test("unsupported host version never claims a review run", async () => {
   const supabase = new FakeSupabase()
-  supabase.db.workers.push(workerRow({ gentic_version: "0.1.0" }))
+  supabase.db.hosts.push(hostRow({ gentic_version: "0.1.0" }))
 
-  const result = await claimNextReviewRun(
-    supabase as never,
-    "user-1",
-    "worker-1"
-  )
+  const result = await claimNextReviewRun(supabase as never, "user-1", "host-1")
 
   assert.equal(result, null)
 })
 
-test("a worker that goes stale immediately after winning the claim is rolled back via fail_review_run", async () => {
+test("a host that goes stale immediately after winning the claim is rolled back via fail_review_run", async () => {
   const supabase = new FakeSupabase()
-  const worker = workerRow()
-  supabase.db.workers.push(worker)
+  const host = hostRow()
+  supabase.db.hosts.push(host)
   supabase.claimResult = {
     review_run_id: "run-1",
     review_cycle_id: "cycle-1",
@@ -229,27 +215,23 @@ test("a worker that goes stale immediately after winning the claim is rolled bac
     head_sha: "abc123",
   }
 
-  // Simulate the worker going stale between the claim and the post-claim
+  // Simulate the host going stale between the claim and the post-claim
   // re-check by mutating its `last_seen_at` once the RPC has been called.
   const originalRpc = supabase.rpc.bind(supabase)
   supabase.rpc = (name, args) => {
     if (name === "claim_review_run") {
-      worker.last_seen_at = "2020-01-01T00:00:00.000Z"
+      host.last_seen_at = "2020-01-01T00:00:00.000Z"
     }
     return originalRpc(name, args)
   }
 
-  const result = await claimNextReviewRun(
-    supabase as never,
-    "user-1",
-    "worker-1"
-  )
+  const result = await claimNextReviewRun(supabase as never, "user-1", "host-1")
 
   assert.equal(result, null)
   assert.deepEqual(supabase.failCalls, [
     {
       p_review_run_id: "run-1",
-      p_error: "Worker became ineligible immediately after claim",
+      p_error: "Host became ineligible immediately after claim",
     },
   ])
 })

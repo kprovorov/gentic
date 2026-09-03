@@ -5,13 +5,13 @@ import { ApiError, ensureActiveReviewRunClaim } from "../app/api/v1/agent/_lib"
 
 const reviewRunId = "11111111-1111-4111-8111-111111111111"
 const ownerId = "user-1"
-const workerId = "22222222-2222-4222-8222-222222222222"
+const hostId = "22222222-2222-4222-8222-222222222222"
 
 function reviewRunRow(overrides: Record<string, unknown> = {}) {
   return {
     id: reviewRunId,
     status: "running",
-    claimed_by_worker_id: workerId,
+    claimed_by_host_id: hostId,
     review_cycles: { issues: { projects: { user_id: ownerId } } },
     ...overrides,
   }
@@ -42,16 +42,11 @@ class FakeSupabase {
   }
 }
 
-test("accepts a review run claimed by the requesting worker", async () => {
+test("accepts a review run claimed by the requesting host", async () => {
   const supabase = new FakeSupabase(reviewRunRow())
 
   await assert.doesNotReject(
-    ensureActiveReviewRunClaim(
-      supabase as never,
-      ownerId,
-      workerId,
-      reviewRunId
-    )
+    ensureActiveReviewRunClaim(supabase as never, ownerId, hostId, reviewRunId)
   )
 })
 
@@ -63,12 +58,7 @@ test("404s when the review run does not belong to the requesting user", async ()
   )
 
   await assert.rejects(
-    ensureActiveReviewRunClaim(
-      supabase as never,
-      ownerId,
-      workerId,
-      reviewRunId
-    ),
+    ensureActiveReviewRunClaim(supabase as never, ownerId, hostId, reviewRunId),
     (error: unknown) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.status, 404)
@@ -81,12 +71,7 @@ test("404s when the review run does not exist", async () => {
   const supabase = new FakeSupabase(null)
 
   await assert.rejects(
-    ensureActiveReviewRunClaim(
-      supabase as never,
-      ownerId,
-      workerId,
-      reviewRunId
-    ),
+    ensureActiveReviewRunClaim(supabase as never, ownerId, hostId, reviewRunId),
     (error: unknown) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.status, 404)
@@ -95,18 +80,13 @@ test("404s when the review run does not exist", async () => {
   )
 })
 
-test("409s when a different worker holds the claim", async () => {
+test("409s when a different host holds the claim", async () => {
   const supabase = new FakeSupabase(
-    reviewRunRow({ claimed_by_worker_id: "another-worker" })
+    reviewRunRow({ claimed_by_host_id: "another-host" })
   )
 
   await assert.rejects(
-    ensureActiveReviewRunClaim(
-      supabase as never,
-      ownerId,
-      workerId,
-      reviewRunId
-    ),
+    ensureActiveReviewRunClaim(supabase as never, ownerId, hostId, reviewRunId),
     (error: unknown) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.status, 409)
@@ -123,7 +103,7 @@ test("409s once the run has left the running status (completed, failed, or cance
       ensureActiveReviewRunClaim(
         supabase as never,
         ownerId,
-        workerId,
+        hostId,
         reviewRunId
       ),
       (error: unknown) => {

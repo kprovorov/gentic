@@ -333,7 +333,7 @@ export type ArchiveLabelResult = {
 // affected issue — all inside the `archive_label` SECURITY DEFINER RPC
 // (20260805130000_add_archive_label_rpc.sql), so a failure partway through
 // leaves no state changed. That RPC enforces ownership itself via
-// `p_user_id` and is granted to `service_role` only (like the worker
+// `p_user_id` and is granted to `service_role` only (like the host
 // lifecycle RPCs), so callers must pass a service-role `Supabase` client.
 // Archival has no dedicated restore action; instead, `createLabel` revives an
 // archived label when a new label reuses its exact name — the former issue

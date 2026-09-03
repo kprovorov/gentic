@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stages the publishable npm package for the gentic worker CLI into
+// Stages the publishable npm package for the gentic host CLI into
 // dist/npm/, ready for `npm publish`. The `npm` job in
 // .github/workflows/release.yml runs this after a release is cut; see
 // packaging/npm/README.md for the full pipeline.

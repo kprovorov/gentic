@@ -64,7 +64,7 @@ export function registerServiceCommands(program: Command): void {
   addScopeOption(
     program
       .command("start")
-      .description("Install (if needed) and start the gentic worker as a background service")
+      .description("Install (if needed) and start the gentic host as a background service")
       .option("--no-boot", "do not start the service automatically on boot/login"),
   ).action(async (opts: StartOptions) => {
     await startGenticService(opts)
@@ -89,7 +89,7 @@ export function registerServiceCommands(program: Command): void {
   addScopeOption(
     program
       .command("reload")
-      .description("Reload worker configuration without interrupting active issues"),
+      .description("Reload host configuration without interrupting active issues"),
   ).action(async (opts: ScopeOptions) => {
     const backend = getServiceBackend({ scope: resolveScope(opts) })
     const s = spinner()
