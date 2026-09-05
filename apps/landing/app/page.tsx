@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Logo } from "@/components/logo"
-import { AgentMark, Icon } from "@/components/icons"
+import { AgentMark, BrandMark, Icon } from "@/components/icons"
 import { ProductPreview } from "@/components/product-preview"
 
 const appUrl = "https://app.gentic.chat"
@@ -111,11 +111,11 @@ export default function Home() {
               Codex
             </span>
             <span>
-              <Icon name="branch" />
+              <BrandMark brand="github" />
               GitHub
             </span>
             <span>
-              <Icon name="link" />
+              <BrandMark brand="mcp" />
               MCP
             </span>
             <span>
@@ -310,9 +310,9 @@ export default function Home() {
                   your coding agents.
                 </p>
                 <div className="workflow-visual">
-                  <Icon name="branch" />
+                  <BrandMark brand="github" />
                   <span className="connecting-line" />
-                  <span className="small-gentic">g</span>
+                  <Logo className="small-gentic" />
                   <span className="connecting-line" />
                   <Icon name="server" />
                 </div>

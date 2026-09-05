@@ -521,22 +521,12 @@ h1 > span {
   font-size: 9px;
   margin-left: 2px;
 }
-.agent-mark {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
+.brand-mark {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
   flex-shrink: 0;
-}
-.claude-mark {
-  color: #bd7655;
-  font-size: 25px;
-  line-height: 1;
-  font-family: serif;
-}
-.codex-mark {
-  width: 25px;
-  height: 25px;
-  color: #393a3c;
 }
 .conversation > p,
 .draft-content > p {
@@ -775,8 +765,9 @@ h1 > span {
   font-family: var(--font-display), sans-serif;
   font-weight: 500;
 }
-.integration-list .claude-mark {
-  font-size: 30px;
+.integration-list .brand-mark {
+  width: 26px;
+  height: 26px;
 }
 .integration-list > span > svg {
   width: 23px;
@@ -868,9 +859,6 @@ h2 span {
   width: 32px;
   height: 32px;
 }
-.agent-option .claude-mark {
-  font-size: 33px;
-}
 .agent-option strong {
   font-size: 12px;
   font-weight: 550;
@@ -929,7 +917,8 @@ h2 span {
 }
 .agent-bubble .agent-mark {
   align-self: flex-start;
-  font-size: 28px;
+  width: 28px;
+  height: 28px;
 }
 .compact-feature {
   padding: 30px 32px;
@@ -1074,15 +1063,8 @@ h2 span {
   margin-inline: 10px;
 }
 .small-gentic {
-  display: grid;
-  place-items: center;
   width: 31px;
   height: 31px;
-  font-family: var(--font-display), sans-serif;
-  font-size: 28px;
-  border-radius: 8px;
-  color: #42552a;
-  background: var(--lime);
 }
 .workflow-pill {
   display: inline-flex;

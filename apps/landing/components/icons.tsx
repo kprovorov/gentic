@@ -1,3 +1,5 @@
+import Image from "next/image"
+
 const paths = {
   arrow: "M5 12h14m-6-6 6 6-6 6",
   branch:
@@ -44,14 +46,33 @@ export function Icon({
   )
 }
 
-export function AgentMark({ provider }: { provider: "claude" | "codex" }) {
-  return provider === "claude" ? (
-    <span className="agent-mark claude-mark" aria-hidden="true">
-      ✳
-    </span>
-  ) : (
-    <span className="agent-mark codex-mark" aria-hidden="true">
-      <Icon name="code" />
-    </span>
+const brandAssets = {
+  claude: "/logos/claude-code.svg",
+  codex: "/logos/codex.svg",
+  github: "/logos/github.svg",
+  mcp: "/logos/mcp.svg",
+} as const
+
+export function BrandMark({
+  brand,
+  className = "",
+}: {
+  brand: keyof typeof brandAssets
+  className?: string
+}) {
+  return (
+    <Image
+      className={`brand-mark ${className}`}
+      src={brandAssets[brand]}
+      width={24}
+      height={24}
+      alt=""
+      aria-hidden="true"
+      unoptimized
+    />
   )
+}
+
+export function AgentMark({ provider }: { provider: "claude" | "codex" }) {
+  return <BrandMark brand={provider} className="agent-mark" />
 }
