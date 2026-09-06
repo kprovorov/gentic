@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Outfit } from "next/font/google"
 
 import "./globals.css"
 
@@ -10,7 +10,7 @@ const description =
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: "Gentic",
+    default: "Gentic — Your next idea, already in progress",
     template: "%s | Gentic",
   },
   description,
@@ -87,7 +87,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 }
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" })
 
 export default function RootLayout({
   children,
@@ -95,7 +95,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={outfit.variable}>
       <body>{children}</body>
     </html>
   )
