@@ -138,14 +138,14 @@
   background: var(--primary-foreground);
   flex-shrink: 0;
 }
-h1 {
+.hero h1 {
   margin-top: 26px;
   font-size: clamp(54px, 6.3vw, 82px);
   letter-spacing: -3.8px;
   font-weight: 500;
   line-height: 1.07;
 }
-h1 > span {
+.hero h1 > span {
   color: var(--primary-foreground);
 }
 .hero-copy > p {
@@ -636,13 +636,13 @@ h1 > span {
   font-weight: 600;
   margin-bottom: 17px;
 }
-h2 {
+section h2 {
   font-size: 43px;
   font-weight: 450;
   letter-spacing: -1.6px;
   line-height: 1.15;
 }
-h2 span {
+section h2 span {
   color: var(--muted-foreground);
 }
 .section-heading > p {
@@ -1045,7 +1045,7 @@ h2 span {
   .desktop-break {
     display: none;
   }
-  h2 {
+  section h2 {
     font-size: 37px;
   }
   .closing-orbit {
@@ -1091,7 +1091,7 @@ h2 span {
   .hero-eyebrow svg {
     margin-left: 0;
   }
-  h1 {
+  .hero h1 {
     font-size: clamp(39px, 8.9vw, 61px);
     letter-spacing: -2px;
     margin-top: 25px;
@@ -1243,7 +1243,7 @@ h2 span {
     font-size: 8px;
     margin-bottom: 15px;
   }
-  h2 {
+  section h2 {
     font-size: 35px;
     letter-spacing: -1.2px;
   }

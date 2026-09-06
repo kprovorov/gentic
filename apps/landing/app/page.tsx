@@ -66,9 +66,9 @@ export default function Home() {
             <a href={`${appUrl}/login`}>Log in</a>
           </Button>
           <Button asChild>
-            <a href={appUrl}>
-              Open Gentic <Icon name="arrow" />
-            </a>
+            <Link href="/waitlist">
+              Join waitlist <Icon name="arrow" />
+            </Link>
           </Button>
         </div>
       </header>
@@ -91,9 +91,9 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <Button asChild size="lg">
-                <a href={appUrl}>
-                  Start building <Icon name="arrow" />
-                </a>
+                <Link href="/waitlist">
+                  Join waitlist <Icon name="arrow" />
+                </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <a href="#how-it-works">
@@ -432,9 +432,9 @@ export default function Home() {
           </h2>
           <p>You bring the ideas. Give your agents a place to build them.</p>
           <Button asChild size="lg">
-            <a href={appUrl}>
-              Start building with Gentic <Icon name="arrow" />
-            </a>
+            <Link href="/waitlist">
+              Join waitlist <Icon name="arrow" />
+            </Link>
           </Button>
         </section>
       </main>
@@ -447,9 +447,7 @@ export default function Home() {
           <p>A home for your AI coding agents.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <a href={appUrl}>
-            Open app <span aria-hidden="true">↗</span>
-          </a>
+          <Link href="/waitlist">Join waitlist</Link>
           <a href={docsUrl}>Documentation</a>
           <a href={githubUrl}>GitHub</a>
         </nav>

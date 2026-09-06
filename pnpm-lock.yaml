@@ -74,6 +74,9 @@ importers:
 
   apps/landing:
     dependencies:
+      '@clerk/nextjs':
+        specifier: ^7.5.18
+        version: 7.5.18(next@16.2.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gentic/ui':
         specifier: workspace:*
         version: link:../../packages/ui
