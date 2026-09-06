@@ -1,5 +1,8 @@
 "use client"
 
+import { Button } from "@gentic/ui/button"
+import { Card } from "@gentic/ui/card"
+import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { useState } from "react"
 import { AgentMark, Icon } from "@/components/icons"
 
@@ -38,24 +41,28 @@ export function ProductPreview() {
 
   return (
     <div className="product-showcase" id="product-preview">
-      <div className="preview-controls" aria-label="Explore the issue workflow">
+      <ToggleGroup
+        type="single"
+        value={String(stage)}
+        onValueChange={(value) => {
+          if (value) setStage(Number(value))
+        }}
+        className="preview-controls"
+        aria-label="Explore the issue workflow"
+      >
         {stages.map((item, index) => (
-          <button
+          <ToggleGroupItem
             key={item.short}
-            type="button"
-            aria-pressed={stage === index}
+            value={String(index)}
             aria-controls="preview-content"
-            onClick={() => setStage(index)}
-            className={stage === index ? "stage-button active" : "stage-button"}
           >
             <span className="stage-number">{index + 1}</span>
             <span className="stage-label">{item.label}</span>
             <span className="stage-short">{item.short}</span>
-            {index < 2 && <Icon name="chevron" className="stage-arrow" />}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
-      <div className="product-window">
+      </ToggleGroup>
+      <Card className="product-window gap-0 py-0">
         <div className="window-bar">
           <span className="window-dots" aria-hidden="true">
             <i />
@@ -123,31 +130,33 @@ export function ProductPreview() {
                     <Icon name="paperclip" /> dashboard-reference.png{" "}
                     <span>Reference attached</span>
                   </div>
-                  <div
+                  <ToggleGroup
+                    type="single"
+                    value={provider}
+                    onValueChange={(value) => {
+                      if (value === "claude" || value === "codex")
+                        setProvider(value)
+                    }}
+                    variant="outline"
                     className="agent-picker"
                     aria-label="Choose a demo agent"
                   >
                     {(["claude", "codex"] as const).map((item) => (
-                      <button
-                        type="button"
-                        key={item}
-                        aria-pressed={provider === item}
-                        onClick={() => setProvider(item)}
-                      >
+                      <ToggleGroupItem key={item} value={item}>
                         <AgentMark provider={item} />
                         {item === "claude" ? "Claude Code" : "Codex"}
                         {provider === item && <Icon name="check" />}
-                      </button>
+                      </ToggleGroupItem>
                     ))}
-                  </div>
-                  <button
+                  </ToggleGroup>
+                  <Button
                     type="button"
-                    className="demo-run"
+                    className="mt-4"
                     onClick={() => setStage(1)}
                   >
                     Run with {agent}
                     <Icon name="arrow" />
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="conversation">
@@ -226,7 +235,7 @@ export function ProductPreview() {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
       <div className="preview-caption" aria-live="polite">
         <strong>{current.title}</strong>
         <span>{current.detail}</span>

@@ -1,3 +1,11 @@
+import { Button } from "@gentic/ui/button"
+import { Card, CardContent } from "@gentic/ui/card"
+import { Bubble, BubbleContent } from "@gentic/ui/bubble"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@gentic/ui/collapsible"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
 import { AgentMark, BrandMark, Icon } from "@/components/icons"
@@ -44,7 +52,7 @@ export default function Home() {
       <header className="site-header">
         <Link href="/" className="brand" aria-label="Gentic home">
           <Logo className="brand-logo" />
-          <span>gentic</span>
+          <span>Gentic</span>
         </Link>
         <nav className="desktop-nav" aria-label="Main navigation">
           <a href="#features">Features</a>
@@ -54,12 +62,14 @@ export default function Home() {
           </a>
         </nav>
         <div className="header-actions">
-          <a className="login-link" href={`${appUrl}/login`}>
-            Log in
-          </a>
-          <a className="button button-small button-dark" href={appUrl}>
-            Open Gentic <Icon name="arrow" />
-          </a>
+          <Button asChild variant="ghost" className="max-[380px]:hidden">
+            <a href={`${appUrl}/login`}>Log in</a>
+          </Button>
+          <Button asChild>
+            <a href={appUrl}>
+              Open Gentic <Icon name="arrow" />
+            </a>
+          </Button>
         </div>
       </header>
       <main id="main">
@@ -80,15 +90,19 @@ export default function Home() {
               keep the whole picture in view.
             </p>
             <div className="hero-actions">
-              <a href={appUrl} className="button button-lime">
-                Start building <Icon name="arrow" />
-              </a>
-              <a href="#how-it-works" className="button button-white">
-                See how it works{" "}
-                <span className="play-icon" aria-hidden="true">
-                  ▷
-                </span>
-              </a>
+              <Button asChild size="lg">
+                <a href={appUrl}>
+                  Start building <Icon name="arrow" />
+                </a>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <a href="#how-it-works">
+                  See how it works{" "}
+                  <span className="play-icon" aria-hidden="true">
+                    ▷
+                  </span>
+                </a>
+              </Button>
             </div>
             <div className="hero-note">
               Your agents. Your infrastructure. Your call.
@@ -145,138 +159,155 @@ export default function Home() {
             </p>
           </div>
           <div className="feature-grid">
-            <article className="feature-card agent-feature">
-              <div className="feature-copy">
-                <span className="feature-icon">
-                  <Icon name="code" />
-                </span>
-                <h3>The right agent for every issue.</h3>
-                <p>
-                  Choose Claude Code or Codex for each piece of work. Use the
-                  agents you already know, with the context they need.
-                </p>
-              </div>
-              <div
-                className="agent-cards"
-                aria-label="Claude Code and Codex are supported"
-              >
-                <div className="agent-option">
-                  <AgentMark provider="claude" />
-                  <div>
-                    <strong>Claude Code</strong>
-                    <small>Anthropic</small>
+            <Card className="feature-card agent-feature">
+              <CardContent>
+                <div className="feature-copy">
+                  <span className="feature-icon">
+                    <Icon name="code" />
+                  </span>
+                  <h3>The right agent for every issue.</h3>
+                  <p>
+                    Choose Claude Code or Codex for each piece of work. Use the
+                    agents you already know, with the context they need.
+                  </p>
+                </div>
+                <div
+                  className="agent-cards"
+                  aria-label="Claude Code and Codex are supported"
+                >
+                  <div className="agent-option">
+                    <AgentMark provider="claude" />
+                    <div>
+                      <strong>Claude Code</strong>
+                      <small>Anthropic</small>
+                    </div>
+                    <span className="agent-ready">Ready</span>
                   </div>
-                  <span className="agent-ready">Ready</span>
-                </div>
-                <div className="agent-option">
-                  <AgentMark provider="codex" />
-                  <div>
-                    <strong>Codex</strong>
-                    <small>OpenAI</small>
+                  <div className="agent-option">
+                    <AgentMark provider="codex" />
+                    <div>
+                      <strong>Codex</strong>
+                      <small>OpenAI</small>
+                    </div>
+                    <span className="agent-ready">Ready</span>
                   </div>
-                  <span className="agent-ready">Ready</span>
-                </div>
-                <span className="mini-note">
-                  Different strengths. Same workspace.
-                </span>
-              </div>
-            </article>
-            <article className="feature-card conversation-feature">
-              <div className="feature-copy">
-                <span className="feature-icon">
-                  <Icon name="message" />
-                </span>
-                <h3>Stay in the conversation.</h3>
-                <p>
-                  Watch progress live. Add a detail, attach a reference, or
-                  steer the work without starting over.
-                </p>
-              </div>
-              <div className="mini-chat">
-                <div className="user-bubble">
-                  Let’s make sure it works on mobile, too.<span>You</span>
-                </div>
-                <div className="agent-bubble">
-                  <AgentMark provider="claude" />
-                  <span>
-                    On it. I’ll add responsive layouts and check the smaller
-                    breakpoints.
+                  <span className="mini-note">
+                    Different strengths. Same workspace.
                   </span>
                 </div>
-              </div>
-            </article>
-            <article className="feature-card compact-feature">
-              <span className="feature-icon">
-                <Icon name="layers" />
-              </span>
-              <h3>Give every idea a place.</h3>
-              <p>
-                Organize work into projects and issues. Add labels, attachments,
-                and blocking dependencies so agents pick up work in the right
-                order.
-              </p>
-              <div className="dependency-example">
-                <span>
-                  <Icon name="check" /> Build the API
+              </CardContent>
+            </Card>
+            <Card className="feature-card conversation-feature">
+              <CardContent>
+                <div className="feature-copy">
+                  <span className="feature-icon">
+                    <Icon name="message" />
+                  </span>
+                  <h3>Stay in the conversation.</h3>
+                  <p>
+                    Watch progress live. Add a detail, attach a reference, or
+                    steer the work without starting over.
+                  </p>
+                </div>
+                <div className="mini-chat">
+                  <Bubble variant="tinted" align="end">
+                    <BubbleContent>
+                      Let’s make sure it works on mobile, too.
+                      <span className="block text-right text-xs text-muted-foreground">
+                        You
+                      </span>
+                    </BubbleContent>
+                  </Bubble>
+                  <div className="agent-bubble">
+                    <AgentMark provider="claude" />
+                    <span>
+                      On it. I’ll add responsive layouts and check the smaller
+                      breakpoints.
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="feature-card compact-feature">
+              <CardContent>
+                <span className="feature-icon">
+                  <Icon name="layers" />
                 </span>
-                <Icon name="arrow" />
-                <span>
-                  <span className="project-dot violet" /> Connect the UI
+                <h3>Give every idea a place.</h3>
+                <p>
+                  Organize work into projects and issues. Add labels,
+                  attachments, and blocking dependencies so agents pick up work
+                  in the right order.
+                </p>
+                <div className="dependency-example">
+                  <span>
+                    <Icon name="check" /> Build the API
+                  </span>
+                  <Icon name="arrow" />
+                  <span>
+                    <span className="project-dot violet" /> Connect the UI
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="feature-card compact-feature">
+              <CardContent>
+                <span className="feature-icon">
+                  <Icon name="branch" />
                 </span>
-              </div>
-            </article>
-            <article className="feature-card compact-feature">
-              <span className="feature-icon">
-                <Icon name="branch" />
-              </span>
-              <h3>Pull requests, without the chase.</h3>
-              <p>
-                Automatically publish successful changes to GitHub. Follow
-                checks and reviews alongside the issue, then decide what’s ready
-                to merge.
-              </p>
-              <div className="feature-pr">
-                <Icon name="branch" />
-                <span>Ready for review</span>
-                <span className="tiny-check">
-                  <Icon name="check" /> Checks passed
+                <h3>Pull requests, without the chase.</h3>
+                <p>
+                  Automatically publish successful changes to GitHub. Follow
+                  checks and reviews alongside the issue, then decide what’s
+                  ready to merge.
+                </p>
+                <div className="feature-pr">
+                  <Icon name="branch" />
+                  <span>Ready for review</span>
+                  <span className="tiny-check">
+                    <Icon name="check" /> Checks passed
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="feature-card compact-feature">
+              <CardContent>
+                <span className="feature-icon">
+                  <Icon name="server" />
                 </span>
-              </div>
-            </article>
-            <article className="feature-card compact-feature">
-              <span className="feature-icon">
-                <Icon name="server" />
-              </span>
-              <h3>Your machines. Working together.</h3>
-              <p>
-                Run workers on infrastructure you control. See what’s connected
-                and process multiple issues in their own isolated working
-                directories.
-              </p>
-              <div className="worker-example">
-                <Icon name="server" />
-                <span>build-worker-01</span>
-                <span className="worker-online">
-                  <span className="online-dot" /> Online
+                <h3>Your machines. Working together.</h3>
+                <p>
+                  Run workers on infrastructure you control. See what’s
+                  connected and process multiple issues in their own isolated
+                  working directories.
+                </p>
+                <div className="worker-example">
+                  <Icon name="server" />
+                  <span>build-worker-01</span>
+                  <span className="worker-online">
+                    <span className="online-dot" /> Online
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="feature-card compact-feature">
+              <CardContent>
+                <span className="feature-icon">
+                  <Icon name="link" />
                 </span>
-              </div>
-            </article>
-            <article className="feature-card compact-feature">
-              <span className="feature-icon">
-                <Icon name="link" />
-              </span>
-              <h3>Fits right into your flow.</h3>
-              <p>
-                Connect Gentic to an MCP-compatible assistant. Create issues,
-                organize projects, and queue agent work from the tools you
-                already use.
-              </p>
-              <div className="mcp-example">
-                <Icon name="terminal" />
-                <code>“Queue this up in Gentic.”</code>
-                <Icon name="arrow" />
-              </div>
-            </article>
+                <h3>Fits right into your flow.</h3>
+                <p>
+                  Connect Gentic to an MCP-compatible assistant. Create issues,
+                  organize projects, and queue agent work from the tools you
+                  already use.
+                </p>
+                <div className="mcp-example">
+                  <Icon name="terminal" />
+                  <code>“Queue this up in Gentic.”</code>
+                  <Icon name="arrow" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
         <section
@@ -361,13 +392,25 @@ export default function Home() {
           </div>
           <div className="faq-list">
             {questions.map(({ question, answer }) => (
-              <details key={question}>
-                <summary>
-                  {question}
-                  <Icon name="plus" />
-                </summary>
-                <p>{answer}</p>
-              </details>
+              <Collapsible key={question} className="border-b border-border">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-auto w-full justify-between rounded-none py-5 text-left whitespace-normal group"
+                  >
+                    {question}
+                    <Icon
+                      name="plus"
+                      className="transition-transform group-data-[state=open]:rotate-45"
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <p className="pb-5 pr-5 text-sm leading-relaxed text-muted-foreground">
+                    {answer}
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         </section>
@@ -388,16 +431,18 @@ export default function Home() {
             More shipped.
           </h2>
           <p>You bring the ideas. Give your agents a place to build them.</p>
-          <a href={appUrl} className="button button-dark">
-            Start building with Gentic <Icon name="arrow" />
-          </a>
+          <Button asChild size="lg">
+            <a href={appUrl}>
+              Start building with Gentic <Icon name="arrow" />
+            </a>
+          </Button>
         </section>
       </main>
       <footer className="site-footer page-width">
         <div>
           <Link href="/" className="brand" aria-label="Gentic home">
             <Logo className="brand-logo" />
-            <span>gentic</span>
+            <span>Gentic</span>
           </Link>
           <p>A home for your AI coding agents.</p>
         </div>
