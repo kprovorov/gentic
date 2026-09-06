@@ -47,8 +47,8 @@ export function Icon({
 }
 
 const brandAssets = {
-  claude: "/logos/claude-code.svg",
-  codex: "/logos/codex.svg",
+  claude: "/logos/claude.svg",
+  codex: "/logos/openai.svg",
   github: "/logos/github.svg",
   mcp: "/logos/mcp.svg",
 } as const

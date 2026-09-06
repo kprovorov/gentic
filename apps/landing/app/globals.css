@@ -11,7 +11,7 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-outfit);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 }
@@ -27,7 +27,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-outfit), sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 a {
@@ -67,7 +67,7 @@ h1,
 h2,
 h3,
 .brand {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-outfit), sans-serif;
 }
 ::selection {
   background: #dceec2;
@@ -762,7 +762,7 @@ h1 > span {
   gap: 10px;
   color: #55525c;
   font-size: 17px;
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-outfit), sans-serif;
   font-weight: 500;
 }
 .integration-list .brand-mark {
@@ -1030,7 +1030,6 @@ h2 span {
   align-items: center;
   gap: 18px;
   margin-bottom: 24px;
-  font-family: monospace;
 }
 .workflow-number::after {
   content: "";

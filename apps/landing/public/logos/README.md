@@ -5,8 +5,8 @@ SVGs vendored unchanged from [theSVG](https://thesvg.org), repository revision
 
 | Local file | theSVG entry | Upstream file |
 | --- | --- | --- |
-| `claude-code.svg` | [Claude Code](https://thesvg.org/icon/claude-code) | `public/icons/claude-code/default.svg` |
-| `codex.svg` | [Codex](https://thesvg.org/icon/codex) | `public/icons/codex/default.svg` |
+| `claude.svg` | [Claude](https://thesvg.org/icon/claude) | `public/icons/claude/default.svg` |
+| `openai.svg` | [OpenAI](https://thesvg.org/icon/openai) | `public/icons/openai/light.svg` |
 | `github.svg` | [GitHub](https://thesvg.org/icon/github) | `public/icons/github/default.svg` |
 | `mcp.svg` | [MCP](https://thesvg.org/icon/mcp-model-context-protocol) | `public/icons/mcp-model-context-protocol/default.svg` |
 

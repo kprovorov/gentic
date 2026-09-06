@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Inter, Outfit } from "next/font/google"
+import { Outfit } from "next/font/google"
 
 import "./globals.css"
 
@@ -87,8 +87,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 }
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-display" })
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" })
 
 export default function RootLayout({
   children,
@@ -96,7 +95,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+    <html lang="en" className={outfit.variable}>
       <body>{children}</body>
     </html>
   )
