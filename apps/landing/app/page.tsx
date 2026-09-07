@@ -14,7 +14,7 @@ import { ProductPreview } from "@/components/product-preview"
 
 const appUrl = "https://app.gentic.chat"
 const githubUrl = "https://github.com/kprovorov/gentic"
-const docsUrl = `${githubUrl}/tree/main/docs`
+const docsUrl = "https://docs.gentic.chat"
 
 const questions = [
   {
@@ -328,7 +328,7 @@ export default function Home() {
               </div>
               <a
                 className="text-link"
-                href={`${githubUrl}/blob/main/docs/quickstart.mdx`}
+                href={`${docsUrl}/quickstart`}
               >
                 Read the setup guide <Icon name="arrow" />
               </a>
