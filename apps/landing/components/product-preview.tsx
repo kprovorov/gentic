@@ -24,12 +24,12 @@ const stages = [
       "Follow the work as it happens. Jump into the conversation whenever you need to.",
   },
   {
-    label: "Review the pull request",
+    label: "Let agents review",
     short: "Review",
-    status: "Ready for review",
-    title: "Real code. Ready for your eyes.",
+    status: "Approved",
+    title: "Built, reviewed, and one step closer.",
     detail:
-      "The changes arrive as a GitHub pull request. You decide what ships.",
+      "A separate review agent checks the code and sends findings back for fixes. You decide when to merge.",
   },
 ]
 
@@ -38,6 +38,8 @@ export function ProductPreview() {
   const [provider, setProvider] = useState<"claude" | "codex">("claude")
   const current = stages[stage]!
   const agent = provider === "claude" ? "Claude Code" : "Codex"
+  const reviewer = provider === "claude" ? "codex" : "claude"
+  const reviewerName = reviewer === "claude" ? "Claude Code" : "Codex"
 
   return (
     <div className="product-showcase" id="product-preview">
@@ -161,29 +163,37 @@ export function ProductPreview() {
               ) : (
                 <div className="conversation">
                   <div className="conversation-author">
-                    <AgentMark provider={provider} />
-                    <strong>{agent}</strong>
+                    <AgentMark provider={stage === 2 ? reviewer : provider} />
+                    <strong>{stage === 2 ? reviewerName : agent}</strong>
                     <span>
-                      {stage === 1 ? "Working on your issue" : "Work completed"}
+                      {stage === 1
+                        ? "Working on your issue"
+                        : "Review agent · Approved"}
                     </span>
                   </div>
                   <p>
                     {stage === 1
                       ? "I’ll check the existing theme setup, add dark mode, and make sure your preference stays with you."
-                      : "Dark mode is ready. I’ve added the theme toggle, saved preferences, and tests for switching themes."}
+                      : "I found a preference reset on reload and sent it back for a fix. The coding agent added persistence and a regression test. I’ve checked the update and approved the pull request."}
                   </p>
                   <div className="task-list">
                     <div>
                       <span className="task-check">
                         <Icon name="check" />
                       </span>{" "}
-                      Explore the dashboard and theme styles <span>Done</span>
+                      {stage === 2
+                        ? "Review the implementation"
+                        : "Explore the dashboard and theme styles"}{" "}
+                      <span>Done</span>
                     </div>
                     <div>
                       <span className="task-check">
                         <Icon name="check" />
                       </span>{" "}
-                      Add system preference and theme toggle <span>Done</span>
+                      {stage === 2
+                        ? "Send findings back for an automatic fix"
+                        : "Add system preference and theme toggle"}{" "}
+                      <span>Done</span>
                     </div>
                     <div>
                       <span
@@ -191,7 +201,9 @@ export function ProductPreview() {
                       >
                         {stage === 2 && <Icon name="check" />}
                       </span>{" "}
-                      Test theme switching and persistence{" "}
+                      {stage === 2
+                        ? "Test the fix and approve the update"
+                        : "Test theme switching and persistence"}{" "}
                       <span>{stage === 1 ? "In progress" : "Done"}</span>
                     </div>
                   </div>
@@ -210,7 +222,7 @@ export function ProductPreview() {
                       </span>
                       <div>
                         <strong>Add dark mode to the dashboard</strong>
-                        <small>Pull request #42 · Ready for review</small>
+                        <small>Pull request #42 · Agent review approved</small>
                       </div>
                       <span className="pr-check">
                         <Icon name="check" /> Checks passed

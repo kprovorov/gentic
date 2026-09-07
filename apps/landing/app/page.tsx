@@ -20,7 +20,7 @@ const questions = [
   {
     question: "What is Gentic?",
     answer:
-      "Gentic is a workspace for managing AI coding agents. Create issues, assign them to Claude Code or Codex, follow their progress, and review the resulting GitHub pull requests from one place.",
+      "Gentic coordinates coding and review agents in one workspace. Turn issues into pull requests, let a separate agent test and review the code, and send findings back for fixes automatically. Less coordination and manual review, from idea to approved pull request.",
   },
   {
     question: "Where do my agents run?",
@@ -38,9 +38,14 @@ const questions = [
       "Yes. Send follow-up messages and attachments from the issue conversation while the agent is running. You can also resume a finished issue with a new message, keeping the existing conversation context.",
   },
   {
+    question: "How does automatic code review work?",
+    answer:
+      "Enable Automatic Review for a project or issue. A separate agent inspects the pull request and can run tests, then publishes a GitHub review. If it requests changes, Gentic sends the findings back to the original coding agent to fix and submit for another review. You can choose the reviewer and step in whenever you need to.",
+  },
+  {
     question: "Does Gentic automatically merge my code?",
     answer:
-      "You decide what ships. Gentic can publish successful changes as pull requests and track their checks and reviews. You review and merge through your existing GitHub workflow.",
+      "You decide what ships. Gentic automates implementation, pull requests, and the review-and-fix loop, reducing the work that needs your attention. The final merge stays in your existing GitHub workflow.",
   },
 ]
 
@@ -86,9 +91,9 @@ export default function Home() {
               <span>Already in progress.</span>
             </h1>
             <p>
-              A home for your AI coding agents. Turn issues into working code
-              <br className="desktop-break" /> with Claude Code and Codex, and
-              keep the whole picture in view.
+              Coding agents build. Review agents check and request fixes.
+              <br className="desktop-break" /> Gentic keeps the whole process moving,
+              from issue to approved pull request, with less human involvement.
             </p>
             <div className="hero-actions">
               <Button asChild size="lg">
@@ -154,9 +159,9 @@ export default function Home() {
               </h2>
             </div>
             <p>
-              From the first “what if” to the final review,
-              <br className="desktop-break" /> keep your agents and your work
-              together.
+              Implementation, testing, review, and fixes.
+              <br className="desktop-break" /> Let agents handle the handoffs
+              while you focus on what to build next.
             </p>
           </div>
           <div className="feature-grid">
@@ -204,26 +209,27 @@ export default function Home() {
                   <span className="feature-icon">
                     <Icon name="message" />
                   </span>
-                  <h3>Stay in the conversation.</h3>
+                  <h3>Agents build. Agents review.</h3>
                   <p>
-                    Watch progress live. Add a detail, attach a reference, or
-                    steer the work without starting over.
+                    Enable automatic review. A separate agent checks the code and
+                    runs tests, then sends findings back to the coding agent.
+                    Fixes move straight into another review.
                   </p>
                 </div>
                 <div className="mini-chat">
                   <Bubble variant="tinted" align="end">
                     <BubbleContent>
-                      Let’s make sure it works on mobile, too.
+                      The theme resets on reload. Please persist the preference.
                       <span className="block text-right text-xs text-muted-foreground">
-                        You
+                        Claude Code · Reviewer
                       </span>
                     </BubbleContent>
                   </Bubble>
                   <div className="agent-bubble">
-                    <AgentMark provider="claude" />
+                    <AgentMark provider="codex" />
                     <span>
-                      On it. I’ll add responsive layouts and check the smaller
-                      breakpoints.
+                      <strong className="block font-medium">Codex · Coding agent</strong>
+                      Fixed, with a regression test. Ready for another review.
                     </span>
                   </div>
                 </div>
@@ -319,7 +325,7 @@ export default function Home() {
           <div className="page-width">
             <div className="section-heading">
               <div>
-                <span className="eyebrow">FROM IDEA TO PULL REQUEST</span>
+                <span className="eyebrow">FROM IDEA TO APPROVED PULL REQUEST</span>
                 <h2 id="workflow-heading">
                   You set the direction.
                   <br />
@@ -364,14 +370,15 @@ export default function Home() {
               </article>
               <article>
                 <span className="workflow-number">03</span>
-                <h3>Review something real.</h3>
+                <h3>Let agents close the loop.</h3>
                 <p>
-                  Get a pull request, ask for changes, and merge when you’re
-                  happy. Your next idea is already waiting.
+                  A review agent checks the pull request and routes findings
+                  back for fixes automatically. Merge when you’re ready,
+                  with less manual back-and-forth.
                 </p>
                 <div className="workflow-visual">
                   <span className="workflow-pill merged-pill">
-                    <Icon name="branch" /> Merged
+                    <Icon name="check" /> Agent review approved
                   </span>
                 </div>
               </article>
@@ -445,7 +452,7 @@ export default function Home() {
             <Logo className="brand-logo" />
             <span>Gentic</span>
           </Link>
-          <p>A home for your AI coding agents.</p>
+          <p>A home for your coding and review agents.</p>
         </div>
         <nav aria-label="Footer navigation">
           <a href="#waitlist">Join waitlist</a>
