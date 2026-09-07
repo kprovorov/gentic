@@ -406,7 +406,7 @@ export default function Home() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <p className="pb-5 pr-5 text-sm leading-relaxed text-muted-foreground">
+                  <p className="pb-5 pr-5 text-base leading-7 text-muted-foreground">
                     {answer}
                   </p>
                 </CollapsibleContent>

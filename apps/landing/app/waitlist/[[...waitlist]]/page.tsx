@@ -22,7 +22,7 @@ export default function WaitlistPage() {
           <p className="text-4xl leading-tight font-medium tracking-tight text-balance">
             Your next idea starts here.
           </p>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-4 text-base leading-7 text-muted-foreground">
             Get early access to Gentic. We’ll email you when you’re invited in.
           </p>
         </div>
