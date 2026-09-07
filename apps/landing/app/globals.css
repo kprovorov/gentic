@@ -1330,9 +1330,6 @@ section h2 span {
   }
 }
 
-.closing-section > [data-slot="button"] {
-  margin-top: 26px;
-}
 .closing-section {
   border-radius: var(--radius-4xl);
 }

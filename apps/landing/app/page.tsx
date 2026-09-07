@@ -9,6 +9,7 @@ import {
 import Link from "next/link"
 import { Logo } from "@/components/logo"
 import { AgentMark, BrandMark, Icon } from "@/components/icons"
+import { WaitlistForm } from "@/components/waitlist-form"
 import { ProductPreview } from "@/components/product-preview"
 
 const appUrl = "https://app.gentic.chat"
@@ -66,9 +67,9 @@ export default function Home() {
             <a href={`${appUrl}/login`}>Log in</a>
           </Button>
           <Button asChild>
-            <Link href="/waitlist">
+            <a href="#waitlist">
               Join waitlist <Icon name="arrow" />
-            </Link>
+            </a>
           </Button>
         </div>
       </header>
@@ -91,9 +92,9 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <Button asChild size="lg">
-                <Link href="/waitlist">
+                <a href="#waitlist">
                   Join waitlist <Icon name="arrow" />
-                </Link>
+                </a>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <a href="#how-it-works">
@@ -415,6 +416,7 @@ export default function Home() {
           </div>
         </section>
         <section
+          id="waitlist"
           className="closing-section page-width"
           aria-labelledby="closing-heading"
         >
@@ -430,12 +432,11 @@ export default function Home() {
             <br />
             More shipped.
           </h2>
-          <p>You bring the ideas. Give your agents a place to build them.</p>
-          <Button asChild size="lg">
-            <Link href="/waitlist">
-              Join waitlist <Icon name="arrow" />
-            </Link>
-          </Button>
+          <p>
+            Join the waitlist for early access. We’ll email you when you’re
+            invited in.
+          </p>
+          <WaitlistForm />
         </section>
       </main>
       <footer className="site-footer page-width">
@@ -447,7 +448,7 @@ export default function Home() {
           <p>A home for your AI coding agents.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <Link href="/waitlist">Join waitlist</Link>
+          <a href="#waitlist">Join waitlist</a>
           <a href={docsUrl}>Documentation</a>
           <a href={githubUrl}>GitHub</a>
         </nav>
