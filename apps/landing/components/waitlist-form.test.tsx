@@ -14,7 +14,9 @@ import { WaitlistForm } from "./waitlist-form"
 const clerk = vi.hoisted(() => ({
   loaded: true,
   join: vi.fn(),
-  errors: { fields: {} },
+  errors: {
+    fields: {} as { emailAddress?: { longMessage: string } },
+  },
 }))
 
 vi.mock("@clerk/nextjs", () => ({
@@ -27,6 +29,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "test-key-not-sent-to-clerk")
   clerk.loaded = true
   clerk.join.mockReset()
+  clerk.errors.fields = {}
 })
 
 afterEach(() => {
@@ -57,6 +60,7 @@ describe("inline waitlist", () => {
     const input = screen.getByLabelText("Email address") as HTMLInputElement
     expect(input.type).toBe("email")
     expect(input.required).toBe(true)
+    expect(input.getAttribute("aria-invalid")).toBeNull()
     expect(input.checkValidity()).toBe(false)
     expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(
       true,
@@ -104,6 +108,7 @@ describe("inline waitlist", () => {
       const input = submitEmail()
       await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy())
       expect(input.value).toBe("test@example.com")
+      expect(input.getAttribute("aria-invalid")).toBeNull()
       expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(
         false,
       )
@@ -113,11 +118,32 @@ describe("inline waitlist", () => {
     },
   )
 
-  it("keeps the form visible with an honest error if deployment configuration is missing", () => {
+  it("only marks the email invalid after a rejected submission and clears it when edited", async () => {
+    clerk.errors.fields.emailAddress = { longMessage: "Use a valid email address." }
+    clerk.join.mockResolvedValueOnce({ error: new Error("Invalid email") })
+    render(<WaitlistForm />)
+    const input = screen.getByLabelText("Email address") as HTMLInputElement
+    expect(input.getAttribute("aria-invalid")).toBeNull()
+    expect(screen.queryByRole("alert")).toBeNull()
+
+    submitEmail()
+    await waitFor(() => expect(input.getAttribute("aria-invalid")).toBe("true"))
+    expect(screen.getByRole("alert").textContent).toBe("Use a valid email address.")
+
+    fireEvent.change(input, { target: { value: "corrected@example.com" } })
+    expect(input.getAttribute("aria-invalid")).toBeNull()
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("shows missing configuration as a service notice without marking the untouched email invalid", () => {
     vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "")
     render(<WaitlistForm />)
-    expect(screen.getByLabelText("Email address")).toBeTruthy()
-    expect(screen.getByRole("alert").textContent).toContain(
+    const input = screen.getByLabelText("Email address") as HTMLInputElement
+    expect(input.value).toBe("")
+    expect(input.getAttribute("aria-invalid")).toBeNull()
+    expect(input.getAttribute("aria-describedby")).toBe("waitlist-feedback")
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(screen.getByRole("status").textContent).toContain(
       "temporarily unavailable",
     )
     expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(

@@ -14,12 +14,19 @@ function EmailForm({
   pending = false,
   loading = false,
   error,
+  fieldError,
+  notice,
+  onEmailChange,
 }: {
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void
   pending?: boolean
   loading?: boolean
   error?: string
+  fieldError?: string
+  notice?: string
+  onEmailChange?: () => void
 }) {
+  const feedback = fieldError || error
   return (
     <form
       onSubmit={onSubmit}
@@ -37,8 +44,9 @@ function EmailForm({
           required
           maxLength={254}
           readOnly={pending}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "waitlist-feedback" : undefined}
+          onChange={onEmailChange}
+          aria-invalid={fieldError ? true : undefined}
+          aria-describedby={feedback || notice ? "waitlist-feedback" : undefined}
           className="h-10 bg-background"
         />
         <Button
@@ -50,9 +58,13 @@ function EmailForm({
         </Button>
       </div>
       <div id="waitlist-feedback" aria-live="polite" aria-atomic="true">
-        {error ? (
+        {feedback ? (
           <p role="alert" className="text-sm leading-6 text-destructive">
-            {error}
+            {feedback}
+          </p>
+        ) : notice ? (
+          <p role="status" className="text-sm leading-6 text-muted-foreground">
+            {notice}
           </p>
         ) : loading ? (
           <p className="text-sm leading-6 text-muted-foreground">
@@ -108,9 +120,9 @@ function ConnectedWaitlistForm() {
           onSubmit={handleSubmit}
           pending={pending}
           loading={!loaded}
-          error={
-            error ? errors.fields.emailAddress?.longMessage || error : undefined
-          }
+          error={error}
+          fieldError={error ? errors.fields.emailAddress?.longMessage : undefined}
+          onEmailChange={() => setError(undefined)}
         />
       )}
     </div>
@@ -127,7 +139,7 @@ export function WaitlistForm() {
           <ConnectedWaitlistForm />
         </ClerkProvider>
       ) : (
-        <EmailForm error={unavailableMessage} />
+        <EmailForm notice={unavailableMessage} />
       )}
     </div>
   )
