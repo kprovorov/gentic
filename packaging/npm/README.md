@@ -50,8 +50,11 @@ The `npm` job needs a registry token with publish rights on `gentic-cli`:
 
 1. Create an npm **granular access token** with **Read and write** on the
    `gentic-cli` package (or on the account, before the first publish).
-2. Add it to the `kprovorov/gentic` repo as an Actions secret named
-   **`NPM_TOKEN`** (`gh secret set NPM_TOKEN --repo kprovorov/gentic`).
+2. Add it to the `kprovorov/gentic` repo's **Production** environment as a
+   secret named **`NPM_TOKEN`**
+   (`gh secret set NPM_TOKEN --repo kprovorov/gentic --env Production`). The
+   `npm` job declares `environment: Production`, which is what makes the
+   secret visible to it.
 
 The first publish creates the package; the token must therefore be
 account-scoped until that has happened once. `--provenance` additionally needs

@@ -343,6 +343,9 @@ jobs:
       - prepare
       - release
     runs-on: ubuntu-latest
+    # NPM_TOKEN is an environment secret; GitHub only injects those into jobs
+    # that declare the environment.
+    environment: Production
     permissions:
       contents: read
       # Required for `npm publish --provenance`.
@@ -350,8 +353,8 @@ jobs:
     env:
       # Registry name for the CLI: `gentic` on npm is an unrelated package
       # owned by someone else. Requires the NPM_TOKEN secret — a granular
-      # access token with write access to this package. See
-      # packaging/npm/README.md.
+      # access token with write access to this package, stored on the
+      # Production environment. See packaging/npm/README.md.
       PACKAGE_NAME: gentic-cli
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
