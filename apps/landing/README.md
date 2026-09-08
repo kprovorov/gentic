@@ -31,3 +31,19 @@ layout. With an approved test email in the development instance, check that a
 successful signup shows confirmation and creates an entry in Clerk.
 
 See [Clerk’s custom waitlist guide](https://clerk.com/docs/nextjs/guides/development/custom-flows/authentication/waitlist).
+
+## Product screenshots
+
+The landing page uses the actual Gentic components with deterministic example
+project data. Captures are lossless PNGs at `deviceScaleFactor: 2`:
+
+- `issues.png` and `planning.png`: 2880 × 2080. Active work and planning views,
+  with varied statuses, agents, priorities, colored labels, dependencies and PRs.
+- `agents.png`: populated issue composer and its complete agent/model menu.
+- `review.png`: 2352 × 1648. Review findings, implementation fix, approval and PR.
+
+Images are served unoptimized to preserve lossless text and 2× detail, with
+intrinsic dimensions to prevent layout shifts. Feature captures load lazily.
+The hero identifies the content as example data and offers both workspace views.
+
+See `../web/screenshots/README.md` for the repeatable local capture procedure.

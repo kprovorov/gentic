@@ -1,257 +1,60 @@
 "use client"
 
-import { Button } from "@gentic/ui/button"
-import { Card } from "@gentic/ui/card"
-import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
 import { useState } from "react"
-import { AgentMark, Icon } from "@/components/icons"
+import { ToggleGroup, ToggleGroupItem } from "@gentic/ui/toggle-group"
+import { ProductScreenshot } from "@/components/product-screenshot"
+import issuesScreenshot from "@/public/screenshots/issues.png"
+import planningScreenshot from "@/public/screenshots/planning.png"
 
-const stages = [
-  {
-    label: "Write an issue",
-    short: "Issue",
-    status: "Draft",
-    title: "A little context goes a long way.",
-    detail:
-      "Describe the outcome, add a reference, and pick the agent for the job.",
+const views = {
+  active: {
+    label: "Building & reviewing",
+    src: issuesScreenshot,
+    alt: "Gentic demo workspace with issues in progress, testing, reviewing, approved, and merged, showing agent, priority, label, dependency, and pull-request pills",
   },
-  {
-    label: "Let your agent build",
-    short: "Build",
-    status: "In progress",
-    title: "Your idea is in good hands.",
-    detail:
-      "Follow the work as it happens. Jump into the conversation whenever you need to.",
+  planning: {
+    label: "Planning & queued",
+    src: planningScreenshot,
+    alt: "Gentic demo workspace with waiting-for-input, queued, and draft tasks, including blocked work, priorities, and colored labels",
   },
-  {
-    label: "Let agents review",
-    short: "Review",
-    status: "Approved",
-    title: "Built, reviewed, and one step closer.",
-    detail:
-      "A separate review agent checks the code and sends findings back for fixes. You decide when to merge.",
-  },
-]
+}
 
 export function ProductPreview() {
-  const [stage, setStage] = useState(1)
-  const [provider, setProvider] = useState<"claude" | "codex">("claude")
-  const current = stages[stage]!
-  const agent = provider === "claude" ? "Claude Code" : "Codex"
-  const reviewer = provider === "claude" ? "codex" : "claude"
-  const reviewerName = reviewer === "claude" ? "Claude Code" : "Codex"
-
+  const [view, setView] = useState<keyof typeof views>("active")
+  const current = views[view]
   return (
-    <div className="product-showcase" id="product-preview">
+    <figure className="product-showcase" id="product-preview">
       <ToggleGroup
         type="single"
-        value={String(stage)}
+        value={view}
         onValueChange={(value) => {
-          if (value) setStage(Number(value))
+          if (value === "active" || value === "planning") setView(value)
         }}
-        className="preview-controls"
-        aria-label="Explore the issue workflow"
+        className="mx-auto mb-5"
+        aria-label="Choose a workspace screenshot"
       >
-        {stages.map((item, index) => (
+        {Object.entries(views).map(([value, item]) => (
           <ToggleGroupItem
-            key={item.short}
-            value={String(index)}
-            aria-controls="preview-content"
+            key={value}
+            value={value}
+            aria-controls="workspace-screenshot"
           >
-            <span className="stage-number">{index + 1}</span>
-            <span className="stage-label">{item.label}</span>
-            <span className="stage-short">{item.short}</span>
+            {item.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <Card className="product-window gap-0 py-0">
-        <div className="window-bar">
-          <span className="window-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>
-            <Icon name="globe" /> app.gentic.chat
-          </span>
-          <span className="preview-label">Interactive preview</span>
-        </div>
-        <div className="preview-app">
-          <aside className="preview-sidebar" aria-label="Example workspace">
-            <div className="workspace-name">
-              <span className="workspace-avatar">S</span> Studio{" "}
-              <span className="muted">⌄</span>
-            </div>
-            <div className="sidebar-item">
-              <Icon name="layers" /> Overview
-            </div>
-            <div className="sidebar-item selected">
-              <Icon name="issue" /> Issues <span>8</span>
-            </div>
-            <div className="sidebar-heading">PROJECTS</div>
-            <div className="sidebar-item">
-              <span className="project-dot violet" /> Web app
-            </div>
-            <div className="sidebar-item">
-              <span className="project-dot peach" /> API
-            </div>
-            <div className="sidebar-worker">
-              <span className="online-dot" />
-              <span>
-                Worker connected<small>Ready for your next idea</small>
-              </span>
-            </div>
-          </aside>
-          <div className="preview-main" id="preview-content">
-            <div className="issue-breadcrumb">
-              <span>Web app</span>
-              <Icon name="chevron" />
-              <span>WEB-24</span>
-              <span className={`issue-status status-${stage}`}>
-                <span />
-                {current.status}
-              </span>
-            </div>
-            <div className="issue-content">
-              <h3>Add dark mode to the dashboard</h3>
-              <div className="issue-tags">
-                <span>
-                  <span className="project-dot violet" /> Feature
-                </span>
-                <span>
-                  <Icon name="layers" /> Web app
-                </span>
-              </div>
-              {stage === 0 ? (
-                <div className="draft-content">
-                  <p>
-                    Add a dark theme that follows the system preference. Include
-                    a toggle in Settings and remember the user’s choice.
-                  </p>
-                  <div className="attachment">
-                    <Icon name="paperclip" /> dashboard-reference.png{" "}
-                    <span>Reference attached</span>
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={provider}
-                    onValueChange={(value) => {
-                      if (value === "claude" || value === "codex")
-                        setProvider(value)
-                    }}
-                    variant="outline"
-                    className="agent-picker"
-                    aria-label="Choose a demo agent"
-                  >
-                    {(["claude", "codex"] as const).map((item) => (
-                      <ToggleGroupItem key={item} value={item}>
-                        <AgentMark provider={item} />
-                        {item === "claude" ? "Claude Code" : "Codex"}
-                        {provider === item && <Icon name="check" />}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                  <Button
-                    type="button"
-                    className="mt-4"
-                    onClick={() => setStage(1)}
-                  >
-                    Run with {agent}
-                    <Icon name="arrow" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="conversation">
-                  <div className="conversation-author">
-                    <AgentMark provider={stage === 2 ? reviewer : provider} />
-                    <strong>{stage === 2 ? reviewerName : agent}</strong>
-                    <span>
-                      {stage === 1
-                        ? "Working on your issue"
-                        : "Review agent · Approved"}
-                    </span>
-                  </div>
-                  <p>
-                    {stage === 1
-                      ? "I’ll check the existing theme setup, add dark mode, and make sure your preference stays with you."
-                      : "I found a preference reset on reload and sent it back for a fix. The coding agent added persistence and a regression test. I’ve checked the update and approved the pull request."}
-                  </p>
-                  <div className="task-list">
-                    <div>
-                      <span className="task-check">
-                        <Icon name="check" />
-                      </span>{" "}
-                      {stage === 2
-                        ? "Review the implementation"
-                        : "Explore the dashboard and theme styles"}{" "}
-                      <span>Done</span>
-                    </div>
-                    <div>
-                      <span className="task-check">
-                        <Icon name="check" />
-                      </span>{" "}
-                      {stage === 2
-                        ? "Send findings back for an automatic fix"
-                        : "Add system preference and theme toggle"}{" "}
-                      <span>Done</span>
-                    </div>
-                    <div>
-                      <span
-                        className={stage === 1 ? "working-ring" : "task-check"}
-                      >
-                        {stage === 2 && <Icon name="check" />}
-                      </span>{" "}
-                      {stage === 2
-                        ? "Test the fix and approve the update"
-                        : "Test theme switching and persistence"}{" "}
-                      <span>{stage === 1 ? "In progress" : "Done"}</span>
-                    </div>
-                  </div>
-                  {stage === 1 ? (
-                    <div className="code-activity">
-                      <Icon name="code" />
-                      <code>components/theme-toggle.tsx</code>
-                      <span>
-                        +38 <i>−4</i>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="preview-pr">
-                      <span className="pr-symbol">
-                        <Icon name="branch" />
-                      </span>
-                      <div>
-                        <strong>Add dark mode to the dashboard</strong>
-                        <small>Pull request #42 · Agent review approved</small>
-                      </div>
-                      <span className="pr-check">
-                        <Icon name="check" /> Checks passed
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-              {stage !== 0 && (
-                <div className="preview-composer">
-                  <Icon name="message" />
-                  <span>
-                    {stage === 1
-                      ? "Send a follow-up without interrupting the flow…"
-                      : "Ask for a change, keep the conversation going…"}
-                  </span>
-                  <span className="composer-arrow">
-                    <Icon name="arrow" />
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-      <div className="preview-caption" aria-live="polite">
-        <strong>{current.title}</strong>
-        <span>{current.detail}</span>
+      <div id="workspace-screenshot" aria-live="polite">
+        <ProductScreenshot
+          src={current.src}
+          alt={current.alt}
+          sizes="(max-width: 1200px) calc(100vw - 40px), 1140px"
+          eager
+        />
       </div>
-    </div>
+      <figcaption className="preview-caption">
+        <strong>From the next idea to the next release.</strong>
+        <span>The real Gentic interface, shown with example project data.</span>
+      </figcaption>
+    </figure>
   )
 }
