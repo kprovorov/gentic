@@ -46,3 +46,6 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# conductor per-machine overrides
+.conductor/settings.local.toml

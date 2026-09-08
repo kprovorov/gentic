@@ -1,0 +1,50 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Shared Conductor config for this repo. Conductor reads it from the default
+# branch, so changes take effect once merged. Per-machine overrides go in
+# .conductor/settings.local.toml (gitignored).
+#
+# Gitignored env files (apps/web/.env, apps/gentic/.env) are copied into each
+# new workspace by Conductor's default `.env*` "Files to copy" pattern, so
+# setup does not need to copy them.
+
+[scripts]
+# Installs every workspace package (pnpm-workspace.yaml). pnpm's allowBuilds
+# list is committed, so no interactive build-approval prompt appears.
+setup = "pnpm install"
+
+# Removes the per-workspace host clone directory created by the `host` run
+# script below. Everything else lives inside the workspace directory.
+archive = "rm -rf \"${TMPDIR:-/tmp}/gentic-host-$CONDUCTOR_WORKSPACE_NAME\""
+
+# Each workspace binds its own Conductor port and shares no local state, so
+# dev servers can run in several workspaces at once.
+run_mode = "concurrent"
+
+# Next.js app (@gentic/web): UI, agent API, GitHub webhooks, and the MCP
+# server. Uses the workspace's first allocated port.
+[scripts.run.web]
+available_in = [ "local" ]
+command = "pnpm --filter @gentic/web dev --port $CONDUCTOR_PORT"
+default = true
+icon = "globe"
+
+# Marketing site (@gentic/landing) on the next port in the workspace range.
+[scripts.run.landing]
+available_in = [ "local" ]
+command = "pnpm --filter @gentic/landing dev --port $((CONDUCTOR_PORT + 1))"
+icon = "megaphone"
+
+# Host CLI (@gentic/gentic) in watch mode, pointed at this workspace's web
+# app and given its own clone directory. Shell env wins over the host's
+# config file and .env, so the host id/credential still come from
+# apps/gentic/.env. Start `web` first.
+[scripts.run.host]
+available_in = [ "local" ]
+command = "GENTIC_API_URL=http://localhost:$CONDUCTOR_PORT/api/v1 WORKDIR=\"${TMPDIR:-/tmp}/gentic-host-$CONDUCTOR_WORKSPACE_NAME\" pnpm --filter @gentic/gentic exec tsx watch src/cli.ts run"
+icon = "server"
+
+# One-shot CI-style gate across every workspace: lint, typecheck, tests.
+[scripts.run.check]
+command = "pnpm lint && pnpm typecheck && pnpm test"
+icon = "test-tube"
