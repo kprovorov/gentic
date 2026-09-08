@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Outfit } from "next/font/google"
 
 import "./globals.css"
 
 const siteUrl = new URL("https://gentic.chat")
 const description =
-  "Gentic is an AI coding agent management platform for creating issues, assigning them to Claude Code or Codex, and receiving pull requests automatically."
+  "Gentic coordinates AI coding and review agents to automate implementation, pull requests, code review, and fixes with less human involvement."
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: "Gentic",
+    default: "Gentic — Your next idea, already in progress",
     template: "%s | Gentic",
   },
   description,
@@ -22,6 +22,8 @@ export const metadata: Metadata = {
     "Claude Code",
     "Codex",
     "automated pull requests",
+    "AI code review",
+    "review agents",
   ],
   authors: [{ name: "Gentic" }],
   creator: "Gentic",
@@ -49,7 +51,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Gentic",
     description:
-      "Create coding issues, assign them to AI agents, and get pull requests back for review.",
+      "Turn issues into reviewed pull requests. Gentic coordinates coding agents, review agents, and automatic fixes.",
     url: "/",
     siteName: "Gentic",
     images: [
@@ -67,7 +69,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Gentic",
     description:
-      "Create coding issues, assign them to AI agents, and get pull requests back for review.",
+      "Turn issues into reviewed pull requests. Gentic coordinates coding agents, review agents, and automatic fixes.",
     images: ["/twitter-image"],
   },
   robots: {
@@ -87,7 +89,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 }
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" })
 
 export default function RootLayout({
   children,
@@ -95,7 +97,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={outfit.variable}>
       <body>{children}</body>
     </html>
   )

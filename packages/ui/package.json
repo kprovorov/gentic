@@ -35,7 +35,8 @@
     "./toggle-group": "./src/ui/toggle-group.tsx",
     "./tooltip": "./src/ui/tooltip.tsx",
     "./use-mobile": "./src/hooks/use-mobile.ts",
-    "./utils": "./src/utils.ts"
+    "./utils": "./src/utils.ts",
+    "./theme.css": "./src/styles/theme.css"
   },
   "scripts": {
     "lint": "eslint .",
