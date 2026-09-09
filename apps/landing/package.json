@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
