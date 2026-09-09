@@ -1355,6 +1355,10 @@ export type Database = {
         Args: { p_now?: string }
         Returns: number
       }
+      reconcile_stuck_reviewing_issues: {
+        Args: { p_now?: string }
+        Returns: number
+      }
       record_host_enrollment_exchange_failure: {
         Args: {
           p_max_failures: number
