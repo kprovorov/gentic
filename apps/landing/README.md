@@ -25,6 +25,13 @@ client-side form. The Clerk provider wraps only the form; the homepage remains
 statically rendered. If the publishable key is missing, the form displays an
 unavailable message instead of breaking the page or pretending to accept emails.
 
+That fallback is a correct last resort but a poor deploy outcome: the key is
+inlined into the client bundle at build time, so a Vercel build started without
+it ships a waitlist nobody can join, and nothing else fails. `next.config.ts`
+therefore fails the build outright when `VERCEL` is set and the key is not.
+Local and CI builds have no key by design and stay unaffected, and the check
+runs only in the build phase so a missing key can never 500 the served site.
+
 Run `pnpm --filter @gentic/landing dev`. Check the header, hero, and footer links
 scroll to the form, invalid email validation, loading/disabled states, and mobile
 layout. With an approved test email in the development instance, check that a

@@ -4,6 +4,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"],
+      "passThroughEnv": ["VERCEL"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
