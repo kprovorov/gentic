@@ -104,14 +104,6 @@ export default function Home() {
                   Join waitlist <Icon name="arrow" />
                 </a>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <a href="#how-it-works">
-                  See how it works{" "}
-                  <span className="play-icon" aria-hidden="true">
-                    ▷
-                  </span>
-                </a>
-              </Button>
             </div>
             <div className="hero-note">
               Your agents. Your infrastructure. Your call.
