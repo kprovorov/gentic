@@ -11,6 +11,20 @@ import type { ReactNode } from "react"
 import Home from "@/app/page"
 import { WaitlistForm } from "./waitlist-form"
 
+// Match Next.js static image imports; Vitest otherwise supplies URL strings.
+vi.mock("@/public/screenshots/issues.png", () => ({
+  default: { src: "/screenshots/issues.png", width: 2880, height: 2080 },
+}))
+vi.mock("@/public/screenshots/planning.png", () => ({
+  default: { src: "/screenshots/planning.png", width: 2880, height: 2080 },
+}))
+vi.mock("@/public/screenshots/agents.png", () => ({
+  default: { src: "/screenshots/agents.png", width: 1392, height: 1168 },
+}))
+vi.mock("@/public/screenshots/review.png", () => ({
+  default: { src: "/screenshots/review.png", width: 2352, height: 1648 },
+}))
+
 const clerk = vi.hoisted(() => ({
   loaded: true,
   join: vi.fn(),
