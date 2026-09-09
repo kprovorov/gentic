@@ -343,18 +343,19 @@ jobs:
       - prepare
       - release
     runs-on: ubuntu-latest
-    # NPM_TOKEN is an environment secret; GitHub only injects those into jobs
-    # that declare the environment.
+    # Publishing uses npm Trusted Publishing: the package's trusted publisher
+    # on npmjs.com is pinned to this repo, this workflow file and the
+    # Production environment, so the job must run under that environment.
     environment: Production
     permissions:
       contents: read
-      # Required for `npm publish --provenance`.
+      # Required for the OIDC token npm exchanges for publish rights, and for
+      # `npm publish --provenance`.
       id-token: write
     env:
       # Registry name for the CLI: `gentic` on npm is an unrelated package
-      # owned by someone else. Requires the NPM_TOKEN secret — a granular
-      # access token with write access to this package, stored on the
-      # Production environment. See packaging/npm/README.md.
+      # owned by someone else. No NPM_TOKEN is involved — see
+      # packaging/npm/README.md.
       PACKAGE_NAME: gentic-cli
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
@@ -370,6 +371,10 @@ jobs:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing needs npm >= 11.5.1; the npm bundled with the
+      # Node release may lag behind.
+      - run: npm install -g npm@latest
 
       - run: pnpm install --frozen-lockfile
 
@@ -387,9 +392,10 @@ jobs:
       # fail the release after the GitHub release already succeeded. Treat an
       # already-published version as done instead, mirroring re-runs of this
       # workflow.
+      #
+      # Deliberately no NODE_AUTH_TOKEN: npm prefers a configured token over
+      # OIDC, and a token subject to the account's 2FA policy fails with EOTP.
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if npm view "${PACKAGE_NAME}@${VERSION}" version >/dev/null 2>&1; then
             echo "${PACKAGE_NAME}@${VERSION} is already published; nothing to do"
