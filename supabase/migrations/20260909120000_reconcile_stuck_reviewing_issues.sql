@@ -117,10 +117,13 @@ revoke all on function public.reconcile_stuck_reviewing_issues(timestamptz)
 
 -- A minute is ample for an invariant that only breaks when a cycle has
 -- already stopped moving, and the 2-minute grace above means a tighter
--- schedule would buy nothing. A stable name keeps this migration replayable:
--- Supabase Cron upserts an existing job with the same case-sensitive name.
+-- schedule would buy nothing. Expressed in cron syntax rather than the
+-- `'30 seconds'` interval form the two run reconcilers use: pg_cron's
+-- interval form accepts seconds only (1-59), so '1 minute' is rejected
+-- outright. A stable name keeps this migration replayable: Supabase Cron
+-- upserts an existing job with the same case-sensitive name.
 select cron.schedule(
   'reconcile-stuck-reviewing-issues',
-  '1 minute',
+  '* * * * *',
   $job$select public.reconcile_stuck_reviewing_issues();$job$
 );

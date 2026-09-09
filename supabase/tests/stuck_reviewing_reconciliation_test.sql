@@ -12,7 +12,7 @@ SELECT has_extension('pg_cron', 'pg_cron is enabled for reliable scheduling');
 
 SELECT is(
   (SELECT schedule FROM cron.job WHERE jobname = 'reconcile-stuck-reviewing-issues'),
-  '1 minute',
+  '* * * * *',
   'stuck-reviewing reconciliation runs every minute'
 );
 
