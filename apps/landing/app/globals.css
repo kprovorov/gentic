@@ -161,10 +161,6 @@
   gap: 12px;
   margin-top: 29px;
 }
-.play-icon {
-  font-size: 22px;
-  line-height: 1;
-}
 .hero-note {
   font-size: var(--text-sm);
   line-height: calc(var(--spacing) * 6);
