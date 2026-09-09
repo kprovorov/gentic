@@ -8,6 +8,7 @@ import envPaths from "env-paths"
 
 import { spawnInteractive } from "../installers.js"
 import { resolveGenticExecutable } from "./entry.js"
+import { tailArgs } from "./log-args.js"
 import type { ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
 
 const paths = envPaths("gentic", { suffix: "" })
@@ -136,7 +137,6 @@ export class FallbackBackend implements ServiceBackend {
       throw new Error(`No log file found at ${LOG_FILE}`)
     }
 
-    const args = opts.follow ? ["-f", LOG_FILE] : ["-n", "200", LOG_FILE]
-    await spawnInteractive("tail", args)
+    await spawnInteractive("tail", tailArgs(LOG_FILE, opts))
   }
 }
