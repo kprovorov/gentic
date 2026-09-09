@@ -184,6 +184,73 @@ describe("IssueCreateForm", () => {
     )
   })
 
+  it("runs the issue when pressing Cmd+Enter in the body", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.type(screen.getByLabelText("Body"), "Send me with the keyboard.")
+    await user.keyboard("{Meta>}{Enter}{/Meta}")
+
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
+    expect(formData.get("body")).toBe("Send me with the keyboard.")
+
+    await waitFor(() => expect(finishIssueCreation).toHaveBeenCalled())
+    const finishData = vi.mocked(finishIssueCreation).mock
+      .calls[0][0] as FormData
+    expect(finishData.get("status")).toBe("todo")
+  })
+
+  it("runs the issue when pressing Ctrl+Enter in the body", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.type(screen.getByLabelText("Body"), "Windows sends too.")
+    await user.keyboard("{Control>}{Enter}{/Control}")
+
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
+    expect(formData.get("body")).toBe("Windows sends too.")
+  })
+
+  it("keeps plain Enter a newline in the body", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.type(screen.getByLabelText("Body"), "First line{Enter}Second")
+
+    expect(screen.getByLabelText("Body")).toHaveValue("First line\nSecond")
+    expect(startIssueCreation).not.toHaveBeenCalled()
+  })
+
+  it("ignores Cmd+Enter while the body is blank", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.type(screen.getByLabelText("Body"), "   ")
+    await user.keyboard("{Meta>}{Enter}{/Meta}")
+
+    expect(startIssueCreation).not.toHaveBeenCalled()
+    expect(screen.getByLabelText("Body")).toHaveValue("   ")
+  })
+
+  it("highlights the project select when Cmd+Enter runs without a project", async () => {
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.type(screen.getByLabelText("Body"), "No project picked yet.")
+    await user.keyboard("{Meta>}{Enter}{/Meta}")
+
+    expect(startIssueCreation).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: "Project" })).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    )
+  })
+
   it("restores attached files from browser storage", async () => {
     const buffer = await new File(["contents"], "notes.txt", {
       type: "text/plain",
