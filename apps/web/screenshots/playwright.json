@@ -1,0 +1,14 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": { "channel": "chrome", "headless": true },
+    "contextOptions": {
+      "viewport": { "width": 1440, "height": 1040 },
+      "deviceScaleFactor": 2,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "locale": "en-US",
+      "timezoneId": "UTC"
+    }
+  }
+}

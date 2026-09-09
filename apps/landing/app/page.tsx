@@ -1,6 +1,5 @@
 import { Button } from "@gentic/ui/button"
 import { Card, CardContent } from "@gentic/ui/card"
-import { Bubble, BubbleContent } from "@gentic/ui/bubble"
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,6 +10,9 @@ import { Logo } from "@/components/logo"
 import { AgentMark, BrandMark, Icon } from "@/components/icons"
 import { WaitlistForm } from "@/components/waitlist-form"
 import { ProductPreview } from "@/components/product-preview"
+import { ProductScreenshot } from "@/components/product-screenshot"
+import agentsScreenshot from "@/public/screenshots/agents.png"
+import reviewScreenshot from "@/public/screenshots/review.png"
 
 const appUrl = "https://app.gentic.chat"
 const githubUrl = "https://github.com/kprovorov/gentic"
@@ -92,8 +94,9 @@ export default function Home() {
             </h1>
             <p>
               Coding agents build. Review agents check and request fixes.
-              <br className="desktop-break" /> Gentic keeps the whole process moving,
-              from issue to approved pull request, with less human involvement.
+              <br className="desktop-break" /> Gentic keeps the whole process
+              moving, from issue to approved pull request, with less human
+              involvement.
             </p>
             <div className="hero-actions">
               <Button asChild size="lg">
@@ -166,7 +169,7 @@ export default function Home() {
           </div>
           <div className="feature-grid">
             <Card className="feature-card agent-feature">
-              <CardContent>
+              <CardContent className="screenshot-feature-content">
                 <div className="feature-copy">
                   <span className="feature-icon">
                     <Icon name="code" />
@@ -177,61 +180,34 @@ export default function Home() {
                     agents you already know, with the context they need.
                   </p>
                 </div>
-                <div
-                  className="agent-cards"
-                  aria-label="Claude Code and Codex are supported"
-                >
-                  <div className="agent-option">
-                    <AgentMark provider="claude" />
-                    <div>
-                      <strong>Claude Code</strong>
-                      <small>Anthropic</small>
-                    </div>
-                    <span className="agent-ready">Ready</span>
-                  </div>
-                  <div className="agent-option">
-                    <AgentMark provider="codex" />
-                    <div>
-                      <strong>Codex</strong>
-                      <small>OpenAI</small>
-                    </div>
-                    <span className="agent-ready">Ready</span>
-                  </div>
-                  <span className="mini-note">
-                    Different strengths. Same workspace.
-                  </span>
+                <div className="feature-screenshot">
+                  <ProductScreenshot
+                    src={agentsScreenshot}
+                    alt="Gentic’s new issue composer with the agent and model menu open, showing Claude Code and Codex models"
+                    sizes="(max-width: 700px) calc(100vw - 88px), 510px"
+                  />
                 </div>
               </CardContent>
             </Card>
             <Card className="feature-card conversation-feature">
-              <CardContent>
+              <CardContent className="screenshot-feature-content">
                 <div className="feature-copy">
                   <span className="feature-icon">
                     <Icon name="message" />
                   </span>
                   <h3>Agents build. Agents review.</h3>
                   <p>
-                    Enable automatic review. A separate agent checks the code and
-                    runs tests, then sends findings back to the coding agent.
-                    Fixes move straight into another review.
+                    Enable automatic review. A separate agent checks the code
+                    and runs tests, then sends findings back to the coding
+                    agent. Fixes move straight into another review.
                   </p>
                 </div>
-                <div className="mini-chat">
-                  <Bubble variant="tinted" align="end">
-                    <BubbleContent>
-                      The theme resets on reload. Please persist the preference.
-                      <span className="block text-right text-xs text-muted-foreground">
-                        Claude Code · Reviewer
-                      </span>
-                    </BubbleContent>
-                  </Bubble>
-                  <div className="agent-bubble">
-                    <AgentMark provider="codex" />
-                    <span>
-                      <strong className="block font-medium">Codex · Coding agent</strong>
-                      Fixed, with a regression test. Ready for another review.
-                    </span>
-                  </div>
+                <div className="feature-screenshot">
+                  <ProductScreenshot
+                    src={reviewScreenshot}
+                    alt="Gentic demo issue showing review findings, an agent fix, automatic approval, and the linked pull request"
+                    sizes="(max-width: 700px) calc(100vw - 88px), 510px"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -246,15 +222,6 @@ export default function Home() {
                   attachments, and blocking dependencies so agents pick up work
                   in the right order.
                 </p>
-                <div className="dependency-example">
-                  <span>
-                    <Icon name="check" /> Build the API
-                  </span>
-                  <Icon name="arrow" />
-                  <span>
-                    <span className="project-dot violet" /> Connect the UI
-                  </span>
-                </div>
               </CardContent>
             </Card>
             <Card className="feature-card compact-feature">
@@ -268,13 +235,6 @@ export default function Home() {
                   checks and reviews alongside the issue, then decide what’s
                   ready to merge.
                 </p>
-                <div className="feature-pr">
-                  <Icon name="branch" />
-                  <span>Ready for review</span>
-                  <span className="tiny-check">
-                    <Icon name="check" /> Checks passed
-                  </span>
-                </div>
               </CardContent>
             </Card>
             <Card className="feature-card compact-feature">
@@ -288,13 +248,6 @@ export default function Home() {
                   connected and process multiple issues in their own isolated
                   working directories.
                 </p>
-                <div className="worker-example">
-                  <Icon name="server" />
-                  <span>build-worker-01</span>
-                  <span className="worker-online">
-                    <span className="online-dot" /> Online
-                  </span>
-                </div>
               </CardContent>
             </Card>
             <Card className="feature-card compact-feature">
@@ -308,11 +261,6 @@ export default function Home() {
                   organize projects, and queue agent work from the tools you
                   already use.
                 </p>
-                <div className="mcp-example">
-                  <Icon name="terminal" />
-                  <code>“Queue this up in Gentic.”</code>
-                  <Icon name="arrow" />
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -325,17 +273,16 @@ export default function Home() {
           <div className="page-width">
             <div className="section-heading">
               <div>
-                <span className="eyebrow">FROM IDEA TO APPROVED PULL REQUEST</span>
+                <span className="eyebrow">
+                  FROM IDEA TO APPROVED PULL REQUEST
+                </span>
                 <h2 id="workflow-heading">
                   You set the direction.
                   <br />
                   <span>Your agents take it from there.</span>
                 </h2>
               </div>
-              <a
-                className="text-link"
-                href={`${docsUrl}/quickstart`}
-              >
+              <a className="text-link" href={`${docsUrl}/quickstart`}>
                 Read the setup guide <Icon name="arrow" />
               </a>
             </div>
@@ -373,8 +320,8 @@ export default function Home() {
                 <h3>Let agents close the loop.</h3>
                 <p>
                   A review agent checks the pull request and routes findings
-                  back for fixes automatically. Merge when you’re ready,
-                  with less manual back-and-forth.
+                  back for fixes automatically. Merge when you’re ready, with
+                  less manual back-and-forth.
                 </p>
                 <div className="workflow-visual">
                   <span className="workflow-pill merged-pill">
@@ -404,7 +351,7 @@ export default function Home() {
                 <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="h-auto w-full justify-between rounded-none py-5 text-left whitespace-normal group"
+                    className="group h-auto w-full justify-between rounded-none py-5 text-left whitespace-normal"
                   >
                     {question}
                     <Icon
@@ -414,7 +361,7 @@ export default function Home() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <p className="pb-5 pr-5 text-base leading-7 text-muted-foreground">
+                  <p className="pr-5 pb-5 text-base leading-7 text-muted-foreground">
                     {answer}
                   </p>
                 </CollapsibleContent>
