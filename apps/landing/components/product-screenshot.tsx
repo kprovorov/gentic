@@ -12,13 +12,7 @@ export function ProductScreenshot({
   eager?: boolean
 }) {
   return (
-    <a
-      className="product-screenshot"
-      href={src.src}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={`${alt}. Open full-size screenshot in a new tab`}
-    >
+    <div className="product-screenshot">
       <Image
         unoptimized
         src={src}
@@ -26,7 +20,6 @@ export function ProductScreenshot({
         sizes={sizes}
         loading={eager ? "eager" : "lazy"}
       />
-      <span className="screenshot-enlarge">View full size ↗</span>
-    </a>
+    </div>
   )
 }
