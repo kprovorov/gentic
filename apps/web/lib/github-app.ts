@@ -819,3 +819,147 @@ export async function fetchCheckSuitesForRef(
     conclusion: suite.conclusion,
   }))
 }
+
+// --- Installation ownership verification -----------------------------------
+//
+// An installation id is a capability, not a fact about the caller: whoever
+// gets it written onto their `github_integrations` row is who Gentic acts as
+// on GitHub. GitHub hands the id to the browser as a redirect query
+// parameter, so the callback cannot take the user's word for it — ids are
+// visible in installation settings URLs and in every webhook payload.
+//
+// The App JWT can read an installation but cannot say who is standing in
+// front of us. Only a *user* access token can: `GET /user/installations`
+// returns exactly the installations that user may administer. So the callback
+// sends the user through the App's user-authorization flow and checks the id
+// against that list before writing anything.
+
+const GITHUB_USER_INSTALLATIONS_PAGE_SIZE = 100
+
+export function getGithubOAuthCredentials(): {
+  clientId: string
+  clientSecret: string
+} | null {
+  const clientId = process.env.GITHUB_APP_CLIENT_ID
+  const clientSecret = process.env.GITHUB_APP_CLIENT_SECRET
+
+  if (!clientId || !clientSecret) {
+    return null
+  }
+
+  return { clientId, clientSecret }
+}
+
+// `redirect_uri` is deliberately omitted so GitHub uses the App's own
+// registered callback URL — the same one that sent the user here — rather
+// than a value this process would have to reconstruct from request headers.
+export function buildGithubUserAuthorizationUrl(
+  clientId: string,
+  state: string
+): string {
+  const url = new URL("https://github.com/login/oauth/authorize")
+  url.searchParams.set("client_id", clientId)
+  url.searchParams.set("state", state)
+
+  return url.toString()
+}
+
+async function exchangeGithubUserCode(code: string): Promise<string | null> {
+  const credentials = getGithubOAuthCredentials()
+  if (!credentials) {
+    return null
+  }
+
+  const response = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+      code,
+    }),
+  })
+
+  if (!response.ok) {
+    return null
+  }
+
+  // GitHub answers a rejected code with HTTP 200 and an `error` body, so the
+  // absence of a token is the only reliable signal here.
+  const data = (await response.json()) as {
+    access_token?: string
+    error?: string
+  }
+
+  return data.access_token ?? null
+}
+
+async function fetchUserInstallationIds(
+  userToken: string
+): Promise<Set<string>> {
+  const ids = new Set<string>()
+  let page = 1
+
+  while (true) {
+    const response = await fetch(
+      `https://api.github.com/user/installations?per_page=${GITHUB_USER_INSTALLATIONS_PAGE_SIZE}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    )
+
+    if (!response.ok) {
+      throw new GithubApiError(
+        response.status,
+        `Failed to list user installations (${response.status})`
+      )
+    }
+
+    const data = (await response.json()) as {
+      installations: { id: number }[]
+    }
+
+    for (const installation of data.installations) {
+      ids.add(String(installation.id))
+    }
+
+    if (data.installations.length < GITHUB_USER_INSTALLATIONS_PAGE_SIZE) {
+      return ids
+    }
+
+    page += 1
+  }
+}
+
+/**
+ * Whether the GitHub user who just authorized us can administer
+ * `installationId`. Fails closed: a code GitHub rejects, a listing call that
+ * errors, or an id absent from the list all mean "not proven".
+ */
+export async function verifyInstallationOwnership(
+  code: string,
+  installationId: string
+): Promise<boolean> {
+  const userToken = await exchangeGithubUserCode(code)
+  if (!userToken) {
+    return false
+  }
+
+  try {
+    return (await fetchUserInstallationIds(userToken)).has(installationId)
+  } catch (error) {
+    console.error(
+      "[github-callback] failed to list user installations:",
+      { installationId },
+      error
+    )
+    return false
+  }
+}

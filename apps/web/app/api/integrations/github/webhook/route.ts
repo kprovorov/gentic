@@ -13,7 +13,7 @@ import {
   fetchPullRequestSnapshot,
   resolvePullRequestState,
 } from "@/lib/github-app"
-import { hasGenticReviewMarker } from "@/lib/review-marker"
+import { isGenticAuthoredReview } from "@/lib/review-marker"
 
 export const runtime = "nodejs"
 
@@ -111,6 +111,7 @@ type PullRequestReviewPayload = {
     id: number
     state: string
     body: string | null
+    author_association?: string | null
     user: {
       login: string
     }
@@ -140,6 +141,7 @@ type IssueCommentPayload = {
     id: number
     body: string
     html_url: string
+    author_association?: string | null
     user: {
       login: string
     }
@@ -162,6 +164,7 @@ type PullRequestReviewCommentPayload = {
     diff_hunk: string
     body: string
     html_url: string
+    author_association?: string | null
     user: {
       login: string
     }
@@ -378,6 +381,7 @@ async function handleIssueCommentEvent(
   await issuesService.applyPullRequestComment(supabase, prUrl, {
     id: payload.comment.id,
     commenterLogin: payload.comment.user.login,
+    authorAssociation: payload.comment.author_association ?? null,
     body: payload.comment.body,
     htmlUrl: payload.comment.html_url,
   })
@@ -397,6 +401,7 @@ async function handlePullRequestReviewCommentEvent(
     {
       id: payload.comment.id,
       commenterLogin: payload.comment.user.login,
+      authorAssociation: payload.comment.author_association ?? null,
       body: payload.comment.body,
       htmlUrl: payload.comment.html_url,
       path: payload.comment.path,
@@ -714,7 +719,14 @@ async function handlePullRequestReviewEvent(
 
   if (
     payload.action === "submitted" &&
-    payload.review.state === "changes_requested"
+    payload.review.state === "changes_requested" &&
+    // Both branches below act on the review as a decision the account owner
+    // stands behind: one cancels their in-flight automatic review, the other
+    // relays the review to the agent and requeues the run. Anyone at all can
+    // submit a review on a public repository's pull request, so neither may
+    // fire until GitHub says the reviewer has standing on the repository.
+    // `applyChangesRequestedReview` checks this again service-side.
+    issuesService.isTrustedPullRequestActor(payload.review.author_association)
   ) {
     // Our own automated reviewer posts its verdict as a normal GitHub review
     // too, so this webhook echoes it back. Everything below this point is
@@ -727,7 +739,10 @@ async function handlePullRequestReviewEvent(
     // from the delivered payload, so it works even if the publish call's DB
     // write lost a race with this webhook; `isKnownReviewAttempt` is the
     // fallback for reviews published before the marker existed.
-    let isAutomated = hasGenticReviewMarker(payload.review.body)
+    let isAutomated = isGenticAuthoredReview(
+      payload.review.body,
+      payload.review.user.login
+    )
     if (!isAutomated) {
       try {
         isAutomated = await services.isKnownReviewAttempt(
@@ -808,6 +823,7 @@ async function applyChangesRequestedReview(
     {
       id: payload.review.id,
       reviewerLogin: payload.review.user.login,
+      authorAssociation: payload.review.author_association ?? null,
       body: payload.review.body,
       comments: comments.map((comment) => ({
         path: comment.path,

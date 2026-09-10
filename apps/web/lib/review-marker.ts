@@ -46,3 +46,29 @@ export function hasGenticReviewMarker(
 ): boolean {
   return reviewBodyMarkerReviewRunId(body) !== null
 }
+
+/**
+ * Whether a delivered review is one Gentic itself published.
+ *
+ * The marker alone is not proof of authorship — it is a comment in a review
+ * body, and anyone able to review the pull request can paste it in. Doing so
+ * would make a genuine human `changes_requested` verdict look like Gentic's
+ * own echo, so neither the review cycle supersede nor the relay to the agent
+ * would fire. The App posts its reviews as `<app-slug>[bot]`, so the login
+ * has to agree with the marker before the review counts as ours.
+ */
+export function isGenticAuthoredReview(
+  body: string | null | undefined,
+  reviewerLogin: string | null | undefined
+): boolean {
+  const appSlug = process.env.GITHUB_APP_SLUG
+
+  if (!appSlug || !reviewerLogin) {
+    return false
+  }
+
+  return (
+    hasGenticReviewMarker(body) &&
+    reviewerLogin.toLowerCase() === `${appSlug.toLowerCase()}[bot]`
+  )
+}
