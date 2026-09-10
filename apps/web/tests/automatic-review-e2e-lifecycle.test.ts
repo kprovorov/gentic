@@ -118,7 +118,11 @@ liveTest(
             merged: false,
             merged_at: null,
             number: 1,
-            head: { ref: "users/tester/TST-1-fix", sha: "sha-policy-1" },
+            head: {
+            ref: "users/tester/TST-1-fix",
+            sha: "sha-policy-1",
+            repo: { full_name: repo },
+          },
             base: { repo: { full_name: repo } },
           },
         }),
@@ -207,7 +211,11 @@ liveTest(
             merged: false,
             merged_at: null,
             number: 1,
-            head: { ref: "users/tester/TST-1-fix", sha: "sha-happy-1" },
+            head: {
+            ref: "users/tester/TST-1-fix",
+            sha: "sha-happy-1",
+            repo: { full_name: repo },
+          },
             base: { repo: { full_name: repo } },
           },
         }),
@@ -770,7 +778,11 @@ liveTest(
           merged: false,
           merged_at: null,
           number: 1,
-          head: { ref: "users/tester/TST-1-fix", sha: "sha-dup-1" },
+          head: {
+            ref: "users/tester/TST-1-fix",
+            sha: "sha-dup-1",
+            repo: { full_name: repo },
+          },
           base: { repo: { full_name: repo } },
         },
       }
