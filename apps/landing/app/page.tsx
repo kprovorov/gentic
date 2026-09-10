@@ -5,9 +5,21 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@gentic/ui/collapsible"
+import {
+  IconArrowRight,
+  IconArrowUpRight,
+  IconCheck,
+  IconCode,
+  IconGitBranch,
+  IconLink,
+  IconMessage,
+  IconPlus,
+  IconServer,
+  IconStack2,
+} from "@tabler/icons-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
-import { AgentMark, BrandMark, Icon } from "@/components/icons"
+import { AgentMark, BrandMark } from "@/components/icons"
 import { WaitlistForm } from "@/components/waitlist-form"
 import { ProductPreview } from "@/components/product-preview"
 import { ProductScreenshot } from "@/components/product-screenshot"
@@ -66,7 +78,7 @@ export default function Home() {
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href={docsUrl}>
-            Documentation <span aria-hidden="true">↗</span>
+            Documentation <IconArrowUpRight aria-hidden="true" />
           </a>
         </nav>
         <div className="header-actions">
@@ -75,7 +87,7 @@ export default function Home() {
           </Button>
           <Button asChild>
             <a href="#waitlist">
-              Join waitlist <Icon name="arrow" />
+              Join waitlist <IconArrowRight aria-hidden="true" />
             </a>
           </Button>
         </div>
@@ -85,7 +97,7 @@ export default function Home() {
           <div className="hero-copy">
             <a className="hero-eyebrow" href={githubUrl}>
               <span className="online-dot" /> A little more building. A lot less
-              juggling. <Icon name="arrow" />
+              juggling. <IconArrowRight aria-hidden="true" />
             </a>
             <h1 id="hero-heading">
               Your next idea.
@@ -101,7 +113,7 @@ export default function Home() {
             <div className="hero-actions">
               <Button asChild size="lg">
                 <a href="#waitlist">
-                  Join waitlist <Icon name="arrow" />
+                  Join waitlist <IconArrowRight aria-hidden="true" />
                 </a>
               </Button>
             </div>
@@ -134,7 +146,7 @@ export default function Home() {
               MCP
             </span>
             <span>
-              <Icon name="server" />
+              <IconServer aria-hidden="true" />
               Your infrastructure
             </span>
           </div>
@@ -164,7 +176,7 @@ export default function Home() {
               <CardContent className="screenshot-feature-content">
                 <div className="feature-copy">
                   <span className="feature-icon">
-                    <Icon name="code" />
+                    <IconCode aria-hidden="true" />
                   </span>
                   <h3>The right agent for every issue.</h3>
                   <p>
@@ -185,7 +197,7 @@ export default function Home() {
               <CardContent className="screenshot-feature-content">
                 <div className="feature-copy">
                   <span className="feature-icon">
-                    <Icon name="message" />
+                    <IconMessage aria-hidden="true" />
                   </span>
                   <h3>Agents build. Agents review.</h3>
                   <p>
@@ -206,7 +218,7 @@ export default function Home() {
             <Card className="feature-card compact-feature">
               <CardContent>
                 <span className="feature-icon">
-                  <Icon name="layers" />
+                  <IconStack2 aria-hidden="true" />
                 </span>
                 <h3>Give every idea a place.</h3>
                 <p>
@@ -219,7 +231,7 @@ export default function Home() {
             <Card className="feature-card compact-feature">
               <CardContent>
                 <span className="feature-icon">
-                  <Icon name="branch" />
+                  <IconGitBranch aria-hidden="true" />
                 </span>
                 <h3>Pull requests, without the chase.</h3>
                 <p>
@@ -232,7 +244,7 @@ export default function Home() {
             <Card className="feature-card compact-feature">
               <CardContent>
                 <span className="feature-icon">
-                  <Icon name="server" />
+                  <IconServer aria-hidden="true" />
                 </span>
                 <h3>Your machines. Working together.</h3>
                 <p>
@@ -245,7 +257,7 @@ export default function Home() {
             <Card className="feature-card compact-feature">
               <CardContent>
                 <span className="feature-icon">
-                  <Icon name="link" />
+                  <IconLink aria-hidden="true" />
                 </span>
                 <h3>Fits right into your flow.</h3>
                 <p>
@@ -275,7 +287,7 @@ export default function Home() {
                 </h2>
               </div>
               <a className="text-link" href={`${docsUrl}/quickstart`}>
-                Read the setup guide <Icon name="arrow" />
+                Read the setup guide <IconArrowRight aria-hidden="true" />
               </a>
             </div>
             <div className="workflow-grid">
@@ -291,7 +303,7 @@ export default function Home() {
                   <span className="connecting-line" />
                   <Logo className="small-gentic" />
                   <span className="connecting-line" />
-                  <Icon name="server" />
+                  <IconServer className="workflow-icon" aria-hidden="true" />
                 </div>
               </article>
               <article>
@@ -317,7 +329,7 @@ export default function Home() {
                 </p>
                 <div className="workflow-visual">
                   <span className="workflow-pill merged-pill">
-                    <Icon name="check" /> Agent review approved
+                    <IconCheck aria-hidden="true" /> Agent review approved
                   </span>
                 </div>
               </article>
@@ -334,7 +346,7 @@ export default function Home() {
             <h2 id="faq-heading">Good questions.</h2>
             <p>Get to know your new workspace.</p>
             <a href={docsUrl} className="text-link">
-              Explore the documentation <Icon name="arrow" />
+              Explore the documentation <IconArrowRight aria-hidden="true" />
             </a>
           </div>
           <div className="faq-list">
@@ -346,9 +358,9 @@ export default function Home() {
                     className="group h-auto w-full justify-between rounded-none py-5 text-left whitespace-normal"
                   >
                     {question}
-                    <Icon
-                      name="plus"
+                    <IconPlus
                       className="transition-transform group-data-[state=open]:rotate-45"
+                      aria-hidden="true"
                     />
                   </Button>
                 </CollapsibleTrigger>

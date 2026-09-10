@@ -89,8 +89,14 @@
 .site-footer nav a:hover {
   color: var(--primary-foreground);
 }
-.desktop-nav a span {
-  margin-left: 3px;
+.desktop-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.desktop-nav a svg {
+  width: 14px;
+  height: 14px;
   color: var(--muted-foreground);
 }
 .header-actions {
@@ -308,6 +314,10 @@ section h2 span {
   color: var(--muted-foreground);
   margin-bottom: 21px;
 }
+.feature-icon svg {
+  width: 20px;
+  height: 20px;
+}
 .feature-card h3 {
   font-size: 22px;
   letter-spacing: -0.5px;
@@ -347,6 +357,7 @@ section h2 span {
 }
 .text-link svg {
   width: 16px;
+  height: 16px;
 }
 .workflow-grid {
   display: grid;
@@ -399,6 +410,10 @@ section h2 span {
 .small-gentic {
   width: 31px;
   height: 31px;
+}
+.workflow-icon {
+  width: 20px;
+  height: 20px;
 }
 .workflow-pill {
   display: inline-flex;
