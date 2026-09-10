@@ -1427,8 +1427,14 @@ export type Database = {
         Returns: undefined
       }
       retry_review_run: {
-        Args: { p_now?: string; p_review_cycle_id: string; p_user_id: string }
+        Args: {
+          p_force?: boolean
+          p_now?: string
+          p_review_cycle_id: string
+          p_user_id: string
+        }
         Returns: {
+          cancelled_run_count: number
           review_cycle_id: string
           review_run_id: string
         }[]

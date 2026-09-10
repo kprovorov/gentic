@@ -91,10 +91,24 @@ These appear directly on the issue when applicable:
 | Control | When it appears | What it does |
 | --- | --- | --- |
 | **Retry review** | The active cycle has no live run and hasn't exhausted its 3-attempt budget (typically after two consecutive infrastructure failures) | Queues a fresh review run at the current commit, same cycle, same budget |
+| **Restart review** | The active cycle has a run still queued or running, and hasn't exhausted its 3-attempt budget | Cancels the in-flight run and queues a fresh one in its place — for a reviewer that has stalled without failing |
 | **Continue with human review** | The pull request has an active Review Cycle | Marks the cycle approved without a further automatic verdict — the only other way (besides an automatic approval) a cycle reaches `Approved` |
 | **Start fresh implementation session** | The durable owner of the implementation session can't resume (agent/model changed, no resumable session was ever recorded, or the original host was deleted or banned) | Abandons the old session and starts a new one to pick up the next review fix |
 
+Neither **Retry review** nor **Restart review** consumes a review attempt — only a completed verdict does — so restarting a stalled reviewer costs you nothing from the 3-attempt budget.
+
 A cycle that has already exhausted its 3 attempts, been superseded, or been approved needs no recovery action — the next push (or **Continue with human review**) is what moves it forward.
+
+### A review sits at "Reviewing" and never finishes
+
+Gentic catches a reviewer whose host crashes or goes silent: the run is
+failed automatically after 5 minutes and retried once. It cannot catch a
+reviewer that hangs while its host keeps heartbeating normally — nothing
+observable has gone wrong, so the run stays `running` indefinitely.
+
+**Restart review** is the escape hatch for exactly that case. It cancels the
+in-flight run (the host holding it notices within about 10 seconds and stops
+work) and queues a fresh run at the same commit.
 
 ## Troubleshooting
 

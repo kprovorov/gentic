@@ -50,6 +50,22 @@ with no live run; nothing new queues until a human acts or new code arrives.
 No new terminal state was added for this — recovery state is read off the
 run history, not persisted.
 
+> **Amended 2026-09-10.** Deriving recovery from run history has one blind
+> spot: it can only see runs that *ended*. A reviewer that hangs leaves its
+> run `running` (or `pending`) forever, so the cycle is never "stuck" by the
+> derived definition and no recovery control is offered — and the automatic
+> nets miss it too, because the run heartbeat `processReviewRun` sends is a
+> timer independent of reviewer progress, and
+> `reconcile_offline_review_runs` ignores `pending` runs entirely.
+> `retry_review_run` therefore gained `p_force`, which cancels the in-flight
+> run and queues a fresh one in its place. Cancellation is the same
+> mechanism every supersede path already uses to release a claimed run, so
+> the holding host aborts on its next control poll; and like those paths it
+> consumes no Review Attempt. The three-strike cap is unaffected: the
+> budget check runs *before* the cancellation, so forcing cannot be used to
+> kill the last attempt that could still conclude a cycle. See
+> `supabase/migrations/20260910120000_force_restart_review_run.sql`.
+
 **Automatic approval only comes from the engine itself.** `review_cycles`
 reaches `state = 'approved'` exactly two ways: `complete_review_attempt`
 recording a `verdict = 'approved'`, or the explicit `continue_with_human_review`

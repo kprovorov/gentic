@@ -1,6 +1,6 @@
 import type { ImplementationOwner, ReviewCycle } from "@gentic/services/issues"
 
-import { isReviewCycleStuck } from "@/app/issues/review-state-meta"
+import { findReviewRetryTarget } from "@/app/issues/review-state-meta"
 
 /** Whether any recovery control would render, so a caller can decide whether
  * to show the surrounding section at all rather than an empty heading.
@@ -12,7 +12,7 @@ export function hasReviewRecoveryControls(
   implementationOwner: ImplementationOwner | null
 ): boolean {
   return (
-    reviewCycles.some(isReviewCycleStuck) ||
+    findReviewRetryTarget(reviewCycles) !== null ||
     reviewCycles.some((cycle) => cycle.state === "active") ||
     (implementationOwner !== null && !implementationOwner.resumable)
   )

@@ -314,11 +314,16 @@ export async function retryReviewRunAction(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedContext()
   const issueId = getUuid(formData, "issue_id")
   const reviewCycleId = getUuid(formData, "review_cycle_id")
+  // Opt-in, because forcing cancels whatever run is in flight: the caller
+  // sets it only when it deliberately offered a "restart the stalled run"
+  // control rather than a plain retry.
+  const force = getString(formData, "force") === "true"
 
   const result = await reviewLifecycleService.retryReviewRun(
     supabase,
     userId,
-    reviewCycleId
+    reviewCycleId,
+    { force }
   )
   revalidatePath("/issues")
   await revalidateIssuePathById(supabase, userId, issueId)

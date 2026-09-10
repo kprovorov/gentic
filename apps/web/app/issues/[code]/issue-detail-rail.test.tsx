@@ -882,6 +882,57 @@ describe("IssueDetailRail automatic review", () => {
     expect(screen.getByRole("button", { name: "Retry review" })).toBeVisible()
   })
 
+  // A reviewer that hangs while its host keeps heartbeating trips no
+  // automatic safety net, so the only way out is this forced restart.
+  it("offers Restart review for a stalled in-flight run and forces the retry", async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    retryReviewRunActionMock.mockResolvedValue({
+      reviewRunId: "run-2",
+      reviewCycleId: "cycle-1",
+      cancelledRunCount: 1,
+    })
+    renderRail(createQueryClient(), {
+      reviewCycles: [
+        {
+          id: "cycle-1",
+          pullRequestId: "pr-1",
+          state: "active",
+          headSha: "sha-1",
+          supersededReason: null,
+          createdAt: "t",
+          updatedAt: "t",
+          runs: [
+            {
+              id: "run-1",
+              status: "running",
+              error: null,
+              headSha: "sha-1",
+              startedAt: "t",
+              finishedAt: null,
+              claimedByHostId: "host-1",
+              heartbeatAt: "t",
+              createdAt: "t",
+            },
+          ],
+          attempts: [],
+        },
+      ],
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Retry review" })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Restart review" }))
+
+    await waitFor(() => {
+      expect(retryReviewRunActionMock).toHaveBeenCalledTimes(1)
+    })
+    const formData = retryReviewRunActionMock.mock.calls[0][0] as FormData
+    expect(formData.get("review_cycle_id")).toBe("cycle-1")
+    expect(formData.get("force")).toBe("true")
+  })
+
   it("hides every recovery control once every cycle has concluded (approved/exhausted/superseded) — the stale-control guard", () => {
     renderRail(createQueryClient(), {
       reviewCycles: [

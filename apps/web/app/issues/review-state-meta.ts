@@ -112,6 +112,12 @@ export function reviewFindingsCount(cycle: ReviewCycle): number {
   return attempt ? attempt.findings.length : 0
 }
 
+export function hasLiveReviewRun(cycle: ReviewCycle): boolean {
+  return cycle.runs.some(
+    (run) => run.status === "pending" || run.status === "running"
+  )
+}
+
 /** A cycle is "stuck" once it has no live run left but hasn't concluded — the
  * state the explicit Retry recovery control exists for (see ADR-0004: two
  * trailing infra failures leave a cycle `active` with no live run). */
@@ -119,10 +125,34 @@ export function isReviewCycleStuck(cycle: ReviewCycle): boolean {
   if (cycle.state !== "active") {
     return false
   }
-  const hasLiveRun = cycle.runs.some(
-    (run) => run.status === "pending" || run.status === "running"
+  return (
+    !hasLiveReviewRun(cycle) && cycle.attempts.length < REVIEW_ATTEMPT_BUDGET
   )
-  return !hasLiveRun && cycle.attempts.length < REVIEW_ATTEMPT_BUDGET
+}
+
+export type ReviewRetryTarget = {
+  cycle: ReviewCycle
+  /** True when a run is still nominally in flight, so re-triggering has to
+   * cancel it first (`retry_review_run`'s `p_force`). Drives the button's
+   * label and confirmation copy as well as the request itself. */
+  force: boolean
+}
+
+/** The cycle a "re-trigger the review" control would act on, if any: any
+ * `active` cycle with attempt budget left, whether it is stuck with no live
+ * run (plain retry) or has a run in flight that has stalled (forced
+ * restart). Concluded cycles — approved/exhausted/superseded — and a spent
+ * budget yield null, so the control never renders where the RPC would
+ * refuse it. */
+export function findReviewRetryTarget(
+  cycles: ReviewCycle[]
+): ReviewRetryTarget | null {
+  const cycle = cycles.find(
+    (candidate) =>
+      candidate.state === "active" &&
+      candidate.attempts.length < REVIEW_ATTEMPT_BUDGET
+  )
+  return cycle ? { cycle, force: hasLiveReviewRun(cycle) } : null
 }
 
 export function githubReviewUrl(
