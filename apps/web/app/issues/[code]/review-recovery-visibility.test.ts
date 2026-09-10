@@ -3,6 +3,8 @@ import { test } from "node:test"
 
 import type { ImplementationOwner, ReviewCycle } from "@gentic/services/issues"
 
+import { findReviewRetryTarget } from "@/app/issues/review-state-meta"
+
 import { hasReviewRecoveryControls } from "./review-recovery-visibility"
 
 function cycle(overrides: Partial<ReviewCycle> = {}): ReviewCycle {
@@ -74,7 +76,7 @@ test("Retry: a cycle stuck with two trailing failures and budget left is a retry
   assert.equal(hasReviewRecoveryControls([stuck], null), true)
 })
 
-test("Retry: a cycle with a live run is not a retry target", () => {
+test("Retry: a cycle with a live run is a forced-restart target", () => {
   const live = cycle({
     runs: [
       {
@@ -91,9 +93,68 @@ test("Retry: a cycle with a live run is not a retry target", () => {
     ],
   })
 
-  // Still shown for "Continue with human review" (active, non-approved),
-  // just not for Retry specifically.
   assert.equal(hasReviewRecoveryControls([live], null), true)
+  assert.deepEqual(findReviewRetryTarget([live]), { cycle: live, force: true })
+})
+
+test("Retry: a cycle stuck with no live run is an unforced retry target", () => {
+  const stuck = cycle({
+    runs: [
+      {
+        id: "run-1",
+        status: "failed",
+        error: "boom",
+        headSha: "sha-1",
+        startedAt: null,
+        finishedAt: "t",
+        claimedByHostId: null,
+        heartbeatAt: null,
+        createdAt: "t",
+      },
+    ],
+  })
+
+  assert.deepEqual(findReviewRetryTarget([stuck]), {
+    cycle: stuck,
+    force: false,
+  })
+})
+
+test("Retry: a spent attempt budget is not a retry target, live run or not", () => {
+  const attempt = (id: string, attemptNumber: number) => ({
+    id,
+    attemptNumber,
+    verdict: "changes_requested",
+    summary: null,
+    githubReviewId: null,
+    publishedAt: null,
+    createdAt: "t",
+    findings: [],
+  })
+  const exhaustedBudget = cycle({
+    attempts: [attempt("a1", 1), attempt("a2", 2), attempt("a3", 3)],
+    runs: [
+      {
+        id: "run-4",
+        status: "running",
+        error: null,
+        headSha: "sha-1",
+        startedAt: "t",
+        finishedAt: null,
+        claimedByHostId: "host-1",
+        heartbeatAt: "t",
+        createdAt: "t",
+      },
+    ],
+  })
+
+  assert.equal(findReviewRetryTarget([exhaustedBudget]), null)
+})
+
+test("Retry: a concluded cycle is never a retry target", () => {
+  assert.equal(findReviewRetryTarget([cycle({ state: "approved" })]), null)
+  assert.equal(findReviewRetryTarget([cycle({ state: "exhausted" })]), null)
+  assert.equal(findReviewRetryTarget([cycle({ state: "superseded" })]), null)
 })
 
 test("Continue with human review: an active cycle counts even with no runs yet", () => {

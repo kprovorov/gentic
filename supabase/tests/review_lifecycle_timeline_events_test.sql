@@ -3,7 +3,7 @@
 -- review_approved/review_changes_requested/review_failed/review_superseded),
 -- plus the new `retry_review_run` recovery RPC.
 BEGIN;
-SELECT plan(19);
+SELECT plan(27);
 
 -- ---------------------------------------------------------------------
 -- Scenario 1: the happy path — queued, started, approved.
@@ -275,6 +275,63 @@ SELECT throws_ok(
   'retry_review_run refuses to queue a second run while one is already live'
 );
 
+-- ---------------------------------------------------------------------
+-- Scenario RF: `p_force` — the stalled-reviewer escape hatch. The run left
+-- live by scenario R is claimed (so it is `running`, heartbeating, and
+-- invisible to every automatic safety net) and then forcibly restarted.
+-- ---------------------------------------------------------------------
+INSERT INTO public.hosts (id, user_id, display_name, credential_hash) VALUES
+  ('f1000000-0000-4000-8000-000000000004', 'user_retry_1', 'Host R1', repeat('7', 64));
+
+CREATE TEMP TABLE rf_claim AS
+SELECT * FROM public.claim_review_run('f1000000-0000-4000-8000-000000000004', 'user_retry_1');
+
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT review_run_id FROM rf_claim)),
+  'running',
+  'the stalled run under test is claimed and running'
+);
+
+CREATE TEMP TABLE rf_force AS
+SELECT * FROM public.retry_review_run(
+  'user_retry_1', (SELECT review_cycle_id FROM r1_eval), true
+);
+
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT review_run_id FROM rf_claim)),
+  'cancelled',
+  'a forced restart cancels the in-flight run, which is how the holding host aborts'
+);
+SELECT is(
+  (SELECT cancelled_run_count FROM rf_force),
+  1,
+  'the forced restart reports the single run it cancelled'
+);
+SELECT is(
+  (SELECT status FROM public.review_runs WHERE id = (SELECT review_run_id FROM rf_force)),
+  'pending',
+  'a forced restart queues a fresh pending run in its place'
+);
+SELECT is(
+  (SELECT count(*)::integer FROM public.review_attempts
+    WHERE review_cycle_id = (SELECT review_cycle_id FROM r1_eval)),
+  0,
+  'a forced restart consumes no Review Attempt'
+);
+SELECT is(
+  (SELECT state FROM public.review_cycles WHERE id = (SELECT review_cycle_id FROM r1_eval)),
+  'active',
+  'a forced restart leaves the cycle active rather than superseding it'
+);
+SELECT is(
+  (SELECT (payload->>'forced')::boolean FROM public.issue_events
+    WHERE issue_id = 'f1000000-0000-4000-8000-000000000002'
+      AND type = 'review_queued'
+      AND (payload->>'review_run_id')::uuid = (SELECT review_run_id FROM rf_force)),
+  true,
+  'the forced restart marks its review_queued event as forced'
+);
+
 -- Exhaust a fresh cycle's attempt budget, then retry_review_run must refuse
 -- the now-concluded (not `active`) cycle.
 INSERT INTO public.projects (id, user_id, name, repo, key, automatic_review_enabled) VALUES
@@ -305,6 +362,16 @@ SELECT throws_ok(
   '23514',
   null,
   'retry_review_run refuses an exhausted (no longer active) cycle'
+);
+SELECT throws_ok(
+  $$
+    SELECT public.retry_review_run('user_retry_2', (
+      SELECT review_cycle_id FROM r2_eval1
+    ), true)
+  $$,
+  '23514',
+  null,
+  'p_force does not override the exhausted-cycle guard'
 );
 
 SELECT * FROM finish();

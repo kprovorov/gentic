@@ -231,18 +231,23 @@ test("continueWithHumanReview returns the approved cycle", async () => {
   assert.deepEqual(result, { reviewCycleId: "cycle-1", issueId: "issue-1", status: "approved" })
 })
 
-test("retryReviewRun returns the queued run and cycle", async () => {
+test("retryReviewRun defaults to an unforced retry and returns the queued run", async () => {
   const client = {
     rpc(name: string, args: Record<string, unknown>) {
       assert.equal(name, "retry_review_run")
       assert.deepEqual(args, {
         p_user_id: "user-1",
         p_review_cycle_id: "cycle-1",
+        p_force: false,
       })
       return {
         single: () =>
           Promise.resolve({
-            data: { review_run_id: "run-2", review_cycle_id: "cycle-1" },
+            data: {
+              review_run_id: "run-2",
+              review_cycle_id: "cycle-1",
+              cancelled_run_count: 0,
+            },
             error: null,
           }),
       }
@@ -250,7 +255,44 @@ test("retryReviewRun returns the queued run and cycle", async () => {
   }
 
   const result = await retryReviewRun(client as never, "user-1", "cycle-1")
-  assert.deepEqual(result, { reviewRunId: "run-2", reviewCycleId: "cycle-1" })
+  assert.deepEqual(result, {
+    reviewRunId: "run-2",
+    reviewCycleId: "cycle-1",
+    cancelledRunCount: 0,
+  })
+})
+
+test("retryReviewRun forwards force and reports how many runs it cancelled", async () => {
+  const client = {
+    rpc(name: string, args: Record<string, unknown>) {
+      assert.equal(name, "retry_review_run")
+      assert.deepEqual(args, {
+        p_user_id: "user-1",
+        p_review_cycle_id: "cycle-1",
+        p_force: true,
+      })
+      return {
+        single: () =>
+          Promise.resolve({
+            data: {
+              review_run_id: "run-3",
+              review_cycle_id: "cycle-1",
+              cancelled_run_count: 1,
+            },
+            error: null,
+          }),
+      }
+    },
+  }
+
+  const result = await retryReviewRun(client as never, "user-1", "cycle-1", {
+    force: true,
+  })
+  assert.deepEqual(result, {
+    reviewRunId: "run-3",
+    reviewCycleId: "cycle-1",
+    cancelledRunCount: 1,
+  })
 })
 
 test("retryReviewRun maps P0002 to not_found", async () => {

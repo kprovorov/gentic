@@ -10,7 +10,7 @@ import type {
   ReviewCycle,
 } from "@gentic/services/issues"
 
-import { isReviewCycleStuck } from "@/app/issues/review-state-meta"
+import { findReviewRetryTarget } from "@/app/issues/review-state-meta"
 import { queryKeys } from "@/app/query-keys"
 
 import {
@@ -31,11 +31,11 @@ const UNAVAILABLE_REASON_LABEL: Record<
 
 /**
  * Recovery controls for a stuck or blocked Automatic Review (GEN-419):
- * retry after a terminal reviewer infrastructure failure, accept a human
- * review as sufficient, or abandon an unresumable implementation session.
- * Visibility is derived from `reviewCycles`/`implementationOwner` — a
- * superseded/exhausted/approved cycle fails every check below by
- * construction, so stale controls never render (no separate guard needed).
+ * re-trigger the reviewer, accept a human review as sufficient, or abandon
+ * an unresumable implementation session. Visibility is derived from
+ * `reviewCycles`/`implementationOwner` — a superseded/exhausted/approved
+ * cycle fails every check below by construction, so stale controls never
+ * render (no separate guard needed).
  */
 export function ReviewRecoveryControls({
   issueId,
@@ -59,7 +59,7 @@ export function ReviewRecoveryControls({
   const retryMutation = useMutation({
     mutationFn: retryReviewRunAction,
     onSuccess: invalidate,
-    onError: () => toast.error("Couldn't retry the review"),
+    onError: () => toast.error("Couldn't re-trigger the review"),
   })
   const continueMutation = useMutation({
     mutationFn: continueWithHumanReviewAction,
@@ -72,26 +72,33 @@ export function ReviewRecoveryControls({
     onError: () => toast.error("Couldn't start a fresh implementation session"),
   })
 
-  const stuckCycle = reviewCycles.find(isReviewCycleStuck) ?? null
+  const retryTarget = findReviewRetryTarget(reviewCycles)
   const activeCycle =
     reviewCycles.find((cycle) => cycle.state === "active") ?? null
   const showOwnerControl =
     implementationOwner !== null && !implementationOwner.resumable
 
-  if (!stuckCycle && !activeCycle && !showOwnerControl) {
+  if (!retryTarget && !activeCycle && !showOwnerControl) {
     return null
   }
 
   function handleRetry() {
-    if (!stuckCycle || retryMutation.isPending) {
+    if (!retryTarget || retryMutation.isPending) {
       return
     }
-    if (!window.confirm("Retry the automatic review now?")) {
+    if (
+      !window.confirm(
+        retryTarget.force
+          ? "Restart the automatic review now? The review already in flight will be cancelled — this doesn't use up a review attempt."
+          : "Retry the automatic review now?"
+      )
+    ) {
       return
     }
     const formData = new FormData()
     formData.set("issue_id", issueId)
-    formData.set("review_cycle_id", stuckCycle.id)
+    formData.set("review_cycle_id", retryTarget.cycle.id)
+    formData.set("force", String(retryTarget.force))
     retryMutation.mutate(formData)
   }
 
@@ -129,7 +136,7 @@ export function ReviewRecoveryControls({
 
   return (
     <div className="grid gap-1.5">
-      {stuckCycle ? (
+      {retryTarget ? (
         <Button
           type="button"
           variant="outline"
@@ -138,7 +145,7 @@ export function ReviewRecoveryControls({
           disabled={retryMutation.isPending}
           onClick={handleRetry}
         >
-          Retry review
+          {retryTarget.force ? "Restart review" : "Retry review"}
         </Button>
       ) : null}
       {activeCycle ? (

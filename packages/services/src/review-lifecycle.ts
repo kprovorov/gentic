@@ -240,28 +240,41 @@ export async function continueWithHumanReview(
 export type RetryReviewRunResult = {
   reviewRunId: string
   reviewCycleId: string
+  // How many in-flight runs the restart cancelled to make room for the new
+  // one: 0 for a plain retry, 1 for a forced restart of a stalled run.
+  cancelledRunCount: number
 }
 
-// The explicit user "retry now" recovery action for a cycle stuck with no
+// The explicit user "retry now" recovery action for a cycle that has stopped
+// progressing — everything else about recovery is derived from run history
+// (ADR-0003/0004), but nothing else re-arms progression without new code
+// arriving or a human GitHub action.
+//
+// Two shapes, one RPC. Without `force` it only serves a cycle stuck with no
 // live run (typically two trailing infra failures at the current head SHA,
-// per `failReviewRun`'s one-automatic-retry budget) — everything else about
-// recovery is derived from run history (ADR-0003/0004), but nothing else
-// re-arms progression without new code arriving or a human GitHub action.
+// per `failReviewRun`'s one-automatic-retry budget) and refuses a cycle with
+// a run in flight. With `force` it also cancels the in-flight run first —
+// the escape hatch for a reviewer that is nominally `running` but making no
+// progress, which no automatic safety net catches while its host keeps
+// heartbeating. Neither shape consumes a Review Attempt.
 export async function retryReviewRun(
   supabase: Supabase,
   userId: string,
-  reviewCycleId: string
+  reviewCycleId: string,
+  options: { force?: boolean } = {}
 ): Promise<RetryReviewRunResult> {
   const { data, error } = await supabase
     .rpc("retry_review_run", {
       p_user_id: userId,
       p_review_cycle_id: reviewCycleId,
+      p_force: options.force ?? false,
     })
     .single()
 
   if (error) {
     // P0002 = no_data_found (cycle not owned / missing); 23514 = the cycle
-    // isn't active, already has a live run, or its attempt budget is spent.
+    // isn't active, its attempt budget is spent, or (unforced only) it
+    // already has a live run.
     if (error.code === "P0002") {
       throw new ServiceError("not_found", "Review cycle not found")
     }
@@ -274,6 +287,7 @@ export async function retryReviewRun(
   return {
     reviewRunId: data.review_run_id,
     reviewCycleId: data.review_cycle_id,
+    cancelledRunCount: data.cancelled_run_count,
   }
 }
 
