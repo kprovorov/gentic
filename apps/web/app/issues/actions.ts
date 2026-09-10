@@ -39,7 +39,10 @@ import { createServiceClient } from "@gentic/supabase/service"
 
 import { mergeIssuePullRequest } from "@/lib/pull-request-merging"
 
-import { getAuthenticatedContext } from "../_lib/auth-context"
+import {
+  getAuthenticatedContext,
+  getAuthenticatedServiceContext,
+} from "../_lib/auth-context"
 import { getString, getUuid } from "../_lib/form-data"
 import type { Attachment } from "./[code]/attachments"
 import {
@@ -310,8 +313,15 @@ export async function resetIssueAgent(formData: FormData) {
 // already enforces its own ownership/state checks (`retry_review_run`,
 // `continue_with_human_review`, `start_fresh_implementation`); the actions
 // here are just the Clerk-authenticated entry points plus cache revalidation.
+//
+// All three run on the service client, like the host lifecycle actions do.
+// These are SECURITY DEFINER RPCs that take the acting user as an argument,
+// so the `authenticated` grant they used to hold made `p_user_id` the whole
+// access check — settable to anything by a direct PostgREST call. The grant
+// is now service_role only and the id comes from Clerk here. `getIssue`
+// scopes by `userId` itself, so revalidation is unaffected.
 export async function retryReviewRunAction(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedServiceContext()
   const issueId = getUuid(formData, "issue_id")
   const reviewCycleId = getUuid(formData, "review_cycle_id")
   // Opt-in, because forcing cancels whatever run is in flight: the caller
@@ -331,7 +341,7 @@ export async function retryReviewRunAction(formData: FormData) {
 }
 
 export async function continueWithHumanReviewAction(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedServiceContext()
   const issueId = getUuid(formData, "issue_id")
 
   const result = await reviewLifecycleService.continueWithHumanReview(
@@ -345,7 +355,7 @@ export async function continueWithHumanReviewAction(formData: FormData) {
 }
 
 export async function startFreshImplementationAction(formData: FormData) {
-  const { supabase, userId } = await getAuthenticatedContext()
+  const { supabase, userId } = await getAuthenticatedServiceContext()
   const issueId = getUuid(formData, "issue_id")
 
   const result = await issuesService.startFreshImplementation(

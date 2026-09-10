@@ -20,7 +20,13 @@ export default async function SettingsPage({
   return (
     <SettingsView
       initialData={initialData}
-      githubConnectionConflict={githubResult === "installation-conflict"}
+      githubConnectionError={
+        githubResult === "installation-conflict"
+          ? "conflict"
+          : githubResult === "installation-unverified"
+            ? "unverified"
+            : null
+      }
     />
   )
 }

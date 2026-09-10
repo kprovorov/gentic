@@ -38,14 +38,21 @@ The GitHub integration card in Settings displays one of three states:
   <Step title="Select repositories">
     On the GitHub App installation page, choose whether to grant access to all repositories or specific ones, then click **Install**.
   </Step>
+  <Step title="Authorize Gentic to confirm it is your installation">
+    GitHub redirects you back to Gentic, which sends you through one more GitHub screen to confirm that the account you are signed in to on GitHub is the one that administers the installation. This is what stops an installation belonging to someone else from being attached to your workspace.
+  </Step>
   <Step title="Confirm the connection">
-    After installation, GitHub redirects you back to Gentic. The integration card now shows **Connected** (or **Pending approval** for org installs awaiting admin sign-off).
+    Back in Gentic, the integration card now shows **Connected** (or **Pending approval** for org installs awaiting admin sign-off). If GitHub does not confirm that you administer the installation, nothing is connected and the card explains why.
   </Step>
 </Steps>
 
 ## Disconnect GitHub
 
 To remove the GitHub integration, open the **GitHub integration** card in Settings and click **Disconnect**. Gentic removes the stored installation record. The GitHub App itself remains installed on your GitHub account or organization — you must uninstall it separately from your GitHub App settings if you no longer want Gentic to have any access.
+
+<Note>
+  Disconnecting frees the installation to be connected again, by you or by anyone else who administers it on GitHub. Reconnecting always goes through the same authorization step, so only someone GitHub agrees administers that installation can claim it. If you want Gentic to have no further access at all, uninstall the app on GitHub as well.
+</Note>
 
 ## Auto-Respond to Review Feedback
 
@@ -57,6 +64,7 @@ If Gentic cannot fetch inline comments (for example, because the App credentials
 
 - The pull request was opened by a Gentic agent run (an issue is linked to it). A pull request that only has a [tracking issue](/web/automatic-review#pull-requests-no-issue-produced) has no agent behind it, so feedback on one is never relayed.
 - The GitHub review is a `changes_requested` review — approvals and plain comment reviews do not trigger a re-run.
+- **The reviewer has write standing on the repository** — GitHub reports them as the repository owner, an organization member, or a collaborator. Relaying feedback puts your host to work on text someone else wrote, so a review or comment from anyone else (an outside contributor, a first-time contributor, a drive-by account on a public repository) is recorded on GitHub as normal but never reaches the agent.
 - The project's **Auto-respond to review feedback** setting is enabled. See [Projects](/web/projects#field-reference) for how to toggle it per project.
 
 Re-queueing is idempotent: if GitHub redelivers the same review webhook, Gentic will not re-queue the run a second time.
@@ -66,6 +74,9 @@ Re-queueing is idempotent: if GitHub redelivers the same review webhook, Gentic 
 Auto-respond needs two credentials **in addition to** the webhook secret used by the base integration, because the `pull_request_review` webhook payload only carries the review body — the inline comments have to be fetched from the GitHub API with an App installation token.
 
 <Steps>
+  <Step title="Set the GitHub App OAuth credentials">
+    On the GitHub App's **General** page, copy the **Client ID** and generate a **client secret**, then set them in the web app environment as `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`. Connecting an installation requires them: the callback exchanges a user authorization code for a user access token and confirms with GitHub that the account completing the flow actually administers the installation it was handed. Without that check, an installation id — which is not secret, it is the path segment of the installation settings URL and appears in every webhook payload — could be bound to an account that does not own it. With the variables unset, **Connect GitHub** returns to Settings without connecting anything.
+  </Step>
   <Step title="Set the GitHub App webhook secret">
     In your GitHub App settings, generate a **webhook secret** and set the **Webhook URL** to `https://YOUR_GENTIC_DOMAIN/api/integrations/github/webhook`. Put the secret in the web app environment as `GITHUB_WEBHOOK_SECRET`. This is required for the base integration too.
   </Step>

@@ -56,7 +56,7 @@ Three kinds of pull request are deliberately left alone, with no tracking issue 
 | Not tracked | Why |
 | --- | --- |
 | Drafts, and closed or merged pull requests | Nothing to review — a draft can't hold a review run at all. A draft marked **Ready for review** is picked up at that moment. |
-| Pull requests from a **fork** | Reviewing runs the branch's code and tests on your host. For a fork that is an outside contributor's code running on your machine, which the reviewer's isolation does not sandbox against. |
+| Pull requests from a **fork** | Reviewing runs the branch's code and tests on your host. For a fork that is an outside contributor's code running on your machine, which the reviewer's isolation does not sandbox against. This holds however the fork's branch is named: a fork branch named like an agent branch (`GEN-42-...`) is not attached to issue GEN-42, and gets no review. |
 | Anything in a project with Automatic Review off | The project setting is the only switch; nothing opts in separately. |
 
 <Note>

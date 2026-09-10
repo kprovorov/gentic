@@ -97,6 +97,7 @@ export {
   formatReviewFixRequestMessage,
   formatTestsFailedMessage,
   GENTIC_AUTHORED_USER_MESSAGE,
+  isTrustedPullRequestActor,
   requeueIssueForUserMessage,
   sendIssueMessage,
 } from "./issues/chat"

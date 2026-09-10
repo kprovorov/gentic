@@ -83,6 +83,20 @@ export type PullRequestWebhookInput = {
   headSha: string | null
 }
 
+// A missing head repository counts as a fork: GitHub omits it once the fork
+// is deleted, which leaves nothing to prove the head lived in the base
+// repository. A same-repository pull request always carries it.
+function isSameRepositoryHead(
+  headRepository: string | null,
+  baseRepository: string
+): boolean {
+  if (!headRepository) {
+    return false
+  }
+
+  return headRepository.toLowerCase() === baseRepository.toLowerCase()
+}
+
 export async function associatePullRequestFromWebhook(
   supabase: Supabase,
   input: PullRequestWebhookInput
@@ -90,6 +104,20 @@ export async function associatePullRequestFromWebhook(
   const { baseRepository, headBranch } = input
   if (!input.installationId || !baseRepository || !headBranch) {
     return { outcome: "no_match", reason: "invalid_scope" }
+  }
+
+  // A fork's head is the one place a pull request's code is untrusted
+  // (ADR-0010), and association is what exposes it: the Issue's status is
+  // recomputed from every pull request attached to it, comments on it are
+  // relayed into the agent's transcript, and Automatic Review would check
+  // the fork's head SHA out on the owner's host. `trackExternalPullRequest`
+  // has always refused forks for that reason, but the canonical branch-match
+  // path below reached `persistPullRequestAssociation` without ever looking
+  // at the head repository — so anyone who could open a fork pull request
+  // named `GEN-42-...` could attach it to Issue GEN-42. The guard belongs
+  // here, ahead of both paths, rather than in only one of them.
+  if (!isSameRepositoryHead(input.headRepository, baseRepository)) {
+    return { outcome: "no_match", reason: "forked_head_repository" }
   }
 
   const { data: integration, error: integrationError } = await supabase
@@ -251,10 +279,10 @@ async function trackExternalPullRequest(
   if (!input.readyForReview) {
     return { outcome: "no_match", reason: input.unmatchedReason }
   }
-  if (
-    !input.headRepository ||
-    input.headRepository.toLowerCase() !== input.baseRepository.toLowerCase()
-  ) {
+  // Unreachable through `associatePullRequestFromWebhook`, which rejects a
+  // forked head before either association path. Kept so this function stays
+  // safe to call on its own.
+  if (!isSameRepositoryHead(input.headRepository, input.baseRepository)) {
     return { outcome: "no_match", reason: "forked_head_repository" }
   }
 
@@ -441,13 +469,18 @@ export async function getGithubIntegration(supabase: Supabase, userId: string) {
 export async function createGithubIntegrationState(
   supabase: Supabase,
   userId: string,
-  state: string
+  state: string,
+  // Set only on the second hop, where it carries the installation the user is
+  // about to authorize across a redirect GitHub round-trips nothing else
+  // through. Still verified against GitHub on the way back.
+  installationId: string | null = null
 ) {
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
   unwrap(
     await supabase.from("github_integration_states").insert({
       state,
       user_id: userId,
+      installation_id: installationId,
       expires_at: expiresAt,
     })
   )
@@ -457,14 +490,14 @@ export async function consumeGithubIntegrationState(
   supabase: Supabase,
   userId: string,
   state: string
-) {
+): Promise<{ installationId: string | null }> {
   const { data, error } = await supabase
     .from("github_integration_states")
     .delete()
     .eq("state", state)
     .eq("user_id", userId)
     .gt("expires_at", new Date().toISOString())
-    .select("state")
+    .select("state,installation_id")
     .maybeSingle()
 
   if (error) {
@@ -476,6 +509,8 @@ export async function consumeGithubIntegrationState(
       "Invalid or expired GitHub setup state"
     )
   }
+
+  return { installationId: data.installation_id ?? null }
 }
 
 export async function upsertGithubIntegration(

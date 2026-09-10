@@ -49,10 +49,10 @@ import { cn } from "@gentic/ui/utils"
 
 export function SettingsView({
   initialData,
-  githubConnectionConflict = false,
+  githubConnectionError = null,
 }: {
   initialData: SettingsData
-  githubConnectionConflict?: boolean
+  githubConnectionError?: "conflict" | "unverified" | null
 }) {
   const queryClient = useQueryClient()
   const [selectedRepo, setSelectedRepo] = React.useState("")
@@ -184,7 +184,7 @@ export function SettingsView({
           ) : null}
         </header>
 
-        {githubConnectionConflict ? (
+        {githubConnectionError ? (
           <div
             role="alert"
             className="flex gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
@@ -192,11 +192,14 @@ export function SettingsView({
             <IconAlertCircle className="mt-0.5 size-5 shrink-0" />
             <div>
               <p className="font-medium">
-                GitHub installation already connected
+                {githubConnectionError === "conflict"
+                  ? "GitHub installation already connected"
+                  : "Could not verify the GitHub installation"}
               </p>
               <p className="mt-1 text-muted-foreground">
-                This installation belongs to another Gentic account. That
-                account remains connected, and no changes were made here.
+                {githubConnectionError === "conflict"
+                  ? "This installation belongs to another Gentic account. That account remains connected, and no changes were made here."
+                  : "GitHub did not confirm that your account administers this installation, so nothing was connected. Try again from the account that installed the app."}
               </p>
             </div>
           </div>

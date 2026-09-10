@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { redirect } from "next/navigation"
 import { auth } from "@clerk/nextjs/server"
 
-import { createClient } from "@gentic/supabase/server"
+import { createServiceClient } from "@gentic/supabase/service"
 import * as githubIntegrationsService from "@gentic/services/github-integrations"
 
 export const runtime = "nodejs"
@@ -21,7 +21,9 @@ export async function GET() {
   }
 
   const state = randomBytes(32).toString("base64url")
-  const supabase = await createClient()
+  // Setup states are no longer writable by `authenticated` — they carry the
+  // pending installation id through the callback's verification hop.
+  const supabase = createServiceClient()
 
   await githubIntegrationsService.createGithubIntegrationState(
     supabase,

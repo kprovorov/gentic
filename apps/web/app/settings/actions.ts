@@ -96,7 +96,10 @@ export async function deleteProject(formData: FormData) {
 }
 
 export async function disconnectGithubIntegration() {
-  const { supabase, userId } = await getAuthenticatedContext()
+  // Writes to `github_integrations` are service-role only, so that the
+  // callback's installation ownership check is the only way the row is ever
+  // written. The Clerk user id still comes from the session, not the request.
+  const { supabase, userId } = await getAuthenticatedServiceContext()
 
   await githubIntegrationsService.deleteGithubIntegration(supabase, userId)
 

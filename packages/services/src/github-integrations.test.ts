@@ -592,3 +592,57 @@ test("buildTrackingIssueContent names the pull request and says no specification
 
   assert.equal(long.title.length, 160)
 })
+
+test("associatePullRequestFromWebhook refuses a fork whose head branch names an issue", async () => {
+  // The branch-match path used to reach `persistPullRequestAssociation`
+  // without ever looking at the head repository, so an outside contributor
+  // could open `GEN-42-...` from a fork and have it attached to the owner's
+  // Issue GEN-42 — and, with Automatic Review on, checked out and run on
+  // the owner's host.
+  const supabase = scopedWebhookClient()
+
+  const result = await associatePullRequestFromWebhook(supabase as never, {
+    ...scopedAssociationInput,
+    headRepository: "mallory/base-fork",
+  })
+
+  assert.deepEqual(result, {
+    outcome: "no_match",
+    reason: "forked_head_repository",
+  })
+  assert.deepEqual(supabase.rpcCalls, [])
+})
+
+test("associatePullRequestFromWebhook refuses a head repository GitHub no longer reports", async () => {
+  const supabase = scopedWebhookClient()
+
+  const result = await associatePullRequestFromWebhook(supabase as never, {
+    ...scopedAssociationInput,
+    headRepository: null,
+  })
+
+  assert.deepEqual(result, {
+    outcome: "no_match",
+    reason: "forked_head_repository",
+  })
+  assert.deepEqual(supabase.rpcCalls, [])
+})
+
+test("associatePullRequestFromWebhook refuses a fork on an already-associated pull request", async () => {
+  const supabase = scopedWebhookClient()
+  supabase.tables.issue_pull_requests.push({
+    issue_id: "issue-42",
+    url: scopedAssociationInput.prUrl,
+  })
+
+  const result = await associatePullRequestFromWebhook(supabase as never, {
+    ...scopedAssociationInput,
+    headRepository: "mallory/base-fork",
+  })
+
+  assert.deepEqual(result, {
+    outcome: "no_match",
+    reason: "forked_head_repository",
+  })
+  assert.deepEqual(supabase.rpcCalls, [])
+})

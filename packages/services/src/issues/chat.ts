@@ -251,6 +251,7 @@ export type ChangesRequestedReviewComment = {
 export type ChangesRequestedReview = {
   id: number
   reviewerLogin: string
+  authorAssociation: string | null
   body: string | null
   comments: ChangesRequestedReviewComment[]
 }
@@ -258,11 +259,37 @@ export type ChangesRequestedReview = {
 export type PullRequestComment = {
   id: number
   commenterLogin: string
+  authorAssociation: string | null
   body: string
   htmlUrl: string | null
   path?: string | null
   line?: number | null
   diffHunk?: string | null
+}
+
+// GitHub's `author_association` values that mean the actor has write-side
+// standing on the repository the pull request targets. Everything else —
+// `CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, `MANNEQUIN`,
+// `NONE` — is any GitHub account on the internet.
+const TRUSTED_AUTHOR_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"])
+
+/**
+ * Whether a pull request comment or review may be relayed to the agent.
+ *
+ * Relaying is a privileged action, not just a transcript append: it writes a
+ * `user` message — the same channel the account owner instructs the agent
+ * through — and moves the Issue back to `todo`, which makes the owner's host
+ * claim it and resume the coding agent with every tool permission
+ * auto-approved. Anyone able to comment on a public repository's pull request
+ * could otherwise dispatch a run on someone else's machine. GitHub states the
+ * actor's standing on the payload; fail closed when it is absent or unknown.
+ */
+export function isTrustedPullRequestActor(
+  authorAssociation: string | null | undefined
+): boolean {
+  return TRUSTED_AUTHOR_ASSOCIATIONS.has(
+    (authorAssociation ?? "").toUpperCase()
+  )
 }
 
 export function formatChangesRequestedMessage(
@@ -374,6 +401,10 @@ export async function applyChangesRequestedReview(
   prUrl: string,
   review: ChangesRequestedReview
 ) {
+  if (!isTrustedPullRequestActor(review.authorAssociation)) {
+    return
+  }
+
   const issue = await getIssueForPullRequestFeedback(supabase, prUrl)
   if (!issue || !issue.projects.auto_respond_to_reviews) {
     return
@@ -415,6 +446,10 @@ export async function applyPullRequestComment(
   prUrl: string,
   comment: PullRequestComment
 ) {
+  if (!isTrustedPullRequestActor(comment.authorAssociation)) {
+    return
+  }
+
   const issue = await getIssueForPullRequestFeedback(supabase, prUrl)
   if (!issue || !issue.projects.auto_respond_to_reviews) {
     return
@@ -422,7 +457,10 @@ export async function applyPullRequestComment(
 
   const { error: insertError } = await supabase.from("messages").insert({
     issue_id: issue.id,
-    role: "user",
+    // `gentic`, not a bare `user` message: the transcript should show this
+    // came from a pull request review rather than from the account owner
+    // typing it, the way every other relayed message already does.
+    ...GENTIC_AUTHORED_USER_MESSAGE,
     content: formatPullRequestCommentMessage(prUrl, comment),
     github_comment_id: comment.id,
   })
