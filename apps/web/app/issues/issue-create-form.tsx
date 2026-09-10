@@ -415,6 +415,28 @@ export function IssueCreateForm({
     }
   }
 
+  // Cmd/Ctrl+Enter runs the issue straight from the body. Plain Enter has to
+  // stay a newline in a multi-line description, so the modifier carries the
+  // submit, and it picks "run" because that's the composer's primary action.
+  const handleBodyKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) {
+      return
+    }
+
+    // Swallow the combo either way: someone reaching for submit never wants a
+    // stray newline when the form isn't ready to send.
+    event.preventDefault()
+
+    if (pendingAction || !body.trim()) {
+      return
+    }
+
+    intentRef.current = "run"
+    event.currentTarget.form?.requestSubmit()
+  }
+
   // Attachments are uploaded from here rather than posted with the form: a
   // Server Action body is capped well below the 25MB a single attachment may
   // be, so the actions only exchange metadata and signed upload tickets while
@@ -555,6 +577,7 @@ export function IssueCreateForm({
         name="body"
         value={body}
         onChange={updateBody}
+        onKeyDown={handleBodyKeyDown}
         files={files}
         onFilesChange={updateFiles}
         rows={3}
