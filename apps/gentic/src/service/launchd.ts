@@ -8,6 +8,7 @@ import { promisify } from "node:util"
 import { spawnInteractive } from "../installers.js"
 import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
+import { tailArgs } from "./log-args.js"
 import type { ExecFn, ServiceBackend, ServiceInstallOptions, ServiceLogsOptions, ServiceStatus } from "./types.js"
 
 const execFileAsync = promisify(execFileCb)
@@ -243,7 +244,6 @@ ${programArguments}
       throw new Error(`No log file found at ${log}`)
     }
 
-    const args = opts.follow ? ["-f", log] : ["-n", "200", log]
-    await spawnInteractive("tail", args)
+    await spawnInteractive("tail", tailArgs(log, opts))
   }
 }

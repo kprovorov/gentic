@@ -119,13 +119,21 @@ gentic status --system
 
 ### View service logs
 
-Stream the host service's logs. On Linux with systemd this delegates to `journalctl` for the `gentic` unit; on other platforms it tails the log file that the fallback backend writes to:
+Stream the host service's logs. On Linux with systemd this delegates to `journalctl` for the `gentic` unit; on other platforms it tails the log file that the fallback backend writes to. By default it shows the **last 100 lines**:
 
 ```bash
 gentic logs
 ```
 
-Follow the log output as it is written (equivalent to `tail -f` or `journalctl -f`):
+Show a different number of trailing lines:
+
+```bash
+gentic logs --lines 500
+# or
+gentic logs -n 500
+```
+
+Follow the log output as it is written (equivalent to `tail -f` or `journalctl -f`). The last 100 lines — or however many `--lines` asks for — are printed first:
 
 ```bash
 gentic logs --follow

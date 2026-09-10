@@ -8,6 +8,7 @@ import { promisify } from "node:util"
 import { spawnInteractive } from "../installers.js"
 import { buildServicePath } from "./env.js"
 import { resolveGenticExecutable } from "./entry.js"
+import { journalctlArgs } from "./log-args.js"
 import type {
   ExecFn,
   ServiceBackend,
@@ -257,9 +258,6 @@ WantedBy=default.target
   }
 
   async logs(opts: ServiceLogsOptions): Promise<void> {
-    const args = [...this.scopeArgs(), "-u", SERVICE_NAME]
-    args.push(opts.follow ? "-f" : "--no-pager")
-
-    await spawnInteractive("journalctl", args)
+    await spawnInteractive("journalctl", journalctlArgs(this.scopeArgs(), SERVICE_NAME, opts))
   }
 }

@@ -23,6 +23,8 @@ export interface ServiceInstallOptions {
 
 export interface ServiceLogsOptions {
   follow: boolean
+  /** How many trailing log lines to show before following (if following). */
+  lines: number
 }
 
 export interface ServiceBackend {
