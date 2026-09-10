@@ -27,10 +27,17 @@ unavailable message instead of breaking the page or pretending to accept emails.
 
 That fallback is a correct last resort but a poor deploy outcome: the key is
 inlined into the client bundle at build time, so a Vercel build started without
-it ships a waitlist nobody can join, and nothing else fails. `next.config.ts`
-therefore fails the build outright when `VERCEL` is set and the key is not.
-Local and CI builds have no key by design and stay unaffected, and the check
-runs only in the build phase so a missing key can never 500 the served site.
+it ships a waitlist nobody can join while lint, typecheck, tests and the build
+all pass. `next.config.ts` therefore prints a warning naming the fix into the
+Vercel production build log, where anyone asking why the waitlist is dead will
+look. Local and CI builds have no key by design and stay quiet.
+
+The warning is deliberately not a thrown error. Failing the build would trade a
+page whose waitlist is broken for a page that cannot deploy at all, freezing the
+entire marketing site at its last good build over one optional widget — and it
+would block the very pull request that reports the problem. Because the key is
+public, the alternative worth considering is committing it to a checked-in
+`.env.production`, which removes the deployment step this can fail on.
 
 Run `pnpm --filter @gentic/landing dev`. Check the header, hero, and footer links
 scroll to the form, invalid email validation, loading/disabled states, and mobile
