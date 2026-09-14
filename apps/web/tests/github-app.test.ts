@@ -4,6 +4,7 @@ import test from "node:test"
 
 import {
   createPullRequestReview,
+  fetchPullRequestMetadata,
   fetchRepositoryMergeMethods,
   isRelevantCheckSuite,
   mergePullRequest,
@@ -284,4 +285,87 @@ test("mergePullRequest evicts the cached installation token on a 403 so a re-gra
   // Without the eviction the second attempt would reuse the first token,
   // which still carries the pre-grant permissions.
   assert.deepEqual(mintedTokens, ["ghs_token_1", "ghs_token_2"])
+})
+
+// GEN-455: `pull_request.base.sha` is the base branch's tip as of the PR's
+// last sync, not the commit it forked from. Diffing the head against it makes
+// every commit that landed on the base branch since the fork look like a
+// revert authored by this PR — which is what produced a blocking review
+// finding about a file the PR never touched.
+test("fetchPullRequestMetadata returns the merge base, not the base branch tip", async (t) => {
+  const requested: string[] = []
+  const { installationId } = stubInstallationApi(t, (url) => {
+    requested.push(url)
+
+    if (url.includes("/compare/")) {
+      return new Response(
+        JSON.stringify({
+          merge_base_commit: { sha: "fork-point-sha" },
+        }),
+        { status: 200 }
+      )
+    }
+
+    return new Response(
+      JSON.stringify({
+        title: "PR title",
+        body: "PR body",
+        base: { ref: "main", sha: "base-branch-tip-sha" },
+        head: { sha: "head-sha" },
+      }),
+      { status: 200 }
+    )
+  })
+
+  const metadata = await fetchPullRequestMetadata(
+    installationId,
+    "acme",
+    "widget",
+    42
+  )
+
+  assert.deepEqual(metadata, {
+    title: "PR title",
+    body: "PR body",
+    baseRef: "main",
+    mergeBaseSha: "fork-point-sha",
+  })
+  assert.ok(
+    requested.some((url) =>
+      url.includes("/repos/acme/widget/compare/main...head-sha")
+    ),
+    `expected a three-dot compare call, got ${JSON.stringify(requested)}`
+  )
+})
+
+test("fetchPullRequestMetadata degrades the merge base to null when the compare fails", async (t) => {
+  const { installationId } = stubInstallationApi(t, (url) => {
+    if (url.includes("/compare/")) {
+      return new Response(JSON.stringify({ message: "Not Found" }), {
+        status: 404,
+      })
+    }
+
+    return new Response(
+      JSON.stringify({
+        title: "PR title",
+        body: null,
+        base: { ref: "main", sha: "base-branch-tip-sha" },
+        head: { sha: "head-sha" },
+      }),
+      { status: 200 }
+    )
+  })
+
+  const metadata = await fetchPullRequestMetadata(
+    installationId,
+    "acme",
+    "widget",
+    42
+  )
+
+  // Null makes the host skip the diff entirely. Falling back to the base tip
+  // here is precisely the bug, so it must never happen.
+  assert.equal(metadata.mergeBaseSha, null)
+  assert.equal(metadata.baseRef, "main")
 })

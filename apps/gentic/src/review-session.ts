@@ -252,7 +252,11 @@ export function buildReviewerPromptText(
             impact: "what breaks, and under what conditions",
             requestedChange: "the specific fix requested",
             filePath: "optional, or null",
-            line: "optional, or null",
+            // Rendered as a bare number so the example itself models the
+            // expected type. Spelling this placeholder as a string taught
+            // models to answer `"line": "25"`, which failed validation and
+            // took the entire verdict down with it (GEN-455).
+            line: 0,
           },
         ],
       },
@@ -261,6 +265,10 @@ export function buildReviewerPromptText(
     )
   )
   lines.push("```")
+  lines.push(
+    "`filePath` is a repository-relative path and `line` a single line " +
+      "number in that file; send null for either when you cannot name one."
+  )
   lines.push(
     "Use `changes_requested` whenever `findings` is non-empty; use " +
       "`approved` only when `findings` is empty. `findings` must be empty " +

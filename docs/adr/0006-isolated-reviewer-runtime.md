@@ -89,6 +89,38 @@ installation-token machinery; a lookup failure there degrades to nulls
 turning a transient GitHub hiccup into a review-blocking infrastructure
 failure.
 
+> **Amended 2026-09-14 (GEN-455).** "A straight tree comparison is exactly
+> what a reviewer needs" held only because the base commit was assumed to be
+> the PR's fork point. It isn't: `pull_request.base.sha` is the base branch's
+> *tip* as of the PR's last sync. Every commit that lands on the base branch
+> after a PR forks therefore appeared in that PR's diff inverted, as though
+> the PR had reverted it. A PR opened four seconds after an unrelated CI
+> commit merged was duly reviewed as having reverted it and blocked with a
+> `changes_requested` finding about a file it never touched.
+>
+> The two-commit diff stays — it is still the only thing two depth-1 fetches
+> can support — but it now runs against the true merge base, which makes it
+> *equal* to the three-dot `base...head` diff the reviewer's prompt claims to
+> be showing. `fetchPullRequestMetadata` resolves that fork point through a
+> second call, `compare/{base}...{head}` → `merge_base_commit.sha` (the same
+> comparison GitHub's own "Files changed" tab renders), and returns it as
+> `mergeBaseSha` — renamed from `baseSha` precisely because the old name is
+> what made the wrong commit look like the right one. A failed compare
+> degrades to null and the host skips the diff; falling back to the base tip
+> would reinstate the bug.
+
+**A finding's `line` can never fail a review.** Added 2026-09-14 (GEN-455).
+`line` is optional locating metadata, but it was typed `z.number()` while the
+prompt's own example rendered the placeholder as a *string* — so a reviewer
+answering `"line": "25"` produced a schema failure, which this ADR classifies
+as an infrastructure failure, which discarded a complete and correct verdict
+and stalled the cycle. The example now renders a bare number, and
+`reviewerFindingSchema` coerces any unambiguous integer reading (`"25"`,
+`"L25"`, `"25-30"`) and degrades everything else to null. The strictness that
+matters — the four required narrative fields, the verdict enum, the
+approved-implies-no-findings refinement — is unchanged; only this one
+cosmetic field stops being load-bearing.
+
 **The Review Run log sink is new, parallel plumbing, not a reuse of Issue
 chat, and deliberately minimal.** A new `review_run_logs` table
 (`review_run_id`, `seq`, `role`, `content` — no tool-call/event-type

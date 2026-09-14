@@ -248,6 +248,63 @@ describe("exact-SHA checkout (GEN-415 isolated reviewer)", () => {
     assert.match(diff, /-base/)
     assert.match(diff, /\+head/)
   })
+
+  // GEN-455: a PR that forked before an unrelated commit landed on the base
+  // branch. Diffed against the merge base, that commit is simply absent;
+  // diffed against the base branch's *tip* it shows up inverted, as though
+  // this PR had reverted it — which is exactly the phantom "the PR removes
+  // the Release environment" finding that blocked GEN-444.
+  test("diffAgainstBase omits base-branch commits made after the fork point", async () => {
+    const git = (...args: string[]): string =>
+      execFileSync("git", args, { cwd: source, encoding: "utf8" }).trim()
+
+    const forkPoint = headSha
+
+    // The PR branch: forks at `forkPoint`, touches only its own file.
+    git("checkout", "-q", "-b", "pr-branch", forkPoint)
+    writeFileSync(join(source, "feature.md"), "feature\n")
+    git("add", "feature.md")
+    git("commit", "-q", "-m", "feat: the actual PR")
+    git("push", "-q", "origin", "pr-branch")
+    const prHeadSha = git("rev-parse", "HEAD")
+
+    // Meanwhile, an unrelated commit lands on main.
+    git("checkout", "-q", "main")
+    writeFileSync(join(source, "release.yml"), "token: RELEASE_TOKEN\n")
+    git("add", "release.yml")
+    git("commit", "-q", "-m", "ci: unrelated change")
+    git("push", "-q", "origin", "main")
+    const baseTipSha = git("rev-parse", "HEAD")
+
+    const checkout = join(dir, "pr-checkout")
+    await cloneRepoAtSha({
+      remoteBase: `${dir}/`,
+      repo: "remote.git",
+      sha: prHeadSha,
+      dir: checkout,
+    })
+
+    const diff = await diffAgainstBase({
+      dir: checkout,
+      baseSha: forkPoint,
+      headSha: prHeadSha,
+    })
+    assert.match(diff, /\+feature/, "the PR's own change is present")
+    assert.doesNotMatch(
+      diff,
+      /release\.yml/,
+      "an unrelated base-branch commit must not appear in the PR's diff"
+    )
+
+    // Pin the old behavior so a regression is unmistakable: against the tip,
+    // the unrelated commit appears as a deletion this PR never made.
+    const againstTip = await diffAgainstBase({
+      dir: checkout,
+      baseSha: baseTipSha,
+      headSha: prHeadSha,
+    })
+    assert.match(againstTip, /-token: RELEASE_TOKEN/)
+  })
 })
 
 describe("repo baseline helpers", () => {

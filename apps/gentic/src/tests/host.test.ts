@@ -1434,7 +1434,7 @@ class FakeApi implements AgentApi {
           title: "PR title",
           body: "PR body",
           baseRef: "main",
-          baseSha: "sha0",
+          mergeBaseSha: "sha0",
         },
       }
     )

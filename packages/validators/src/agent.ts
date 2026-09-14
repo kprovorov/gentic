@@ -337,6 +337,27 @@ export const attachmentsResponseSchema = z.object({
 // instructions), so every finding requires its defect/evidence/impact/
 // requestedChange — there is no `severity` field here, unlike the general-
 // purpose `reviewFindingInputSchema` findings map into.
+// `line` is optional locating metadata, so it must never be able to sink an
+// otherwise-complete verdict. Models routinely quote it as a string ("25"),
+// and just as often as something with no single integer meaning at all
+// ("25-30", "L25", "unknown"). Both used to fail `.strict()` validation and
+// take the whole review down as an infrastructure failure, discarding real
+// findings over a formatting detail (GEN-455). Coerce what has an
+// unambiguous integer reading; degrade everything else to null.
+const reviewerLineSchema = z.preprocess((value) => {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null
+  }
+  if (typeof value === "string") {
+    const match = /^\s*[Ll]?(\d+)/.exec(value)
+    const parsed = match ? Number(match[1]) : Number.NaN
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  }
+  // Anything else (an object, a boolean, an array of lines) has no integer
+  // reading at all — still null rather than a validation failure.
+  return null
+}, z.number().int().positive().nullable())
+
 export const reviewerFindingSchema = z
   .object({
     defect: z.string().min(1),
@@ -344,7 +365,7 @@ export const reviewerFindingSchema = z
     impact: z.string().min(1),
     requestedChange: z.string().min(1),
     filePath: z.string().nullable().optional(),
-    line: z.number().int().positive().nullable().optional(),
+    line: reviewerLineSchema.optional(),
   })
   .strict()
 
@@ -393,7 +414,11 @@ export const reviewRunContextResponseSchema = z.object({
     title: z.string().nullable(),
     body: z.string().nullable(),
     baseRef: z.string().nullable(),
-    baseSha: z.string().nullable(),
+    // The *merge base* of the base branch and the head SHA, never the base
+    // branch's current tip. Diffing against the tip shows every commit that
+    // landed on the base branch after this PR forked as though the PR had
+    // reverted it (GEN-455) — see `resolvePullRequestMetadata`.
+    mergeBaseSha: z.string().nullable(),
   }),
 })
 

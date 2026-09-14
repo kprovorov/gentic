@@ -296,6 +296,41 @@ test("reviewerStructuredOutputSchema validates the reviewer's raw final-message 
   )
 })
 
+// GEN-455: `line` is optional locating metadata and must never be able to
+// discard an otherwise-valid verdict. A string line number used to fail
+// `.strict()` validation, which the host reports as an infrastructure
+// failure — so a complete, correct review was thrown away over quoting.
+test("reviewerStructuredOutputSchema coerces or drops a non-numeric line", () => {
+  const parse = (line: unknown) =>
+    reviewerStructuredOutputSchema.parse({
+      verdict: "changes_requested",
+      findings: [
+        {
+          defect: "Unbounded recursion",
+          evidence: "foo() calls itself with no base case",
+          impact: "stack overflow on any nonempty input",
+          requestedChange: "add a base case",
+          line,
+        },
+      ],
+    }).findings[0].line
+
+  // Unambiguous integer readings are preserved.
+  assert.equal(parse(25), 25)
+  assert.equal(parse("25"), 25)
+  assert.equal(parse("L25"), 25)
+  assert.equal(parse("25-30"), 25)
+
+  // Everything else degrades to null instead of failing the whole review.
+  for (const line of [null, "unknown", "", 0, -4, 1.5, {}]) {
+    assert.equal(parse(line), null, `line ${JSON.stringify(line)} -> null`)
+  }
+
+  // An omitted `line` stays omitted rather than becoming null; the host
+  // normalizes it with `?? null` on the way to `completeReviewRun`.
+  assert.equal(parse(undefined), undefined)
+})
+
 test("reviewerStructuredOutputSchema rejects an approved verdict carrying findings", () => {
   assert.throws(() =>
     reviewerStructuredOutputSchema.parse({
@@ -327,7 +362,7 @@ test("reviewRunContextResponseSchema validates the assembled reviewer context", 
       title: "Fix the thing",
       body: "PR body",
       baseRef: "main",
-      baseSha: "def456",
+      mergeBaseSha: "def456",
     },
   })
   assert.equal(context.pullRequest.ciState, "success")

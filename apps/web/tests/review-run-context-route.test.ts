@@ -22,7 +22,7 @@ function fakeSupabase(integration: Record<string, unknown> | null) {
   } as never
 }
 
-const empty = { title: null, body: null, baseRef: null, baseSha: null }
+const empty = { title: null, body: null, baseRef: null, mergeBaseSha: null }
 
 test("resolvePullRequestMetadata degrades to nulls when the PR URL has no number", async () => {
   const result = await resolvePullRequestMetadata(

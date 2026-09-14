@@ -125,10 +125,15 @@ export async function verifyHeadSha(
 /**
  * Diffs the exact-SHA checkout against its pull request's base commit, which
  * `cloneRepoAtSha` never fetched — this pulls it in (also depth 1) purely to
- * compute the diff. A plain two-commit diff, not a three-dot merge-base
- * diff: the two shallow fetches share no history to derive a merge base
- * from, but a straight tree comparison is exactly what a reviewer needs to
- * see "what changed" between the two commits.
+ * compute the diff.
+ *
+ * `baseSha` must be the PR's **merge base**, which the server resolves via
+ * GitHub's compare API (`fetchPullRequestMetadata`). Two depth-1 fetches
+ * share no history, so `git merge-base` can't run here; against the true
+ * fork point, though, this two-commit diff already equals the three-dot
+ * `base...head` diff the reviewer is told it is reading. Passing the base
+ * branch's *tip* instead is what caused GEN-455 — unrelated commits that
+ * landed after the fork show up as PR-authored reversions.
  */
 export async function diffAgainstBase(options: {
   dir: string

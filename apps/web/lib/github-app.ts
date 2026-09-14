@@ -505,15 +505,23 @@ export type GithubPullRequestMetadata = {
   title: string | null
   body: string | null
   baseRef: string | null
-  baseSha: string | null
+  mergeBaseSha: string | null
 }
 
 // The automatic reviewer (GEN-415) needs the PR's own title/description and
-// base branch/commit — none of which are computable from the local
-// disposable checkout the way the diff is, so this is the one GitHub API
-// call the reviewer's context assembly makes. `baseSha` (not just the base
-// branch's current tip, which can move after the PR was opened) is what the
-// host actually diffs the disposable checkout against.
+// the commit to diff the disposable checkout against — neither computable
+// from that checkout, so this is where the reviewer's context assembly talks
+// to GitHub.
+//
+// That commit is the **merge base**, not `pull_request.base.sha`. Despite the
+// name, `base.sha` is the base branch's tip as of the PR's last sync, not the
+// commit the branch forked from, so `git diff base.sha head` renders every
+// commit that landed on the base branch in the meantime as though this PR had
+// reverted it. GEN-455 is exactly that: a PR opened four seconds after an
+// unrelated CI commit merged was reviewed as having reverted it, and the
+// reviewer filed a (faithful, but entirely fictional) blocking finding.
+// `compare/{base}...{head}` is the same three-dot comparison GitHub's own
+// "Files changed" tab shows, and `merge_base_commit.sha` is its fork point.
 export async function fetchPullRequestMetadata(
   installationId: string,
   owner: string,
@@ -521,16 +529,15 @@ export async function fetchPullRequestMetadata(
   pullNumber: number
 ): Promise<GithubPullRequestMetadata> {
   const token = await getInstallationToken(installationId)
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  }
 
   const response = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    }
+    { headers }
   )
 
   if (!response.ok) {
@@ -541,14 +548,58 @@ export async function fetchPullRequestMetadata(
     title: string | null
     body: string | null
     base: { ref: string | null; sha: string | null }
+    head: { sha: string | null }
   }
+
+  const baseRef = data.base?.ref ?? null
+  const headSha = data.head?.sha ?? null
 
   return {
     title: data.title,
     body: data.body,
-    baseRef: data.base?.ref ?? null,
-    baseSha: data.base?.sha ?? null,
+    baseRef,
+    mergeBaseSha:
+      baseRef && headSha
+        ? await fetchMergeBaseSha(token, owner, repo, baseRef, headSha)
+        : null,
   }
+}
+
+// Returns the fork point of `baseRef` and `headSha`, or null if GitHub can't
+// compare them (a force-pushed or deleted base branch, an unrelated history).
+// Null makes the host skip the diff rather than fall back to a comparison
+// that would resurrect GEN-455's phantom findings.
+async function fetchMergeBaseSha(
+  token: string,
+  owner: string,
+  repo: string,
+  baseRef: string,
+  headSha: string
+): Promise<string | null> {
+  const basis = `${encodeURIComponent(baseRef)}...${encodeURIComponent(headSha)}`
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/compare/${basis}?per_page=1`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    console.error(
+      `[github-app] failed to compare ${basis} for ${owner}/${repo} (${response.status})`
+    )
+    return null
+  }
+
+  const data = (await response.json()) as {
+    merge_base_commit?: { sha?: string | null } | null
+  }
+
+  return data.merge_base_commit?.sha ?? null
 }
 
 export type GithubPullRequestState =

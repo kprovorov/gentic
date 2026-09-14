@@ -751,10 +751,10 @@ export async function processReviewRun(
     await deps.verifyHeadSha(dir, reviewRun.headSha)
 
     throwIfAborted(options.signal)
-    const diff = context.pullRequest.baseSha
+    const diff = context.pullRequest.mergeBaseSha
       ? await deps.diffAgainstBase({
           dir,
-          baseSha: context.pullRequest.baseSha,
+          baseSha: context.pullRequest.mergeBaseSha,
           headSha: reviewRun.headSha,
         })
       : ""

@@ -65,7 +65,7 @@ const baseContext: ReviewRunContext = {
     title: "PR title",
     body: "PR body",
     baseRef: "main",
-    baseSha: "def456",
+    mergeBaseSha: "def456",
   },
 }
 
@@ -118,6 +118,42 @@ test("extractReviewerOutput parses the last fenced json block", () => {
   assert.equal(output.verdict, "changes_requested")
   assert.equal(output.findings.length, 1)
   assert.equal(output.findings[0]?.defect, "Unbounded recursion")
+})
+
+// GEN-455, verbatim: the reviewer returned a well-formed verdict whose only
+// flaw was quoting `line` as a string. That failed schema validation, the run
+// was reported as an infrastructure failure, and GEN-444 sat in `reviewing`
+// with its real findings discarded.
+test("extractReviewerOutput keeps a verdict whose line number is a string", () => {
+  const text = [
+    "```json",
+    JSON.stringify({
+      verdict: "changes_requested",
+      summary: "The PR introduces a release-workflow regression.",
+      findings: [
+        {
+          defect: "The release workflow can no longer push its version bump",
+          evidence: "RELEASE_TOKEN is replaced with GITHUB_TOKEN at checkout",
+          impact: "A dispatched release fails during the version-bump push",
+          requestedChange: "Restore the Release environment",
+          filePath: ".github/workflows/release.yml",
+          line: "25",
+        },
+      ],
+    }),
+    "```",
+  ].join("\n")
+
+  const output = extractReviewerOutput(text)
+  assert.equal(output.verdict, "changes_requested")
+  assert.equal(output.findings[0]?.line, 25)
+  assert.equal(output.findings[0]?.filePath, ".github/workflows/release.yml")
+})
+
+test("buildReviewerPromptText shows the line placeholder as a number", () => {
+  const prompt = buildReviewerPromptText(baseContext, "")
+  assert.match(prompt, /"line": 0/)
+  assert.doesNotMatch(prompt, /"line": "/)
 })
 
 test("extractReviewerOutput throws ReviewerOutputInvalidError when no json block exists", () => {

@@ -75,9 +75,9 @@ export async function resolvePullRequestMetadata(
   title: string | null
   body: string | null
   baseRef: string | null
-  baseSha: string | null
+  mergeBaseSha: string | null
 }> {
-  const empty = { title: null, body: null, baseRef: null, baseSha: null }
+  const empty = { title: null, body: null, baseRef: null, mergeBaseSha: null }
   const pullNumber = parsePullNumber(prUrl)
   const [owner, name] = repo.split("/")
 
