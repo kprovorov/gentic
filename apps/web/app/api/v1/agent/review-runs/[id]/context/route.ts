@@ -36,7 +36,10 @@ export async function GET(
       supabase,
       userId,
       context.repo,
-      context.pullRequest.url
+      context.pullRequest.url,
+      // The run's pinned head, not the PR's live head — see
+      // `ReviewRunPullRequestState.headSha`.
+      context.pullRequest.headSha
     )
 
     return json(
@@ -70,7 +73,8 @@ export async function resolvePullRequestMetadata(
   supabase: Supabase,
   userId: string,
   repo: string,
-  prUrl: string
+  prUrl: string,
+  headSha: string
 ): Promise<{
   title: string | null
   body: string | null
@@ -95,7 +99,8 @@ export async function resolvePullRequestMetadata(
       integration.installation_id,
       owner,
       name,
-      pullNumber
+      pullNumber,
+      headSha
     )
   } catch (error) {
     console.error(

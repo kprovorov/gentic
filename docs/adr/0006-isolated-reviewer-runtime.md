@@ -108,6 +108,19 @@ failure.
 > what made the wrong commit look like the right one. A failed compare
 > degrades to null and the host skips the diff; falling back to the base tip
 > would reinstate the bug.
+>
+> Both sides of that comparison must be pinned. The merge base is resolved
+> against the run's frozen `review_runs.head_sha`, never the PR's live head,
+> and `getReviewRunContext` now reports that same frozen SHA as
+> `pullRequest.headSha` (it previously read `issue_pull_requests.head_sha`,
+> the PR's *current* head — the distinction `getReviewRunPublishContext`
+> already drew for its staleness guard). Otherwise a rebase or force-push
+> landing between run creation and context assembly — the window before the
+> lifecycle engine supersedes the cycle — yields a merge base for the new head
+> while the host still clones, `verifyHeadSha`-asserts, and diffs the old one,
+> making the commits between the two fork points reappear as PR-authored
+> reversions. It also means the prompt's "Head SHA under review" now names the
+> commit actually in the checkout.
 
 **A finding's `line` can never fail a review.** Added 2026-09-14 (GEN-455).
 `line` is optional locating metadata, but it was typed `z.number()` while the

@@ -321,7 +321,8 @@ test("fetchPullRequestMetadata returns the merge base, not the base branch tip",
     installationId,
     "acme",
     "widget",
-    42
+    42,
+    "head-sha"
   )
 
   assert.deepEqual(metadata, {
@@ -335,6 +336,54 @@ test("fetchPullRequestMetadata returns the merge base, not the base branch tip",
       url.includes("/repos/acme/widget/compare/main...head-sha")
     ),
     `expected a three-dot compare call, got ${JSON.stringify(requested)}`
+  )
+})
+
+// A rebase or force-push can land between a review run being created (which
+// freezes its head SHA) and the host fetching that run's context. The host
+// clones and diffs the frozen SHA, so the merge base has to belong to that
+// same commit; one computed for the newer head would make the commits between
+// the two fork points look like reversions authored by the PR.
+test("fetchPullRequestMetadata compares the pinned head, not GitHub's live PR head", async (t) => {
+  const requested: string[] = []
+  const { installationId } = stubInstallationApi(t, (url) => {
+    requested.push(url)
+
+    if (url.includes("/compare/")) {
+      return new Response(
+        JSON.stringify({ merge_base_commit: { sha: "fork-point-sha" } }),
+        { status: 200 }
+      )
+    }
+
+    return new Response(
+      JSON.stringify({
+        title: "PR title",
+        body: null,
+        base: { ref: "main", sha: "base-branch-tip-sha" },
+        // GitHub already reflects a force-push this review run predates.
+        head: { sha: "rebased-onto-newer-main" },
+      }),
+      { status: 200 }
+    )
+  })
+
+  await fetchPullRequestMetadata(
+    installationId,
+    "acme",
+    "widget",
+    42,
+    "pinned-at-run-creation"
+  )
+
+  const compare = requested.find((url) => url.includes("/compare/"))
+  assert.ok(
+    compare?.includes("main...pinned-at-run-creation"),
+    `expected the pinned head in the compare, got ${compare}`
+  )
+  assert.ok(
+    !compare?.includes("rebased-onto-newer-main"),
+    "the PR's live head must not drive the merge base"
   )
 })
 
@@ -361,7 +410,8 @@ test("fetchPullRequestMetadata degrades the merge base to null when the compare 
     installationId,
     "acme",
     "widget",
-    42
+    42,
+    "head-sha"
   )
 
   // Null makes the host skip the diff entirely. Falling back to the base tip

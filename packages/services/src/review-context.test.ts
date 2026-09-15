@@ -149,11 +149,42 @@ test("getReviewRunContext assembles issue, policy, PR, and attachment context", 
     reviewerModel: null,
     reviewerInstructions: "Pay extra attention to auth boundaries.",
     pullRequest: {
+      // The run's frozen SHA, not `issue_pull_requests.head_sha` ("abc123").
+      headSha: "frozen-sha-abc123",
       url: "https://github.com/gentic/app/pull/42",
-      headSha: "abc123",
       ciState: "success",
     },
   })
+})
+
+// GEN-455 follow-up: the reviewer is told which commit it is reviewing, and
+// that label feeds the merge-base lookup. If it reported the PR's live head
+// while the host cloned and diffed the run's pinned head, a rebase landing
+// mid-run would produce a merge base for one revision and a diff for another
+// — reintroducing exactly the phantom reversions this work removes.
+test("getReviewRunContext pins the head SHA to the run, not the PR's live head", async () => {
+  const supabase = fakeSupabase({
+    review_runs: [
+      {
+        ...reviewRunRow,
+        head_sha: "pinned-at-run-creation",
+        review_cycles: {
+          ...(reviewRunRow.review_cycles as DbRow),
+          issue_pull_requests: {
+            url: "https://github.com/gentic/app/pull/42",
+            // A force-push landed after this run was created.
+            head_sha: "rebased-onto-newer-main",
+            ci_state: "success",
+          },
+        },
+      },
+    ],
+    issue_review_policies: [policyRow],
+    attachments: [],
+  })
+
+  const context = await getReviewRunContext(supabase, "run-1")
+  assert.equal(context.pullRequest.headSha, "pinned-at-run-creation")
 })
 
 test("getReviewRunContext excludes attachments outside the issue's own durable set", async () => {

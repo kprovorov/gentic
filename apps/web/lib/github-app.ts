@@ -522,11 +522,19 @@ export type GithubPullRequestMetadata = {
 // reviewer filed a (faithful, but entirely fictional) blocking finding.
 // `compare/{base}...{head}` is the same three-dot comparison GitHub's own
 // "Files changed" tab shows, and `merge_base_commit.sha` is its fork point.
+//
+// `headSha` is the caller's *pinned* review-run head — deliberately a
+// parameter rather than the `head.sha` this very response carries. The merge
+// base must belong to the same revision the host checks out and diffs; taking
+// it from the PR's live head means a rebase or force-push landing mid-run
+// yields a merge base for the new head while the diff still runs against the
+// old pinned one, which is the same phantom-revert shape all over again.
 export async function fetchPullRequestMetadata(
   installationId: string,
   owner: string,
   repo: string,
-  pullNumber: number
+  pullNumber: number,
+  headSha: string
 ): Promise<GithubPullRequestMetadata> {
   const token = await getInstallationToken(installationId)
   const headers = {
@@ -548,20 +556,17 @@ export async function fetchPullRequestMetadata(
     title: string | null
     body: string | null
     base: { ref: string | null; sha: string | null }
-    head: { sha: string | null }
   }
 
   const baseRef = data.base?.ref ?? null
-  const headSha = data.head?.sha ?? null
 
   return {
     title: data.title,
     body: data.body,
     baseRef,
-    mergeBaseSha:
-      baseRef && headSha
-        ? await fetchMergeBaseSha(token, owner, repo, baseRef, headSha)
-        : null,
+    mergeBaseSha: baseRef
+      ? await fetchMergeBaseSha(token, owner, repo, baseRef, headSha)
+      : null,
   }
 }
 

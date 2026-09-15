@@ -18,6 +18,14 @@ export type ReviewRunContextAttachment = {
 
 export type ReviewRunPullRequestState = {
   url: string
+  // `review_runs.head_sha` — the commit this run was pinned to at creation,
+  // which is what the host clones, asserts via `verifyHeadSha`, and diffs.
+  // Deliberately *not* `issue_pull_requests.head_sha`: that tracks the PR's
+  // live head and can move mid-run (a rebase or force-push landing before
+  // the lifecycle engine supersedes the cycle). Handing the live head to the
+  // reviewer would label the prompt with one commit while the checkout held
+  // another, and — once the merge base is derived from it — would resurrect
+  // GEN-455's phantom diff against a head that was never reviewed.
   headSha: string
   ciState: "unknown" | "pending" | "success" | "failure"
 }
@@ -56,9 +64,10 @@ export async function getReviewRunContext(
     .from("review_runs")
     .select(
       `
+      head_sha,
       review_cycles!inner (
         issue_id,
-        issue_pull_requests!inner ( url, head_sha, ci_state ),
+        issue_pull_requests!inner ( url, ci_state ),
         issues!inner (
           number,
           title,
@@ -73,11 +82,11 @@ export async function getReviewRunContext(
 
   const { data: run, error: runError } = runResult as {
     data: {
+      head_sha: string
       review_cycles: {
         issue_id: string
         issue_pull_requests: {
           url: string
-          head_sha: string | null
           ci_state: "unknown" | "pending" | "success" | "failure"
         }
         issues: {
@@ -104,10 +113,10 @@ export async function getReviewRunContext(
     issues: issue,
   } = run.review_cycles
 
-  if (!pullRequest.head_sha) {
+  if (!run.head_sha) {
     throw new ServiceError(
       "internal",
-      "Review run's pull request has no head SHA on record"
+      "Review run has no head SHA on record"
     )
   }
 
@@ -149,7 +158,7 @@ export async function getReviewRunContext(
     reviewerInstructions: policy.reviewer_instructions,
     pullRequest: {
       url: pullRequest.url,
-      headSha: pullRequest.head_sha,
+      headSha: run.head_sha,
       ciState: pullRequest.ci_state,
     },
   }

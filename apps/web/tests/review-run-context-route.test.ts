@@ -29,7 +29,8 @@ test("resolvePullRequestMetadata degrades to nulls when the PR URL has no number
     fakeSupabase(null),
     "user-1",
     "gentic/app",
-    "https://github.com/gentic/app/pull/not-a-number"
+    "https://github.com/gentic/app/pull/not-a-number",
+    "pinned-head-sha"
   )
   assert.deepEqual(result, empty)
 })
@@ -39,7 +40,8 @@ test("resolvePullRequestMetadata degrades to nulls when there is no GitHub integ
     fakeSupabase(null),
     "user-1",
     "gentic/app",
-    "https://github.com/gentic/app/pull/42"
+    "https://github.com/gentic/app/pull/42",
+    "pinned-head-sha"
   )
   assert.deepEqual(result, empty)
 })
@@ -49,7 +51,8 @@ test("resolvePullRequestMetadata degrades to nulls when the integration has no i
     fakeSupabase({ installation_id: null }),
     "user-1",
     "gentic/app",
-    "https://github.com/gentic/app/pull/42"
+    "https://github.com/gentic/app/pull/42",
+    "pinned-head-sha"
   )
   assert.deepEqual(result, empty)
 })
@@ -59,7 +62,8 @@ test("resolvePullRequestMetadata degrades to nulls when the repo has no owner/na
     fakeSupabase({ installation_id: "123" }),
     "user-1",
     "not-a-repo-slug",
-    "https://github.com/gentic/app/pull/42"
+    "https://github.com/gentic/app/pull/42",
+    "pinned-head-sha"
   )
   assert.deepEqual(result, empty)
 })
