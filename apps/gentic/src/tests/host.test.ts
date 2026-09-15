@@ -744,6 +744,40 @@ test("processReviewRun completes a review, mapping findings to the general-purpo
   })
 })
 
+// GEN-449: a verdict the server discards comes back as a 200 with
+// `accepted: false`, and the host used to log it identically to a recorded
+// one — so an Issue silently left in `reviewing` looked, in the journal,
+// exactly like one that had been approved.
+test("processReviewRun distinguishes a discarded verdict from a recorded one in its log", async () => {
+  await withHarness(async ({ api, config, deps }) => {
+    api.completeReviewRunResults.push({
+      reviewAttemptId: null,
+      reviewCycleId: "cycle-1",
+      issueId: null,
+      attemptNumber: null,
+      cycleState: "superseded",
+      accepted: false,
+    })
+
+    const lines = await captureConsoleLog(() =>
+      processReviewRun(api, config, claimedReviewRun("review-1"), deps)
+    )
+
+    assert.equal(api.completedReviewRuns.length, 1)
+    assert.deepEqual(api.failedReviewRuns, [])
+    assert.equal(
+      lines.some((line) => /discarded as stale/.test(line)),
+      true,
+      `expected a discarded-verdict log line, got: ${lines.join(" | ")}`
+    )
+    assert.equal(
+      lines.some((line) => /completed with verdict/.test(line)),
+      false,
+      "a discarded verdict must not read as a completed one"
+    )
+  })
+})
+
 test("processReviewRun proves the exact-SHA checkout before reviewing and fails the run on a mismatch", async () => {
   await withHarness(async ({ api, config, deps }) => {
     api.reviewVerifyError = new Error(
@@ -1150,6 +1184,24 @@ test("publishes the Associated Pull Request aggregate returned by completion", a
     assert.equal(api.publishedRunStates.at(-1), "tests-failed")
   })
 })
+
+// The host's only channel for "the server took this, but discarded it" is
+// its log, so asserting on it means reading stdout.
+async function captureConsoleLog(run: () => Promise<void>): Promise<string[]> {
+  const lines: string[] = []
+  const original = console.log
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map((arg) => String(arg)).join(" "))
+  }
+
+  try {
+    await run()
+  } finally {
+    console.log = original
+  }
+
+  return lines
+}
 
 async function withHarness(
   run: (harness: {

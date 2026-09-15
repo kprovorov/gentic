@@ -772,7 +772,7 @@ export async function processReviewRun(
     })
 
     throwIfAborted(options.signal)
-    await api.completeReviewRun(reviewRun.id, {
+    const completion = await api.completeReviewRun(reviewRun.id, {
       verdict: output.verdict,
       summary: output.summary ?? null,
       findings: output.findings.map((finding) => ({
@@ -785,9 +785,25 @@ export async function processReviewRun(
         requestedChange: finding.requestedChange,
       })),
     })
-    logInfo(
-      `review run ${reviewRun.id} completed with verdict: ${output.verdict}`
-    )
+    // A discarded verdict is a 200, not an error: the run was superseded,
+    // cancelled, or its cycle already concluded while the reviewer worked,
+    // so nothing was recorded and the Issue's status did not move. Logging
+    // it as a plain completion (GEN-449) made a dropped verdict read exactly
+    // like a delivered one in the host's journal.
+    if (completion.accepted) {
+      logInfo(
+        `review run ${reviewRun.id} completed with verdict: ${output.verdict}`
+      )
+    } else {
+      logInfo(
+        `review run ${reviewRun.id} produced verdict ${output.verdict} but it was discarded as stale:`,
+        {
+          issueId: reviewRun.issueId,
+          reviewCycleId: reviewRun.reviewCycleId,
+          cycleState: completion.cycleState,
+        }
+      )
+    }
   } catch (error) {
     if (options.signal?.aborted || isSessionCancelled(error)) {
       throw error

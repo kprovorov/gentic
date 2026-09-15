@@ -78,6 +78,10 @@ With Automatic Review enabled, the Review Cycle is what decides the issue's `App
 
 A crash, timeout, or malformed reviewer output is never treated as a verdict. It retries automatically once at the same commit; if that retry also fails, automatic progress stops and the Review Cycle is left `Active` with no live run, waiting for a human action or new code — see [Recovery actions](#recovery-actions).
 
+### The `Reviewing` status is self-correcting
+
+An issue shows `Reviewing` because a review run was queued for it, and every way a cycle can stop early — the spent retry budget above, a verdict arriving too late to count, a push that superseded the run mid-flight — stops the cycle without writing the issue's status again. Gentic reconciles this in the background: an issue left in `Reviewing` with nothing running and nothing a host could still claim has its status re-derived from its pull requests, within a couple of minutes. So `Reviewing` always means a reviewer really is looking at the code, and an issue the reviewer already approved lands on `Approved` even if the verdict itself was lost.
+
 ## Observability
 
 - **Issue timeline** — every lifecycle transition (`review_queued`, `review_started`, `review_approved`, `review_changes_requested`, `review_failed`, `review_superseded`, `review_fix_delivered`) appears as a timeline event on the issue, including *why* (e.g. superseded by a human review vs. a new push).
