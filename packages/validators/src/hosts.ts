@@ -52,6 +52,11 @@ export const hostCapabilitiesSchema = z
       .object({
         claude_code: hostProviderCapabilitySchema.optional(),
         codex: hostProviderCapabilitySchema.optional(),
+        // Not an agent provider, but the same readiness shape: every agent
+        // shells out to `gh` to open its pull request, and Settings shows it
+        // so a "Update GitHub CLI" result can be read against a version.
+        // Optional so CLIs that predate it still heartbeat.
+        github: hostProviderCapabilitySchema.optional(),
       })
       .strict(),
   })

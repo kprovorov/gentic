@@ -18,13 +18,18 @@ type HostMutationContext = {
 }
 
 export function hostMutationRoute<T>(
-  mutate: (input: HostMutationContext) => Promise<T>
+  mutate: (input: HostMutationContext) => Promise<T>,
+  deps: {
+    getContext?: typeof getOptionalAuthenticatedServiceContext
+  } = {}
 ) {
+  const getContext = deps.getContext ?? getOptionalAuthenticatedServiceContext
+
   return async function handler(
     request: Request,
     routeContext: { params?: Promise<Record<string, string>> } = {}
   ) {
-    const context = await getOptionalAuthenticatedServiceContext()
+    const context = await getContext()
     if (!context) {
       return Response.json(
         { error: { code: "unauthorized", message: "Unauthorized" } },

@@ -529,6 +529,10 @@ function fakeApi(options: { failInsertAttempts?: Error[] } = {}): AgentApi & {
       return null
     },
     async reportSkillInstall() {},
+    async claimToolUpdate() {
+      return null
+    },
+    async reportToolUpdate() {},
   }
   return api
 }

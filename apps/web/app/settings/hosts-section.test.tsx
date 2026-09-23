@@ -345,6 +345,11 @@ function baseHost() {
         authenticated: false,
         version: "1.2.3",
       },
+      github: {
+        installed: true,
+        authenticated: true,
+        version: "2.60.0",
+      },
     },
   } satisfies SettingsHostsData["hosts"][number]
 }
