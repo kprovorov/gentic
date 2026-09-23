@@ -327,6 +327,37 @@ export function getAgentProviderConfig(
   }
 }
 
+/**
+ * Command that invokes the *bundled* Claude Code CLI — the binary that
+ * actually serves sessions — rather than whatever `claude` happens to be on
+ * PATH. The two are unrelated installs and routinely differ: the bundled one
+ * is pinned by @agentclientprotocol/claude-agent-acp and only moves when that
+ * dependency is bumped, so a host that runs `claude update` does not change
+ * the version below.
+ *
+ * claude-agent-acp's entrypoint treats `--cli` as "forward the remaining
+ * arguments to the wrapped native CLI", which is the one resolution path that
+ * holds in both launch modes: it honours the sidecar's CLAUDE_CODE_EXECUTABLE
+ * when compiled, and otherwise runs the SDK's own per-platform (including
+ * musl) lookup under node_modules. Going through it keeps this in step with
+ * the agent across upgrades instead of duplicating that resolution here.
+ */
+export function claudeCliCommand(args: string[]): {
+  command: string
+  args: string[]
+  env: NodeJS.ProcessEnv
+} {
+  const agent = getAgentProviderConfig({
+    agentProvider: "claude_code",
+    issueModel: null,
+  })
+  return {
+    command: agent.entry.command,
+    args: [...agent.entry.args, "--cli", ...args],
+    env: agent.env,
+  }
+}
+
 function mergeCodexConfigModel(issueModel: string): string {
   const config = process.env.CODEX_CONFIG
     ? JSON.parse(process.env.CODEX_CONFIG)

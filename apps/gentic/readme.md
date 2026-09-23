@@ -114,6 +114,17 @@ authenticated in the host environment. Codex runs default to
 `INITIAL_AGENT_MODE=agent-full-access` unless overridden in the host
 environment.
 
+The Claude Code that runs `claude_code` issues is the native CLI **bundled
+with `@agentclientprotocol/claude-agent-acp`** (pinned through its
+`@anthropic-ai/claude-agent-sdk` dependency), not the `claude` on the host's
+PATH. Running `claude update` on a host therefore does not change the version
+that runs issues — only bumping `claude-agent-acp` in `package.json` does. The
+version Settings reports for Claude Code is deliberately read from that
+bundled binary, so it matches what actually serves sessions. This matters when
+a new model rejects older Claude Code builds ("version X or newer is
+required"): the fix is a dependency bump and a host upgrade, not `claude
+update`.
+
 ## Setup
 
 Install dependencies from the repository root:

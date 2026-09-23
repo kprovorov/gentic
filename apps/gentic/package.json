@@ -17,7 +17,7 @@
     "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/claude-agent-acp": "^0.59.0",
+    "@agentclientprotocol/claude-agent-acp": "^0.79.0",
     "@agentclientprotocol/codex-acp": "^1.1.0",
     "@agentclientprotocol/sdk": "^1.1.0",
     "@clack/prompts": "^1.6.0",
