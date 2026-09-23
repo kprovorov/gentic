@@ -248,8 +248,8 @@ describe("IssueTimeline", () => {
     expect(screen.getByText("Considering approach")).toBeVisible()
   })
 
-  it("renders user and assistant chat bubbles", () => {
-    render(
+  it("bubbles user messages and leaves assistant messages unbubbled", () => {
+    const { container } = render(
       <IssueTimeline
         items={[
           messageItem({
@@ -268,6 +268,29 @@ describe("IssueTimeline", () => {
 
     expect(screen.getByText("Please fix this")).toBeInTheDocument()
     expect(screen.getByText("On it")).toBeInTheDocument()
+
+    const bubbles = container.querySelectorAll('[data-slot="bubble"]')
+    expect(bubbles.length).toBe(2)
+    expect(bubbles[0].getAttribute("data-variant")).toBe("muted")
+    expect(bubbles[1].getAttribute("data-variant")).toBe("ghost")
+  })
+
+  it("keeps a failed assistant message unbubbled", () => {
+    const { container } = render(
+      <IssueTimeline
+        items={[
+          messageItem({
+            id: "assistant-error",
+            role: "assistant",
+            content: "Run failed",
+            status: "error",
+          }),
+        ]}
+      />
+    )
+
+    const bubble = container.querySelector('[data-slot="bubble"]')
+    expect(bubble?.getAttribute("data-variant")).toBe("ghost")
   })
 
   it("renders timestamps for messages and activity events", () => {

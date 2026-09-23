@@ -575,8 +575,30 @@ function MessageBody({ message }: { message: ChatMessage }) {
   }
 
   const isUser = message.role === "user"
-  const variant =
-    message.status === "error" ? "destructive" : isUser ? "tinted" : "secondary"
+  const isError = message.status === "error"
+  // Only the user's own turns wear a bubble; the agent answers as bare text so
+  // a long reply reads as prose rather than a stack of shaded blocks. An agent
+  // failure stays bubble-less too and signals itself with destructive text.
+  const variant = isUser ? (isError ? "destructive" : "muted") : "ghost"
+
+  const bubble = (
+    <Bubble
+      align="start"
+      variant={variant}
+      className={cn("max-w-full", isUser ? "w-fit" : "w-full")}
+    >
+      <BubbleContent
+        className={cn(
+          "w-full whitespace-pre-wrap",
+          !isUser && isError && "text-destructive"
+        )}
+      >
+        <ChatMarkdown content={content} isStreaming={isStreaming} />
+        {isStreaming ? <span className="ml-0.5 animate-pulse">▍</span> : null}
+        <AttachmentPreviews attachments={message.attachments} />
+      </BubbleContent>
+    </Bubble>
+  )
 
   return (
     <div className="min-w-0">
@@ -585,14 +607,16 @@ function MessageBody({ message }: { message: ChatMessage }) {
           Gentic
         </div>
       ) : null}
-      <Bubble align="start" variant={variant} className="w-full max-w-full">
-        <BubbleContent className="w-full whitespace-pre-wrap">
-          <ChatMarkdown content={content} isStreaming={isStreaming} />
-          {isStreaming ? <span className="ml-0.5 animate-pulse">▍</span> : null}
-          <AttachmentPreviews attachments={message.attachments} />
-        </BubbleContent>
-      </Bubble>
-      {isUser ? <MessageDeliveryStatus message={message} /> : null}
+      {isUser ? (
+        // The bubble hugs its text, so the delivery tick rides in the same
+        // fit-width column instead of drifting off to the panel's edge.
+        <div className="w-fit max-w-full min-w-0">
+          {bubble}
+          <MessageDeliveryStatus message={message} />
+        </div>
+      ) : (
+        bubble
+      )}
     </div>
   )
 }
