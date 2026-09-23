@@ -159,7 +159,8 @@ export async function runHostLoop(
   // Tracked separately from `activeRuns` because review jobs are a distinct
   // process launch from implementation issues (GEN-414), but both maps count
   // against the same `MAX_CONCURRENT_ISSUES` capacity and are drained
-  // together on shutdown.
+  // together on shutdown. Review jobs are claimed ahead of implementation
+  // issues (ADR-0013).
   const activeReviewRuns = new Map<
     Promise<void>,
     { reviewRunId: string; controller: AbortController }
@@ -295,6 +296,52 @@ export async function runHostLoop(
       continue
     }
 
+    // Review work always wins capacity contention (ADR-0013): a pull request
+    // that is ready for review is a nearly finished issue, so reviewing it
+    // now unblocks a merge (or hands fixes back to its implementation
+    // session) before another issue is started from scratch. A queued
+    // review run is therefore claimed before any implementation issue,
+    // re-evaluated on every poll tick — with N slots and a backlog of
+    // issues this pipelines "implement 1, implement 2, review 1, ..."
+    // rather than implementing the whole backlog first.
+    let reviewRun: ClaimedReviewRun | null = null
+    if (!running) {
+      break
+    }
+    try {
+      reviewRun = await api.claimReviewRun()
+    } catch (error) {
+      logError("failed to poll for review runs:", describe(error))
+    }
+
+    if (reviewRun) {
+      const reviewController = new AbortController()
+      const reviewRunPromise = processReviewRun(api, config, reviewRun, deps, {
+        signal: reviewController.signal,
+      })
+        .catch((error) => {
+          if (isSessionCancelled(error)) {
+            logInfo(`review run ${reviewRun.id} cancelled by host control`)
+            return
+          }
+          logError(
+            `review run ${reviewRun.id} ended unexpectedly:`,
+            describe(error)
+          )
+        })
+        .finally(() => {
+          activeReviewRuns.delete(reviewRunPromise)
+        })
+      activeReviewRuns.set(reviewRunPromise, {
+        reviewRunId: reviewRun.id,
+        controller: reviewController,
+      })
+      logInfo(
+        `review run ${reviewRun.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      )
+      continue
+    }
+
     let issue: ClaimedIssue | null = null
     if (!running) {
       break
@@ -308,49 +355,7 @@ export async function runHostLoop(
       logError("failed to poll for queued issues:", describe(error))
     }
 
-    if (issue) {
-      const controller = new AbortController()
-      const run = processIssue(api, config, issue, deps, {
-        signal: controller.signal,
-      })
-        .catch((error) => {
-          if (isSessionCancelled(error)) {
-            logInfo(`issue ${issue.id} cancelled by host control`)
-            return
-          }
-          // processIssue records ordinary failures itself. This protects the
-          // pool from an unexpected failure in its cleanup path.
-          logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
-        })
-        .finally(() => {
-          activeRuns.delete(run)
-        })
-      activeRuns.set(run, {
-        issueId: issue.id,
-        activeRunId: issue.activeRunId,
-        controller,
-      })
-      logInfo(
-        `issue ${issue.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
-      )
-      continue
-    }
-
-    // Implementation work always wins capacity contention (GEN-414): a
-    // review job is only claimed once no implementation issue was available
-    // for this host, re-evaluated on every poll tick rather than just once
-    // at cold start.
-    let reviewRun: ClaimedReviewRun | null = null
-    if (!running) {
-      break
-    }
-    try {
-      reviewRun = await api.claimReviewRun()
-    } catch (error) {
-      logError("failed to poll for review runs:", describe(error))
-    }
-
-    if (!reviewRun) {
+    if (!issue) {
       await sleepUntilNextTick(
         deps,
         config.POLL_INTERVAL_MS,
@@ -360,29 +365,29 @@ export async function runHostLoop(
       continue
     }
 
-    const reviewController = new AbortController()
-    const reviewRunPromise = processReviewRun(api, config, reviewRun, deps, {
-      signal: reviewController.signal,
+    const controller = new AbortController()
+    const run = processIssue(api, config, issue, deps, {
+      signal: controller.signal,
     })
       .catch((error) => {
         if (isSessionCancelled(error)) {
-          logInfo(`review run ${reviewRun.id} cancelled by host control`)
+          logInfo(`issue ${issue.id} cancelled by host control`)
           return
         }
-        logError(
-          `review run ${reviewRun.id} ended unexpectedly:`,
-          describe(error)
-        )
+        // processIssue records ordinary failures itself. This protects the
+        // pool from an unexpected failure in its cleanup path.
+        logError(`issue ${issue.id} ended unexpectedly:`, describe(error))
       })
       .finally(() => {
-        activeReviewRuns.delete(reviewRunPromise)
+        activeRuns.delete(run)
       })
-    activeReviewRuns.set(reviewRunPromise, {
-      reviewRunId: reviewRun.id,
-      controller: reviewController,
+    activeRuns.set(run, {
+      issueId: issue.id,
+      activeRunId: issue.activeRunId,
+      controller,
     })
     logInfo(
-      `review run ${reviewRun.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
+      `issue ${issue.id} started (${activeRuns.size + activeReviewRuns.size}/${config.MAX_CONCURRENT_ISSUES} active)`
     )
   }
 

@@ -30,7 +30,7 @@ These statuses cover the period before an agent host has claimed the issue.
 | Status | Description |
 |---|---|
 | `draft` | The issue is being prepared. It is invisible to the host. Use this while you are still writing or refining the body, uploading attachments, or setting blockers. |
-| `todo` | The issue is ready and sits in the unclaimed pool. The next host poll that finds no other pending work will claim it. |
+| `todo` | The issue is ready and sits in the unclaimed pool. The next host poll with a free slot claims it, once no review run is waiting — a pull request that is ready for review is always picked up before new implementation work. |
 
 ## Agent running
 
