@@ -37,7 +37,7 @@ function settingsHost(overrides: Partial<SettingsHost>): SettingsHost {
     processStartedAt: "2026-09-24T00:00:00.000Z",
     connectedAt: "2026-09-24T00:00:00.000Z",
     setupCompleted: true,
-    providers: {},
+    providers: { claude_code: null, codex: null, github: null },
     ...overrides,
   }
 }
