@@ -103,6 +103,7 @@ export function IssueDetailView({ data }: { data: IssueDetailData }) {
             priority={issue.priority}
             isSpec={isSpec}
             host={issue.host}
+            pinnedHost={issue.pinnedHost}
             hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
             automaticPrPublishingInProgress={automaticPrPublishingInProgress}
             pullRequests={pullRequests}

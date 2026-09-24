@@ -654,6 +654,7 @@ export type Database = {
           id: string
           issue_model: string | null
           number: number
+          pinned_host_id: string | null
           priority: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           run_error: string | null
@@ -679,6 +680,7 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number: number
+          pinned_host_id?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id: string
           run_error?: string | null
@@ -704,6 +706,7 @@ export type Database = {
           id?: string
           issue_model?: string | null
           number?: number
+          pinned_host_id?: string | null
           priority?: Database["public"]["Enums"]["issue_priority"]
           project_id?: string
           run_error?: string | null
@@ -721,6 +724,13 @@ export type Database = {
           {
             foreignKeyName: "issues_active_host_id_fkey"
             columns: ["active_host_id"]
+            isOneToOne: false
+            referencedRelation: "hosts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_pinned_host_id_fkey"
+            columns: ["pinned_host_id"]
             isOneToOne: false
             referencedRelation: "hosts"
             referencedColumns: ["id"]

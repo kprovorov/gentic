@@ -177,7 +177,9 @@ export async function getHomeData(
     supabase
       .from("issues")
       .select(
-        "id,title,status,type,priority,agent_provider,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),active_host:hosts(id,display_name),projects(id,name,repo,key)"
+        // `issues` carries two foreign keys to `hosts` (the run lease and the
+        // pin), so the embed has to name which one it follows.
+        "id,title,status,type,priority,agent_provider,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),active_host:hosts!issues_active_host_id_fkey(id,display_name),projects(id,name,repo,key)"
       )
       .order("created_at", { ascending: false }),
     labelsService.listLabels(supabase, userId),
@@ -309,7 +311,7 @@ export async function getIssueEditData(
   const { data: issue, error } = await supabase
     .from("issues")
     .select(
-      "id,number,title,body,agent_provider,issue_model,type,priority,create_pr_automatically,automatic_review_enabled,issue_pull_requests(id),projects(id,name,repo,key,automatic_review_enabled,automatic_review_provider,automatic_review_model,automatic_review_instructions)"
+      "id,number,title,body,agent_provider,issue_model,type,priority,create_pr_automatically,automatic_review_enabled,pinned_host_id,issue_pull_requests(id),projects(id,name,repo,key,automatic_review_enabled,automatic_review_provider,automatic_review_model,automatic_review_instructions)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -455,6 +457,7 @@ async function getIssueDetailDataForIssue(
     reviewCycles,
     implementationOwner,
     host,
+    pinnedHost,
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -486,6 +489,7 @@ async function getIssueDetailDataForIssue(
     issuesService.listReviewStateForIssue(supabase, userId, id),
     issuesService.resolveImplementationOwner(supabase, id),
     getIssueHost(supabase, parsedIssue.active_host_id),
+    getIssueHost(supabase, parsedIssue.pinned_host_id),
   ])
 
   if (messagesError) {
@@ -544,7 +548,7 @@ async function getIssueDetailDataForIssue(
   )
 
   return {
-    issue: { ...parsedIssue, host },
+    issue: { ...parsedIssue, host, pinnedHost },
     messages: messagesWithAttachments,
     attachments,
     messageAttachments,
@@ -564,16 +568,16 @@ async function getIssueDetailDataForIssue(
 // RLS proves the user owns it. Null whenever no run is in flight.
 async function getIssueHost(
   supabase: AuthenticatedContext["supabase"],
-  activeHostId: string | null
+  hostId: string | null
 ) {
-  if (!activeHostId) {
+  if (!hostId) {
     return null
   }
 
   const { data, error } = await supabase
     .from("hosts")
     .select("id,display_name")
-    .eq("id", activeHostId)
+    .eq("id", hostId)
     .maybeSingle()
 
   if (error) {

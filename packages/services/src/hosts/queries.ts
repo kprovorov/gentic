@@ -71,6 +71,36 @@ export async function getHost(
   return toHostDomain(data, counts.get(id) ?? 0, options)
 }
 
+// Whether an issue may be pinned to this host: it must belong to the caller
+// and not be banned, since a banned host never claims work and the pin would
+// leave the issue queued forever. Deliberately not a full `getHost` — that
+// also counts running tasks, which a pin check has no use for.
+export async function ensureHostPinnable(
+  supabase: Supabase,
+  userId: string,
+  hostId: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("hosts")
+    .select("id,banned_at")
+    .eq("id", hostId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ServiceError("internal", error.message)
+  }
+  if (!data) {
+    throw new ServiceError("not_found", "Host not found")
+  }
+  if (data.banned_at !== null) {
+    throw new ServiceError(
+      "validation",
+      "A banned host cannot be assigned issues. Unban it first."
+    )
+  }
+}
+
 export async function getHostControlState(
   supabase: Supabase,
   hostId: string,

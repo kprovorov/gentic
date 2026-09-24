@@ -12,6 +12,7 @@ export {
   type HostProviderReadiness,
 } from "./hosts/domain"
 export {
+  ensureHostPinnable,
   getHost,
   getHostControlState,
   listHosts,

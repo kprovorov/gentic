@@ -29,6 +29,12 @@ import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
 
 import { AutomaticPrPreferenceField } from "../../automatic-pr-preference-field"
 import { AutomaticReviewPreferenceField } from "../../automatic-review-preference-field"
+import {
+  ANY_HOST_LABEL,
+  hostStateLabel,
+  listPinnableHosts,
+  useHostOptions,
+} from "../../issue-host-picker"
 
 export function EditIssueView({
   issueId,
@@ -48,6 +54,15 @@ export function EditIssueView({
     issue.agent_provider
   )
   const [issueModel, setIssueModel] = useState<string | null>(issue.issue_model)
+  const { hosts, isLoading: hostsLoading } = useHostOptions()
+  // The current pin stays selectable even if that host is now banned, so the
+  // form can be saved (or the pin removed) without first unbanning it.
+  const hostOptions = listPinnableHosts(hosts)
+  const currentPinnedHost =
+    issue.pinned_host_id !== null &&
+    !hostOptions.some((host) => host.id === issue.pinned_host_id)
+      ? (hosts.find((host) => host.id === issue.pinned_host_id) ?? null)
+      : null
 
   return (
     <div className="bg-background px-4 py-8 md:px-8">
@@ -178,6 +193,42 @@ export function EditIssueView({
                   ))}
                 </NativeSelect>
               </div>
+
+              {/* Rendered only once the host list is known: submitting the
+                  select before then would silently unpin the issue, since an
+                  unknown id has no option to select. */}
+              {hostsLoading ? null : (
+                <div className="grid gap-2">
+                  <Label htmlFor="issue-pinned-host">Host</Label>
+                  <NativeSelect
+                    name="pinned_host_id"
+                    key={`host-${issue.id}-${issue.pinned_host_id ?? ""}`}
+                    defaultValue={issue.pinned_host_id ?? ""}
+                    id="issue-pinned-host"
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="">
+                      {ANY_HOST_LABEL}
+                    </NativeSelectOption>
+                    {currentPinnedHost ? (
+                      <NativeSelectOption value={currentPinnedHost.id}>
+                        {currentPinnedHost.editableName} (
+                        {hostStateLabel(currentPinnedHost.primaryState)})
+                      </NativeSelectOption>
+                    ) : null}
+                    {hostOptions.map((host) => (
+                      <NativeSelectOption key={host.id} value={host.id}>
+                        {host.editableName} ({hostStateLabel(host.primaryState)}
+                        )
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <p className="text-xs text-muted-foreground">
+                    Pin the issue to one host, or let the first available host
+                    claim it.
+                  </p>
+                </div>
+              )}
 
               <AutomaticPrPreferenceField
                 key={`pr-${issue.id}-${issue.create_pr_automatically}-${issue.has_attached_pull_request}`}

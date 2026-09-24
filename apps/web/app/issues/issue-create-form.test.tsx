@@ -10,7 +10,7 @@ import {
   startIssueCreation,
 } from "@/app/issues/actions"
 import { createLabel } from "@/app/settings/actions"
-import type { SettingsLabelsData } from "@/app/queries"
+import type { SettingsHost, SettingsLabelsData } from "@/app/queries"
 import { TooltipProvider } from "@gentic/ui/tooltip"
 
 import { IssueCreateForm } from "./issue-create-form"
@@ -66,14 +66,49 @@ const defaultLabels = [
   label({ id: "label-feature", name: "Feature", color: "#16A34A" }),
 ]
 
-function stubLabelsFetch(labels: SettingsLabelsData["labels"]) {
+function settingsHost(overrides: Partial<SettingsHost>): SettingsHost {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    editableName: "Laptop",
+    primaryState: "online",
+    genticVersion: "0.26.0",
+    genticVersionHealth: "current",
+    runningCount: 0,
+    configuredCapacity: 1,
+    lastSeenAt: "2026-09-24T00:00:00.000Z",
+    os: "darwin",
+    architecture: "arm64",
+    processStartedAt: "2026-09-24T00:00:00.000Z",
+    connectedAt: "2026-09-24T00:00:00.000Z",
+    setupCompleted: true,
+    providers: {},
+    ...overrides,
+  }
+}
+
+// The form fetches both the label and host option lists through the same
+// `fetch`, so the stub answers by URL.
+function stubOptionsFetch(
+  labels: SettingsLabelsData["labels"],
+  hosts: SettingsHost[] = []
+) {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
+    vi.fn().mockImplementation(async (input: RequestInfo | URL) => ({
       ok: true,
-      json: async () => ({ labels }),
-    })
+      json: async () =>
+        String(input).includes("/settings/hosts")
+          ? {
+              hosts,
+              summary: { online: 0, offline: 0, banned: 0 },
+            }
+          : { labels },
+    }))
   )
+}
+
+function stubLabelsFetch(labels: SettingsLabelsData["labels"]) {
+  stubOptionsFetch(labels)
 }
 
 class TestResizeObserver {
@@ -494,6 +529,100 @@ describe("IssueCreateForm", () => {
       "name",
       "issue_model"
     )
+  })
+
+  it("hides the host picker until a host is enrolled", async () => {
+    renderForm(<IssueCreateForm projects={projects} />)
+
+    // Labels load through the same stub, so once they are visible the host
+    // query has settled too.
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    expect(
+      screen.queryByRole("button", { name: "Choose host" })
+    ).not.toBeInTheDocument()
+    expect(document.querySelector("input[name='pinned_host_id']")).toHaveValue(
+      ""
+    )
+  })
+
+  it("pins the issue to the chosen host and submits it, hiding banned hosts", async () => {
+    stubOptionsFetch(defaultLabels, [
+      settingsHost({
+        id: "55555555-5555-4555-8555-555555555555",
+        editableName: "Build box",
+        primaryState: "offline",
+      }),
+      settingsHost({ id: "44444444-4444-4444-8444-444444444444" }),
+      settingsHost({
+        id: "66666666-6666-4666-8666-666666666666",
+        editableName: "Old box",
+        primaryState: "banned",
+      }),
+    ])
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    const trigger = await screen.findByRole("button", { name: "Choose host" })
+    expect(trigger).toHaveTextContent("Any host")
+
+    await user.click(trigger)
+    const items = screen.getAllByRole("menuitem")
+    // Online hosts come first, banned ones are not offered at all.
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("Any host"),
+      expect.stringContaining("Laptop"),
+      expect.stringContaining("Build box"),
+    ])
+    await user.click(screen.getByRole("menuitem", { name: /Laptop/ }))
+
+    expect(trigger).toHaveTextContent("Laptop")
+    expect(
+      screen.getByDisplayValue("44444444-4444-4444-8444-444444444444")
+    ).toHaveAttribute("name", "pinned_host_id")
+
+    await user.type(screen.getByLabelText("Body"), "Run this on my laptop.")
+    await user.click(screen.getByRole("button", { name: "Project" }))
+    await user.click(screen.getByRole("menuitem", { name: /Gentic/ }))
+    await user.click(screen.getByRole("button", { name: "Run Agent" }))
+
+    await waitFor(() => expect(startIssueCreation).toHaveBeenCalled())
+    const formData = vi.mocked(startIssueCreation).mock.calls[0][0] as FormData
+    expect(formData.get("pinned_host_id")).toBe(
+      "44444444-4444-4444-8444-444444444444"
+    )
+  })
+
+  it("returns a pinned issue to the shared queue with Any host", async () => {
+    stubOptionsFetch(defaultLabels, [settingsHost({})])
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    const trigger = await screen.findByRole("button", { name: "Choose host" })
+    await user.click(trigger)
+    await user.click(screen.getByRole("menuitem", { name: /Laptop/ }))
+    await user.click(trigger)
+    await user.click(screen.getByRole("menuitem", { name: /Any host/ }))
+
+    expect(trigger).toHaveTextContent("Any host")
+    expect(document.querySelector("input[name='pinned_host_id']")).toHaveValue(
+      ""
+    )
+  })
+
+  it("does not persist the chosen host with the other settings", async () => {
+    stubOptionsFetch(defaultLabels, [settingsHost({})])
+    const { user } = renderForm(<IssueCreateForm projects={projects} />)
+
+    await user.click(await screen.findByRole("button", { name: "Choose host" }))
+    await user.click(screen.getByRole("menuitem", { name: /Laptop/ }))
+    await user.click(screen.getByRole("button", { name: "Priority" }))
+    await user.click(screen.getByRole("menuitem", { name: "Urgent" }))
+
+    const stored = JSON.parse(
+      window.localStorage.getItem("gentic:issue-create-settings:v1") ?? "{}"
+    )
+
+    expect(stored.priority).toBe("urgent")
+    expect(stored).not.toHaveProperty("pinnedHostId")
+    expect(JSON.stringify(stored)).not.toContain("44444444-4444")
   })
 
   it("initializes automatic PR creation checked and submits it when running", async () => {

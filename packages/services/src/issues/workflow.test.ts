@@ -539,6 +539,7 @@ test("createIssue persists the requested priority", async () => {
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    pinned_host_id: null,
     label_ids: [],
   })) as unknown as Row
 
@@ -561,6 +562,7 @@ test("createIssue persists explicit automatic PR preference", async () => {
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    pinned_host_id: null,
     label_ids: [],
   })) as unknown as Row
 

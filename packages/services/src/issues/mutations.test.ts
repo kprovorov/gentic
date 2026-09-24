@@ -8,18 +8,20 @@ type Row = Record<string, unknown>
 type TableName =
   | "projects"
   | "labels"
+  | "hosts"
   | "issues"
   | "issue_labels"
   | "issue_events"
 
 // A minimal fake covering exactly the query shapes `createIssue` uses
-// (ownership checks, label validation, issue insert, issue_labels insert,
-// and the compensating delete on assignment failure) — kept separate from
-// `workflow.test.ts`'s `EventLogDb` since that fake has no `labels`/
-// `issue_labels` tables or `delete()` support.
+// (ownership checks, label validation, host pin validation, issue insert,
+// issue_labels insert, and the compensating delete on assignment failure) —
+// kept separate from `workflow.test.ts`'s `EventLogDb` since that fake has no
+// `labels`/`issue_labels` tables or `delete()` support.
 class FakeDb {
   projects: Row[] = []
   labels: Row[] = []
+  hosts: Row[] = []
   issues: Row[] = []
   issue_labels: Row[] = []
   issue_events: Row[] = []
@@ -165,10 +167,77 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     agent_provider: "claude_code" as const,
     issue_model: null,
     type: "feature" as const,
+    pinned_host_id: null as string | null,
     label_ids: [] as string[],
     ...overrides,
   }
 }
+
+test("createIssue persists a pin to one of the caller's hosts", async () => {
+  const db = new FakeDb()
+  db.projects.push({ id: "project-1", user_id: "user-1" })
+  db.hosts.push({ id: "host-1", user_id: "user-1", banned_at: null })
+  const supabase = new FakeSupabase(db)
+
+  const issue = (await createIssue(
+    supabase as never,
+    "user-1",
+    baseInput({ pinned_host_id: "host-1" }) as never
+  )) as unknown as Row
+
+  assert.equal(issue.pinned_host_id, "host-1")
+  assert.equal(db.issues[0]?.pinned_host_id, "host-1")
+})
+
+test("createIssue leaves an unpinned issue on the shared queue", async () => {
+  const db = new FakeDb()
+  db.projects.push({ id: "project-1", user_id: "user-1" })
+  const supabase = new FakeSupabase(db)
+
+  await createIssue(supabase as never, "user-1", baseInput() as never)
+
+  assert.equal(db.issues[0]?.pinned_host_id, null)
+})
+
+test("createIssue rejects a pin to another account's host and creates no issue", async () => {
+  const db = new FakeDb()
+  db.projects.push({ id: "project-1", user_id: "user-1" })
+  db.hosts.push({ id: "host-1", user_id: "someone-else", banned_at: null })
+  const supabase = new FakeSupabase(db)
+
+  await assert.rejects(
+    () =>
+      createIssue(
+        supabase as never,
+        "user-1",
+        baseInput({ pinned_host_id: "host-1" }) as never
+      ),
+    (error) => error instanceof ServiceError && error.code === "not_found"
+  )
+  assert.equal(db.issues.length, 0)
+})
+
+test("createIssue rejects a pin to a banned host and creates no issue", async () => {
+  const db = new FakeDb()
+  db.projects.push({ id: "project-1", user_id: "user-1" })
+  db.hosts.push({
+    id: "host-1",
+    user_id: "user-1",
+    banned_at: "2026-09-24T00:00:00.000Z",
+  })
+  const supabase = new FakeSupabase(db)
+
+  await assert.rejects(
+    () =>
+      createIssue(
+        supabase as never,
+        "user-1",
+        baseInput({ pinned_host_id: "host-1" }) as never
+      ),
+    (error) => error instanceof ServiceError && error.code === "validation"
+  )
+  assert.equal(db.issues.length, 0)
+})
 
 test("createIssue assigns valid label ids and logs no issue event", async () => {
   const db = new FakeDb()

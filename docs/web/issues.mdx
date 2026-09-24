@@ -53,6 +53,10 @@ An issue represents a discrete coding task — a feature, bug fix, piece of feed
   The AI agent that will execute the issue. The primary run button uses Claude Code; use its dropdown to run with Codex. You can change the agent before the first run from the issue detail page.
 </ParamField>
 
+<ParamField body="host" type="Any host | <host name>">
+  Which [host](/web/hosts) runs the issue. **Any host** (the default) leaves it on the shared queue, where the first eligible host to poll claims it. Choosing a host **pins** the issue: only that host will ever claim it, so it waits while that host is offline, busy, or banned rather than moving to another machine. The picker lists your enrolled hosts with their current state and leaves out banned ones. You can change the pin later on the edit page; the issue detail page shows it under **Host**.
+</ParamField>
+
 <ParamField body="body" type="text">
   Detailed instructions for the agent. Include background context, step-by-step requirements, acceptance criteria, links to relevant files, and any constraints. The body is passed directly to the agent at the start of each run.
 </ParamField>
@@ -122,7 +126,9 @@ Changing a Spec back to another type restores its agent behaviour. You cannot co
 
 ## Edit an Issue
 
-Open the issue detail page and click **Edit**. You can update the **Title**, **Body**, **Agent**, **Type**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
+Open the issue detail page and click **Edit**. You can update the **Title**, **Body**, **Agent**, **Type**, **Host**, and **Create PR automatically** fields. Once a pull request is attached, the publishing preference becomes read-only historical data. The **Project** field cannot be changed after creation.
+
+Changing **Host** takes effect at the next claim: an issue already running somewhere keeps running there, and the new pin applies the next time it is queued. An issue pinned to a host that has since been banned stays editable, so you can move it to **Any host** or another host without unbanning first.
 
 ## Reset an Issue
 

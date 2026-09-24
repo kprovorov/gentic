@@ -10,6 +10,7 @@ import {
 } from "@gentic/validators/issues"
 
 import { ServiceError, unwrap } from "../errors"
+import { ensureHostPinnable } from "../hosts/queries"
 import { ensureLabelsAssignable } from "../labels"
 import type { Supabase } from "../types"
 import { logIssueEvent } from "./events"
@@ -36,6 +37,10 @@ export async function createIssue(
     await ensureLabelsAssignable(supabase, userId, input.label_ids)
   }
 
+  if (input.pinned_host_id !== null) {
+    await ensureHostPinnable(supabase, userId, input.pinned_host_id)
+  }
+
   const number = unwrap(
     await supabase.rpc("next_issue_number_for_project", {
       p_project_id: input.project_id,
@@ -60,6 +65,7 @@ export async function createIssue(
       agent_provider: input.agent_provider,
       issue_model: input.issue_model,
       type: input.type,
+      pinned_host_id: input.pinned_host_id,
     })
     .select(ISSUE_WITH_PROJECT_SELECT)
     .single()
@@ -160,7 +166,7 @@ export async function updateIssue(
   const { data: current, error: fetchError } = await supabase
     .from("issues")
     .select(
-      "agent_provider, issue_model, priority, type, active_run_id, automatic_review_enabled, issue_pull_requests(id), projects!inner(user_id)"
+      "agent_provider, issue_model, priority, type, active_run_id, automatic_review_enabled, pinned_host_id, issue_pull_requests(id), projects!inner(user_id)"
     )
     .eq("id", id)
     .eq("projects.user_id", userId)
@@ -193,6 +199,17 @@ export async function updateIssue(
     )
   }
 
+  // Only a *new* pin is checked: an issue already pinned to a host that has
+  // since been banned must stay editable (and unpinnable) without tripping
+  // over the ban.
+  if (
+    input.pinned_host_id !== undefined &&
+    input.pinned_host_id !== null &&
+    input.pinned_host_id !== current.pinned_host_id
+  ) {
+    await ensureHostPinnable(supabase, userId, input.pinned_host_id)
+  }
+
   const { data: issue, error: updateError } = await supabase
     .from("issues")
     .update({
@@ -207,6 +224,9 @@ export async function updateIssue(
         : {}),
       ...(input.automatic_review_enabled !== undefined
         ? { automatic_review_enabled: input.automatic_review_enabled }
+        : {}),
+      ...(input.pinned_host_id !== undefined
+        ? { pinned_host_id: input.pinned_host_id }
         : {}),
       ...(current.agent_provider !== input.agent_provider ||
       current.issue_model !== input.issue_model

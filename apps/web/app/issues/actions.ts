@@ -235,6 +235,7 @@ export async function updateIssue(formData: FormData) {
     priority,
     create_pr_automatically,
     automatic_review_enabled,
+    pinned_host_id,
   } = parseUpdateIssueFormData(formData)
   validateIssueModelForAgent(agent_provider, issue_model)
 
@@ -248,6 +249,7 @@ export async function updateIssue(formData: FormData) {
     priority,
     create_pr_automatically,
     automatic_review_enabled,
+    pinned_host_id,
   })
   revalidatePath("/issues")
   revalidateIssuePath(issue)

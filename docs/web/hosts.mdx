@@ -78,6 +78,17 @@ The card refreshes automatically every 15 seconds, so status changes (a host goi
   Gentic only stores whether a provider is enabled, installed, authenticated, and its version. Any local model lists or provider metadata a host reports are discarded before they reach the database — they never leave the host process.
 </Note>
 
+## Pin an issue to a host
+
+By default every issue sits on one shared queue and the first eligible host to poll claims it, ordered by priority and then age. When a task has to run on a particular machine — it needs a local dataset, a licensed toolchain, or the beefier box — pick that host from the **Host** pill in the new-issue composer (or the **Host** field on the issue's edit page). A pinned issue is claimed by that host alone:
+
+- Other hosts skip it entirely, even when it is the highest-priority issue waiting, and take the next unpinned issue instead.
+- It waits while the pinned host is offline, at capacity, unsupported, or banned — Gentic never quietly reroutes it. The issue detail page shows **Pinned to \<host\>** under **Host** so the wait is explained.
+- The pin is a standing choice, not part of a run: it survives requeues, resets, and bans, and it is only removed when you change it or delete the host. Banning a host still requeues its active pinned issues to `Todo`, where they wait for that host to be unbanned.
+- Deleting a host unpins its issues, which fall back to the shared queue for any host to claim.
+
+The picker lists every enrolled host except banned ones. An issue already pinned to a host that was banned afterwards can still be edited, so you can move it to **Any host** or another host without unbanning first.
+
 ## Install a skill on hosts
 
 Click **Install skill** on the **Hosts** card to install one [skills.sh](https://skills.sh) skill on the hosts you choose. This is a one-time remote command, not a skill manager: Gentic keeps no inventory of what is installed, and never syncs, updates, or removes skills afterwards.

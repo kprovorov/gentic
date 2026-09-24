@@ -116,6 +116,8 @@ export const reviewIssue: IssueDetail = {
   issue_model: "claude-sonnet-5",
   active_run_id: null,
   active_host_id: null,
+  pinned_host_id: null,
+  pinnedHost: null,
   usage_limit_reset_at: null,
   run_started_at: null,
   has_unpublished_agent_changes: false,

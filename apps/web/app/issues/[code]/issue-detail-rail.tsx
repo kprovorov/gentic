@@ -865,20 +865,35 @@ export function RailSection({
 }
 
 // Which host the agent is running on. A host is only attached while a run
-// lease is held, so an empty value means no run is in flight.
-function IssueDetailHost({ host }: { host: IssueHost | null }) {
-  if (!host) {
-    return <p className="text-sm text-muted-foreground">Not running</p>
-  }
-
+// lease is held, so an empty value means no run is in flight. A pin, by
+// contrast, is a standing preference and is shown whether or not a run is
+// live, since it explains why the issue waits for one particular host.
+function IssueDetailHost({
+  host,
+  pinnedHost,
+}: {
+  host: IssueHost | null
+  pinnedHost: IssueHost | null
+}) {
   return (
-    <Link
-      href="/settings"
-      className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-sm font-medium hover:text-primary"
-    >
-      <IconServer className="size-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 truncate">{host.name}</span>
-    </Link>
+    <div className="grid gap-1.5">
+      {host ? (
+        <Link
+          href="/settings"
+          className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-sm font-medium hover:text-primary"
+        >
+          <IconServer className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 truncate">{host.name}</span>
+        </Link>
+      ) : (
+        <p className="text-sm text-muted-foreground">Not running</p>
+      )}
+      {pinnedHost ? (
+        <p className="truncate text-xs text-muted-foreground">
+          Pinned to {pinnedHost.name}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -913,6 +928,7 @@ export function IssueDetailRail({
   priority,
   isSpec,
   host,
+  pinnedHost = null,
   hasUnpublishedAgentChanges,
   automaticPrPublishingInProgress,
   pullRequests,
@@ -932,6 +948,7 @@ export function IssueDetailRail({
   // publish — that whole section is dropped rather than left empty.
   isSpec: boolean
   host: IssueHost | null
+  pinnedHost?: IssueHost | null
   hasUnpublishedAgentChanges: boolean
   automaticPrPublishingInProgress: boolean
   pullRequests: IssuePullRequest[]
@@ -977,7 +994,7 @@ export function IssueDetailRail({
 
       {isSpec ? null : (
         <RailSection title="Host">
-          <IssueDetailHost host={host} />
+          <IssueDetailHost host={host} pinnedHost={pinnedHost} />
         </RailSection>
       )}
 

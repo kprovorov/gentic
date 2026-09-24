@@ -22,6 +22,7 @@ const issueRow = {
   issue_model: "gpt-5.6",
   active_run_id: null,
   active_host_id: null,
+  pinned_host_id: "9f14e45f-ceea-467e-b7ea-05a3e2b3f4c9",
   usage_limit_reset_at: null,
   run_started_at: null,
   has_unpublished_agent_changes: false,
@@ -144,6 +145,21 @@ test("detail issue query contract maps assigned Labels alphabetically", () => {
   assert.deepEqual(
     issue.labels.map((label) => label.name),
     ["Alpha", "zeta"]
+  )
+})
+
+test("detail and edit issue query contracts carry the pinned host id", () => {
+  const detail = toIssueDetail(issueDetailSchema.parse(issueRow))
+  const edit = toIssueEdit(issueEditSchema.parse(issueRow))
+
+  assert.equal(detail.pinned_host_id, "9f14e45f-ceea-467e-b7ea-05a3e2b3f4c9")
+  // The name is resolved later by the detail loader, not by the mapper.
+  assert.equal(detail.pinnedHost, null)
+  assert.equal(edit.pinned_host_id, "9f14e45f-ceea-467e-b7ea-05a3e2b3f4c9")
+  assert.equal(
+    toIssueEdit(issueEditSchema.parse({ ...issueRow, pinned_host_id: null }))
+      .pinned_host_id,
+    null
   )
 })
 
