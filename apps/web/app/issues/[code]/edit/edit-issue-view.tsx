@@ -54,7 +54,7 @@ export function EditIssueView({
     issue.agent_provider
   )
   const [issueModel, setIssueModel] = useState<string | null>(issue.issue_model)
-  const { hosts, isLoading: hostsLoading } = useHostOptions()
+  const { hosts, isReady: hostsReady, isError: hostsError } = useHostOptions()
   // The current pin stays selectable even if that host is now banned, so the
   // form can be saved (or the pin removed) without first unbanning it.
   const hostOptions = listPinnableHosts(hosts)
@@ -194,10 +194,22 @@ export function EditIssueView({
                 </NativeSelect>
               </div>
 
-              {/* Rendered only once the host list is known: submitting the
-                  select before then would silently unpin the issue, since an
-                  unknown id has no option to select. */}
-              {hostsLoading ? null : (
+              {/* Rendered only once the host list has actually arrived, not
+                  merely stopped loading: a failed query yields an empty list,
+                  and a select with no option for the current pin would submit
+                  "" and silently unpin the issue. Leaving the field out keeps
+                  the pin untouched (`parseUpdateIssueFormData` maps a missing
+                  field to "leave as is"). */}
+              {hostsError ? (
+                <div className="grid gap-2">
+                  <Label>Host</Label>
+                  <p className="text-sm text-muted-foreground">
+                    The host list could not be loaded, so the current host
+                    setting is kept as is. Reload the page to change it.
+                  </p>
+                </div>
+              ) : null}
+              {hostsReady ? (
                 <div className="grid gap-2">
                   <Label htmlFor="issue-pinned-host">Host</Label>
                   <NativeSelect
@@ -228,7 +240,7 @@ export function EditIssueView({
                     claim it.
                   </p>
                 </div>
-              )}
+              ) : null}
 
               <AutomaticPrPreferenceField
                 key={`pr-${issue.id}-${issue.create_pr_automatically}-${issue.has_attached_pull_request}`}

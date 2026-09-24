@@ -59,6 +59,11 @@ export function useHostOptions() {
   return {
     hosts: query.data?.hosts ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    // True only once the list has actually arrived. Callers that submit a
+    // host id must not render their field before this: an empty list from a
+    // failed query looks the same as "no hosts" and would drop the pin.
+    isReady: query.isSuccess,
   }
 }
 

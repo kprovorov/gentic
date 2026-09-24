@@ -153,6 +153,47 @@ describe("EditIssueView", () => {
     expect(formData.get("pinned_host_id")).toBe("")
   })
 
+  it("leaves the pin untouched when the host list cannot be loaded", async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchSettingsHostsData).mockRejectedValue(
+      new Error("hosts unavailable")
+    )
+
+    renderView({ ...baseIssue, pinned_host_id: laptopHostId })
+
+    // The explanatory note replaces the select, so nothing named
+    // `pinned_host_id` is ever submitted.
+    expect(
+      await screen.findByText(/host list could not be loaded/)
+    ).toBeVisible()
+    expect(screen.queryByLabelText("Host")).not.toBeInTheDocument()
+    expect(
+      document.querySelector("select[name='pinned_host_id']")
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() => expect(updateIssue).toHaveBeenCalled())
+    const formData = vi.mocked(updateIssue).mock.calls[0][0] as FormData
+    expect(formData.has("pinned_host_id")).toBe(false)
+  })
+
+  it("does not submit a host while the host list is still loading", async () => {
+    const user = userEvent.setup()
+    // Never resolves: the field must stay out of the form for the whole
+    // loading state, not just until a response arrives.
+    vi.mocked(fetchSettingsHostsData).mockReturnValue(new Promise(() => {}))
+
+    renderView({ ...baseIssue, pinned_host_id: laptopHostId })
+
+    expect(screen.queryByLabelText("Host")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() => expect(updateIssue).toHaveBeenCalled())
+    const formData = vi.mocked(updateIssue).mock.calls[0][0] as FormData
+    expect(formData.has("pinned_host_id")).toBe(false)
+  })
+
   it("shows automatic PR creation as editable and submits checked values", async () => {
     const user = userEvent.setup()
 
