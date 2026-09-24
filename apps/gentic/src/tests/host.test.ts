@@ -631,7 +631,7 @@ test("host control invalidates active runs and cancels their sessions", async ()
   )
 })
 
-test("implementation work is claimed before a queued review job with one available slot", async () => {
+test("a queued review job is claimed before implementation work with one available slot", async () => {
   const clock = new FakeClock()
   await withHarness(
     async ({ config, issue, api, deps }) => {
@@ -639,6 +639,83 @@ test("implementation work is claimed before a queued review job with one availab
       config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
       api.claims.push(issue)
       api.reviewRunClaims.push(claimedReviewRun("review-1"))
+      let reviewerEntered = false
+      api.controlResponse = () => ({
+        host: {
+          banned: reviewerEntered && clock.elapsedMs >= CONTROL_INTERVAL_MS,
+        },
+        runs: [],
+        review_runs: [{ review_run_id: "review-1", status: "running" }],
+      })
+      deps.runReviewerSession = async (input) => {
+        assert.ok(input.signal)
+        reviewerEntered = true
+        await waitForAbort(input.signal)
+        throw new Error("aborted")
+      }
+
+      await runHostLoop(api, config, loopDeps(deps, clock, api))
+
+      // The review job filled the host's only slot, so the queued
+      // implementation issue was never claimed this run.
+      assert.deepEqual(api.reviewRunHeartbeats, ["review-1"])
+      assert.deepEqual(api.claims, [issue])
+      assert.equal(api.cloneCalls, 0)
+    },
+    { now: () => clock.now() }
+  )
+})
+
+test("a review job is claimed when a slot is free even while implementation work is running", async () => {
+  const clock = new FakeClock()
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 2
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue)
+      let sessionEntered = false
+      api.controlResponse = () => ({
+        host: {
+          banned: sessionEntered && api.completedReviewRuns.length > 0,
+        },
+        runs: [
+          {
+            issue_id: issue.id,
+            active_run_id: issue.activeRunId,
+            status: "in-progress",
+          },
+        ],
+        review_runs: [{ review_run_id: "review-1", status: "running" }],
+      })
+      deps.runAgentSession = async (input) => {
+        assert.ok(input.signal)
+        await input.onSessionId("session-1")
+        sessionEntered = true
+        // The review job only becomes claimable once the implementation
+        // issue is already occupying a slot, mirroring a pull request that
+        // becomes ready for review while other work is in flight.
+        api.reviewRunClaims.push(claimedReviewRun("review-1"))
+        await waitForAbort(input.signal)
+      }
+
+      await runHostLoop(api, config, loopDeps(deps, clock, api))
+
+      assert.deepEqual(api.reviewRunHeartbeats, ["review-1"])
+      assert.equal(api.completedReviewRuns.length, 1)
+      assert.equal(api.completedReviewRuns[0]?.reviewRunId, "review-1")
+    },
+    { now: () => clock.now() }
+  )
+})
+
+test("an implementation issue is claimed once no review job is pending", async () => {
+  const clock = new FakeClock()
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      // No review job queued — `api.reviewRunClaims` stays empty.
+      api.claims.push(issue)
       let sessionEntered = false
       api.controlResponse = () => ({
         host: {
@@ -661,42 +738,9 @@ test("implementation work is claimed before a queued review job with one availab
 
       await runHostLoop(api, config, loopDeps(deps, clock, api))
 
-      // The implementation issue filled the host's only slot, so the
-      // queued review job was never claimed this run.
-      assert.deepEqual(api.reviewRunClaims, [claimedReviewRun("review-1")])
+      assert.equal(sessionEntered, true)
+      assert.deepEqual(api.claims, [])
       assert.deepEqual(api.reviewRunHeartbeats, [])
-    },
-    { now: () => clock.now() }
-  )
-})
-
-test("a review job is claimed once no implementation issue is available", async () => {
-  const clock = new FakeClock()
-  await withHarness(
-    async ({ config, api, deps }) => {
-      config.MAX_CONCURRENT_ISSUES = 1
-      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
-      // No implementation issue queued — `api.claims` stays empty.
-      api.reviewRunClaims.push(claimedReviewRun("review-1"))
-      // Banning on the heartbeat alone would race the review run's own
-      // (now genuinely async — real fs calls in the fakes below) work to
-      // completion: a control poll landing between the heartbeat and
-      // `completeReviewRun` would abort the run before it finished.
-      // `completedReviewRuns.length` only ever becomes true once
-      // `processReviewRun` has actually finished, so waiting for it keeps
-      // this deterministic.
-      api.controlResponse = () => ({
-        host: { banned: api.completedReviewRuns.length > 0 },
-        runs: [],
-        review_runs: [{ review_run_id: "review-1", status: "running" }],
-      })
-
-      await runHostLoop(api, config, loopDeps(deps, clock, api))
-
-      assert.deepEqual(api.reviewRunHeartbeats, ["review-1"])
-      assert.equal(api.completedReviewRuns.length, 1)
-      assert.equal(api.completedReviewRuns[0]?.reviewRunId, "review-1")
-      assert.deepEqual(api.failedReviewRuns, [])
     },
     { now: () => clock.now() }
   )

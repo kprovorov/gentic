@@ -4,7 +4,10 @@ Date: 2026-08-19
 
 ## Status
 
-Accepted
+Accepted. The "implementation priority" decision below — implementation
+work is claimed before review work — is superseded by ADR-0013, which
+reverses that ordering. The claiming, lease, and recovery decisions still
+stand.
 
 ## Context
 

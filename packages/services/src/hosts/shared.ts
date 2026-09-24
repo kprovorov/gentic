@@ -77,8 +77,9 @@ export async function listRunningTaskCounts(
 
   // Implementation issues and claimed review runs share one capacity pool
   // per host, so both are counted into the same map — this is what makes
-  // "implementation work always wins capacity contention" (GEN-414) work:
-  // whichever job class claims first consumes the slot the other sees.
+  // the host's claim ordering (review work first, ADR-0013) enforce
+  // priority: whichever job class claims first consumes the slot the other
+  // sees.
   const [issueRows, reviewRunRows] = await Promise.all([
     unwrap(
       await supabase

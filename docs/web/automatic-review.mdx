@@ -66,6 +66,10 @@ Three kinds of pull request are deliberately left alone, with no tracking issue 
   picked up on its next push, not immediately.
 </Note>
 
+### Review runs go first
+
+A host claims a waiting review run before it claims any new `Todo` issue. A pull request that is ready for review is an issue that is almost done, so reviewing it takes precedence over starting the next issue from scratch: with a backlog of issues, a host implements one, starts the next while the first is in CI, and reviews the first as soon as its run is queued. A review never interrupts an implementation already in flight — it takes the next free slot, and wins it.
+
 ### Multiple pull requests
 
 If an issue has more than one open, non-draft associated pull request, every one of them must independently reach an approved Review Cycle before Gentic presents the issue's overall status as `Approved`.
