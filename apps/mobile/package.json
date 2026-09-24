@@ -1,0 +1,31 @@
+{
+  "name": "@gentic/mobile",
+  "version": "0.0.1",
+  "description": "Gentic mobile app (Expo).",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint .",
+    "format": "prettier --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~57.0.25",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@gentic/eslint-config": "workspace:*",
+    "@types/react": "~19.2.2",
+    "eslint": "^9",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "typescript": "~6.0.3"
+  }
+}
