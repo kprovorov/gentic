@@ -35,7 +35,12 @@ import type {
   ReportHostSkillInstallResultInput,
   HostSkillInstallCommand,
 } from "@gentic/validators/skills"
+import type {
+  HostToolUpdateCommand,
+  ReportHostToolUpdateResultInput,
+} from "@gentic/validators/host-tool-updates"
 import { createSkillInstallRunner } from "../skill-installs.js"
+import { createToolUpdateRunner } from "../tool-updates.js"
 import {
   CONTROL_INTERVAL_MS,
   applyReloadedConfig,
@@ -1203,6 +1208,81 @@ async function captureConsoleLog(run: () => Promise<void>): Promise<string[]> {
   return lines
 }
 
+test("a gentic update lets active work finish, claims nothing new, then asks to restart", async () => {
+  const clock = new FakeClock()
+  await withHarness(
+    async ({ config, issue, api, deps }) => {
+      config.MAX_CONCURRENT_ISSUES = 1
+      config.POLL_INTERVAL_MS = CONTROL_INTERVAL_MS
+      api.claims.push(issue, claimedIssue("issue-2"))
+      api.addMessage(issue.id, message("initial", "Initial prompt", 1))
+      api.controlResponse = () => ({
+        host: { banned: false },
+        runs: [
+          {
+            issue_id: issue.id,
+            active_run_id: issue.activeRunId,
+            status: "in-progress",
+          },
+        ],
+      })
+      let sessionsRun = 0
+      deps.runAgentSession = async (input) => {
+        sessionsRun += 1
+        await input.onSessionId("session-1")
+        // The update lands while this session is running; hold the session
+        // open until the host has reported it, so the loop is seen waiting.
+        api.pendingToolUpdates.push({
+          id: "66666666-6666-4666-8666-666666666666",
+          tool: "gentic",
+          expires_at: new Date(clock.nowMs + 30 * 60_000).toISOString(),
+        })
+        while (api.toolUpdateResults.length === 0) {
+          await new Promise<void>((resolve) => setImmediate(resolve))
+        }
+      }
+      const hostDeps = loopDeps(deps, clock, api)
+      hostDeps.createToolUpdateRunner = (api_, options) =>
+        createToolUpdateRunner(api_, {
+          ...options,
+          run: async () => ({
+            report: {
+              status: "updated",
+              summary: "Installed 0.28.0.",
+              output: null,
+              version: "0.28.0",
+            },
+            restartRequired: true,
+          }),
+        })
+      const heartbeatsBefore = api.heartbeats.length
+
+      const outcome = await runHostLoop(api, config, hostDeps)
+
+      assert.deepEqual(outcome, { restart: true })
+      // The second queued issue was never claimed once the restart was
+      // pending, and the running session was allowed to complete.
+      assert.equal(sessionsRun, 1)
+      assert.equal(api.claims.length, 1)
+      assert.deepEqual(api.toolUpdateResults, [
+        {
+          updateId: "66666666-6666-4666-8666-666666666666",
+          result: {
+            status: "updated",
+            summary: "Installed 0.28.0.",
+            output: null,
+            version: "0.28.0",
+          },
+        },
+      ])
+      // The update refreshed the tool telemetry with an immediate heartbeat.
+      assert.ok(api.heartbeats.length > heartbeatsBefore + 1)
+      assert.ok(api.providerCheckCalls >= 2)
+    },
+    { now: () => clock.now() }
+  )
+})
+
 async function withHarness(
   run: (harness: {
     config: Config
@@ -1383,6 +1463,11 @@ class FakeApi implements AgentApi {
     result: ReportHostSkillInstallResultInput
   }[] = []
   skillInstallClaims = 0
+  readonly pendingToolUpdates: HostToolUpdateCommand[] = []
+  readonly toolUpdateResults: {
+    updateId: string
+    result: ReportHostToolUpdateResultInput
+  }[] = []
   finishResults: boolean[] = [true]
   finishStatusOverride: FinishRunResult["status"] | null = null
   onFinishAttempt: ((attempt: number) => void) | null = null
@@ -1670,6 +1755,17 @@ class FakeApi implements AgentApi {
   ): Promise<void> {
     this.skillInstallResults.push({ installId, result })
   }
+
+  async claimToolUpdate(): Promise<HostToolUpdateCommand | null> {
+    return this.pendingToolUpdates.shift() ?? null
+  }
+
+  async reportToolUpdate(
+    updateId: string,
+    result: ReportHostToolUpdateResultInput
+  ): Promise<void> {
+    this.toolUpdateResults.push({ updateId, result })
+  }
 }
 
 class FakeClock {
@@ -1716,6 +1812,7 @@ function loopDeps(
       throw new Error("unexpected config reload")
     },
     createSkillInstallRunner,
+    createToolUpdateRunner,
     async getToolStatuses(): Promise<ToolStatuses> {
       api.providerCheckCalls += 1
       if (api.failNextProviderCheck) {

@@ -7,6 +7,7 @@
     "./attachments": "./src/attachments.ts",
     "./errors": "./src/errors.ts",
     "./github-integrations": "./src/github-integrations.ts",
+    "./host-tool-updates": "./src/host-tool-updates.ts",
     "./issues": "./src/issues.ts",
     "./labels": "./src/labels.ts",
     "./projects": "./src/projects.ts",

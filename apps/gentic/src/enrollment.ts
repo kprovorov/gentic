@@ -74,6 +74,7 @@ export async function connectHostWithCode(
             providers: {
               claude_code: toolCapability(tools.claude),
               codex: toolCapability(tools.codex),
+              github: toolCapability(tools.github),
             },
           },
           process_started_at: (deps.now ?? (() => new Date()))().toISOString(),

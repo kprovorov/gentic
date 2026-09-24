@@ -148,6 +148,7 @@ test("settings hosts query scopes rows to the owner and returns the approved sha
       authenticated: null,
       version: null,
     },
+    github: null,
   })
 
   const serialized = JSON.stringify(data)

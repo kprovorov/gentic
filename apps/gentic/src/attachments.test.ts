@@ -84,6 +84,10 @@ function apiWithAttachments(
       return null
     },
     async reportSkillInstall() {},
+    async claimToolUpdate() {
+      return null
+    },
+    async reportToolUpdate() {},
   }
 }
 

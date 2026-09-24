@@ -749,6 +749,7 @@ test("provider readiness exposes only approved structured metadata", async () =>
       authenticated: null,
       version: null,
     },
+    github: null,
   })
   assert.equal(JSON.stringify(host).includes("/Users/alice"), false)
   assert.equal(JSON.stringify(host).includes("192.0.2.1"), false)

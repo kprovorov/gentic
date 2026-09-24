@@ -72,7 +72,7 @@ The card refreshes automatically every 15 seconds, so status changes (a host goi
 - **Running** — active task count out of the host's configured concurrency (`MAX_CONCURRENT_ISSUES`).
 - **Last seen** — time since the last heartbeat.
 - **OS / arch**, **Uptime**, **Connected** — platform and process telemetry reported at enrollment and on every heartbeat.
-- **Claude Code** / **Codex** — each provider shows **Ready**, **Needs auth**, or **Missing**, plus the detected CLI version, so you can see at a glance which issue types a host is eligible to claim.
+- **Claude Code** / **Codex** — each provider shows **Ready**, **Needs auth**, or **Missing**, plus the detected CLI version, so you can see at a glance which issue types a host is eligible to claim. The **GitHub CLI** version is reported the same way and shown in the **Update tools** dialog.
 
 <Note>
   Gentic only stores whether a provider is enabled, installed, authenticated, and its version. Any local model lists or provider metadata a host reports are discarded before they reach the database — they never leave the host process.
@@ -118,6 +118,29 @@ A few consequences worth knowing:
 - **Commands expire after 10 minutes.** A host that is selected and then disconnects still runs the command if it reconnects inside that window; after that the result is **Timed out**.
 - **There is no retry and no cancel.** Once a host accepts a command it is attempted exactly once, and closing the dialog hides the results without stopping anything.
 - **Results are transient.** Closing the dialog loses them, and reopening it shows no history — Gentic stores no record of past installations.
+
+## Update tools on a host
+
+Click **Update tools** on a host row to update the CLIs that host runs work with, one at a time, without shelling into the machine. The dialog lists four tools with the version the host last reported:
+
+| Tool | What the host runs |
+| --- | --- |
+| **Gentic** | Reinstalls `gentic-cli` with the package manager that installed it (`npm install -g gentic-cli@latest`, or the `pnpm`/`bun` equivalent). Once the new version is on disk the host stops claiming new work, lets its active tasks finish, and then exits so its service manager restarts it on the new version. Hosts running the standalone binary or a source checkout report the update as unsupported — update those as described in [Installation](/agent/installation). |
+| **Claude Code** | `claude update`, for the `claude` CLI on the host's PATH. The Claude Code build that actually serves sessions ships with Gentic, so **Update Gentic** is what moves the version shown on the host row. |
+| **Codex** | `brew upgrade codex` on macOS with Homebrew, otherwise `npm install -g @openai/codex@latest`. |
+| **GitHub CLI** | `brew upgrade gh` on macOS, or the system package manager on Linux (`apt-get`, `dnf` or `pacman`). Unless the host runs as root this needs passwordless `sudo` for the host's user; a password prompt fails immediately with the reason in the result. |
+
+Each update moves through **Waiting** → **Updating** → **Updated**, **Failed**, or **Timed out**, with a one-line summary such as "Updated from 2.60.0 to 2.61.0" or "Already up to date". Failures show the CLI output behind **Show output**, with credentials and machine paths stripped out. After a successful update the host re-checks its tools and heartbeats straight away, so the versions on the host row refresh within seconds.
+
+A few consequences worth knowing:
+
+- **Updates never interrupt work.** A host keeps running and claiming issues while a tool updates — except after a Gentic update, when it finishes what it has and claims nothing new until it has restarted.
+- **One update at a time per host.** You can queue all four tools; the host runs them in the order you clicked. Queuing the same tool twice is refused while the first is pending.
+- **Commands expire after 30 minutes.** A host that goes offline still runs the command if it reconnects inside that window; after that the result is **Timed out**.
+- **There is no retry and no cancel.** Once a host accepts a command it is attempted exactly once.
+- **Results are kept for an hour.** Reopening the dialog shows recent results; older ones are purged, and Gentic keeps no update history.
+
+A host must be **Online** to accept an update — banned, offline and setup-incomplete hosts show why instead of the buttons.
 
 ## Rename a host
 

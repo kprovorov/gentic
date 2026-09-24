@@ -31,6 +31,11 @@ import {
 } from "@gentic/validators/agent"
 import type { IssueStatus } from "@gentic/validators/issues"
 import {
+  claimHostToolUpdateResponseSchema,
+  type HostToolUpdateCommand,
+  type ReportHostToolUpdateResultInput,
+} from "@gentic/validators/host-tool-updates"
+import {
   claimHostSkillInstallResponseSchema,
   type ReportHostSkillInstallResultInput,
   type HostSkillInstallCommand,
@@ -128,6 +133,12 @@ export interface AgentApi {
   reportSkillInstall(
     installId: string,
     result: ReportHostSkillInstallResultInput
+  ): Promise<void>
+  /** Accepts this host's oldest pending tool update, if it has one. */
+  claimToolUpdate(): Promise<HostToolUpdateCommand | null>
+  reportToolUpdate(
+    updateId: string,
+    result: ReportHostToolUpdateResultInput
   ): Promise<void>
 }
 
@@ -350,6 +361,21 @@ export function createAgentApi(input: {
     async reportSkillInstall(installId, result) {
       await request(
         `/agent/host/skill-installs/${encodeURIComponent(installId)}`,
+        okResponseSchema,
+        { method: "PATCH", body: result }
+      )
+    },
+    async claimToolUpdate() {
+      const data = await request(
+        "/agent/host/tool-updates",
+        claimHostToolUpdateResponseSchema,
+        { method: "POST", body: {} }
+      )
+      return data.command
+    },
+    async reportToolUpdate(updateId, result) {
+      await request(
+        `/agent/host/tool-updates/${encodeURIComponent(updateId)}`,
         okResponseSchema,
         { method: "PATCH", body: result }
       )

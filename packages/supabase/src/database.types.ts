@@ -231,6 +231,62 @@ export type Database = {
           },
         ]
       }
+      host_tool_updates: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          expires_at: string
+          finished_at: string | null
+          host_id: string
+          id: string
+          output: string | null
+          status: string
+          summary: string | null
+          tool: string
+          updated_at: string
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at: string
+          finished_at?: string | null
+          host_id: string
+          id?: string
+          output?: string | null
+          status?: string
+          summary?: string | null
+          tool: string
+          updated_at?: string
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at?: string
+          finished_at?: string | null
+          host_id?: string
+          id?: string
+          output?: string | null
+          status?: string
+          summary?: string | null
+          tool?: string
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_tool_updates_host_owner"
+            columns: ["host_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "hosts"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       hosts: {
         Row: {
           arch: string | null

@@ -58,6 +58,7 @@ export type HostProjectionOptions = {
 const supportedHostProviderKeys: Record<HostProviderKey, true> = {
   claude_code: true,
   codex: true,
+  github: true,
 }
 
 export function toHostDomain(
@@ -88,6 +89,7 @@ export function toHostDomain(
     providers: {
       claude_code: toProviderReadiness(capabilities.providers.claude_code),
       codex: toProviderReadiness(capabilities.providers.codex),
+      github: toProviderReadiness(capabilities.providers.github),
     },
     running_task_count: runningTaskCount,
   }

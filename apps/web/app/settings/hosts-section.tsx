@@ -8,6 +8,7 @@ import {
   IconClock,
   IconCopy,
   IconDotsVertical,
+  IconDownload,
   IconPencil,
   IconPlayerPlay,
   IconPackageImport,
@@ -19,6 +20,7 @@ import {
 
 import type { SettingsHost, SettingsHostsData } from "@/app/queries"
 import { InstallSkillDialog } from "@/app/settings/install-skill-dialog"
+import { UpdateHostToolsDialog } from "@/app/settings/update-host-tools-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -350,6 +352,7 @@ function HostRow({
   })
   const [banOpen, setBanOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [updateToolsOpen, setUpdateToolsOpen] = React.useState(false)
   const [typedDeleteName, setTypedDeleteName] = React.useState("")
   const [actionState, setActionState] = React.useState<MutationState>({
     status: "idle",
@@ -513,13 +516,25 @@ function HostRow({
             ) : null}
           </div>
         </div>
-        <HostActions
-          host={host}
-          actionPending={actionState.status === "pending"}
-          onBan={() => setBanOpen(true)}
-          onUnban={() => void runHostAction("unban")}
-          onDelete={() => setDeleteOpen(true)}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={`Update tools on ${host.editableName}`}
+            onClick={() => setUpdateToolsOpen(true)}
+          >
+            <IconDownload />
+            Update tools
+          </Button>
+          <HostActions
+            host={host}
+            actionPending={actionState.status === "pending"}
+            onBan={() => setBanOpen(true)}
+            onUnban={() => void runHostAction("unban")}
+            onDelete={() => setDeleteOpen(true)}
+          />
+        </div>
       </div>
 
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -560,6 +575,12 @@ function HostRow({
           {actionState.message}
         </p>
       ) : null}
+
+      <UpdateHostToolsDialog
+        host={host}
+        open={updateToolsOpen}
+        onOpenChange={setUpdateToolsOpen}
+      />
 
       <AlertDialog open={banOpen} onOpenChange={setBanOpen}>
         <AlertDialogContent>

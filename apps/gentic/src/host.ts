@@ -39,6 +39,7 @@ import {
   throwIfAborted,
 } from "./session.js"
 import { createSkillInstallRunner } from "./skill-installs.js"
+import { createToolUpdateRunner } from "./tool-updates.js"
 import { getToolStatuses, type ToolStatuses } from "./tools.js"
 import { describeAgentError, getUsageLimitResetAt } from "./usage-limits.js"
 import type {
@@ -51,6 +52,15 @@ import type {
 export const HEARTBEAT_INTERVAL_MS = 30_000
 export const CONTROL_INTERVAL_MS = 10_000
 export const PROVIDER_CHECK_CACHE_MS = 5 * 60_000
+
+/**
+ * Exit status after a gentic update has been installed and every active run
+ * has finished. Deliberately non-zero: the systemd unit `gentic start` writes
+ * restarts on failure only, and launchd's KeepAlive restarts on any exit, so
+ * this is the one code both service managers bring the host back from on the
+ * new version. EX_TEMPFAIL in sysexits terms.
+ */
+export const RESTART_EXIT_CODE = 75
 
 export interface ProcessIssueDeps {
   connectIssueChannel: typeof connectIssueChannel
@@ -79,6 +89,7 @@ export interface HostLoopDeps extends ProcessIssueDeps, ProcessReviewRunDeps {
   getToolStatuses: () => Promise<ToolStatuses>
   loadConfig: () => Config
   createSkillInstallRunner: typeof createSkillInstallRunner
+  createToolUpdateRunner: typeof createToolUpdateRunner
 }
 
 const defaultProcessIssueDeps: ProcessIssueDeps = {
@@ -110,6 +121,7 @@ const defaultHostLoopDeps: HostLoopDeps = {
   getToolStatuses,
   loadConfig,
   createSkillInstallRunner,
+  createToolUpdateRunner,
 }
 
 const RESTART_ONLY_CONFIG_KEYS = [
@@ -140,18 +152,34 @@ export async function runHost(): Promise<void> {
     apiKey: config.GENTIC_HOST_CREDENTIAL,
   })
 
-  await runHostLoop(api, config, defaultHostLoopDeps)
+  const outcome = await runHostLoop(api, config, defaultHostLoopDeps)
+  if (outcome.restart) {
+    logInfo(
+      `exiting with status ${RESTART_EXIT_CODE} so the service manager restarts the host on the updated gentic`
+    )
+    process.exit(RESTART_EXIT_CODE)
+  }
+}
+
+export type HostLoopOutcome = {
+  /** A gentic update was installed; the process should be restarted. */
+  restart: boolean
 }
 
 export async function runHostLoop(
   api: AgentApi,
   config: Config,
   deps: HostLoopDeps = defaultHostLoopDeps
-): Promise<void> {
+): Promise<HostLoopOutcome> {
   let running = true
   let offlineMarked = false
   let offlinePending: Promise<void> | null = null
   let stoppedByControl = false
+  // Set once a gentic update has landed on disk. The loop then stops taking
+  // new work and exits as soon as the runs it already owns are done — never
+  // by aborting them, since the new binary cannot resume a half-finished
+  // session and the update is not urgent.
+  let restartPending = false
   const activeRuns = new Map<
     Promise<void>,
     { issueId: string; activeRunId: string; controller: AbortController }
@@ -214,6 +242,21 @@ export async function runHostLoop(
     }
   }
 
+  const toolUpdates = deps.createToolUpdateRunner(api, {
+    onUpdated: async ({ tool, restartRequired }) => {
+      // The cached tool versions are now stale; tell the server right away
+      // rather than up to five minutes later.
+      telemetry.refresh()
+      await sendHeartbeat()
+      if (restartRequired && !restartPending) {
+        restartPending = true
+        logInfo(
+          `${tool} updated; no new work will be claimed and the host restarts once active runs finish`
+        )
+      }
+    },
+  })
+
   const pollControl = async (): Promise<void> => {
     let control: HostControlResponse
     try {
@@ -271,10 +314,30 @@ export async function runHostLoop(
       // Starts the install in the background: skill installation shares the
       // control tick but never a run slot, so issue claiming continues.
       await skillInstalls.poll()
+      await toolUpdates.poll()
     }
 
     if (!running) {
       break
+    }
+
+    if (restartPending) {
+      if (activeRuns.size + activeReviewRuns.size === 0) {
+        running = false
+        break
+      }
+      // Keep heartbeating and honouring control while the last runs finish,
+      // but claim nothing new.
+      await Promise.race([
+        Promise.race([...activeRuns.keys(), ...activeReviewRuns.keys()]),
+        sleepUntilNextTick(
+          deps,
+          config.POLL_INTERVAL_MS,
+          nextHeartbeatAt,
+          nextControlAt
+        ),
+      ])
+      continue
     }
 
     if (
@@ -408,11 +471,13 @@ export async function runHostLoop(
   // An accepted install is attempted once and never retried, so let it report
   // its result rather than abandoning it half-finished on shutdown.
   await skillInstalls.drain()
+  await toolUpdates.drain()
 
   process.off("SIGINT", stop)
   process.off("SIGTERM", stop)
   process.off("SIGHUP", reload)
   logInfo("host stopped")
+  return { restart: restartPending }
 }
 
 export async function processIssue(
@@ -862,6 +927,8 @@ function createTelemetrySource(
   deps: Pick<HostLoopDeps, "getToolStatuses" | "now">
 ): {
   snapshot: () => Promise<HostHeartbeatTelemetry>
+  /** Drops the cached tool check so the next snapshot probes again. */
+  refresh: () => void
 } {
   const processStartedAt = deps.now().toISOString()
   let cached: {
@@ -870,6 +937,9 @@ function createTelemetrySource(
   } | null = null
 
   return {
+    refresh() {
+      cached = null
+    },
     async snapshot() {
       const nowMs = deps.now().getTime()
       if (!cached || nowMs >= cached.expiresAt) {
@@ -906,6 +976,7 @@ function providerCapabilities(tools: ToolStatuses): HostCapabilities {
     providers: {
       claude_code: toolCapability(tools.claude),
       codex: toolCapability(tools.codex),
+      github: toolCapability(tools.github),
     },
   }
 }
