@@ -104,6 +104,7 @@ export function IssuePropertiesDialog({
             status={issue.status}
             priority={issue.priority}
             isSpec={isSpec}
+            host={issue.host}
             hasUnpublishedAgentChanges={issue.has_unpublished_agent_changes}
             automaticPrPublishingInProgress={automaticPrPublishingInProgress}
             pullRequests={pullRequests}

@@ -63,6 +63,7 @@ import {
   blockingBadgeStyles,
   blockingIconStyles,
   getIssuesColumns,
+  HostBadge,
   IssueIndicatorBadge,
   IssuePriorityMenu,
   IssueStatusMenu,
@@ -318,6 +319,7 @@ function IssueRow({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <IssueTypeMenu issue={issue} />
             <AgentProviderBadge provider={issue.agent_provider} />
+            {issue.host ? <HostBadge host={issue.host} /> : null}
             {isBlocked ? (
               <IssueIndicatorBadge
                 label="Blocked"

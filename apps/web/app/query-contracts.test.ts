@@ -21,11 +21,13 @@ const issueRow = {
   agent_provider: "codex",
   issue_model: "gpt-5.6",
   active_run_id: null,
+  active_host_id: null,
   usage_limit_reset_at: null,
   run_started_at: null,
   has_unpublished_agent_changes: false,
   create_pr_automatically: true,
   automatic_review_enabled: null,
+  active_host: null,
   issue_pull_requests: [
     {
       id: "pull-request-1",
@@ -113,6 +115,25 @@ test("home issue query contract maps active Labels alphabetically", () => {
       state: undefined,
     },
   ])
+})
+
+test("home issue query contract maps the running host", () => {
+  const idle = toHomeIssue(homeIssueSchema.parse(issueRow))
+  assert.equal(idle.host, null)
+
+  const running = toHomeIssue(
+    homeIssueSchema.parse({
+      ...issueRow,
+      active_host: {
+        id: "9f14e45f-ceea-467e-b7ea-05a3e2b3f4c9",
+        display_name: "build-box",
+      },
+    })
+  )
+  assert.deepEqual(running.host, {
+    id: "9f14e45f-ceea-467e-b7ea-05a3e2b3f4c9",
+    name: "build-box",
+  })
 })
 
 test("detail issue query contract maps assigned Labels alphabetically", () => {

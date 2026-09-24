@@ -36,6 +36,7 @@ function issue(
     projects: project,
     labels: [labels[0]!],
     pullRequests: [],
+    host: null,
     ...options,
   }
 }
@@ -114,6 +115,7 @@ export const reviewIssue: IssueDetail = {
   body: "Show recent project activity in one feed. Group updates by day and keep unread items easy to spot.",
   issue_model: "claude-sonnet-5",
   active_run_id: null,
+  active_host_id: null,
   usage_limit_reset_at: null,
   run_started_at: null,
   has_unpublished_agent_changes: false,

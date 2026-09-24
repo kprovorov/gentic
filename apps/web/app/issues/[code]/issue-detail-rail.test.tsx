@@ -153,6 +153,7 @@ function renderRail(
         status="todo"
         priority="medium"
         isSpec={false}
+        host={null}
         hasUnpublishedAgentChanges={false}
         automaticPrPublishingInProgress={false}
         pullRequests={[]}
@@ -173,6 +174,34 @@ function renderRail(
 
 afterEach(() => {
   vi.clearAllMocks()
+})
+
+describe("IssueDetailRail host", () => {
+  it("shows the host the issue is running on", () => {
+    renderRail(createQueryClient(), {
+      status: "in-progress",
+      host: { id: "host-1", name: "build-box" },
+    })
+
+    expect(screen.getByText("Host")).toBeVisible()
+    expect(screen.getByRole("link", { name: "build-box" })).toHaveAttribute(
+      "href",
+      "/settings"
+    )
+  })
+
+  it("says the issue is not running when no host holds it", () => {
+    renderRail()
+
+    expect(screen.getByText("Not running")).toBeVisible()
+  })
+
+  it("has no host section for a Spec", () => {
+    renderRail(createQueryClient(), { isSpec: true })
+
+    expect(screen.queryByText("Host")).not.toBeInTheDocument()
+    expect(screen.queryByText("Not running")).not.toBeInTheDocument()
+  })
 })
 
 describe("IssueDetailRail manual Create PR", () => {

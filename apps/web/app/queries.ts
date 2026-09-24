@@ -28,11 +28,13 @@ import {
   toHomeIssue,
   toIssueDetail,
   toIssueEdit,
+  toIssueHost,
   toIssueReviewPolicySnapshot,
   type HomeIssue,
   type AssignedIssueLabel,
   type IssueDetail,
   type IssueEdit,
+  type IssueHost,
   type ProjectOption,
 } from "./query-contracts"
 import type { Attachment } from "./issues/[code]/attachments"
@@ -61,7 +63,7 @@ type AttachmentRow = {
   deleted_at: string | null
 }
 
-export type { HomeIssue, IssueDetail, IssueEdit, ProjectOption }
+export type { HomeIssue, IssueDetail, IssueEdit, IssueHost, ProjectOption }
 
 export type SettingsProject = ProjectOption & {
   setup_script: string | null
@@ -175,7 +177,7 @@ export async function getHomeData(
     supabase
       .from("issues")
       .select(
-        "id,title,status,type,priority,agent_provider,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),projects(id,name,repo,key)"
+        "id,title,status,type,priority,agent_provider,number,created_at,issue_pull_requests(id,url,created_at,state),issue_labels(labels!inner(id,name,color,state)),active_host:hosts(id,display_name),projects(id,name,repo,key)"
       )
       .order("created_at", { ascending: false }),
     labelsService.listLabels(supabase, userId),
@@ -452,6 +454,7 @@ async function getIssueDetailDataForIssue(
     relationCandidates,
     reviewCycles,
     implementationOwner,
+    host,
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -482,6 +485,7 @@ async function getIssueDetailDataForIssue(
     issuesService.listIssueRelationCandidates(supabase, userId, id),
     issuesService.listReviewStateForIssue(supabase, userId, id),
     issuesService.resolveImplementationOwner(supabase, id),
+    getIssueHost(supabase, parsedIssue.active_host_id),
   ])
 
   if (messagesError) {
@@ -540,7 +544,7 @@ async function getIssueDetailDataForIssue(
   )
 
   return {
-    issue: parsedIssue,
+    issue: { ...parsedIssue, host },
     messages: messagesWithAttachments,
     attachments,
     messageAttachments,
@@ -554,6 +558,29 @@ async function getIssueDetailDataForIssue(
     reviewCycles,
     implementationOwner,
   }
+}
+
+// The host an issue is running on, read through the Clerk-scoped client so
+// RLS proves the user owns it. Null whenever no run is in flight.
+async function getIssueHost(
+  supabase: AuthenticatedContext["supabase"],
+  activeHostId: string | null
+) {
+  if (!activeHostId) {
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from("hosts")
+    .select("id,display_name")
+    .eq("id", activeHostId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return toIssueHost(data)
 }
 
 // Historical `labels_changed` snapshots keep a label's name and color even

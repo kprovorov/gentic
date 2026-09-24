@@ -16,6 +16,7 @@ import {
   IconGitPullRequest,
   IconLink,
   IconPlus,
+  IconServer,
   IconTrash,
 } from "@tabler/icons-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
@@ -47,7 +48,7 @@ import {
 } from "@/app/issues/review-state-meta"
 import { getIssueHref } from "@/app/issues/urls"
 import { queryKeys } from "@/app/query-keys"
-import type { IssuePullRequest } from "@/app/queries"
+import type { IssueHost, IssuePullRequest } from "@/app/queries"
 import { Button } from "@gentic/ui/button"
 import { Input } from "@gentic/ui/input"
 import { NativeSelect, NativeSelectOption } from "@gentic/ui/native-select"
@@ -863,6 +864,24 @@ export function RailSection({
   )
 }
 
+// Which host the agent is running on. A host is only attached while a run
+// lease is held, so an empty value means no run is in flight.
+function IssueDetailHost({ host }: { host: IssueHost | null }) {
+  if (!host) {
+    return <p className="text-sm text-muted-foreground">Not running</p>
+  }
+
+  return (
+    <Link
+      href="/settings"
+      className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-sm font-medium hover:text-primary"
+    >
+      <IconServer className="size-4 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 truncate">{host.name}</span>
+    </Link>
+  )
+}
+
 function ReviewRecoverySection({
   issueId,
   reviewCycles,
@@ -893,6 +912,7 @@ export function IssueDetailRail({
   status,
   priority,
   isSpec,
+  host,
   hasUnpublishedAgentChanges,
   automaticPrPublishingInProgress,
   pullRequests,
@@ -911,6 +931,7 @@ export function IssueDetailRail({
   // A Spec is never handed to an agent, so it has no pull requests to show or
   // publish — that whole section is dropped rather than left empty.
   isSpec: boolean
+  host: IssueHost | null
   hasUnpublishedAgentChanges: boolean
   automaticPrPublishingInProgress: boolean
   pullRequests: IssuePullRequest[]
@@ -953,6 +974,12 @@ export function IssueDetailRail({
       <RailSection title="Labels">
         <IssueDetailLabels issueId={issueId} labels={labels} />
       </RailSection>
+
+      {isSpec ? null : (
+        <RailSection title="Host">
+          <IssueDetailHost host={host} />
+        </RailSection>
+      )}
 
       {isSpec ? null : (
         <RailSection title="Pull requests">
