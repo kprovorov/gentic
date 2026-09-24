@@ -87,6 +87,7 @@ export default function CaptureView() {
                           status={reviewIssue.status}
                           priority={reviewIssue.priority}
                           isSpec={false}
+                          host={reviewIssue.host}
                           hasUnpublishedAgentChanges={false}
                         />
                       </aside>

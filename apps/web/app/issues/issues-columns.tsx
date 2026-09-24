@@ -15,13 +15,14 @@ import {
   IconLock,
   IconMessage2,
   IconMinus,
+  IconServer,
   IconSparkles,
   IconTrendingDown,
   IconTrendingUp,
   type IconProps,
 } from "@tabler/icons-react"
 
-import type { HomeIssue } from "@/app/queries"
+import type { HomeIssue, IssueHost } from "@/app/queries"
 import { getIssueHref } from "@/app/issues/urls"
 import { pullRequestStateMeta } from "@/app/issues/pull-request-state-meta"
 import { AgentProviderIcon, BrandIcon } from "@/components/agent-provider-icon"
@@ -120,6 +121,32 @@ export function AgentProviderBadge({ provider }: { provider: AgentProvider }) {
       <AgentProviderIcon provider={provider} className="size-3.5" />
       <span className="whitespace-nowrap">{agentProviderLabels[provider]}</span>
     </span>
+  )
+}
+
+// Where the issue's agent is running right now. Rendered only while a run
+// holds a host, so its absence reads as "not running" rather than "unknown".
+export function HostBadge({
+  host,
+  className,
+}: {
+  host: IssueHost
+  className?: string
+}) {
+  return (
+    <Link
+      href="/settings"
+      aria-label={`Running on host ${host.name}`}
+      className={cn(
+        issueBadgeClassName,
+        interactiveIssueBadgeClassName,
+        "max-w-full hover:text-primary",
+        className
+      )}
+    >
+      <IconServer className="size-3.5 shrink-0" />
+      <span className="min-w-0 truncate">{host.name}</span>
+    </Link>
   )
 }
 
@@ -578,6 +605,13 @@ export function getIssuesColumns(
       cell: ({ row }) => (
         <AgentProviderBadge provider={row.original.agent_provider} />
       ),
+    },
+    {
+      id: "host",
+      accessorFn: (issue) => issue.host?.name ?? "",
+      header: ({ column }) => <SortableHeader label="Host" column={column} />,
+      cell: ({ row }) =>
+        row.original.host ? <HostBadge host={row.original.host} /> : null,
     },
     {
       id: "project",

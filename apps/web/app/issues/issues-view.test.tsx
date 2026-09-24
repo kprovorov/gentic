@@ -84,6 +84,7 @@ function issue(
     agent_provider: "claude_code",
     created_at: "2026-07-01T00:00:00.000Z",
     pullRequests: [],
+    host: null,
     projects: project,
     ...overrides,
     labels: overrides.labels ?? [],
@@ -432,6 +433,43 @@ describe("IssuesView pull request links", () => {
     if (hasColumn) {
       expect(
         screen.getByRole("columnheader", { name: "Pull requests" })
+      ).toBeInTheDocument()
+    }
+  })
+})
+
+describe("IssuesView host", () => {
+  const host = { id: "host-1", name: "build-box" }
+
+  it.each([
+    ["list", false],
+    ["table", true],
+  ] as const)("shows the running host in %s view", (view, hasColumn) => {
+    renderIssuesView({
+      view,
+      data: baseData([
+        issue({
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Running issue",
+          status: "in-progress",
+          host,
+        }),
+        issue({
+          id: "22222222-2222-4222-8222-222222222222",
+          title: "Idle issue",
+        }),
+      ]),
+    })
+
+    const badges = screen.getAllByRole("link", {
+      name: "Running on host build-box",
+    })
+    expect(badges).toHaveLength(1)
+    expect(badges[0]).toHaveAttribute("href", "/settings")
+
+    if (hasColumn) {
+      expect(
+        screen.getByRole("columnheader", { name: "Host" })
       ).toBeInTheDocument()
     }
   })

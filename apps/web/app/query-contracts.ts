@@ -31,6 +31,15 @@ const issueLabelJoinSchema = z.object({
   labels: assignedIssueLabelSchema.extend({ state: z.string() }),
 })
 
+// The host currently running the issue's agent. `issues.active_host_id` is
+// only ever set while a run lease is held (see the
+// `issues_active_worker_requires_active_run` check), so a non-null host means
+// "running there right now", never "last ran there".
+export const issueHostSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+})
+
 export const homeIssueSchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
@@ -49,6 +58,7 @@ export const homeIssueSchema = z.object({
     })
   ),
   issue_labels: z.array(issueLabelJoinSchema),
+  active_host: issueHostSchema.nullable(),
   projects: projectOptionSchema.nullable(),
 })
 
@@ -86,6 +96,7 @@ export const issueDetailSchema = z.object({
   priority: issuePrioritySchema,
   status: issueStatusSchema,
   active_run_id: z.string().nullable(),
+  active_host_id: z.string().nullable(),
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   has_unpublished_agent_changes: z.boolean(),
@@ -101,6 +112,11 @@ export type ProjectOption = {
   name: string
   repo: string
   key: string
+}
+
+export type IssueHost = {
+  id: string
+  name: string
 }
 
 export type HomeIssue = {
@@ -119,6 +135,7 @@ export type HomeIssue = {
     state?: GithubPullRequestState
   }[]
   labels: AssignedIssueLabel[]
+  host: IssueHost | null
   projects: ProjectOption | null
 }
 
@@ -136,6 +153,7 @@ export type IssueDetail = {
   priority: IssuePriority
   status: IssueStatus
   active_run_id: string | null
+  active_host_id: string | null
   usage_limit_reset_at: string | null
   run_started_at: string | null
   has_unpublished_agent_changes: boolean
@@ -143,6 +161,7 @@ export type IssueDetail = {
   created_at: string
   updated_at: string
   labels: AssignedIssueLabel[]
+  host: IssueHost | null
   projects: ProjectOption | null
 }
 
@@ -231,6 +250,12 @@ function normalizePersistedPullRequestState(
     : undefined
 }
 
+export function toIssueHost(
+  host: { id: string; display_name: string } | null
+): IssueHost | null {
+  return host ? { id: host.id, name: host.display_name } : null
+}
+
 export function toProjectOption(project: ProjectOption | null) {
   return project
     ? {
@@ -267,6 +292,7 @@ export function toHomeIssue(issue: HomeIssueRow): HomeIssue {
       .toSorted((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       ),
+    host: toIssueHost(issue.active_host),
     projects: toProjectOption(issue.projects),
   }
 }
@@ -284,6 +310,7 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     priority: issue.priority,
     status: issue.status,
     active_run_id: issue.active_run_id,
+    active_host_id: issue.active_host_id,
     usage_limit_reset_at: issue.usage_limit_reset_at,
     run_started_at: issue.run_started_at,
     has_unpublished_agent_changes: issue.has_unpublished_agent_changes,
@@ -293,6 +320,9 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     labels: issue.labels.toSorted((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     ),
+    // The service row only carries the id; `getIssueDetailDataForIssue`
+    // resolves it to the host's name once the rest of the detail data loads.
+    host: null,
     projects: toProjectOption(issue.projects),
   }
 }
