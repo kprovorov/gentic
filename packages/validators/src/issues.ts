@@ -157,6 +157,9 @@ export const createIssueSchema = z.object({
   // classified in the background after the issue is saved, so it defaults
   // to the "issue" placeholder until then.
   type: issueTypeSchema.default("issue"),
+  // Pins the issue to one host: only that host may claim it. Null keeps the
+  // shared queue, where any eligible host may claim it.
+  pinned_host_id: z.string().uuid().nullable().default(null),
   label_ids: z
     .array(z.string().uuid())
     .default([])
@@ -187,6 +190,8 @@ export const updateIssueSchema = z.object({
   // mutable before the Issue's first pull request is associated — enforced by
   // a DB trigger, see `enforce_issue_review_override_immutable`.
   automatic_review_enabled: z.boolean().nullable().optional(),
+  // Null unpins the issue; undefined leaves the current pin untouched.
+  pinned_host_id: z.string().uuid().nullable().optional(),
 })
 
 export type UpdateIssueValues = z.infer<typeof updateIssueSchema>

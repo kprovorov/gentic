@@ -52,6 +52,51 @@ test("issue priority defaults to medium on create and update validators", () => 
   assert.equal(updateValues.priority, "medium")
 })
 
+test("createIssueSchema defaults the pinned host to null and validates a uuid", () => {
+  const unpinned = createIssueSchema.parse({
+    project_id: projectId,
+    status: "draft",
+  })
+  const pinned = createIssueSchema.parse({
+    project_id: projectId,
+    status: "draft",
+    pinned_host_id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c7",
+  })
+
+  assert.equal(unpinned.pinned_host_id, null)
+  assert.equal(pinned.pinned_host_id, "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c7")
+  assert.throws(() =>
+    createIssueSchema.parse({
+      project_id: projectId,
+      status: "draft",
+      pinned_host_id: "not-a-host",
+    })
+  )
+})
+
+test("updateIssueSchema distinguishes unpinning from leaving the pin alone", () => {
+  const base = {
+    id: issueId,
+    title: "Refine issue workflow",
+    agent_provider: "claude_code",
+    issue_model: null,
+    type: "feature",
+  }
+
+  assert.equal(updateIssueSchema.parse(base).pinned_host_id, undefined)
+  assert.equal(
+    updateIssueSchema.parse({ ...base, pinned_host_id: null }).pinned_host_id,
+    null
+  )
+  assert.equal(
+    updateIssueSchema.parse({
+      ...base,
+      pinned_host_id: "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c7",
+    }).pinned_host_id,
+    "7f14e45f-ceea-467e-b7ea-05a3e2b3f4c7"
+  )
+})
+
 test("createIssueSchema preserves explicit automatic PR opt-in", () => {
   const createValues = createIssueSchema.parse({
     project_id: projectId,

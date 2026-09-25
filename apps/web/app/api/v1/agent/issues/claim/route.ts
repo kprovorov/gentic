@@ -27,6 +27,13 @@ function eligibleIssueFilter(now: string): string {
   return `status.eq.todo,and(status.eq.held,usage_limit_reset_at.lte.${now})`
 }
 
+// An issue pinned to a host is claimable by that host alone; an unpinned one
+// stays in the shared queue. Applied as its own `or` group, which PostgREST
+// ANDs with the eligibility group above.
+function pinnedHostFilter(hostId: string): string {
+  return `pinned_host_id.is.null,pinned_host_id.eq.${hostId}`
+}
+
 export async function POST(request: Request) {
   try {
     const { supabase, userId, hostId } = await getAgentContext(request)
@@ -68,6 +75,7 @@ export async function claimNextQueuedIssue(
     .from("issues")
     .select(CLAIM_ISSUE_SELECT)
     .or(eligibleIssueFilter(now))
+    .or(pinnedHostFilter(hostId))
     .eq("projects.user_id", userId)
     // A Spec documents intent rather than requesting work, so it is never
     // agent work no matter what status it carries.
@@ -109,6 +117,7 @@ export async function claimNextQueuedIssue(
     })
     .eq("id", id)
     .or(eligibleIssueFilter(now))
+    .or(pinnedHostFilter(hostId))
     .neq("type", "spec")
     .in("agent_provider", eligibleProviders)
     .is("active_run_id", null)

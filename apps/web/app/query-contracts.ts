@@ -81,6 +81,7 @@ export const issueEditSchema = z.object({
   create_pr_automatically: z.boolean(),
   // Null inherits the Project's Automatic Review default.
   automatic_review_enabled: z.boolean().nullable(),
+  pinned_host_id: z.string().nullable(),
   issue_pull_requests: z.array(z.object({ id: z.string() })).optional(),
   projects: projectOptionSchema.merge(projectAutomaticReviewSchema).nullable(),
 })
@@ -97,6 +98,9 @@ export const issueDetailSchema = z.object({
   status: issueStatusSchema,
   active_run_id: z.string().nullable(),
   active_host_id: z.string().nullable(),
+  // The host the issue is pinned to, if any — a standing preference, unlike
+  // the transient `active_host_id` lease.
+  pinned_host_id: z.string().nullable(),
   usage_limit_reset_at: z.string().nullable(),
   run_started_at: z.string().nullable(),
   has_unpublished_agent_changes: z.boolean(),
@@ -154,6 +158,7 @@ export type IssueDetail = {
   status: IssueStatus
   active_run_id: string | null
   active_host_id: string | null
+  pinned_host_id: string | null
   usage_limit_reset_at: string | null
   run_started_at: string | null
   has_unpublished_agent_changes: boolean
@@ -162,6 +167,7 @@ export type IssueDetail = {
   updated_at: string
   labels: AssignedIssueLabel[]
   host: IssueHost | null
+  pinnedHost: IssueHost | null
   projects: ProjectOption | null
 }
 
@@ -192,6 +198,7 @@ export type IssueEdit = Pick<
   | "type"
   | "priority"
   | "create_pr_automatically"
+  | "pinned_host_id"
   | "projects"
 > & {
   has_attached_pull_request: boolean
@@ -311,6 +318,7 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     status: issue.status,
     active_run_id: issue.active_run_id,
     active_host_id: issue.active_host_id,
+    pinned_host_id: issue.pinned_host_id,
     usage_limit_reset_at: issue.usage_limit_reset_at,
     run_started_at: issue.run_started_at,
     has_unpublished_agent_changes: issue.has_unpublished_agent_changes,
@@ -320,9 +328,10 @@ export function toIssueDetail(issue: IssueDetailRow): IssueDetail {
     labels: issue.labels.toSorted((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     ),
-    // The service row only carries the id; `getIssueDetailDataForIssue`
-    // resolves it to the host's name once the rest of the detail data loads.
+    // The service row only carries the ids; `getIssueDetailDataForIssue`
+    // resolves them to host names once the rest of the detail data loads.
     host: null,
+    pinnedHost: null,
     projects: toProjectOption(issue.projects),
   }
 }
@@ -343,6 +352,7 @@ export function toIssueEdit(
     priority: issue.priority,
     create_pr_automatically: issue.create_pr_automatically,
     automatic_review_enabled: issue.automatic_review_enabled,
+    pinned_host_id: issue.pinned_host_id,
     has_attached_pull_request: hasAttachedIssuePullRequest(issue),
     projects: toProjectOption(issue.projects),
     project_automatic_review: issue.projects

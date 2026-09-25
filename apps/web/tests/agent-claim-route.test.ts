@@ -27,6 +27,7 @@ type FakeIssue = {
   usage_limit_reset_at: string | null
   active_run_id: string | null
   active_host_id: string | null
+  pinned_host_id: string | null
   run_started_at: string | null
   run_error: string | null
   run_finished_at: string | null
@@ -138,6 +139,7 @@ class FakeIssuesQuery {
     activeHostIds?: string[]
     activeRunIdIsNull?: boolean
     excludedType?: string
+    claimingHostId?: string
   } = {}
   private updateValues: Partial<FakeIssue> | null = null
   private limitCount: number | null = null
@@ -154,6 +156,14 @@ class FakeIssuesQuery {
   }
 
   or(filter: string) {
+    const pinMatch = filter.match(
+      /^pinned_host_id\.is\.null,pinned_host_id\.eq\.(.+)$/
+    )
+    if (pinMatch) {
+      this.filters.claimingHostId = pinMatch[1]
+      return this
+    }
+
     const match = filter.match(/usage_limit_reset_at\.lte\.(.+)\)$/)
     if (!filter.startsWith("status.eq.todo,and(status.eq.held,") || !match) {
       throw new Error(`Unexpected issue eligibility filter: ${filter}`)
@@ -276,6 +286,13 @@ class FakeIssuesQuery {
         return false
       }
       if (this.filters.excludedType === issue.type) {
+        return false
+      }
+      if (
+        this.filters.claimingHostId &&
+        issue.pinned_host_id !== null &&
+        issue.pinned_host_id !== this.filters.claimingHostId
+      ) {
         return false
       }
       if (
@@ -422,6 +439,7 @@ function issue(
     usage_limit_reset_at: null,
     active_run_id: null,
     active_host_id: null,
+    pinned_host_id: null,
     run_started_at: null,
     run_error: "previous error",
     run_finished_at: "2026-07-01T00:01:00.000Z",
@@ -706,6 +724,98 @@ test("claim routes a shared queue by the authenticated host's provider readiness
       ?.active_host_id,
     claudeHostId
   )
+})
+
+test("claim hands a pinned issue only to the host it is pinned to", async () => {
+  const supabase = new FakeSupabase(
+    [],
+    [
+      issue({
+        id: "pinned-urgent",
+        priority: "urgent",
+        pinned_host_id: claudeHostId,
+        agent_provider: "codex",
+      }),
+      issue({ id: "shared-low", priority: "low" }),
+    ],
+    [
+      host(),
+      host({
+        id: claudeHostId,
+        provider_capabilities: {
+          providers: {
+            codex: {
+              enabled: true,
+              available: true,
+              authenticated: true,
+              version: "1.0.0",
+            },
+          },
+        },
+      }),
+    ]
+  )
+
+  // The unpinned host skips the higher-priority pinned issue and takes the
+  // shared one; the pinned host then finds its own issue still waiting.
+  const otherClaim = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    hostId
+  )
+  assert.equal(otherClaim?.id, "shared-low")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "pinned-urgent")?.status,
+    "todo"
+  )
+
+  const pinnedClaim = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    claudeHostId
+  )
+  assert.equal(pinnedClaim?.id, "pinned-urgent")
+  assert.equal(
+    supabase.issues.find((entry) => entry.id === "pinned-urgent")
+      ?.active_host_id,
+    claudeHostId
+  )
+})
+
+test("claim leaves a pinned issue waiting when only other hosts poll", async () => {
+  const supabase = new FakeSupabase(
+    [],
+    [issue({ id: "pinned-elsewhere", pinned_host_id: "host-away" })]
+  )
+
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    hostId
+  )
+
+  assert.equal(claimed, null)
+  assert.equal(supabase.issues[0]?.status, "todo")
+  assert.equal(supabase.issues[0]?.active_host_id, null)
+})
+
+test("claim also re-checks the pin in the atomic update", async () => {
+  const supabase = new FakeSupabase([], [issue({ id: "repinned" })])
+  // Simulates the issue being pinned to another host between the candidate
+  // read and the compare-and-swap, which must then find nothing to claim.
+  supabase.beforeIssueUpdate = () => {
+    supabase.issues[0]!.pinned_host_id = "host-away"
+  }
+
+  const claimed = await claimNextQueuedIssue(
+    supabase as never,
+    "user-1",
+    hostId
+  )
+
+  assert.equal(claimed, null)
+  assert.equal(supabase.issues[0]?.status, "todo")
+  assert.equal(supabase.issues[0]?.active_run_id, null)
 })
 
 test("claim derives capacity from active issue assignments", async () => {

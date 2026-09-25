@@ -53,6 +53,7 @@ import {
   interactiveIssueBadgeClassName,
   issueBadgeClassName,
 } from "./issue-badge-styles"
+import { IssueHostPicker } from "./issue-host-picker"
 import { IssueLabelChip } from "./issue-label-chip"
 import { IssueLabelsPicker } from "./issue-labels-field"
 import {
@@ -265,6 +266,9 @@ export function IssueCreateForm({
   const [priority, setPriority] = useState<IssuePriority>(defaultIssuePriority)
   const [projectId, setProjectId] = useState("")
   const [labelIds, setLabelIds] = useState<string[]>([])
+  // Deliberately not persisted with the other settings: hosts come and go,
+  // and a sticky pin would quietly route every later issue to one machine.
+  const [pinnedHostId, setPinnedHostId] = useState<string | null>(null)
   const [createPrAutomatically, setCreatePrAutomatically] = useState(true)
   const [prSettingsVersion, setPrSettingsVersion] = useState(0)
   const [projectError, setProjectError] = useState("")
@@ -499,6 +503,7 @@ export function IssueCreateForm({
       <input type="hidden" name="priority" value={priority} />
       <input type="hidden" name="agent_provider" value={agentProvider} />
       <input type="hidden" name="issue_model" value={issueModel ?? ""} />
+      <input type="hidden" name="pinned_host_id" value={pinnedHostId ?? ""} />
       <input
         type="hidden"
         name="create_pr_automatically"
@@ -599,6 +604,12 @@ export function IssueCreateForm({
                 setIssueModel(model)
                 persistSettings({ agentProvider: provider, issueModel: model })
               }}
+              className={metaControlClassName}
+            />
+
+            <IssueHostPicker
+              pinnedHostId={pinnedHostId}
+              onPinnedHostChange={setPinnedHostId}
               className={metaControlClassName}
             />
 

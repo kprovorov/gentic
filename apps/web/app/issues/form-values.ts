@@ -34,6 +34,7 @@ export function parseCreateIssueFormData(formData: FormData) {
     agent_provider: getString(formData, "agent_provider") || "claude_code",
     issue_model: getString(formData, "issue_model") || null,
     priority: getString(formData, "priority") || undefined,
+    pinned_host_id: getString(formData, "pinned_host_id") || null,
     label_ids: formData.getAll("label_id").map(String),
   })
 }
@@ -54,6 +55,11 @@ export function parseUpdateIssueFormData(formData: FormData) {
     // — a locked form omits the field entirely, which `has` distinguishes.
     automatic_review_enabled: formData.has("automatic_review_enabled")
       ? getString(formData, "automatic_review_enabled")
+      : undefined,
+    // Same shape: "" means "unpin" (null), a missing field leaves the pin
+    // alone (undefined).
+    pinned_host_id: formData.has("pinned_host_id")
+      ? getString(formData, "pinned_host_id") || null
       : undefined,
   })
 }

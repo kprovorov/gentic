@@ -796,6 +796,7 @@ test("create_issue defaults priority to medium without changing other defaults",
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    pinned_host_id: null,
     label_ids: [],
   })
   assert.deepEqual(result, { issue: { id: issueId, priority: "medium" } })
@@ -832,6 +833,7 @@ test("create_issue passes deduped label_ids through to the issue service", async
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    pinned_host_id: null,
     label_ids: [labelId],
   })
 })
@@ -866,6 +868,7 @@ test("create_issue lets callers opt out of automatic PR creation", async () => {
     agent_provider: "claude_code",
     issue_model: null,
     type: "feature",
+    pinned_host_id: null,
     label_ids: [],
   })
 })

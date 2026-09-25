@@ -200,6 +200,7 @@ test("creating a spec directly in todo skips the run-opening RPC", async () => {
     create_pr_automatically: false,
     agent_provider: "claude_code",
     issue_model: null,
+    pinned_host_id: null,
     label_ids: [],
   })
 
